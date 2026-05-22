@@ -31,6 +31,10 @@ DEFAULT_FILTER_CONCURRENCY = 4
 MAX_FILTER_RETRIES = 3
 
 
+class FilterOutputTruncatedError(ValueError):
+    """LLM 输出被截断时触发，优先拆小批次而不是重复请求同一批。"""
+
+
 def log(message: str) -> None:
     ts = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
     print(f"[{ts}] {message}", flush=True)
@@ -440,7 +444,10 @@ def call_filter(
         if resp.get("refusal"):
             raise ValueError(f"structured output refusal: {resp.get('refusal')}")
         if resp.get("finish_reason") not in (None, "stop"):
-            raise ValueError(f"unexpected finish_reason: {resp.get('finish_reason')}")
+            msg = f"unexpected finish_reason: {resp.get('finish_reason')}"
+            if resp.get("finish_reason") == "length":
+                raise FilterOutputTruncatedError(msg)
+            raise ValueError(msg)
         if resp.get("parse_error") is not None:
             raise resp["parse_error"]
         payload = resp.get("parsed")
@@ -574,6 +581,8 @@ def recover_filter_results(
         except Exception as exc:
             last_error = exc
             log(f"[WARN] filter {debug_tag} attempt {attempt}/{max_attempts} invalid: {exc}")
+            if isinstance(exc, FilterOutputTruncatedError) and len(batch_docs) > 1:
+                break
 
     if len(batch_docs) == 1:
         raise ValueError(f"{debug_tag} failed after {max_attempts} attempts: {last_error}")
@@ -912,8 +921,8 @@ def main() -> None:
     parser.add_argument(
         "--max-output-tokens",
         type=int,
-        default=4096,
-        help="max tokens for model output (clamped to 4096 in llm.py).",
+        default=8192,
+        help="max tokens for model output.",
     )
     parser.add_argument(
         "--filter-concurrency",
