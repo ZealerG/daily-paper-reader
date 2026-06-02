@@ -6,74 +6,73 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-05-04 ~ 2026-06-02
-- 运行时间：2026-06-02 12:50:35 UTC
+- 最新运行日期：2026-06-02
+- 运行时间：2026-06-02 22:55:41 UTC
 - 运行状态：成功
-- 本次总论文数：18
-- 精读区：7
+- 本次总论文数：17
+- 精读区：6
 - 速读区：11
 
 ### 今日简报（AI）
-今日精读7篇速读11篇，聚焦图划分公平性改进与多智能体强化学习分散式探索。最值得看的是图划分公平性综述（10.0分）与多智能体扩散策略学习（9.0分），均为各自领域的最新突破。建议优先研读这两篇精读文章，并配合速读中的异构图信息瓶颈协调与图组合优化投影方法，形成系统认知。
-- 详情：[/20260504-20260602/README](/20260504-20260602/README)
+今日日报精选17篇强化学习与多智能体前沿，两篇9分高光聚焦方差自适应算法与凝聚力感知任务分配。  
+最值得精读的方向：多类Logit函数近似下的RL最优性，以及多智能体编码中基于凝聚力的并行划分。  
+建议优先精读这两篇满分论文，速读可关注策略梯度中重试涌现探索与拓扑状态抽象。
+- 详情：[/202606/02/README](/202606/02/README)
 
 ### 精读区论文标签
-1. [Some Improved Results on Fair and Balanced Graph Partitions](/20260504-20260602/2605.03238v1-some-improved-results-on-fair-and-balanced-graph-partitions)  
-   标签：评分：10.0/10、query:graph-part
-   evidence：直接研究公平平衡图划分
-2. [Decentralized Diffusion Policy Learning for Enhanced Exploration in Cooperative Multi-agent Reinforcement Learning](/20260504-20260602/2605.07101v1-decentralized-diffusion-policy-learning-for-enhanced-exploration-in-cooperative-multi-agent-reinforcement-learning)  
+1. [Variance-Adaptive Optimal Algorithm for Reinforcement Learning with Multinomial Logit Function Approximation](/202606/02/2605.28364v1-variance-adaptive-optimal-algorithm-for-reinforcement-learning-with-multinomial-logit-function-approximation)  
    标签：评分：9.0/10、query:graph-part
-   evidence：用于合作多智能体强化学习的分散式扩散策略学习
-3. [Rethinking Ratio-Based Trust Regions for Policy Optimization in Multi-Agent Reinforcement Learning](/20260504-20260602/2605.09212v1-rethinking-ratio-based-trust-regions-for-policy-optimization-in-multi-agent-reinforcement-learning)  
+   evidence：直接针对强化学习算法并提供理论分析
+2. [When Parallelism Pays Off: Cohesion-Aware Task Partitioning for Multi-Agent Coding](/202606/02/2606.00953v1-when-parallelism-pays-off-cohesion-aware-task-partitioning-for-multi-agent-coding)  
    标签：评分：9.0/10、query:graph-part
-   evidence：多智能体策略优化信任区域
-4. [Submodular Multi-Agent Policy Learning for Online Distributed Task Allocation in Open Multi-Agent Systems](/20260504-20260602/2605.13269v1-submodular-multi-agent-policy-learning-for-online-distributed-task-allocation-in-open-multi-agent-systems)  
+   evidence：将多智能体编排建模为图划分问题
+3. [Adversarial Configurations for the ReCom Transition Function](/202606/02/2606.01333v1-adversarial-configurations-for-the-recom-transition-function)  
    标签：评分：9.0/10、query:graph-part
-   evidence：多智能体强化学习用于在线分布式任务分配，利用子模效用
-5. [Distributionally Robust Multi-Task Reinforcement Learning via Adaptive Task Sampling](/20260504-20260602/2605.14350v1-distributionally-robust-multi-task-reinforcement-learning-via-adaptive-task-sampling)  
+   evidence：通过MCMC进行图划分，直接解决平衡图划分采样
+4. [Coordination Graphs for Constrained Multi-Agent Reinforcement Learning](/202606/02/2606.02337v1-coordination-graphs-for-constrained-multi-agent-reinforcement-learning)  
    标签：评分：9.0/10、query:graph-part
-   evidence：多任务强化学习算法，解决数据分配不平衡问题
-6. [Leveraging Deep Reinforcement Learning for Clustered Cell-Free Networking Over User Mobility](/20260504-20260602/2605.17266v1-leveraging-deep-reinforcement-learning-for-clustered-cell-free-networking-over-user-mobility)  
-   标签：评分：9.0/10、query:graph-part
-   evidence：深度强化学习应用于图分割，聚类无蜂窝网络，用户移动性
-7. [Learning Fill-in Reduction Ordering via Graph Policy Optimization for Sparse Matrices](/20260504-20260602/2605.17362v1-learning-fill-in-reduction-ordering-via-graph-policy-optimization-for-sparse-matrices)  
-   标签：评分：9.0/10、query:graph-part
-   evidence：强化学习用于图填充减少排序
+   evidence：约束多智能体强化学习的协调图
+5. [Ratio-Variance Regularized Policy Optimization](/202606/02/2605.26784v1-ratio-variance-regularized-policy-optimization)  
+   标签：评分：8.0/10、query:graph-part
+   evidence：强化学习策略优化算法
+6. [Optimal Data Acquisition for Reinforcement Learning: A Large Deviations Perspective](/202606/02/2605.28675v1-optimal-data-acquisition-for-reinforcement-learning-a-large-deviations-perspective)  
+   标签：评分：8.0/10、query:graph-part
+   evidence：强化学习数据获取理论
 
 ### 速读区论文标签
-1. [Heterogeneous Information-Bottleneck Coordination Graphs for Multi-Agent Reinforcement Learning](/20260504-20260602/2605.17393v1-heterogeneous-information-bottleneck-coordination-graphs-for-multi-agent-reinforcement-learning)  
+1. [Emergence of Exploration in Policy Gradient Reinforcement Learning via Retrying](/202606/02/2606.00151v1-emergence-of-exploration-in-policy-gradient-reinforcement-learning-via-retrying)  
    标签：评分：8.0/10、query:graph-part
-   evidence：多智能体强化学习中的协调图学习
-2. [Projecting Latent RL Actions: Towards Generalizable and Scalable Graph Combinatorial Optimization](/20260504-20260602/2605.19721v1-projecting-latent-rl-actions-towards-generalizable-and-scalable-graph-combinatorial-optimization)  
+   evidence：通过重试机制实现策略梯度强化学习中的探索
+2. [Topology-Aware State Abstraction with Tangle Cores for Markov Decision Processes](/202606/02/2606.00427v1-topology-aware-state-abstraction-with-tangle-cores-for-markov-decision-processes)  
    标签：评分：8.0/10、query:graph-part
-   evidence：将深度强化学习应用于图组合优化问题，涵盖图分区
-3. [Neural Acceleration for Graph Partitioning](/20260504-20260602/2605.21519v1-neural-acceleration-for-graph-partitioning)  
+   evidence：基于图缠结的重叠状态抽象用于强化学习
+3. [Decoupled Behavioral Cloning for Scalable Inductive Generalization in RL from Specifications](/202606/02/2606.00838v1-decoupled-behavioral-cloning-for-scalable-inductive-generalization-in-rl-from-specifications)  
    标签：评分：8.0/10、query:graph-part
-   evidence：使用神经网络加速图分区
-4. [Multivariate Distributional Reinforcement Learning Using Sliced Divergences](/20260504-20260602/2605.31222v1-multivariate-distributional-reinforcement-learning-using-sliced-divergences)  
-   标签：评分：8.0/10、query:graph-part
-   evidence：多元回报分布强化学习算法
-5. [Hierarchical Support Vector State Partitioning for Distilling Black Box Reinforcement Learning Policies](/20260504-20260602/2605.04254v1-hierarchical-support-vector-state-partitioning-for-distilling-black-box-reinforcement-learning-policies)  
+   evidence：提出DIBS算法，通过解耦行为克隆实现RL的归纳泛化
+4. [SeqRoute: Global Budget-Aware Sequential LLM Routing via Offline Reinforcement Learning](/202606/02/2605.25424v1-seqroute-global-budget-aware-sequential-llm-routing-via-offline-reinforcement-learning)  
    标签：评分：7.0/10、query:graph-part
-   evidence：使用支持向量机进行状态空间划分的强化学习策略蒸馏方法
-6. [Coordination Matters: Evaluation of Cooperative Multi-Agent Reinforcement Learning](/20260504-20260602/2605.06557v1-coordination-matters-evaluation-of-cooperative-multi-agent-reinforcement-learning)  
+   evidence：离线强化学习用于顺序LLM路由
+5. [Explicit Critic Guidance for Aligning Diffusion Models](/202606/02/2605.27736v1-explicit-critic-guidance-for-aligning-diffusion-models)  
    标签：评分：7.0/10、query:graph-part
-   evidence：协作多智能体强化学习的评估，协调感知诊断
-7. [Recursive Agent Optimization](/20260504-20260602/2605.06639v1-recursive-agent-optimization)  
+   evidence：在线强化学习用于扩散模型对齐
+6. [Theoretical Foundations and Effective Algorithms for Policy-Aware Simulator Learning](/202606/02/2605.29032v1-theoretical-foundations-and-effective-algorithms-for-policy-aware-simulator-learning)  
    标签：评分：7.0/10、query:graph-part
-   evidence：用于并行子任务委托的递归智能体，通过分治扩展
-8. [A Single Deep Preference-Conditioned Policy for Learning Pareto Coverage Sets](/20260504-20260602/2605.08946v1-a-single-deep-preference-conditioned-policy-for-learning-pareto-coverage-sets)  
+   evidence：基于模型的强化学习中的对抗策略模拟器学习
+7. [Skill Reuse as Compression in Agentic RL](/202606/02/2605.31509v1-skill-reuse-as-compression-in-agentic-rl)  
    标签：评分：7.0/10、query:graph-part
-   evidence：多目标优化的强化学习算法
-9. [Hidden Coalitions in Multi-Agent AI: A Spectral Diagnostic from Internal Representations](/20260504-20260602/2605.06696v1-hidden-coalitions-in-multi-agent-ai-a-spectral-diagnostic-from-internal-representations)  
+   evidence：面向LLM智能体的强化学习与技能重用
+8. [Agentic Transformers Provably Learn to Search via Reinforcement Learning](/202606/02/2606.00183v1-agentic-transformers-provably-learn-to-search-via-reinforcement-learning)  
+   标签：评分：7.0/10、query:graph-part
+   evidence：强化学习训练动力学使transformer学会搜索
+9. [Joint Optimization of Training and Inference in Federated Edge Learning via Constrained Multi-Objective Deep Reinforcement Learning](/202606/02/2605.25916v1-joint-optimization-of-training-and-inference-in-federated-edge-learning-via-constrained-multi-objective-deep-reinforcement-learning)  
    标签：评分：6.0/10、query:graph-part
-   evidence：谱分割方法用于多智能体系统
-10. [Reinforcement Learning for Scalable and Trustworthy Intelligent Systems](/20260504-20260602/2605.08378v1-reinforcement-learning-for-scalable-and-trustworthy-intelligent-systems)  
+   evidence：深度强化学习用于联邦边缘学习的联合优化
+10. [Efficient On-policy Visual-RL via Stochastic Decoupled Policy Gradient](/202606/02/2605.26478v1-efficient-on-policy-visual-rl-via-stochastic-decoupled-policy-gradient)  
    标签：评分：6.0/10、query:graph-part
-   evidence：分布式环境中的可扩展强化学习，联邦优化，多智能体并行决策
-11. [Learning Minimally Rigid Graphs with High Realization Counts](/20260504-20260602/2605.12427v1-learning-minimally-rigid-graphs-with-high-realization-counts)  
+   evidence：通过解耦策略梯度的高效在线视觉强化学习
+11. [Beyond Trajectory-Level Attribution: Graph-Based Credit Assignment for Agentic Reinforcement Learning](/202606/02/2605.26684v1-beyond-trajectory-level-attribution-graph-based-credit-assignment-for-agentic-reinforcement-learning)  
    标签：评分：6.0/10、query:graph-part
-   evidence：使用强化学习构造具有高实现数的最小刚性图
+   evidence：使用图结构进行信用分配的强化学习算法
 
 
 <div class="dpr-home-promo-card">

@@ -1,0 +1,685 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-02T22:39:36.253368+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 9,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 25,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2605.28364v1",
+      "source": "arxiv",
+      "title": "Variance-Adaptive Optimal Algorithm for Reinforcement Learning with Multinomial Logit Function Approximation",
+      "abstract": "Reinforcement learning with multinomial logistic (MNL) function approximation has become an important framework due to its flexibility and broad applicability. While existing studies have established regret guarantees under worst-case analysis, they do not capture how performance depends on the variability of the interaction between the learner and the environment. In this paper, we develop a new theoretical analysis for MNL-based Markov decision processes that yields explicit variance-adaptive regret bounds. Our algorithm is computationally efficient and achieves the instance-wise optimal rate of regret, narrowing the gap between upper and lower bounds. Our numerical experiments validate that our method learns optimal policies more efficiently than conventional approaches.",
+      "authors": [
+        "Wonyoung Kim",
+        "Min-Hwan Oh",
+        "Garud Iyengar",
+        "Assaf Zeevi"
+      ],
+      "primary_category": "stat.ML",
+      "categories": [
+        "stat.ML",
+        "cs.LG"
+      ],
+      "published": "2026-05-27T11:59:26+00:00",
+      "link": "https://arxiv.org/pdf/2605.28364v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "direct RL algorithm with theoretical analysis",
+      "llm_evidence_cn": "直接针对强化学习算法并提供理论分析",
+      "llm_evidence": "直接针对强化学习算法并提供理论分析",
+      "canonical_evidence": "直接针对强化学习算法并提供理论分析",
+      "llm_tldr_en": "Proposes a variance-adaptive optimal algorithm for RL with multinomial logit function approximation, achieving instance-wise optimal regret bounds.",
+      "llm_tldr_cn": "针对多项逻辑函数逼近下的强化学习，现有方法缺乏对交互方差的自适应。本文提出一种方差自适应最优算法，在MDP框架下导出显式方差自适应遗憾界，计算高效且达到实例最优遗憾率，缩小了上下界差距。实验验证了算法的有效学习能力。",
+      "llm_tldr": "针对多项逻辑函数逼近下的强化学习，现有方法缺乏对交互方差的自适应。本文提出一种方差自适应最优算法，在MDP框架下导出显式方差自适应遗憾界，计算高效且达到实例最优遗憾率，缩小了上下界差距。实验验证了算法的有效学习能力。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.00953v1",
+      "source": "arxiv",
+      "title": "When Parallelism Pays Off: Cohesion-Aware Task Partitioning for Multi-Agent Coding",
+      "abstract": "Multi-agent Large Language Model (LLM) systems offer a way to decompose complex tasks, such as coding, through parallelization and context isolation. However, adding agents in practice introduces inter-agent communication overhead, which incurs extra cost and can sometimes offset the efficiency gains. We formalize multi-agent orchestration as a graph partitioning problem that captures the communication-to-computation trade-off: task decomposition can shorten critical-path computation, but cross-agent dependencies require costly context transfer. We instantiate this view in repository-level software engineering and present Cohesion-aware Coder (Co-Coder), which builds dependency graphs from static analysis, isolates structural hub files, partitions the graph via community detection, and executes the partition with a dependency-aware scheduler.   Across 28 real-world tasks on DevEval and CodeProjectEval, Co-Coder advances the Pareto-frontier over sequential and file-based parallel baselines as well as Claude Code with Agent Teams, lifting pass rate by up to 14.0%, achieving up to a 2.10x wall-clock speedup, and reducing API cost by up to 35%, with the largest gains on the most dependency-dense projects. Co-coder demonstrates how cohesion-aware orchestration can make parallel coding agents both theoretically grounded and practically efficient, suggesting a broader design principle for multi-agent systems.",
+      "authors": [
+        "Xu Yang",
+        "Lunyiu Nie",
+        "Ethan Chandra",
+        "Stanislav Gannutin",
+        "Fangru Lin",
+        "Swarat Chaudhuri"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.MA"
+      ],
+      "published": "2026-05-31T02:10:12+00:00",
+      "link": "https://arxiv.org/pdf/2606.00953v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "formulates multi-agent orchestration as graph partitioning problem",
+      "llm_evidence_cn": "将多智能体编排建模为图划分问题",
+      "llm_evidence": "将多智能体编排建模为图划分问题",
+      "canonical_evidence": "将多智能体编排建模为图划分问题",
+      "llm_tldr_en": "Formalizes multi-agent LLM orchestration as graph partitioning, proposes Co-Coder that builds dependency graphs and isolates hub files for parallel coding.",
+      "llm_tldr_cn": "该论文将多智能体编排正式化为图划分问题，考虑通信与计算权衡。提出Co-Coder框架，基于静态分析构建依赖图，识别并隔离结构枢纽文件，实现高效任务划分。在仓库级软件工程任务上，该方法有效减少跨智能体通信开销，提升并行效率。该工作连接了图划分理论与多智能体系统优化。",
+      "llm_tldr": "该论文将多智能体编排正式化为图划分问题，考虑通信与计算权衡。提出Co-Coder框架，基于静态分析构建依赖图，识别并隔离结构枢纽文件，实现高效任务划分。在仓库级软件工程任务上，该方法有效减少跨智能体通信开销，提升并行效率。该工作连接了图划分理论与多智能体系统优化。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "graph partitioning",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.01333v1",
+      "source": "arxiv",
+      "title": "Adversarial Configurations for the ReCom Transition Function",
+      "abstract": "ReCom is a leading Markov Chain Monte Carlo algorithm for sampling balanced graph partitions in computational redistricting. At each step, its transition function proposes a new partition by merging two adjacent districts and if possible re-splitting the conjoined region. The transition function is efficient in practice, however, it is unknown whether it is guaranteed to run in polynomial time. In this report we exhibit an explicit family of 3-partitions on planar square grid graphs from which ReCom requires an exponentially large expected number of steps to re-split the graph (even if we admit approximately balanced splits), showing that in the worst case ReCom does not run in polynomial time. Notably, this result implies that ReCom is not technically rapidly mixing (if started from an adversarial configuration, ReCom requires exponential many steps to reach the stationary distribution).",
+      "authors": [
+        "Micah Gold"
+      ],
+      "primary_category": "cs.DS",
+      "categories": [
+        "cs.DS",
+        "cs.DM"
+      ],
+      "published": "2026-05-31T16:35:51+00:00",
+      "link": "https://arxiv.org/pdf/2606.01333v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "graph partitioning via MCMC, directly addresses balanced graph partition sampling",
+      "llm_evidence_cn": "通过MCMC进行图划分，直接解决平衡图划分采样",
+      "llm_evidence": "通过MCMC进行图划分，直接解决平衡图划分采样",
+      "canonical_evidence": "通过MCMC进行图划分，直接解决平衡图划分采样",
+      "llm_tldr_en": "Shows worst-case exponential runtime for ReCom MCMC algorithm for sampling balanced graph partitions, implying practical but non-polynomial complexity.",
+      "llm_tldr_cn": "本工作针对ReCom这一用于计算性重新划分的马尔可夫链蒙特卡洛算法，在平面方格图上构造了显式的3-划分族，证明在最坏情况下算法需要指数级步骤才能重新划分，尽管实际中效率高，但并非多项式时间。该结果揭示了ReCom算法的理论局限性，对图划分方法的效率分析有重要意义。",
+      "llm_tldr": "本工作针对ReCom这一用于计算性重新划分的马尔可夫链蒙特卡洛算法，在平面方格图上构造了显式的3-划分族，证明在最坏情况下算法需要指数级步骤才能重新划分，尽管实际中效率高，但并非多项式时间。该结果揭示了ReCom算法的理论局限性，对图划分方法的效率分析有重要意义。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "graph partitioning",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.02337v1",
+      "source": "arxiv",
+      "title": "Coordination Graphs for Constrained Multi-Agent Reinforcement Learning",
+      "abstract": "Constrained Multi-agent reinforcement learning (CMARL) faces two intertwined challenges: the joint action space grows exponentially with the number of agents, and additional requirements couple agents in ways that reward structure alone does not capture. We introduce Coordination Graphs for Constrained Multi-Agent Reinforcement Learning (CG-CMARL), a framework that addresses both challenges by combining coordination graphs with Lagrangian duality. The system decomposes the joint problem into pairwise regions, each served by a set of shared Q-functions, one for the primary objective and one for each of the constraints, so that the number of learned models is independent of the number of agents. At execution time, Max-Sum message passing coordinates actions across the factor graph, while a Lagrangian multiplier controls the objective--constraint tradeoff, allowing a single trained model to trace a Pareto front without retraining. We provide convergence guarantees under mild conditions, together with a compositional error bound that decomposes into separate interpretable sources, each traceable to a specific design choice and independently controllable. Experiments on cooperative navigation tasks (where teams of up to 10 agents must coordinate to reach target positions while satisfying pairwise constraints) show that our method produces Pareto fronts dominating established baselines trained at fixed reward-shaping ratios, while scaling to team sizes where centralized approaches become intractable.",
+      "authors": [
+        "Santiago Amaya-Corredor",
+        "Miguel Calvo-Fullana",
+        "Anders Jonsson"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-06-01T14:46:16+00:00",
+      "link": "https://arxiv.org/pdf/2606.02337v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "coordination graphs for constrained multi-agent RL",
+      "llm_evidence_cn": "约束多智能体强化学习的协调图",
+      "llm_evidence": "约束多智能体强化学习的协调图",
+      "canonical_evidence": "约束多智能体强化学习的协调图",
+      "llm_tldr_en": "Introduces CG-CMARL, combining coordination graphs with Lagrangian duality to address exponential action space and constraints in multi-agent RL.",
+      "llm_tldr_cn": "约束多智能体强化学习面临联合动作空间指数增长和额外约束耦合的挑战。本文提出CG-CMARL框架，结合协调图和拉格朗日对偶性，将联合问题分解为成对区域，每个区域使用共享Q函数。执行时通过Max-Sum消息传递协调动作。实验表明该方法在多个约束MARL任务上高效且可扩展。",
+      "llm_tldr": "约束多智能体强化学习面临联合动作空间指数增长和额外约束耦合的挑战。本文提出CG-CMARL框架，结合协调图和拉格朗日对偶性，将联合问题分解为成对区域，每个区域使用共享Q函数。执行时通过Max-Sum消息传递协调动作。实验表明该方法在多个约束MARL任务上高效且可扩展。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.26784v1",
+      "source": "arxiv",
+      "title": "Ratio-Variance Regularized Policy Optimization",
+      "abstract": "Standard on-policy reinforcement learning relies on heuristic clipping to enforce trust regions, but this mechanism imposes a severe cost by indiscriminately truncating high-return yet high-divergence updates. We demonstrate that explicitly constraining the policy ratio variance provides a principled local approximation to trust-region constraints, eliminating the need for binary hard clipping. By acting as a distributional ``soft brake'', this approach preserves critical gradient signals from novel discoveries while naturally down-weighting and enabling the reuse of stale, off-policy data. We introduce ${\\bf R}^2{\\bf VPO}$ (Ratio-Variance Regularized Policy Optimization), which implements this constraint via a primal-dual optimization framework. Extensive evaluations across $7$ LLM scales, spanning both fast and slow reasoning paradigms, and $10$ robotic control tasks demonstrate the generality of the proposed approach. R$^2$VPO achieves substantial performance gains on mathematical reasoning benchmarks, with particularly pronounced improvements on smaller models, while significantly improving sample efficiency. Furthermore, it consistently outperforms PPO baselines in continuous control domains, particularly in sparse-reward and dynamic environments. Together, these findings establish ratio-variance regularization as a principled foundation for stable and data-efficient policy optimization.",
+      "authors": [
+        "Yu Luo",
+        "Shuo Han",
+        "Yihan Hu",
+        "Lei Lv",
+        "Huaping Liu",
+        "Fuchun Sun",
+        "Jianye Hao",
+        "Dong Li"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-26T09:53:42+00:00",
+      "link": "https://arxiv.org/pdf/2605.26784v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "reinforcement learning policy optimization algorithm",
+      "llm_evidence_cn": "强化学习策略优化算法",
+      "llm_evidence": "强化学习策略优化算法",
+      "canonical_evidence": "强化学习策略优化算法",
+      "llm_tldr_en": "Proposes R2VPO, a ratio-variance regularized policy optimization that avoids hard clipping by constraining policy ratio variance, enabling principled trust-region updates and off-policy data reuse.",
+      "llm_tldr_cn": "现有on-policy强化学习依赖启发式裁剪来保证信任区域，但这会截断高回报但高偏离的更新。本文提出R2VPO，通过显式约束策略比值方差作为分布式的软刹车，避免了硬裁剪，同时保留关键梯度信号并允许重用旧数据。在多个任务上验证了其有效性。这项研究为强化学习提供了一种更稳定且数据高效的优化方法。",
+      "llm_tldr": "现有on-policy强化学习依赖启发式裁剪来保证信任区域，但这会截断高回报但高偏离的更新。本文提出R2VPO，通过显式约束策略比值方差作为分布式的软刹车，避免了硬裁剪，同时保留关键梯度信号并允许重用旧数据。在多个任务上验证了其有效性。这项研究为强化学习提供了一种更稳定且数据高效的优化方法。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.28675v1",
+      "source": "arxiv",
+      "title": "Optimal Data Acquisition for Reinforcement Learning: A Large Deviations Perspective",
+      "abstract": "Data acquisition efficiency is a central challenge in deploying reinforcement learning in business and healthcare operations, where interactions are costly, slow, and often involve humans in the loop. This paper develops a unified large deviations framework for data acquisition in infinite-horizon reinforcement learning. We introduce the exponential decay rate of the policy-selection error probability as a principled efficiency metric and derive a variational characterization of this rate via large deviations theory for Markov chains, yielding a nested optimization problem. Based on this characterization, we formalize two complementary notions of optimality in terms of the optimal solution of the nested problem. Because the resulting program is implicit and generally intractable, we propose a tractable convex relaxation with explicit constraints. We then develop a lazy one-step projected subgradient method to solve the relaxed problem and use its iterates to construct an adaptive data acquisition policy. We prove that the resulting reinforcement learning algorithm is near-robustly optimal under our optimality criterion, up to a constant factor. Finally, we extend the framework to linear function approximation to improve scalability, and numerical experiments support the effectiveness of the proposed approach.",
+      "authors": [
+        "Mingjie Hu",
+        "Jian-Qiang Hu",
+        "Enlu Zhou"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-05-27T16:08:56+00:00",
+      "link": "https://arxiv.org/pdf/2605.28675v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "reinforcement learning data acquisition theory",
+      "llm_evidence_cn": "强化学习数据获取理论",
+      "llm_evidence": "强化学习数据获取理论",
+      "canonical_evidence": "强化学习数据获取理论",
+      "llm_tldr_en": "Develops a large deviations framework for optimal data acquisition in infinite-horizon RL, introducing policy-selection error decay rate as efficiency metric.",
+      "llm_tldr_cn": "该论文从大偏差视角研究强化学习数据获取的最优性问题。针对RL在商业和医疗等场景中交互成本高昂的挑战，提出了基于政策选择错误概率指数衰减率的效率度量，并通过马尔可夫链大偏差理论给出变分特征，转化为嵌套优化问题。论文定义了两种互补的最优性概念，为数据获取策略提供了理论指导，推动了RL在交互昂贵场景下的实际部署。",
+      "llm_tldr": "该论文从大偏差视角研究强化学习数据获取的最优性问题。针对RL在商业和医疗等场景中交互成本高昂的挑战，提出了基于政策选择错误概率指数衰减率的效率度量，并通过马尔可夫链大偏差理论给出变分特征，转化为嵌套优化问题。论文定义了两种互补的最优性概念，为数据获取策略提供了理论指导，推动了RL在交互昂贵场景下的实际部署。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2606.00151v1",
+      "source": "arxiv",
+      "title": "Emergence of Exploration in Policy Gradient Reinforcement Learning via Retrying",
+      "abstract": "In reinforcement learning (RL), agents benefit from exploration only because they repeatedly encounter similar states: trying different actions can improve performance or reduce uncertainty; without such retries, a greedy policy is optimal. We formalize this intuition with ReMax, an objective that evaluates a policy by the expected maximum return over $M$ samples, where $M$ is a positive integer, while accounting for return uncertainty. Optimizing this objective induces stochastic exploration as an emergent property, without explicit bonus terms. For efficient policy optimization, we derive a new policy-gradient formulation for ReMax and introduce ReMax PPO (RePPO), a PPO variant that optimizes ReMax while generalizing the discrete retry count $M$ to a continuous parameter $m > 0$, enabling fine-grained control of exploration. Empirically, RePPO promotes exploration, without any explicit exploration bonuses, on the MinAtar and Craftax benchmarks.",
+      "authors": [
+        "Soichiro Nishimori",
+        "Paavo Parmas",
+        "Sotetsu Koyamada",
+        "Tadashi Kozuno",
+        "Toshinori Kitamura",
+        "Shin Ishii",
+        "Yutaka Matsuo"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-29T03:35:13+00:00",
+      "link": "https://arxiv.org/pdf/2606.00151v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "policy gradient RL method with exploration via retrying",
+      "llm_evidence_cn": "通过重试机制实现策略梯度强化学习中的探索",
+      "llm_evidence": "通过重试机制实现策略梯度强化学习中的探索",
+      "canonical_evidence": "通过重试机制实现策略梯度强化学习中的探索",
+      "llm_tldr_en": "Introduces ReMax objective and RePPO algorithm, where stochastic exploration emerges from optimizing expected maximum return over multiple samples.",
+      "llm_tldr_cn": "该论文提出ReMax目标函数，通过最大化多个样本的期望最大回报来自然诱导随机探索，无需显式奖励项。并基于此推导RePPO算法，将重试次数推广为连续参数。从理论上论证了在重复访问状态的情况下探索才是有益的，并在策略梯度框架中实现了高效的探索机制。",
+      "llm_tldr": "该论文提出ReMax目标函数，通过最大化多个样本的期望最大回报来自然诱导随机探索，无需显式奖励项。并基于此推导RePPO算法，将重试次数推广为连续参数。从理论上论证了在重复访问状态的情况下探索才是有益的，并在策略梯度框架中实现了高效的探索机制。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.25424v1",
+      "source": "arxiv",
+      "title": "SeqRoute: Global Budget-Aware Sequential LLM Routing via Offline Reinforcement Learning",
+      "abstract": "Existing LLM routing frameworks treat queries as independent events, neglecting the sequential nature of real-world user sessions constrained by global computational budgets. This mismatch inevitably leads to budget bankruptcy: myopic routing policies exhaust resources on early interactions, forcing subsequent and often more complex queries onto inadequate models. We introduce SeqRoute, a framework that formulates multi-turn routing as a finite-horizon Markov Decision Process and solves it via offline reinforcement learning. By incorporating the remaining budget into the state space and training with Conservative Q-Learning (CQL), SeqRoute learns delayed gratification to strategically preserve resources for high-stakes turns later in the session. To overcome data starvation, we propose Hindsight Budget Relabeling (HBR). This technique retrospectively simulates historical trajectories under diverse hypothetical budgets, expanding 10,000 raw sessions into 2.38 million transitions enriched with critical bankruptcy signals. At deployment, a dynamic $λ$-sweep mechanism enables zero-shot navigation of the cost-quality Pareto frontier without retraining. Extensive evaluations demonstrate that SeqRoute reduces operational costs by 6.0-73.5% while maintaining or improving quality, and suppresses bankruptcy rates to under 1%, strictly dominating behavior cloning, budget-aware heuristics, and static baselines across the entire Pareto frontier.",
+      "authors": [
+        "Zhongling Xu",
+        "Shunan Zheng",
+        "Wei Wang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-25T04:52:10+00:00",
+      "link": "https://arxiv.org/pdf/2605.25424v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "offline reinforcement learning for sequential LLM routing",
+      "llm_evidence_cn": "离线强化学习用于顺序LLM路由",
+      "llm_evidence": "离线强化学习用于顺序LLM路由",
+      "canonical_evidence": "离线强化学习用于顺序LLM路由",
+      "llm_tldr_en": "Formulates multi-turn LLM routing as an MDP and solves via offline RL (CQL) to respect global budget constraints.",
+      "llm_tldr_cn": "该论文提出SeqRoute框架，将多轮LLM路由建模为有限时域马尔可夫决策过程，并通过离线强化学习（保守Q学习）求解。通过将剩余预算纳入状态空间，策略学会延迟满足，为后续高成本查询保留资源。实验表明该方法在预算约束下显著提升了整体路由质量。",
+      "llm_tldr": "该论文提出SeqRoute框架，将多轮LLM路由建模为有限时域马尔可夫决策过程，并通过离线强化学习（保守Q学习）求解。通过将剩余预算纳入状态空间，策略学会延迟满足，为后续高成本查询保留资源。实验表明该方法在预算约束下显著提升了整体路由质量。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2605.25916v1",
+      "source": "arxiv",
+      "title": "Joint Optimization of Training and Inference in Federated Edge Learning via Constrained Multi-Objective Deep Reinforcement Learning",
+      "abstract": "Federated edge learning (FEEL) has recently emerged as a promising paradigm for achieving edge intelligence (EI) via enabling collaborative model training across edge devices while protecting data privacy. In this paper, we put forth an online optimization framework that jointly manages federated training and inference on resource-constrained edge devices. We introduce a tandem-queue-inspired conversion mechanism that bridges inference requests and training data, and further incorporate both data and model freshness into the accuracy formulation to capture temporal dynamics in real-world environments. To maximize inference accuracy while minimizing latency and energy consumption, the mode selections, communication, and computation resource allocations of edge devices are jointly optimized. We formulate this optimization as a multi-objective optimization problem, which is NP-hard and further complicated by the online setting. To address these challenges, we transform the problem into a multi-objective Markov decision process (MOMDP) and develop a \\underline{c}onstrained \\underline{m}ulti-\\underline{o}bjective \\underline{p}roximal \\underline{p}olicy \\underline{o}ptimization (C-MOPPO) algorithm. Specifically, C-MOPPO first learns a set of policies with different preferences across three objectives, then leverages constrained policy optimization to enrich the Pareto front and obtain high-quality, dense solutions. Extensive experiments demonstrate that C-MOPPO achieves well-balanced trade-offs among objectives and significantly outperforms baselines under various system configurations.",
+      "authors": [
+        "Zhen Li",
+        "Jun Cai",
+        "Chao Yang",
+        "Haoran Gao"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.DC",
+        "cs.NI"
+      ],
+      "published": "2026-05-25T14:51:07+00:00",
+      "link": "https://arxiv.org/pdf/2605.25916v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "deep reinforcement learning for joint optimization in federated edge learning",
+      "llm_evidence_cn": "深度强化学习用于联邦边缘学习的联合优化",
+      "llm_evidence": "深度强化学习用于联邦边缘学习的联合优化",
+      "canonical_evidence": "深度强化学习用于联邦边缘学习的联合优化",
+      "llm_tldr_en": "Constrained multi-objective DRL jointly optimizes training and inference in federated edge learning, balancing accuracy, latency, and energy with a tandem-queue conversion mechanism.",
+      "llm_tldr_cn": "针对联邦边缘学习中训练与推断的资源竞争问题，本文提出一个在线优化框架，利用约束多目标深度强化学习联合管理模式选择。设计串联队列转换机制桥接推断请求与训练数据，并引入数据和模型新鲜度以刻画动态环境。实验表明该方法能在保持精度的同时显著降低延迟和能耗。",
+      "llm_tldr": "针对联邦边缘学习中训练与推断的资源竞争问题，本文提出一个在线优化框架，利用约束多目标深度强化学习联合管理模式选择。设计串联队列转换机制桥接推断请求与训练数据，并引入数据和模型新鲜度以刻画动态环境。实验表明该方法能在保持精度的同时显著降低延迟和能耗。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.00427v1",
+      "source": "arxiv",
+      "title": "Topology-Aware State Abstraction with Tangle Cores for Markov Decision Processes",
+      "abstract": "State abstraction in reinforcement learning is usually formulated as a partition of states based on reward and transition similarity. This excludes a common structural pattern in navigation, graph, and hierarchical decision problems: interface states such as doors, hubs, and bottlenecks naturally participate in more than one region. We introduce \\emph{tangle-core abstraction}, an overlapping state-abstraction framework based on graph tangles of empirical transition graphs. The method constructs abstract states from consistently oriented low-order separations and represents shared interfaces through a membership kernel rather than a hard partition. We give value-preservation guarantees for the induced overlapping abstract MDP under an explicit action-consistency condition, identify an interior-homogeneity/boundary-leakage error decomposition, and prove a quantitative interface-overlap result showing when hard partitions incur an avoidable boundary error. Empirically, tangle-core abstractions achieve favorable compression--return tradeoffs against reward-aware, learned, topological-map, and graph-partitioning baselines across bottlenecked tabular domains, procedurally generated mazes, and MiniGrid representations. We also identify a clear failure regime in which transition topology is uninformative, where tangles predictably offer little benefit. These results position graph tangles as an effective topology-aware abstraction prior for decision problems with shared interface structure.",
+      "authors": [
+        "Ibne Farabi Shihab",
+        "Sanjeda Akter",
+        "Anuj Sharma"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-05-29T23:29:49+00:00",
+      "link": "https://arxiv.org/pdf/2606.00427v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "overlapping state abstraction using graph tangles for RL",
+      "llm_evidence_cn": "基于图缠结的重叠状态抽象用于强化学习",
+      "llm_evidence": "基于图缠结的重叠状态抽象用于强化学习",
+      "canonical_evidence": "基于图缠结的重叠状态抽象用于强化学习",
+      "llm_tldr_en": "Tangle-core abstraction partitions RL state space using graph tangles, enabling overlapping abstract states that preserve value information for hierarchical decision problems.",
+      "llm_tldr_cn": "针对强化学习中状态抽象通常要求硬划分而忽视接口状态的问题，本文提出基于图缠结（tangle-core）的重叠状态抽象框架。该方法利用经验转移图的低阶分离构建抽象状态，并通过隶属度核表示共享接口。理论证明了诱导重叠抽象MDP的价值保持性质，为导航、图决策和层次问题提供了更灵活的状态抽象方案。",
+      "llm_tldr": "针对强化学习中状态抽象通常要求硬划分而忽视接口状态的问题，本文提出基于图缠结（tangle-core）的重叠状态抽象框架。该方法利用经验转移图的低阶分离构建抽象状态，并通过隶属度核表示共享接口。理论证明了诱导重叠抽象MDP的价值保持性质，为导航、图决策和层次问题提供了更灵活的状态抽象方案。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning for graph partitioning",
+      "matched_requirement_id": "req-3",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.27736v1",
+      "source": "arxiv",
+      "title": "Explicit Critic Guidance for Aligning Diffusion Models",
+      "abstract": "Online reinforcement learning is becoming increasingly important for aligning diffusion models with non-differentiable objectives. However, existing methods still face limitations in assigning fine-grained credit along denoising trajectories and in realizing stable value-based optimization. We propose a state-aligned latent actor-critic framework for diffusion post-training, in which the diffusion model serves as its own timestep-conditioned value function and predicts values directly on noisy latent states. This enables trajectory-level PPO training, supports stable actor-critic optimization with simple conditioning and value pretraining strategies, and naturally allows the learned critic to be reused for inference-time steering. We further extend the framework to multi-reward optimization, where joint training with complementary rewards helps alleviate reward hacking. Across both UNet- and DiT-based backbones, our method consistently outperforms prior group-relative RL and actor-critic baselines on single-reward and multi-reward benchmarks, while test-time steering provides additional gains in generation quality.",
+      "authors": [
+        "Zhengyang Liang",
+        "Qihang Zhang",
+        "Ceyuan Yang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CV"
+      ],
+      "published": "2026-05-26T22:20:51+00:00",
+      "link": "https://arxiv.org/pdf/2605.27736v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "online reinforcement learning for diffusion model alignment",
+      "llm_evidence_cn": "在线强化学习用于扩散模型对齐",
+      "llm_evidence": "在线强化学习用于扩散模型对齐",
+      "canonical_evidence": "在线强化学习用于扩散模型对齐",
+      "llm_tldr_en": "Proposes a state-aligned latent actor-critic framework for diffusion models, enabling trajectory-level PPO and value reuse.",
+      "llm_tldr_cn": "该论文提出一个状态对齐的潜在演员-评论家框架用于扩散模型后训练，扩散模型自身作为时间步条件价值函数，直接对噪声潜在状态进行估值。该方法支持轨迹级PPO训练，实现稳定的演员-批评家优化，并允许学到的批评家用于推理时引导。扩展至多步推断，提高了对齐效率。",
+      "llm_tldr": "该论文提出一个状态对齐的潜在演员-评论家框架用于扩散模型后训练，扩散模型自身作为时间步条件价值函数，直接对噪声潜在状态进行估值。该方法支持轨迹级PPO训练，实现稳定的演员-批评家优化，并允许学到的批评家用于推理时引导。扩展至多步推断，提高了对齐效率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2605.26478v1",
+      "source": "arxiv",
+      "title": "Efficient On-policy Visual-RL via Stochastic Decoupled Policy Gradient",
+      "abstract": "We present the stochastic decoupled policy gradient (SDPG), a lightweight visual reinforcement learning (RL) method that trains diverse visuomotor control policies end-to-end within a few hours on a single NVIDIA RTX 4080 GPU. SDPG estimates policy gradients via random perturbations of trajectory rollouts, requiring orders of magnitude fewer batch-rendered environments and substantially reducing compute and memory overhead. On visual MuJoCo benchmarks, SDPG consistently outperforms baseline methods in training time, memory usage, and rewards. Finally, to support future research, we introduce a suite of realistic visual robotics benchmarks spanning dexterous manipulation, challenging locomotion, and demonstrate effective sim-to-real transfer on physical hardware.",
+      "authors": [
+        "Haoxiang You",
+        "Yilang Liu",
+        "Davis Zong",
+        "Qian Wang",
+        "Teeratham Vitchutripop",
+        "Qi Wang",
+        "Daniel Rakita",
+        "Ian Abraham"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO",
+        "cs.AI",
+        "cs.CV",
+        "cs.LG",
+        "eess.SY"
+      ],
+      "published": "2026-05-26T02:35:08+00:00",
+      "link": "https://arxiv.org/pdf/2605.26478v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "efficient on-policy visual RL via decoupled policy gradient",
+      "llm_evidence_cn": "通过解耦策略梯度的高效在线视觉强化学习",
+      "llm_evidence": "通过解耦策略梯度的高效在线视觉强化学习",
+      "canonical_evidence": "通过解耦策略梯度的高效在线视觉强化学习",
+      "llm_tldr_en": "Presents SDPG for lightweight visual RL, estimating policy gradients via random trajectory perturbations, reducing environment interactions significantly.",
+      "llm_tldr_cn": "该论文提出随机解耦策略梯度（SDPG），一种轻量级视觉强化学习方法。通过随机扰动轨迹滚动来估计策略梯度，大幅减少批渲染环境数量，降低计算和内存开销。在视觉MuJoCo基准上，SDPG在训练时间、内存使用和奖励方面均优于基线，并展示了从仿真到真实机器人的迁移能力。",
+      "llm_tldr": "该论文提出随机解耦策略梯度（SDPG），一种轻量级视觉强化学习方法。通过随机扰动轨迹滚动来估计策略梯度，大幅减少批渲染环境数量，降低计算和内存开销。在视觉MuJoCo基准上，SDPG在训练时间、内存使用和奖励方面均优于基线，并展示了从仿真到真实机器人的迁移能力。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.00838v1",
+      "source": "arxiv",
+      "title": "Decoupled Behavioral Cloning for Scalable Inductive Generalization in RL from Specifications",
+      "abstract": "Inductive generalization is a framework for reinforcement learning (RL) generalization in which inductively related task instances admit inductively related policies. Prior work captures this structure via a higher-order policy-evolution function learned directly with RL, but suffers from poor training scalability: as training tasks grow, aggregated reward feedback becomes noisy and conflicting, destabilizing training and weakening generalization. We propose DIBS, a decoupled behavioral cloning approach that separates learning task-specific policies from learning the evolution function. We first learn individual teacher policies per task via standard RL, then fit the evolution function via behavioral cloning on teacher-labeled state-action pairs. This replaces noisy reward aggregation with dense, stable supervision. DIBS achieves significant improvements in both training stability and zero-shot generalization against existing RL and meta-RL algorithms.",
+      "authors": [
+        "Vignesh Subramanian",
+        "Subhajit Roy",
+        "Suguman Bansal"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-30T18:26:59+00:00",
+      "link": "https://arxiv.org/pdf/2606.00838v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "new RL algorithm DIBS for inductive generalization, uses behavioral cloning",
+      "llm_evidence_cn": "提出DIBS算法，通过解耦行为克隆实现RL的归纳泛化",
+      "llm_evidence": "提出DIBS算法，通过解耦行为克隆实现RL的归纳泛化",
+      "canonical_evidence": "提出DIBS算法，通过解耦行为克隆实现RL的归纳泛化",
+      "llm_tldr_en": "Proposes DIBS, a decoupled behavioral cloning approach that separates task-specific RL from learning the policy evolution function, improving scalability and generalization in RL from specifications.",
+      "llm_tldr_cn": "针对现有基于RL归纳泛化方法训练扩展性差的问题，提出DIBS算法，先将每个任务独立训练教师策略，再通过行为克隆学习演化函数，从而分离任务策略与演化函数的学习。实验表明该方法能有效缓解奖励噪声和冲突，提升多任务泛化能力，为RL泛化提供了一种可扩展的解决方案。",
+      "llm_tldr": "针对现有基于RL归纳泛化方法训练扩展性差的问题，提出DIBS算法，先将每个任务独立训练教师策略，再通过行为克隆学习演化函数，从而分离任务策略与演化函数的学习。实验表明该方法能有效缓解奖励噪声和冲突，提升多任务泛化能力，为RL泛化提供了一种可扩展的解决方案。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.29032v1",
+      "source": "arxiv",
+      "title": "Theoretical Foundations and Effective Algorithms for Policy-Aware Simulator Learning",
+      "abstract": "Model-based reinforcement learning (MBRL) agents typically learn world models by minimizing predictive loss. However, powerful RL optimizers inevitably exploit minor model inaccuracies, leading to simulator exploitation and a reality gap where policies succeed in simulation but fail in the real world. We propose that the objective for learning simulators should be strategic robustness rather than predictive accuracy, and formulate this as a zero-sum minimax game between a model player and an adversarial policy player. We provide a comprehensive theoretical analysis: (1) an online learning guarantee showing the game is learnable with sublinear regret bounds; (2) a tractable critic-based simplification bounding the global policy-value gap by the local critic's loss; and (3) an Error-MDP duality, proving that finding the worst-case policy is formally dual to a standard RL problem where the reward is the one-step critic error. This duality yields a provably convergent active data selection algorithm. Experiments on continuous control tasks demonstrate that our approach reduces prediction error in strategically important regions by $1.5$-$2.2\\times$ and enables policies trained purely in simulation to match near-optimal real-world performance.",
+      "authors": [
+        "Christoph Dann",
+        "Yishay Mansour",
+        "Mehryar Mohri"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "stat.ML"
+      ],
+      "published": "2026-05-27T19:31:37+00:00",
+      "link": "https://arxiv.org/pdf/2605.29032v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "model-based RL with adversarial policy for simulator learning",
+      "llm_evidence_cn": "基于模型的强化学习中的对抗策略模拟器学习",
+      "llm_evidence": "基于模型的强化学习中的对抗策略模拟器学习",
+      "canonical_evidence": "基于模型的强化学习中的对抗策略模拟器学习",
+      "llm_tldr_en": "Proposes minimax game formulation for simulator learning in MBRL, achieving strategic robustness rather than predictive accuracy, with sublinear regret.",
+      "llm_tldr_cn": "该论文针对模型基强化学习中模拟器被策略利用的问题，提出以策略鲁棒性为目标，将模拟器学习建模为零和极小极大博弈。理论分析提供在线学习次线性遗憾保障，并给出基于评论家的简化方法，有效缩小全局策略价值差距。该工作为MBRL模拟器学习提供了新理论框架。",
+      "llm_tldr": "该论文针对模型基强化学习中模拟器被策略利用的问题，提出以策略鲁棒性为目标，将模拟器学习建模为零和极小极大博弈。理论分析提供在线学习次线性遗憾保障，并给出基于评论家的简化方法，有效缩小全局策略价值差距。该工作为MBRL模拟器学习提供了新理论框架。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2605.26684v1",
+      "source": "arxiv",
+      "title": "Beyond Trajectory-Level Attribution: Graph-Based Credit Assignment for Agentic Reinforcement Learning",
+      "abstract": "Group-based reinforcement learning (RL) methods have achieved remarkable success in improving the performance of large language models (LLMs) and have been rapidly extended to agentic tasks. However, their credit assignment relies heavily on coarse-grained trajectory-level attribution according to final outcomes, making it difficult to capture the contribution of individual steps, such as valuable steps obscured within failed trajectories. To uncover latent information and enable more faithful step-level credit assignment, we propose Graph-based Group Policy Optimization (GraphGPO), which first aggregates all rollout trajectories into a unified state-transition graph and then estimates the distance from each state to the task goal using the global information encoded in the graph. Finally, GraphGPO assigns credit to each edge by estimating a graph-based advantage, based on how much the transition reduces the distance to the task goal. In this way, GraphGPO significantly improves training efficiency and achieves state-of-the-art performance across a range of challenging benchmarks.",
+      "authors": [
+        "Xin Cheng",
+        "Shuo He",
+        "Lang Feng",
+        "HaiYang Xu",
+        "Ming Yan",
+        "Lei Feng",
+        "Bo An"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-26T08:23:34+00:00",
+      "link": "https://arxiv.org/pdf/2605.26684v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "RL algorithm using graph-based credit assignment",
+      "llm_evidence_cn": "使用图结构进行信用分配的强化学习算法",
+      "llm_evidence": "使用图结构进行信用分配的强化学习算法",
+      "canonical_evidence": "使用图结构进行信用分配的强化学习算法",
+      "llm_tldr_en": "Proposes GraphGPO, a graph-based credit assignment method for agentic RL, aggregating trajectories into a state-transition graph for step-level attribution.",
+      "llm_tldr_cn": "现有组强化学习依赖轨迹级粗粒度信用分配，忽略了内部步骤贡献。本文提出GraphGPO，将所有轨迹聚合为统一状态转移图，基于状态到目标的距离进行细粒度信用分配，实现更精确的步骤级归因，提升agent学习效率。",
+      "llm_tldr": "现有组强化学习依赖轨迹级粗粒度信用分配，忽略了内部步骤贡献。本文提出GraphGPO，将所有轨迹聚合为统一状态转移图，基于状态到目标的距离进行细粒度信用分配，实现更精确的步骤级归因，提升agent学习效率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2605.31509v1",
+      "source": "arxiv",
+      "title": "Skill Reuse as Compression in Agentic RL",
+      "abstract": "Large language model agents trained with reinforcement learning (RL) often learn brittle, task-specific shortcuts. We hypothesize that agents generalize better when their successful trajectories are structurally compressible, decomposed into a small set of reusable abstract patterns. To formalize this, we introduce ReuseRL, which grounds agentic RL in the Minimum Description Length (MDL) principle. ReuseRL extracts a shared skill dictionary from successful trajectories and augments the RL objective with a segmentation cost, explicitly penalizing idiosyncratic behaviors that encode poorly. We prove a PAC-Bayes generalization bound for this compression penalty. Across ALFWorld, TextWorld-Cooking, and Countdown-Stepwise, ReuseRL improves in- and out-of-distribution success over vanilla GRPO and strong round-length baselines.",
+      "authors": [
+        "Zhikun Xu",
+        "Yu Feng",
+        "Jacob Dineen",
+        "Taiwei Shi",
+        "Jieyu Zhao",
+        "Ben Zhou"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-29T16:28:34+00:00",
+      "link": "https://arxiv.org/pdf/2605.31509v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "reinforcement learning for LLM agents with skill reuse",
+      "llm_evidence_cn": "面向LLM智能体的强化学习与技能重用",
+      "llm_evidence": "面向LLM智能体的强化学习与技能重用",
+      "canonical_evidence": "面向LLM智能体的强化学习与技能重用",
+      "llm_tldr_en": "Proposes ReuseRL that grounds agentic RL in Minimum Description Length principle, extracting reusable skill dictionary and penalizing idiosyncratic behaviors.",
+      "llm_tldr_cn": "LLM智能体通过RL学习时容易学到脆弱的任务特定捷径。本文假设泛化好的轨迹应可压缩为少量可重用模式，据此提出ReuseRL，基于最小描述长度原则提取技能字典并惩罚独特性行为，推导PAC-Bayes泛化界。在多个环境上，ReuseRL提升了分布内和分布外成功率。该工作为智能体RL提供了基于压缩的归纳偏置。",
+      "llm_tldr": "LLM智能体通过RL学习时容易学到脆弱的任务特定捷径。本文假设泛化好的轨迹应可压缩为少量可重用模式，据此提出ReuseRL，基于最小描述长度原则提取技能字典并惩罚独特性行为，推导PAC-Bayes泛化界。在多个环境上，ReuseRL提升了分布内和分布外成功率。该工作为智能体RL提供了基于压缩的归纳偏置。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.00183v1",
+      "source": "arxiv",
+      "title": "Agentic Transformers Provably Learn to Search via Reinforcement Learning",
+      "abstract": "Tree search is a central abstraction behind many language-agent reasoning and decision-making tasks: agents must explore actions, remember failures, and backtrack toward promising alternatives. Yet, we lack a theoretical understanding of how transformer-based policies acquire such search capabilities from the training dynamics of reinforcement learning (RL). We study this question in a stochastic $k$-ary tree environment, where an agentic transformer observes only its trajectory history through interaction and receives a terminal reward for reaching a hidden leaf goal node. We first construct a two-head transformer that implements randomized depth-first search (DFS): one head tracks previous actions, while the other detects failure outcomes and triggers backtracking. We then analyze the training dynamics of policy gradient under a depth-wise curriculum, showing that this same DFS mechanism emerges in stages from sparse reinforcement feedback without expert demonstrations. The resulting policy exhibits depth generalization: after training only on depth-$1$ and depth-$2$ trees, it succeeds on deeper full trees. We further show that, under imbalanced goal distributions, discounting the return leads to a ranked DFS policy that prioritizes higher-probability branches. Overall, our results identify a mechanistic normal form for transformer-based search, in which attention heads specialize and cooperate to extract decision-relevant traces from context and convert them into agentic action selection via RL training.",
+      "authors": [
+        "Tong Yang",
+        "Yu Huang",
+        "Yingbin Liang",
+        "Yuejie Chi"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "math.OC",
+        "stat.ML"
+      ],
+      "published": "2026-05-29T14:58:03+00:00",
+      "link": "https://arxiv.org/pdf/2606.00183v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "reinforcement learning training dynamics for transformers to learn search",
+      "llm_evidence_cn": "强化学习训练动力学使transformer学会搜索",
+      "llm_evidence": "强化学习训练动力学使transformer学会搜索",
+      "canonical_evidence": "强化学习训练动力学使transformer学会搜索",
+      "llm_tldr_en": "Proves that transformer policies can learn randomized depth-first search through RL in a stochastic k-ary tree environment, with theoretical analysis.",
+      "llm_tldr_cn": "目前缺乏对transformer通过RL获得搜索能力的理论理解。本文在随机k叉树环境中研究，构造了一个双头transformer实现随机深度优先搜索，一个头跟踪历史动作，另一个检测失败并触发回溯。理论证明了RL训练动力学能收敛到该搜索策略。该工作为语言智能体决策提供了理论基础。",
+      "llm_tldr": "目前缺乏对transformer通过RL获得搜索能力的理论理解。本文在随机k叉树环境中研究，构造了一个双头transformer实现随机深度优先搜索，一个头跟踪历史动作，另一个检测失败并触发回溯。理论证明了RL训练动力学能收敛到该搜索策略。该工作为语言智能体决策提供了理论基础。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

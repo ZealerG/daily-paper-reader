@@ -1,0 +1,612 @@
+Title: Adversarial Configurations for the ReCom Transition Function
+
+URL Source: https://arxiv.org/pdf/2606.01333v1
+
+Published Time: Tue, 02 Jun 2026 02:06:11 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Adversarial Configurations for the ReCom Transition Function 
+
+Micah Gold micahcgold@gmail.com June 2, 2026 
+
+Abstract 
+
+ReCom is a leading Markov Chain Monte Carlo algorithm for sampling balanced graph partitions in computational redistricting. At each step, its transition function proposes a new partition by merging two adjacent districts and if possible re-splitting the conjoined region. The transition function is efficient in practice, however, it is unknown whether it is guaranteed to run in polynomial time. In this report we exhibit an explicit family of 3-partitions on planar square grid graphs from which ReCom requires an exponentially large expected number of steps to re-split the graph (even if we admit approximately balanced splits), showing that in the worst case ReCom does not run in polynomial time. Notably, this result implies that ReCom is not technically rapidly mixing (if started from an adversarial configuration, ReCom requires exponentially many steps to reach the stationary distribution). 
+
+# 1 Introduction 
+
+In the United States, members of the House of Representatives are elected to represent geographic districts. States are divided into districts through a map-drawing process known as redistricting. Redistricting is politically important. Shifting the boundaries of a district by even a few miles can alter the composition of its voter-base and sway election outcomes. Partisan gerrymandering, or strategically drawing districts to maximize political advantage, has haunted redistricting since the 19th century [9]. In recent years, states from Utah to Michigan have passed laws prohibiting partisan gerrymandering [4] and courts have increasingly been asked to adjudicate whether proposed maps are fair [3]. Unfortunately, quantifying unfairness is non-trivial. Fortunately, experts have converged on an intuitive and theoretically appealing approach: the ensemble method .The ensemble method entails drawing a large sample of “reasonable” redistricting plans from an explicit distribution, and checking whether the proposed plan is a statistical outlier. The leading algorithm in this space is ReCom [8], together with its provably reversible variant Reversible ReCom 
+
+[5]. 
+
+1.1 ReCom and Problem 2.8 
+
+ReCom is a Markov Chain Monte Carlo algorithm used to sample redistricting plans [8]. Sampling from the ReCom steady-state approximates sampling from the distribution of spanning trees over the graph of census blocks (in the “Reversible” variant of the algorithm used in this paper, which adds a Metropolis-Hastings acceptance probability for state transitions, the steady-state exactly converges to the spanning tree distribution [5]). As a result, districts sampled from ReCom have 1
+
+> arXiv:2606.01333v1 [cs.DS] 31 May 2026
+
+nice properties. They are always contiguous (an effective requirement for real-world districts) and usually compact. 
+
+ReCom maintains a balanced k-partition P = {P1, . . . , P k} of a planar graph G whose vertices represent census blocks. At each step, the chain (i) selects two random pieces Pi, P j , (ii) if they are adjacent, samples a uniform spanning tree T of Pi ∪ Pj , (iii) checks whether some edge e ∈ T splits 
+
+T into two approximately balanced halves, and if so accepts a swap with a reversibility correction probability. Otherwise, the chain returns P unchanged. The full pseudocode for Reversible ReCom 
+
+appears as Algorithm 2 in Appendix A. Empirically, ReCom mixes quickly and produces high-quality samples [5, 8], yet many of its theoretical properties remain unknown. Chief among them is whether a single step always runs in polynomial time. The bottleneck is (iii). ReCom only makes progress when the spanning tree sampled from the merged region Pi ∪Pj happens to have a balanced cut-edge, so the running time is governed by how likely a uniform spanning tree of that region is to be splittable. If this probability is inverse-polynomial the step is efficient; if it is exponentially small the chain stalls on that move. Charikar, Liu, Liu, and Vuong [7] have conjectured that, on grids, splittable partitions are abundant under the spanning tree distribution: 
+
+Conjecture 1.1 (Charikar, Liu, Liu, and Vuong [7]) . For the m × n grid graph, the proportion of balanced k-partitions under the spanning tree distribution is at least 1/ poly( m, n ) when k = O(1) .
+
+Cannon, Pegden, and Tucker-Foltz [6] made the link to (iii) precise, showing that the proportion of balanced partitions is equivalent, up to polynomial factors, to the probability that a single uniform spanning tree can be split into balanced subtrees. They then proved this probability is inverse-polynomial for grids and a broad class of grid-like graphs. In other words, on a well-shaped region, a ReCom step is likely to succeed. But ReCom does not get to choose well-shaped regions. It must merge whatever pieces the current partition provides. The positive result therefore leaves open whether the chain can be forced into a state where every available move is bad. Concretely, to stall the chain one would need a balanced partition in which every pair of mergeable districts forms a region whose spanning trees are rarely splittable, so that no merge is likely to admit a balanced cut. Tucker-Foltz formalized the question as Problem 2.8 on the AIM open problem list for sampling connected balanced graph partitions: 
+
+Problem 2.8. Does the ReCom transition function run in polynomial time? Or can it get stuck in configurations where it is very unlikely a random tree will be splittable? Can we at least show that such configurations are exponentially unlikely? [2] In this paper we address the existence half of Problem 2.8. We answer the question “do such stuck configurations exist?” 
+
+1.2 Our Result 
+
+Surprisingly, the answer is a resounding yes, even when ReCom is run on planar square grid graphs and even when we allow approximately balanced splits (see Theorem 8). Informally, there exists an infinite family of 3-partitions Pn = {Rn 
+
+> 1
+
+, R n 
+
+> 2
+
+, R n 
+
+> 3
+
+} of planar square grid graphs Gn such that: 
+
+• Each Rni is connected and approximately population-balanced. 
+
+• The probability that the ReCom transition function finds an approximately balanced cut is exponentially small with respect to the dimensions of the grid. 2Consequently, the expected number of steps required for ReCom to leave the state Pn is exponen-tially large with respect to the dimensions of the grid. Notably, the existence of such an adversarial configuration means that ReCom is not technically rapidly mixing because there exists a starting configuration from which it cannot reach steady-state in a polynomial number of steps. 
+
+1.3 Argument Outline 
+
+The argument proceeds in two stages. 1. First, we identify a family of graphs we call highway graphs – two large dense subgraphs connected by long 2 × m ladders, with a third dense subgraph tethered to the middle of the highway by a thin tendril — and prove that any spanning tree of a highway graph that contains two or more vertical rungs on each half of the highway admits no approximately balanced cut (Lemma 5). Second, we use the effective-resistance machinery of [10] to show that a uniform spanning tree of the highway contains at least two rungs on each side of the highway except with exponentially small probability (Lemma 6). We combine these two lemmas to show that any single highway graph is exponentially hard to cut in a balanced way. 2. We then exhibit a symmetrical 3-partitioned planar graph on which all possible merges pro-duce a highway graph. Finally we demonstrate that Reversible ReCom will take an expected exponential number of steps in order to find a balanced cut and transition to its next state. 
+
+# 2 Preliminaries 
+
+2.1 Graph Partitions and Reversible ReCom 
+
+We consider connected, undirected planar graphs G = ( V, E ) in which every vertex represents a census unit of unit population. For a positive integer k dividing |V |, a k-partition of G is a collection 
+
+P = {P1, . . . , P k} of pairwise-disjoint vertex subsets covering V such that each induced subgraph 
+
+G[Pi] is connected. We say P is ε-balanced if 
+
+|Pi| − | V |/k ≤ ε|V |/k for all i ∈ { 1, . . . , k }.
+
+Two pieces Pi and Pj are adjacent if some edge of G has one endpoint in each. The Reversible ReCom transition function [5] on ε-balanced k-partitions of G executes the following procedure at each step: 1. Select an unordered pair {Pi, P j } uniformly at random. 2. If Pi and Pj are not adjacent, return P unchanged. 3. Otherwise, sample a uniform spanning tree T of G[Pi ∪ Pj ]. 4. Search T for an edge e whose removal splits T into two components P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+, each within ε
+
+tolerance of size |V |/k .5. If no such e exists, return P unchanged. 6. If such an e exists, accept the swap with probability 1 /E (P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+), where E(P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+) is the number of edges of G crossing the cut. 3We refer to a step that returns P unchanged as a stalled step . Our goal is to construct a state 
+
+P from which every step stalls with exponentially high probability. 
+
+2.2 Effective Resistance and Spanning Trees 
+
+Borrowing the insight from [10], we view an unweighted graph H as an electrical network with a unit resistor on each edge. For any edge e∗ = {a, b } ∈ E(H), the effective resistance Rab is the voltage required to drive one unit of current from a to b [11]. Three facts will suffice for our purposes. 
+
+Lemma 1 ( [10], Lemma 2.1) . For any edge e∗ = {a, b } ∈ E(H), the effective resistance Rab equals the probability that e∗ appears in a uniformly random spanning tree of H.
+
+Lemma 2 ( [10], Lemma 2.4) . For any pair of adjacent vertices a, b in H with unit resistors, 
+
+Rab ≥ 1/ deg H (a).
+
+We will also borrow the following mechanism for sampling uniform spanning trees, which makes the connection between effective resistance and uniform spanning trees algorithmically explicit [10]. 
+
+Algorithm 1 Sample a uniform spanning tree of H via effective resistance [10].  
+
+> 1:
+
+T ← ∅  
+
+> 2:
+
+while H has at least two vertices do  
+
+> 3:
+
+pick any edge e ∈ E(H) 
+
+> 4:
+
+compute r ← effective resistance of e in H 
+
+> 5:
+
+with probability r: 
+
+> 6:
+
+add e to T and contract e in H 
+
+> 7:
+
+otherwise:  
+
+> 8:
+
+delete e from H 
+
+> 9:
+
+end while  
+
+> 10:
+
+return T
+
+We will use Algorithm 1 in Section 5 to bound the probability that few rungs appear in T .Notably, by Lemma 1, the probability of a contraction/deletion sequence occurring equals the probability that a uniform spanning tree of the original graph H contains all of the contracted edges and excludes all of the deleted edges. This means that the order in which edges are processed does not affect the joint distribution over outcomes [10]. 
+
+# 3 The Highway Graph 
+
+We now describe the central object of our construction: a planar graph Hm whose uniform spanning trees almost never admit an approximately balanced cut. 
+
+Definition 3 (Highway graph) . Fix a positive integer m (to be thought of as large) and a balance tolerance ε ∈ [0 , 112 ). The highway graph Hm is the planar graph on N vertices assembled from the following pieces (see Figure 1): 1. Three regions. Three pairwise vertex-disjoint connected planar graphs RL, RR, and RT ,each satisfying the size bound 
+
+|V (Ri)| <   12 − εN −  2(2 m + 1) + 1 , i ∈ { L, R, T }.
+
+42. The ladder. A 2 × (2 m + 1) grid graph L, vertex-disjoint from RL ∪ RR ∪ RT . We label its columns 1 , 2, . . . , 2m + 1 from left to right, and refer to columns 1 , . . . , m as the left half ,columns m + 2 , . . . , 2m + 1 as the right half , and column m + 1 as the central column . The 2m + 1 vertical edges of L are called rungs and form the set R; the remaining 2 · 2m = 4 m
+
+edges along the top and bottom rows are called rail edges . For a spanning tree T of Hm and each side s ∈ { L, R }, we write RsT for the set of rungs of T lying in the s-half of the ladder. 3. The tendril. An additional vertex vT /∈ V (RL) ∪ V (RR) ∪ V (RT ) ∪ V (L), joined by a single edge to the bottom vertex of column m + 1 of the ladder and by a single edge to a boundary vertex of RT .The left end column (column 1) of the ladder is joined to RL, and the right end column (column 2m + 1) to RR, by a single edge from each of the two end-column vertices to a boundary vertex of the corresponding region. In particular, like every interior ladder vertex, each end-column vertex is incident to exactly one rung and two further edges, so every vertex of the ladder except the bottom vertex of the central column (which additionally carries the tendril) has degree 3 in Hm. We refer to L ∪ { vT } as the highway corridor , and we write R for the set of rungs. 
+
+Figure 1: The highway graph Hm. Three regions RL, R T , R R are connected by a horizontal 2 ×
+
+(2 m + 1) ladder, with a single vertex vT tendril dropping from the bottom of the central column to RT .
+
+Remark 4 (Region masses) . The size bound on each region in Definition 3 is calibrated so that no single region can occupy a balanced half of Hm. Throughout this section we measure the balance tolerance relative to the target half-size N/ 2, so that an ε-balanced 2-partition {A, A c} of Hm
+
+requires |A|, |Ac| ∈ [( 12 − ε)N, ( 12 + ε)N ]. Even appending the entire highway corridor L ∪ { vT },which has |V (L)| + 1 = 2(2 m + 1) + 1 vertices, to a single region falls short of the lower endpoint of this interval: 
+
+|V (Ri)| + |V (L)| + 1 <
+
+h  12 − εN −  2(2 m + 1) + 1 i
+
++  2(2 m + 1) + 1  =   12 − εN. 
+
+Hence even appending the entire highway corridor to a single region does not yield enough mass for a balanced half (and this holds for every N and every ε ≥ 0, with no large-N side condition). It follows that every ε-balanced 2-partition of Hm places at least a portion of two of the three regions 
+
+RL, R R, R T on the same side of the cut. 5Moreover, because RT contains a single entrance vertex vT , a balanced cut can never split RT
+
+(as one of the produced regions would be contained entirely in RT and therefore have less than half the mass). This means then that any ε-balanced 2-partition of Hm must place at least a portion of RL and 
+
+RR on the same side. In other words, any partition cannot have RL completely intact on one side and RR completely intact on the other. 
+
+# 4 Combinatorial Obstruction: Two Rungs Forbid a Balanced Cut 
+
+In this section, we prove the following lemma: 
+
+Lemma 5. If T is a spanning tree of Hm such that |R LT | ≥ 2 and |R RT | ≥ 2, then there is no edge 
+
+e ∈ T whose removal splits T into two ε-balanced components. Proof. Suppose, for contradiction, that the removal of some edge e ∈ T splits T into two components 
+
+T1 and T2 that form an ε-balanced 2-partition of V (Hm). Note that from the previous remark at least one of RL and RR is split between T1 and T2
+
+because both cannot be intact. Without loss of generality, assume RL is split into a1 = V (RL) ∩ T1
+
+and a2 = V (RL) ∩ T2 where a1 and a2 are non-empty and a1 ∪ a2 = V (RL). Now, note that because T1 and T2 are balanced partitions, they both traverse the highway from 
+
+RL to other regions. The highway is two vertices thick. Clearly T1 and T2 cannot both enter the highway from the same vertex because they are not connected. Without loss of generality let T1
+
+enter via the bottom vertex and T2 enter via the top vertex. 
+
+Figure 2: T is drawn such that T1 and T2 represent a balanced partition. Note that there is only one vertical rung between the two rails and that the rung is e, the cut-edge that when removed produces the balanced partition. Similarly, because they both traverse the highway, T1 and T2 must both reach the middle of the ladder. T1 and T2 are vertex disjoint, so the only way they can both reach the middle of the ladder is if each tree follows its horizontal rail as in Figure 2. That is, if there exists a rung in T1
+
+or T2, then that tree would control both vertices in a column along the highway corridor, blocking the other tree from reaching the middle of the ladder (as in Figure 3). 6Figure 3: In this figure, there are two rungs in T and consequently a vertical rung in T1. As a result, T1 contains both vertices in the ( m − 2)th column of the left portion of the highway. This means that T2 is blocked from traversing the highway because the existence of the brown dashed edge would necessitate the connection of T1 and T2. As a result, no ε balanced split is admitted. However, this implies that T1 ∪T2 contains zero vertical rungs, which implies T1 ∪T2 ∪e contains at most 1 vertical rung. But this is a contradiction as T1 ∪ T2 ∪ e = T and |R LT | ≥ 2. The same contradiction is reached if T1 and T2 fall on the right side of the ladder by symmetry. So we conclude that T1 and T2 are not ε balanced. 
+
+# 5 Lemma: Uniform Spanning Trees Have Many Rungs in Each Half With High Probability 
+
+Lemma 5 requires at least two rungs in each half of the ladder. We now show that a uniform spanning tree of Hm satisfies this two-sided condition with high probability. 
+
+Lemma 6. Let T be a uniform spanning tree of Hm. Then 
+
+P|R LT | ≤ 1 or |R RT | ≤ 1 ≤ 2   89
+
+⌊m/ 2⌋ .
+
+Proof. We start by noting that both halves of the Hm highway in Figure 1 are composed of ⌊m/ 2⌋
+
+consecutive disjoint 4-cycles (with each cycle formed by two rungs edges and two rail edges). We can label these cycles from left-to-right C1...C ⌊ m  
+
+> 2⌋
+
+for each half of the ladder. Now use Algorithm 1 to sample T . As noted in the preliminaries, the probability T is sampled is independent of the order in which edges are processed, so we can process all 2 × 2⌊m/ 2⌋ rungs from left to right before any other edges of Hm.Consider any of the 4-cycles, say Ci, with its two rungs r⊤ 
+
+> i
+
+and r⊥ 
+
+> i
+
+(which lie in distinct columns and therefore share no vertex). By Definition 3, every vertex incident to a rung of Ci has degree 3 in Hm. By Lemma 2, 
+
+Rr⊤ 
+
+> i
+
+≥ 13 , Rr⊥ 
+
+> i
+
+≥ 13 .
+
+We sample T with Algorithm 1, processing the rungs cycle by cycle in the order C1, C 2, . . . , and within each cycle processing r⊤ 
+
+> i
+
+before r⊥ 
+
+> i
+
+. Suppose the rungs of C1, . . . , C i−1 have already been 7processed, leaving a contracted/deleted graph H′. Because the cycles are pairwise vertex-disjoint, the endpoints of r⊤ 
+
+> i
+
+and r⊥ 
+
+> i
+
+still have degree 3 in H′, so by Lemmas 1 and 2 the conditional probability that r⊤ 
+
+> i
+
+is contracted into T is its effective resistance in H′, which is at least 13 . Now condition further on r⊤ 
+
+> i
+
+∈ T , i.e. contract r⊤ 
+
+> i
+
+. This does change effective resistances elsewhere in the network; what matters is only that, since r⊥ 
+
+> i
+
+is vertex-disjoint from r⊤ 
+
+> i
+
+, its two endpoints retain degree 3 in the contracted graph, so Lemma 2 applies there and gives Rr⊥ 
+
+> i
+
+≥ 13 in that graph. Hence the conditional probability that r⊥ 
+
+> i
+
+∈ T is also at least 13 , and 
+
+Pr⊤ 
+
+> i
+
+∈ T and r⊥ 
+
+> i
+
+∈ T history through Ci−1
+
+ ≥ 19 .
+
+Equivalently, whatever the outcomes for the earlier cycles, the conditional probability that Ci
+
+contributes at most one rung to T is 
+
+P|{ r⊤ 
+
+> i
+
+, r ⊥ 
+
+> i
+
+} ∩ T | ≤ 1 history through Ci−1
+
+ ≤ 89 .
+
+If |R LT | ≤ 1, then every one of the ⌊m/ 2⌋ disjoint cycles in the left half contributes at most one rung. Multiplying the conditional bounds above along the processing order (rather than appealing to independence, which fails for spanning-tree edge events), the chain rule gives: 
+
+P|R LT | ≤ 1 ≤
+
+> ⌊m/ 2⌋
+
+Y
+
+> i=1
+
+89 =
+
+ 89
+
+⌊m/ 2⌋
+
+.
+
+An identical argument applies to the right half of the ladder, so using a union bound we get that: 
+
+P|R LT | ≤ 1 or |R RT | ≤ 1 ≤ 2
+
+ 89
+
+⌊m/ 2⌋
+
+.
+
+Combining Lemmas 5 and 6 yields: 
+
+Corollary 7. For a uniform spanning tree T of Hm,
+
+P T admits an ε-balanced cut  ≤ 2
+
+ 89
+
+⌊m/ 2⌋
+
+.
+
+Proof. By Lemma 5, if T admits an ε-balanced cut then |R LT | ≤ 1 or |R RT | ≤ 1. Apply Lemma 6. 
+
+# 6 The Adversarial 3-Partition 
+
+We now embed the highway graph as the merge of two adjacent districts in a 3-partition of a planar square grid graph. 
+
+Theorem 8. There exists an infinite family {(Gn, Pn)}∞ 
+
+> n=1
+
+of planar square grid graphs with ε-balanced 3-partitions, for any fixed balance tolerance ε ∈ [0 , 112 ), such that, writing m = m(n) = Θ( n) for the half-length of the ladder in the construction, the expected number of steps for ReCom 
+
+to leave Pn is at least exp (n)
+
+Proof. We construct Gn and the partition Pn = {Rn 
+
+> 1
+
+, R n 
+
+> 2
+
+, R n 
+
+> 3
+
+} as illustrated in Figure 4. The picture is a vertically-symmetric grid graph divided into four rectangular columns of widths roughly proportional to 14 , 16 , 16 , 14 of the total mass (with ε-corrections), arranged so that: 8• Rn 
+
+> 2
+
+(green) consists of the two narrow middle columns as well as a long thin tendril wrapping and dividing Rn 
+
+> 1
+
+from Rn 
+
+> 3
+
+.
+
+• Rn 
+
+> 1
+
+(brown) and Rn 
+
+> 3
+
+(blue) each consist of one wide outer column connected via a thin bridge to an arm of size 112 − ε that wraps one of the columns of Rn 
+
+> 2
+
+.
+
+Figure 4: On the left, the 3-partition Pn = {Rn 
+
+> 1
+
+, R n 
+
+> 2
+
+, R n 
+
+> 3
+
+} on the 264 × 264 grid graph Gn, colored in brown, green, and blue respectively. Each region has 23232 vertices, 13 of the mass. On the right, the highway graphs created by the labeled merges. The black rectangles inscribe regions that are shown scaled and zoomed-in; these zoomed views are included to make it easier to identify the “ladder” portions of the graphs. By construction, there are only two possible merges in this graph because Rn 
+
+> 1
+
+is nowhere adjacent to Rn 
+
+> 3
+
+. Moreover, both merges are highway graphs. To see this, consider the merge Rn 
+
+> 1
+
+∪ Rn 
+
+> 2
+
+. The merge consists of two wide outer regions of mass 14 − ε and one wide inner region of mass 16 − ε.The two wide outer regions are joined by a 2 × (2 m + 1) ladder, which is also connected to the inner region by a single vertex. If we denote the wide outer regions on the left and right with RL and 
+
+RR, and the inner region with RT , the result is the highway graph Hm of Definition 3. To see this, note that each of the three regions has at most 13 N vertices, while the highway corridor contributes only 2(2 m + 1) + 1 = Θ( n) vertices — an O(1 /n ) fraction of the total mass N = Θ( n2). Hence, for large n, each region together with the corridor still satisfies the size bound of Definition 3 (since  
+
+> 13
+
+N + Θ( n) < ( 12 − ε)N once N is large, using ε < 112 ). Similarly, because the initial construction is symmetric, the merge Rn 
+
+> 2
+
+∪Rn 
+
+> 3
+
+produces a symmetric highway graph. 9Now note that Reversible ReCom ’s transition function picks one of the three unordered pairs of pieces uniformly at random. With probability 1 /3 it picks {Rn 
+
+> 1
+
+, R n 
+
+> 3
+
+}, which is non-adjacent, and stalls. With probability 2 /3 it picks an adjacent pair, in which case Corollary 7 bounds the conditional probability of finding a balanced cut by 2   89
+
+⌊m/ 2⌋. Therefore the probability that any step succeeds in proposing a non-trivial move is at most 23 · 2   89
+
+⌊m/ 2⌋ = 43
+
+  89
+
+⌊m/ 2⌋ .
+
+Even ignoring the further reduction from the reversibility correction 1 /E (P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+), this is expo-nentially small in m, and the expected number of outer iterations until the state changes is the reciprocal of this probability, namely Ω 
+
+  98
+
+⌊m/ 2⌋
+
+.
+
+# 7 Discussion 
+
+Theorem 8 establishes that, in the worst case over starting states, the ReCom transition function does not run in expected polynomial time with respect to m. In the above construction the variable 
+
+m grows with n, the width of the grid graph, so we can say that the ReCom transition function does not run in polynomial time with respect to the dimensions of the grid graph. This affirmatively answers the first half of Problem 2.8 [2]. The chain can get stuck in con-figurations where a uniform random spanning tree of the merge admits a balanced cut only with exponentially small probability. The second half of Problem 2.8 — which asks whether such “bad” configurations are exponentially unlikely under the chain’s stationary distribution, or alternatively, exponentially unlikely to be reached from a typical starting state — is left open. We note two features of our construction that may bear on future work. First, the bad 3-partitions Pn are themselves moderately compact in the cut-edge sense, so compactness alone does not rule out adversarial configurations, even though the spanning-tree distribution favors compact partitions [5]. Second, our graphs Gn are grid graphs, which means that ReCom difficulty is not just an artifact of pathological planar geometry. A natural next step would be to bound the probability that the ReCom markov chain, started from the stationary distribution of an n × n grid, ever reaches a configuration of the type produced by Theorem 8. Finally, while we have found a family of adversarial configurations for ReCom , it should be noted that there are other related MCMC algorithms used for sampling districts which would not have to rediscover the thin path through the highway graph and would hence not be obstructed by this construction (e.g. the Balanced Up-Down Walk [1]). 
+
+# Acknowledgements 
+
+The author extends sincere thanks to Jamie Tucker-Foltz for introducing them to this problem and for providing invaluable mentorship and guidance throughout the preparation of this result. 10 A Reversible ReCom Pseudocode 
+
+Algorithm 2 Reversible ReCom (one step) [5]. 
+
+Require: A connected planar graph G on kn vertices, an ε-balanced k-partition P = {P1, . . . , P k}. 
+
+> 1:
+
+Select uniformly at random an unordered pair {Pi, P j }. 
+
+> 2:
+
+if Pi and Pj are not adjacent in G then  
+
+> 3:
+
+return P 
+
+> 4:
+
+end if  
+
+> 5:
+
+Sample a uniform random spanning tree T of G[Pi ∪ Pj ].  
+
+> 6:
+
+Run a depth-first search on T to find an edge e such that the two components of T − e each have size n (within ε tolerance).  
+
+> 7:
+
+if no such e exists then  
+
+> 8:
+
+return P 
+
+> 9:
+
+end if  
+
+> 10:
+
+Label the two components of T − e as P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+. 
+
+> 11:
+
+Let E(P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+) be the number of edges of G with one endpoint in P ′ 
+
+> i
+
+and one in P ′ 
+
+> j
+
+. 
+
+> 12:
+
+With probability 1 /E (P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+), replace {Pi, P j } in P with {P ′ 
+
+> i
+
+, P ′ 
+
+> j
+
+}. 
+
+> 13:
+
+return P
+
+# References 
+
+[1] Hugo A. Akitaya, Sarah Cannon, Gregory Herschlag, Gabe Schoenbach, Kristopher Tapp, and Jamie Tucker-Foltz. The balanced up-down walk, 2026. [2] American Institute of Mathematics. Open problems in redistricting mathematics. http: //aimpl.org/redistrictingmath . Problem list from the AIM workshop on mathematical aspects of redistricting. Problem 2.8 posed by Jamie Tucker-Foltz. Accessed 2026. [3] Brennan Center for Justice. Who controlled redistricting in every state. https://www.brennancenter.org/our-work/research-reports/ who-controlled-redistricting-every-state , 2022. [4] Campaign Legal Center. Independent redistricting commissions. https://campaignlegal. org/democracyu/accountability/independent-redistricting-commissions , 2018. [5] Sarah Cannon, Moon Duchin, Dana Randall, and Parker Rule. Spanning trees and redistrict-ing: New methods for sampling and validation. arXiv preprint arXiv:2210.01401 , 2022. [6] Sarah Cannon, Wesley Pegden, and Jamie Tucker-Foltz. Sampling balanced forests of grids in polynomial time, 2024. [7] Moses Charikar, Paul Liu, Tianyu Liu, and Thuy-Duong Vuong. On the complexity of sampling redistricting plans, 2023. [8] Daryl DeFord, Moon Duchin, and Justin Solomon. Recombination: A family of Markov chains for redistricting. Harvard Data Science Review , 3(1), 2021. 11 [9] Massachusetts Historical Society. The birth of the gerrymander. https://www.masshist.org/ object-of-the-month/objects/the-birth-of-the-gerrymander-2008-09-01 , 2008. Ob-ject of the Month, September 2008. [10] Ariel D. Procaccia and Jamie Tucker-Foltz. Compact redistricting plans have many spanning trees. SIAM Journal on Discrete Mathematics , 36(4):2787–2802, 2022. [11] Daniel A. Spielman. Spectral and Algebraic Graph Theory . 2019. Manuscript. Available at 
+
+http://cs-www.cs.yale.edu/homes/spielman/sagt .12
