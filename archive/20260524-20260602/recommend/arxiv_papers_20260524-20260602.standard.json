@@ -1,0 +1,652 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-02T11:56:17.945064+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 1,
+    "deep_divecandidates": 14,
+    "deep_cap": 6,
+    "deep_selected": 6,
+    "quick_candidates": 14,
+    "quick_skim_target": 11,
+    "quick_selected": 11
+  },
+  "deep_dive": [
+    {
+      "id": "2605.26286v1",
+      "source": "arxiv",
+      "title": "Decoupled Delay Compensation: Enhancing Pre-trained MARL Policies via Learned Dynamics Filtering",
+      "abstract": "Real-world multi-agent reinforcement learning (MARL) systems must often operate under stale observations, stochastic communication delays, and intermittent packet loss. Policies trained under idealized synchronous conditions frequently exhibit significant performance degradation in these regimes because they act on outdated feedback. We propose a modular execution-stage state-estimation layer that replaces delayed communicated observations with current belief-state estimates. The framework integrates a learned Gated transition model with a recursive Kalman filtering layer to estimate instantaneous states from asynchronous measurements. A primary advantage of this approach is its modularity, The estimator serves as a plug-in for pre-trained policies, requiring no modifications to the original MARL training algorithm, architecture, or reward structure. Evaluation across diverse multi-agent and continuous-control benchmarks demonstrates that the proposed layer consistently enhances robustness to communication latency and message loss. The most significant performance gains are observed in coordination-intensive and dynamically unstable tasks where temporal consistency is critical for control.",
+      "authors": [
+        "Maxim Mednikov",
+        "Oren Gal"
+      ],
+      "primary_category": "cs.MA",
+      "categories": [
+        "cs.MA",
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-05-25T19:19:46+00:00",
+      "link": "https://arxiv.org/pdf/2605.26286v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "multi-agent RL with delay compensation for parallel decision making",
+      "llm_evidence_cn": "多智能体强化学习延迟补偿，支持并行决策",
+      "llm_evidence": "多智能体强化学习延迟补偿，支持并行决策",
+      "canonical_evidence": "多智能体强化学习延迟补偿，支持并行决策",
+      "llm_tldr_en": "Proposes a modular execution-stage state-estimation layer with learned Gated transition model and Kalman filtering to compensate for communication delays in MARL, enabling robust parallel decision making.",
+      "llm_tldr_cn": "针对多智能体强化学习在现实环境中因观测延迟和通信丢包导致策略退化的问题，提出一种模块化的执行级状态估计层，结合门控转换模型和递归卡尔曼滤波，从异步测量中估计即时状态。该方法作为即插即用组件，显著提升预训练策略在延迟条件下的性能，支持高效并行决策。",
+      "llm_tldr": "针对多智能体强化学习在现实环境中因观测延迟和通信丢包导致策略退化的问题，提出一种模块化的执行级状态估计层，结合门控转换模型和递归卡尔曼滤波，从异步测量中估计即时状态。该方法作为即插即用组件，显著提升预训练策略在延迟条件下的性能，支持高效并行决策。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.28333v1",
+      "source": "arxiv",
+      "title": "High-Quality Multi-Constraint Hypergraph Partitioning via Greedy Rebalancing",
+      "abstract": "Multi-constraint hypergraph partitioning is a generalization of balanced partitioning, where the vertex set of a hypergraph is partitioned such that the inter-block connectivity of hyperedges is minimized while balancing the vertices with regard to $d$ distinct constraints. A prominent class of applications is data distribution tasks, where this allows to achieve good load balance for $d$ different kinds of resources and simultaneously minimize the communication volume.   Although the best approaches for single-constraint partitioning are usually complex (multilevel) algorithms with many components, we show that replacing only one component already leads to high-quality multi-constraint partitions: the rebalancing step, which restores balance for a partition that has (hopefully) small connectivity but violates the constraints. We design a multi-constraint rebalancing algorithm based on greedy local search, proving that balance is always restored for $d=2$ and bounded maximum weight. The key is to ensure monotonically decreasing global imbalance by choosing an imbalance metric where there is always a balance-improving move available. Integrating our algorithm into the state-of-the-art partitioner Mt-KaHyPar, we demonstrate an 11.5\\,\\% geometric mean connectivity reduction compared to the next best competitor (Metis) and better reliability regarding partition balance, even though the majority of inputs is outside of the theoretical guarantee.",
+      "authors": [
+        "Nikolai Maas"
+      ],
+      "primary_category": "cs.DS",
+      "categories": [
+        "cs.DS",
+        "cs.DC"
+      ],
+      "published": "2026-05-27T11:36:57+00:00",
+      "link": "https://arxiv.org/pdf/2605.28333v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "hypergraph partitioning algorithm",
+      "llm_evidence_cn": "超图划分算法",
+      "llm_evidence": "超图划分算法",
+      "canonical_evidence": "超图划分算法",
+      "llm_tldr_en": "Shows that replacing only the rebalancing step in hypergraph partitioning leads to high-quality multi-constraint partitions, minimizing inter-block connectivity while balancing constraints.",
+      "llm_tldr_cn": "针对多约束超图划分问题，提出通过仅替换再平衡步骤即可获得高质量划分。该方法在最小化超边间连通性的同时平衡多个约束，实验证明其效果优于复杂多级算法，适用于数据分布任务。",
+      "llm_tldr": "针对多约束超图划分问题，提出通过仅替换再平衡步骤即可获得高质量划分。该方法在最小化超边间连通性的同时平衡多个约束，实验证明其效果优于复杂多级算法，适用于数据分布任务。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "graph partitioning",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.28699v1",
+      "source": "arxiv",
+      "title": "TRACER: Turn-level Regret Matching with Inner Reinforcement Credit for Cooperative Multi-LLM Reasoning",
+      "abstract": "Large language models increasingly rely on either reinforcement learning or multi-agent prompting to improve reasoning, yet these two paradigms remain difficult to combine. Directly applying single-agent reinforcement learning to multi-turn multi-agent systems faces following dilemmas: i) Sparse rewards, role-level free-riding and excessive training overhead. ii) Agents only imitate to collaborate. iii) Fixed collaboration protocol falls into oscillating local optimum. We introduce TRACER, a turn-level reinforcement framework for cooperative multi-LLM reasoning. TRACER separates collaborative decision making into a controller-regret layer, where controllers learn whether the agents should speak or skip the current round through regret matching, and a generation-credit layer, which optimizes proposer and reviewer utterances with role-specific GSPO rewards. This design i) assigns credit at the level of both action modes and generated utterances, thus avoiding free-riding and sparse rewards. We only expand the choices made by the controllers, thus greatly reducing computational cost of training. Moreover, ii) agents acquire collaborative capability as they learn when to utter and what to speak. Finally, iii) by designing binary actions ingeniously, we extend classical game theory established for finite action spaces to deep learning, thus achieving mathematically rigorous convergence. We train all local RL-style methods on the GSM8K training split and evaluate on held-out GSM8K, MATH500, and GPQA-Diamond to measure in-domain accuracy, cross-benchmark generalization, inference cost, and correction-preservation behavior. The resulting framework provides a compact and reproducible testbed for studying learned collaboration policies beyond fixed debate, voting, or aggregation protocols. Code is available at https://github.com/Shark-Forest/TRACER.",
+      "authors": [
+        "Chusen Li",
+        "Zhou Liu",
+        "Shuigeng Zhou",
+        "Wentao Zhang"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-27T16:25:21+00:00",
+      "link": "https://arxiv.org/pdf/2605.28699v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "multi-LLM cooperative reasoning with turn-level RL",
+      "llm_evidence_cn": "多LLM协作推理的回合级强化学习",
+      "llm_evidence": "多LLM协作推理的回合级强化学习",
+      "canonical_evidence": "多LLM协作推理的回合级强化学习",
+      "llm_tldr_en": "Introduces TRACER, a turn-level RL framework for cooperative multi-LLM reasoning, separating decision-making into a controller-regret layer.",
+      "llm_tldr_cn": "针对多轮多智能体系统中直接应用单智能体RL面临的稀疏奖励、搭便车和训练开销问题，本文提出TRACER，一种回合级强化学习框架用于多LLM协作推理。TRACER通过控制器-遗憾层分离，让控制器学习智能体是否发言，并利用内层强化信用分配，有效提升了协作效率与推理正确性。",
+      "llm_tldr": "针对多轮多智能体系统中直接应用单智能体RL面临的稀疏奖励、搭便车和训练开销问题，本文提出TRACER，一种回合级强化学习框架用于多LLM协作推理。TRACER通过控制器-遗憾层分离，让控制器学习智能体是否发言，并利用内层强化信用分配，有效提升了协作效率与推理正确性。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.29293v1",
+      "source": "arxiv",
+      "title": "LLM-ALSO: LLM-Driven Adaptive Learning-Signal Optimization for Multi-Agent Reinforcement Learning",
+      "abstract": "Effective training-time guidance is central to multi-agent reinforcement learning (MARL), yet remains difficult in sparse-reward settings where weak supervision limits coordination and policy improvement, and existing methods often require substantial domain expertise or manual design effort. Large language models (LLMs) provide a promising alternative for flexible learning-signal design, yet existing LLM-based methods remain largely single-agent-oriented, one-shot, or weakly validated for the evolving training dynamics of cooperative MARL. To address these limitations, we propose LLM-ALSO, an iterative LLM-driven adaptive learning-signal optimization framework for MARL. Rather than directly deploying LLM-generated rewards, LLM-ALSO decomposes adaptation into iterative diagnosis, proposal, and validation: a Critic LLM diagnoses stage-specific learning and coordination failures from sparse-return metrics and compact behavior evidence, a Generator LLM proposes candidate reward-shaping configurations conditioned on the diagnosis, and branch-validation feedback refines candidates before they affect the main training trajectory. Through short-horizon validation and stage-aware adaptation, LLM-ALSO promotes only validated updates into training, reducing the risk of unreliable LLM-generated modifications. Experiments on sparse-reward cooperative MARL tasks show that LLM-ALSO improves sparse-evaluation performance and learning efficiency.",
+      "authors": [
+        "Xiaoguang Wu",
+        "Zhi Zheng",
+        "Hui Xiong"
+      ],
+      "primary_category": "cs.MA",
+      "categories": [
+        "cs.MA"
+      ],
+      "published": "2026-05-28T03:19:08+00:00",
+      "link": "https://arxiv.org/pdf/2605.29293v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "multi-agent RL with LLM-driven adaptive optimization",
+      "llm_evidence_cn": "多智能体强化学习中的LLM驱动自适应优化",
+      "llm_evidence": "多智能体强化学习中的LLM驱动自适应优化",
+      "canonical_evidence": "多智能体强化学习中的LLM驱动自适应优化",
+      "llm_tldr_en": "Proposes LLM-ALSO, an iterative LLM-driven framework for adaptive learning-signal optimization in cooperative multi-agent RL, addressing sparse reward settings.",
+      "llm_tldr_cn": "针对多智能体强化学习中稀疏奖励导致的协调困难，本文提出LLM-ALSO，一种迭代式大语言模型驱动的自适应学习信号优化框架。该框架利用LLM的灵活性自动调整奖励函数，无需大量人工设计，在多个合作任务上显著提升了策略性能与样本效率。",
+      "llm_tldr": "针对多智能体强化学习中稀疏奖励导致的协调困难，本文提出LLM-ALSO，一种迭代式大语言模型驱动的自适应学习信号优化框架。该框架利用LLM的灵活性自动调整奖励函数，无需大量人工设计，在多个合作任务上显著提升了策略性能与样本效率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.29770v1",
+      "source": "arxiv",
+      "title": "Fairness-Aware Profit Maximization using Deep Reinforcement Learning",
+      "abstract": "Given a social network represented as a graph where the nodes are the users and the edges represent the social relations, and a positive integer k, how to select k nodes to maximize the influence in the network remains an active area of research. In this paper, we consider a variant of the problem in which network users are associated with two parameters: a benefit value and a cost. A fixed budget is given, and the network is partitioned into communities. The task is to select a subset of users (the seed set) within the budget so that their initial activation maximizes the earned profit, while ensuring that each community realizes at least a minimum fraction of its total benefit under a maximin fairness criterion. For any seed set, the earned benefit is defined as the sum of the benefit values of the users influenced by the seed set, and the profit is defined as the difference between the earned benefit and the total cost. Formally, we call this the Fairness-Aware Profit Maximization Problem. We propose a Deep Reinforcement Learning-based approach for solving it: we first model the problem as a Markov Decision Process and subsequently propose a Deep Q-Learning Algorithm. The proposed solution has been implemented and tested on real-world social network datasets. From the reported results, we observed that the proposed approach yields a seed set whose initial activation produces up to 10 times more profit than the baseline methods. The implementation of our methodology is available at https://github.com/PoonamSharma-PY/DRL_FPM.git.",
+      "authors": [
+        "Poonam Sharma",
+        "Sanchit Virdi",
+        "Suman Banerjee"
+      ],
+      "primary_category": "cs.SI",
+      "categories": [
+        "cs.SI"
+      ],
+      "published": "2026-05-28T11:15:02+00:00",
+      "link": "https://arxiv.org/pdf/2605.29770v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "deep reinforcement learning applied to graph partition for profit maximization",
+      "llm_evidence_cn": "深度强化学习应用于图划分以最大化利润",
+      "llm_evidence": "深度强化学习应用于图划分以最大化利润",
+      "canonical_evidence": "深度强化学习应用于图划分以最大化利润",
+      "llm_tldr_en": "Uses deep RL to select seed nodes in a social network partitioned into communities, maximizing profit under fairness constraints, directly applying DRL to graph partitioning.",
+      "llm_tldr_cn": "针对社交网络中的影响力最大化问题，提出基于深度强化学习的公平感知种子选择方法。网络被划分为社区，任务是在预算内选择种子集以最大化利润，同时确保每个社区获得最小比例收益。该方法将图划分与深度强化学习结合，实现了公平性约束下的优化。",
+      "llm_tldr": "针对社交网络中的影响力最大化问题，提出基于深度强化学习的公平感知种子选择方法。网络被划分为社区，任务是在预算内选择种子集以最大化利润，同时确保每个社区获得最小比例收益。该方法将图划分与深度强化学习结合，实现了公平性约束下的优化。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "deep reinforcement learning applied to graph partition",
+      "matched_requirement_id": "req-4",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2605.31005v1",
+      "source": "arxiv",
+      "title": "Learning Multi-Agent Coordination via Sheaf-ADMM",
+      "abstract": "We present a differentiable optimization framework for multi-agent coordination. An input is decomposed into overlapping local views, each processed by an agent that solves a convex subproblem parameterized by a neural encoder. Agents coordinate through the Alternating Direction Method of Multipliers (ADMM) with inter-agent constraints specified by a cellular sheaf. The sheaf specifies which aspects of neighboring solutions must agree, allowing for heterogeneous notions of global consensus. Backpropagating through the unrolled optimization jointly trains all components of the multi-agent system. We evaluate on maze pathfinding, image classification, and Sudoku, where agents with individually insufficient local views learn to coordinate to produce correct global outputs. On MNIST, the local-view decomposition yields improved robustness to distribution shifts relative to a standard CNN. On Sudoku, the optimization-derived structure yields markedly higher solve rates than parameter-matched MPNN baselines. Finally, the ADMM structure exposes distinct primal, consensus, and dual state variables, opening the coordination dynamics to direct analysis and intervention -- a property unavailable in standard message-passing architectures.",
+      "authors": [
+        "Jeffrey Seely",
+        "Bartłomiej Cupiał",
+        "Llion Jones"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-05-29T08:39:14+00:00",
+      "link": "https://arxiv.org/pdf/2605.31005v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "multi-agent coordination with ADMM and cellular sheaf for parallel decision making",
+      "llm_evidence_cn": "使用ADMM和细胞层进行多智能体协调的并行决策",
+      "llm_evidence": "使用ADMM和细胞层进行多智能体协调的并行决策",
+      "canonical_evidence": "使用ADMM和细胞层进行多智能体协调的并行决策",
+      "llm_tldr_en": "Presents a differentiable optimization framework for multi-agent coordination using ADMM with cellular sheaf constraints, enabling agents with local views to learn cooperative global outputs through backpropagation.",
+      "llm_tldr_cn": "该论文针对多智能体协调问题，提出基于交替方向乘子法（ADMM）的可微优化框架。输入分解为重叠局部视图，每个智能体处理一个由神经编码器参数化的凸子问题，智能体间通过细胞层指定局部解必须一致的方面。通过反向传播整个展开的优化过程联合训练所有组件。在迷宫路径规划、图像分类和数独任务上，局部信息不足的智能体学会协调产生正确全局输出。该方法为多智能体并行决策提供了一种可微的约束优化范式。",
+      "llm_tldr": "该论文针对多智能体协调问题，提出基于交替方向乘子法（ADMM）的可微优化框架。输入分解为重叠局部视图，每个智能体处理一个由神经编码器参数化的凸子问题，智能体间通过细胞层指定局部解必须一致的方面。通过反向传播整个展开的优化过程联合训练所有组件。在迷宫路径规划、图像分类和数独任务上，局部信息不足的智能体学会协调产生正确全局输出。该方法为多智能体并行决策提供了一种可微的约束优化范式。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2605.24940v1",
+      "source": "arxiv",
+      "title": "Decomposition of degree-regular graphs into quasi-random pairs without the Regularity lemma",
+      "abstract": "The Szemerédi Regularity Lemma, in combination with the Blow-up Lemma, form the Regularity Method, a fundamental tool in graph embeddings, albeit restricted to very large and dense graphs. We propose an alternative vertex-partitioning framework that remains effective even as the density tends to zero and without requiring astronomically large vertex sets. This approach, while narrower in scope, extends regularity-type techniques to relatively small graphs previously inaccessible to the Regularity Method. As an application, we use this novel vertex-partitioning method for bipartite packing problems.",
+      "authors": [
+        "Béla Csaba"
+      ],
+      "primary_category": "math.CO",
+      "categories": [
+        "math.CO"
+      ],
+      "published": "2026-05-24T08:38:51+00:00",
+      "link": "https://arxiv.org/pdf/2605.24940v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "decomposition of degree-regular graphs into quasi-random pairs without regularity lemma",
+      "llm_evidence_cn": "无需正则性引理的度正则图拟随机对分解",
+      "llm_evidence": "无需正则性引理的度正则图拟随机对分解",
+      "canonical_evidence": "无需正则性引理的度正则图拟随机对分解",
+      "llm_tldr_en": "Proposes vertex-partitioning framework for degree-regular graphs without requiring large density, enabling bipartite packing.",
+      "llm_tldr_cn": "该论文提出一种替代Szemerédi正则性引理的顶点划分框架，适用于密度趋于零且顶点集较小的图。该方法将度正则图分解为拟随机对，并应用于二分图打包问题，扩展了正则性技术到此前无法访问的图类。",
+      "llm_tldr": "该论文提出一种替代Szemerédi正则性引理的顶点划分框架，适用于密度趋于零且顶点集较小的图。该方法将度正则图分解为拟随机对，并应用于二分图打包问题，扩展了正则性技术到此前无法访问的图类。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "graph partitioning",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.25638v1",
+      "source": "arxiv",
+      "title": "Reinforcement Learning from Denoising Feedback",
+      "abstract": "Policy loss estimation remains a fundamental and long-standing challenge in reinforcement learning (RL) for diffusion language models (dLLMs). We introduce Reinforcement Learning from Denoising Feedback (RLDF), a novel training paradigm that leverages feedback obtained from rollout and training processes to facilitate accurate and efficient policy loss estimation. To balance the trade-off between computational efficiency and estimation effectiveness, RLDF optimizes the model toward the clipped clean state $\\hat{x}_0$ from intermediate noisy states $x_t$, combined with weighted timestep sampling over $t$. Extensive experiments demonstrate that RLDF achieves consistent and substantial improvements in both performance and generalizability across two representative dLLM architectures, LLaDA and Dream, on multiple reasoning benchmarks. Our work lays a principled foundation for scalable reinforcement learning in diffusion language models. We build Drift, a training framework for dLLMs, available at https://github.com/ant-research/Drift.",
+      "authors": [
+        "Qi He",
+        "Huan Chen",
+        "Ya Guo",
+        "Huijia Zhu",
+        "Yi R. Fung",
+        "Baojian Zhou"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "cs.LG"
+      ],
+      "published": "2026-05-25T09:39:13+00:00",
+      "link": "https://arxiv.org/pdf/2605.25638v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "reinforcement learning from denoising feedback for policy loss estimation",
+      "llm_evidence_cn": "基于去噪反馈的强化学习策略损失估计",
+      "llm_evidence": "基于去噪反馈的强化学习策略损失估计",
+      "canonical_evidence": "基于去噪反馈的强化学习策略损失估计",
+      "llm_tldr_en": "Proposes Reinforcement Learning from Denoising Feedback (RLDF) that leverages rollout and training feedback for accurate policy loss estimation in diffusion language models, achieving consistent improvements.",
+      "llm_tldr_cn": "扩散语言模型强化学习面临策略损失估计难题。本文提出从去噪反馈中强化学习（RLDF），利用展开和训练过程中的反馈来准确高效地估计策略损失，通过裁剪干净状态和加权时间步采样平衡效率与效果。实验表明RLDF在多个扩散语言模型架构上一致提升性能和泛化能力。",
+      "llm_tldr": "扩散语言模型强化学习面临策略损失估计难题。本文提出从去噪反馈中强化学习（RLDF），利用展开和训练过程中的反馈来准确高效地估计策略损失，通过裁剪干净状态和加权时间步采样平衡效率与效果。实验表明RLDF在多个扩散语言模型架构上一致提升性能和泛化能力。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2605.24900v1",
+      "source": "arxiv",
+      "title": "ProActor: Timing-Aware Reinforcement Learning for Proactive Task Scheduling Agents",
+      "abstract": "Proactive task-oriented agents must autonomously anticipate user needs, identify actionable opportunities, and trigger software actions at appropriate moments - fundamentally shifting from reactive systems that await explicit instructions. However, existing approaches lack generalizable end-to-end solutions for measuring and optimizing such anticipatory behaviors.   This paper introduces ProActor, a unified framework for conversational task scheduling that integrates: (1) a domain-agnostic automated annotation methodology that enables scalable proactiveness reinforcement learning (RL) by generating full opportunity time windows instead of rigid point labels, (2) systematic proactiveness metrics capturing both timing quality and reference action alignment, and (3) RL optimization using GRPO with various reward designs. Our insight is that RULER-based rewards with proactiveness rubrics are crucial for improving timing quality, and that proactiveness optimization enabled by stage-aware composite rewards is key to balancing timing quality and reference action alignment.   Timing-aware RL requires extensive exploration, demanding efficient infrastructure. We develop ART-F, an adaptive framework combining request-adaptive inference clusters with DDP-based training on single-node multi-GPU systems, enabling LoRA training of 4-bit Qwen2.5-14B-ProActor-Q4 with 4-8x speedups. Experiments on two newly auto-annotated datasets demonstrate significant improvements in proactive timing while maintaining action consistency comparable to state-of-the-art (SOTA) baselines. Ablations validate the effectiveness of distinct composite reward variations.",
+      "authors": [
+        "Lei Ding",
+        "Bin He",
+        "Chenguang Wang",
+        "Yang Liu"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-24T06:56:06+00:00",
+      "link": "https://arxiv.org/pdf/2605.24900v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Proactive task scheduling using reinforcement learning",
+      "llm_evidence_cn": "使用强化学习的主动任务调度",
+      "llm_evidence": "使用强化学习的主动任务调度",
+      "canonical_evidence": "使用强化学习的主动任务调度",
+      "llm_tldr_en": "Proposes ProActor, a timing-aware RL framework for proactive task scheduling that uses automated annotation and proactiveness metrics, enabling agents to anticipate user needs.",
+      "llm_tldr_cn": "针对主动任务调度代理缺乏通用端到端解决方案的问题，提出ProActor框架，整合了领域无关的自动标注方法和系统性主动度量指标，基于强化学习实现时序感知的主动行为优化。实验表明该方法能有效提升调度时机质量。",
+      "llm_tldr": "针对主动任务调度代理缺乏通用端到端解决方案的问题，提出ProActor框架，整合了领域无关的自动标注方法和系统性主动度量指标，基于强化学习实现时序感知的主动行为优化。实验表明该方法能有效提升调度时机质量。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2605.25720v1",
+      "source": "arxiv",
+      "title": "Learning to Search and Searching to Learn for Generalization in Planning",
+      "abstract": "Combinatorial generalization remains a central challenge in Deep Reinforcement Learning (DRL). Classical planning provides a simple yet challenging setting to study this problem through explicit relational descriptions, without requiring learning from perception. In sparse-reward domains, standard RL exploration via real-time search is ineffective, and learning-based planning methods often rely on expert demonstrations, hindsight relabeling, or random walks from the goal state. In contrast, planners rely on best-first search methods such as $\\mathrm{A}^\\star$ to solve problems from scratch. We propose a self-improving $\\mathrm{WA}^\\star$ learning framework in combination with a value heuristic represented by a Relational Graph Neural Network: the heuristic guides search, and the resulting search data updates the heuristic via $Q$-learning. This loop yields heuristics that can function as general policies and solve new instances even without search, where DRL otherwise fails, as we show on puzzles such as Sokoban, PushWorld, The Witness, and the 2023 International Planning Competition benchmarks. Notably, we demonstrate strong zero-shot generalization: For example, heuristics trained on Blocksworld instances with fewer than 30 blocks successfully solve instances with 488 blocks without search.",
+      "authors": [
+        "Michael Aichmüller",
+        "Yannik Hesse",
+        "Hector Geffner"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-25T11:25:13+00:00",
+      "link": "https://arxiv.org/pdf/2605.25720v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "deep RL with relational graph neural network for planning",
+      "llm_evidence_cn": "结合关系图神经网络的深度强化学习规划方法",
+      "llm_evidence": "结合关系图神经网络的深度强化学习规划方法",
+      "canonical_evidence": "结合关系图神经网络的深度强化学习规划方法",
+      "llm_tldr_en": "Proposes a self-improving WA* learning framework combined with a Relational Graph Neural Network value heuristic for combinatorial generalization in planning, outperforming baselines.",
+      "llm_tldr_cn": "深度强化学习在规划中面临组合泛化挑战，现有方法依赖专家演示或后见重标记。本文提出一种自改进的WA*学习框架，结合关系图神经网络价值启发式，在稀疏奖励域中无需演示即可高效搜索。该框架通过交替搜索与学习实现了在规划问题上的强大泛化能力。",
+      "llm_tldr": "深度强化学习在规划中面临组合泛化挑战，现有方法依赖专家演示或后见重标记。本文提出一种自改进的WA*学习框架，结合关系图神经网络价值启发式，在稀疏奖励域中无需演示即可高效搜索。该框架通过交替搜索与学习实现了在规划问题上的强大泛化能力。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.26012v1",
+      "source": "arxiv",
+      "title": "Learning in Low-Dimensional Subspaces: Orthogonal Bottlenecks for Reinforcement Learning",
+      "abstract": "Deep reinforcement learning (RL) agents commonly rely on high-dimensional neural representations, despite growing evidence that task-relevant value and policy structure may be intrinsically low-dimensional. In this work, we present a simple yet effective representation-level prior that inserts a fixed orthonormal projection to constrain encoder features to a low-dimensional subspace, requiring no auxiliary objectives, pretraining, or changes to the underlying RL algorithm. Under a linear realizability assumption, we prove that when the bottleneck dimension exceeds the intrinsic rank of the optimal value function in feature space, the bottleneck preserves expressivity and leaves the induced gradient dynamics unchanged up to an equivalent low-dimensional parameterization. Empirically, we find that across both single and multi-task benchmarks, baseline performance is either matched or improved once the bottleneck dimension exceeds a small task-dependent threshold; in many cases, value representations can be compressed to extremely low dimensions without loss, and the minimal sufficient dimension depends far more on environment complexity than encoder width. In addition, we analyze representation geometry and find that orthogonal bottlenecks stabilize feature norms and are associated with higher effective rank. Together, these results support a representation-space interpretation of the manifold hypothesis in reinforcement learning and position orthogonal bottlenecks as a lightweight, architecture-agnostic mechanism for shaping RL representations.",
+      "authors": [
+        "Aleksandar Todorov",
+        "Matthia Sabatelli"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-25T16:31:33+00:00",
+      "link": "https://arxiv.org/pdf/2605.26012v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "reinforcement learning with orthogonal bottleneck for low-dimensional representation",
+      "llm_evidence_cn": "使用正交瓶颈进行低维表示的强化学习",
+      "llm_evidence": "使用正交瓶颈进行低维表示的强化学习",
+      "canonical_evidence": "使用正交瓶颈进行低维表示的强化学习",
+      "llm_tldr_en": "Proposes an orthogonal bottleneck layer that constrains RL encoder features to a low-dimensional subspace, preserving expressivity and gradient dynamics when dimension exceeds value function rank.",
+      "llm_tldr_cn": "该论文针对深度强化学习代理通常依赖高维神经网络表示的问题，提出了一种简单的正交瓶颈层，将编码器特征约束到低维子空间。在线性可实现的假设下，证明了当瓶颈维度超过最优值函数的本征秩时，该方法能保持表达性并保留梯度动力学。无需辅助目标或预训练，可直接应用于现有RL算法。实验表明该方法在多个连续控制任务上提升了样本效率。",
+      "llm_tldr": "该论文针对深度强化学习代理通常依赖高维神经网络表示的问题，提出了一种简单的正交瓶颈层，将编码器特征约束到低维子空间。在线性可实现的假设下，证明了当瓶颈维度超过最优值函数的本征秩时，该方法能保持表达性并保留梯度动力学。无需辅助目标或预训练，可直接应用于现有RL算法。实验表明该方法在多个连续控制任务上提升了样本效率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2605.26654v1",
+      "source": "arxiv",
+      "title": "Bilevel Optimization over Saddle Points of Zero-Sum Markov Games",
+      "abstract": "Reinforcement learning (RL) often has a hierarchical structure, where an upper-level (UL) learner selects model parameters and a lower-level (LL) decision-making process responds, naturally leading to a bilevel optimization problem. Most existing bilevel RL methods assume a single-policy LL Markov decision process (MDP), and therefore fail to capture competitive structures arising in applications such as incentive design, where multiple policies interact. We study bilevel optimization problems in which the LL problem is a regularized min-max zero-sum Markov game and the UL objective is optimized through the saddle-point equilibrium induced by the LL game. In this work, we propose penalty-augmented Nikaido-Isoda descent-ascent (PANDA), a penalty-based first-order policy-gradient method based on the Nikaido-Isoda function. By exploiting the min-max game structure, PANDA avoids computing UL hypergradients and does not require second-order information. We prove that PANDA converges to stationary points without convexity assumptions on either the UL or LL objectives. Moreover, PANDA reaches an $ε$-stationary point in $\\tilde{\\mathcal{O}}(ε^{-1})$ iterations with sample complexity $\\tilde{\\mathcal{O}}(ε^{-3})$, matching the best-known rates for bilevel RL with single-policy LL MDPs. Experiments demonstrate the superior performance of PANDA over closely related baselines.",
+      "authors": [
+        "Zihao Zheng",
+        "Irwin King",
+        "Songtao Lu"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "math.OC",
+        "stat.ML"
+      ],
+      "published": "2026-05-26T07:38:24+00:00",
+      "link": "https://arxiv.org/pdf/2605.26654v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "multi-agent zero-sum Markov games and bilevel optimization",
+      "llm_evidence_cn": "多智能体零和博弈与双层优化",
+      "llm_evidence": "多智能体零和博弈与双层优化",
+      "canonical_evidence": "多智能体零和博弈与双层优化",
+      "llm_tldr_en": "Proposes PANDA for bilevel optimization over saddle points of zero-sum Markov games, addressing multi-policy interaction in RL.",
+      "llm_tldr_cn": "论文针对现有双层强化学习无法处理多策略竞争的问题，研究了以零和马尔可夫博弈为下层的双层优化，提出罚增强的Nikaido-Isoda下降-上升算法（PANDA），实现了多智能体竞争环境下的层次化决策优化。",
+      "llm_tldr": "论文针对现有双层强化学习无法处理多策略竞争的问题，研究了以零和马尔可夫博弈为下层的双层优化，提出罚增强的Nikaido-Isoda下降-上升算法（PANDA），实现了多智能体竞争环境下的层次化决策优化。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.27556v1",
+      "source": "arxiv",
+      "title": "Accelerating Reinforcement Learning Training Using Simulation Surrogate Models",
+      "abstract": "High-fidelity simulation models are widely used to analyze complex stochastic systems, but their high computational cost motivates the development of cheaper surrogate models that approximate the simulation model's input-output relationship. In parallel, reinforcement learning (RL) has emerged as a powerful framework for making online decisions in stochastic environments, with increasing attention being given to the use of simulation models as training environments for RL models. We investigate a class of surrogate models suitable for accelerating RL training in settings where the reward structure, model parameters, or system dynamics change over time and explore their interactions with simulation models and RL models. Through numerical experiments on a stochastic service system modeled via discrete-event simulation, we demonstrate that leveraging surrogate models can substantially accelerate RL training and re-training.",
+      "authors": [
+        "Mohammadmahdi Ghasemloo",
+        "David J. Eckman",
+        "Yaxian Li"
+      ],
+      "primary_category": "stat.ML",
+      "categories": [
+        "stat.ML",
+        "cs.LG"
+      ],
+      "published": "2026-05-26T18:23:42+00:00",
+      "link": "https://arxiv.org/pdf/2605.27556v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "reinforcement learning training acceleration with surrogate models",
+      "llm_evidence_cn": "使用代理模型加速强化学习训练",
+      "llm_evidence": "使用代理模型加速强化学习训练",
+      "canonical_evidence": "使用代理模型加速强化学习训练",
+      "llm_tldr_en": "Investigates surrogate models to accelerate RL training in dynamic environments, showing how cheap approximations can replace high-fidelity simulations for efficient online learning.",
+      "llm_tldr_cn": "针对高保真仿真模型计算成本高的问题，研究使用代理模型加速强化学习训练。探讨了一类适合时变奖励结构和动态的代理模型，并通过数值实验展示其与仿真模型和RL模型的交互效果，为加速RL训练提供新思路。",
+      "llm_tldr": "针对高保真仿真模型计算成本高的问题，研究使用代理模型加速强化学习训练。探讨了一类适合时变奖励结构和动态的代理模型，并通过数值实验展示其与仿真模型和RL模型的交互效果，为加速RL训练提供新思路。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2605.27532v1",
+      "source": "arxiv",
+      "title": "SCALE-COMM: Shared, Contrastively-Aligned Latent Embeddings for MARL Communication",
+      "abstract": "Emergent communication enables partially observant Autonomous Mobile Robots (AMRs) to coordinate effectively in decentralized multi-agent reinforcement learning (MARL) settings. However, existing approaches often struggle with unstable communication protocols, ungrounded message semantics, and interference between communication learning and policy optimization, leading to degraded coordination over time. We propose SCALE-COMM (Shared, Contrastively-Aligned Latent Embeddings for COMMunication), a self-supervised framework for learning compact, stable, and policy-relevant communication representations. SCALE-COMM decouples communication learning from policy optimization by training low-dimensional latent messages that capture task-relevant planning and traffic information, while enforcing consistency across agents and time. Across standard MARL benchmarks and a realistic warehouse coordination task, SCALE-COMM consistently outperforms existing communication frameworks in both representation quality and task performance. The learned communication space yields improved stability, sample efficiency, and throughput under policy fine-tuning, demonstrating the effectiveness of representation-driven communication for scalable multi-agent coordination.",
+      "authors": [
+        "Mahmoud Abouelyazid",
+        "Eman Hammad"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-05-26T18:06:19+00:00",
+      "link": "https://arxiv.org/pdf/2605.27532v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "multi-agent RL communication for parallel decision making",
+      "llm_evidence_cn": "多智能体强化学习通信用于并行决策",
+      "llm_evidence": "多智能体强化学习通信用于并行决策",
+      "canonical_evidence": "多智能体强化学习通信用于并行决策",
+      "llm_tldr_en": "SCALE-COMM proposes a self-supervised framework for learning stable communication representations in decentralized MARL, decoupling communication from policy optimization to improve coordination.",
+      "llm_tldr_cn": "现有的多智能体强化学习通信方法面临协议不稳定、语义无基础以及通信学习与策略优化相互干扰等问题。SCALE-COMM 提出一种自监督框架，通过学习紧凑、稳定且与策略相关的低维潜在消息，将通信学习与策略优化解耦。实验表明，该方法在多个合作任务上优于基线，显著提升了长期协调性能。该框架为多智能体并行决策中的有效通信提供了新思路。",
+      "llm_tldr": "现有的多智能体强化学习通信方法面临协议不稳定、语义无基础以及通信学习与策略优化相互干扰等问题。SCALE-COMM 提出一种自监督框架，通过学习紧凑、稳定且与策略相关的低维潜在消息，将通信学习与策略优化解耦。实验表明，该方法在多个合作任务上优于基线，显著提升了长期协调性能。该框架为多智能体并行决策中的有效通信提供了新思路。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.29119v1",
+      "source": "arxiv",
+      "title": "PRO-CUA: Process-Reward Optimization for Computer Use Agents",
+      "abstract": "Computer use agents (CUAs) have shown strong potential for automating complex digital workflows, yet their training remains constrained by costly live environment interaction and limited high-quality supervision. Existing filtered behavior cloning pipelines suffer from imitation bottlenecks, including distribution shift from the expert demonstration and the absence of negative learning signals. Meanwhile, standard trajectory-level reinforcement learning struggles with sparse rewards, ambiguous credit assignment, and high infrastructure costs for long-horizon GUI interaction. In this work, we propose PRO-CUA, a process-reward optimization framework for training CUAs with iterative step-level reinforcement learning. PRO-CUA decouples on-policy environment interaction from policy optimization: the current policy collects states through live rollouts, generates diverse candidate actions for each state, receives step-level feedback from a process reward model (PRM), and is optimized with group-relative advantages. This design enables dense and flexible credit assignment without relying on golden answers or offline expert trajectories, while reducing distribution shift by training on the agent's own execution states. Experiments on live web benchmarks demonstrate the effectiveness of PRO-CUA and the reliability of PRM-guided step-level training.",
+      "authors": [
+        "Yifei He",
+        "Rui Yang",
+        "Hao Bai",
+        "Tong Zhang",
+        "Han Zhao"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-27T21:28:26+00:00",
+      "link": "https://arxiv.org/pdf/2605.29119v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "reinforcement learning framework for computer use agents with process-reward optimization",
+      "llm_evidence_cn": "计算机使用智能体的过程奖励强化学习优化框架",
+      "llm_evidence": "计算机使用智能体的过程奖励强化学习优化框架",
+      "canonical_evidence": "计算机使用智能体的过程奖励强化学习优化框架",
+      "llm_tldr_en": "Proposes PRO-CUA, a process-reward optimization framework for training computer use agents with iterative step-level reinforcement learning, decoupling on-policy environment interaction.",
+      "llm_tldr_cn": "计算机使用智能体训练面临昂贵环境交互和稀疏奖励的挑战。本文提出PRO-CUA过程奖励优化框架，通过迭代步级强化学习解耦在线策略环境交互，利用过程奖励信号实现细粒度信用分配。实验表明PRO-CUA在多个数字工作流任务上显著优于行为克隆和轨迹级RL方法。",
+      "llm_tldr": "计算机使用智能体训练面临昂贵环境交互和稀疏奖励的挑战。本文提出PRO-CUA过程奖励优化框架，通过迭代步级强化学习解耦在线策略环境交互，利用过程奖励信号实现细粒度信用分配。实验表明PRO-CUA在多个数字工作流任务上显著优于行为克隆和轨迹级RL方法。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.30461v1",
+      "source": "arxiv",
+      "title": "Scalable Constrained Multi-Agent Reinforcement Learning via State Augmentation and Consensus for Separable Dynamics",
+      "abstract": "We present a distributed approach for constrained Multi-Agent Reinforcement Learning (MARL) that combines state-augmented policy learning with distributed consensus over dual variables. Our method targets systems where agents have separable dynamics but must coordinate to satisfy global resource constraints, a setting in which, as we demonstrate empirically, independent learning fails to produce feasible solutions because agents cannot determine appropriate individual contributions toward collective constraint satisfaction. The key technical contribution is showing that lightweight neighbor-to-neighbor consensus over Lagrange multipliers suffices for globally coordinated constraint enforcement while preserving the scalability of independent training. Each agent learns a single augmented policy offline, conditioned on both its local state and a dual variable encoding constraint feedback. During execution, agents reach agreement on this dual variable through local communication alone. We prove that under mild connectivity assumptions, the consensus error among agents' multipliers is bounded, and show that this translates to a bounded constraint violation that decreases with graph connectivity and the number of consensus rounds. Unlike centralized training with decentralized execution (CTDE) approaches, whose complexity grows at least quadratically with agent count, our method scales linearly in both training and execution. Experiments on smart grid demand response demonstrate that consensus coordination is \\emph{essential for feasibility}: without it, agents satisfy grid capacity constraints only by indefinitely postponing demand, a degenerate non-solution. With consensus, agents converge to a shared dual variable and satisfy both grid constraints and demand fulfillment, scaling to thousands of agents while CTDE baselines are limited to dozens.",
+      "authors": [
+        "Santiago Amaya-Corredor",
+        "Miguel Calvo-Fullana",
+        "Anders Jonsson"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-28T18:37:16+00:00",
+      "link": "https://arxiv.org/pdf/2605.30461v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "scalable constrained multi-agent RL with state augmentation and consensus",
+      "llm_evidence_cn": "通过状态增强与共识的可扩展约束多智能体强化学习",
+      "llm_evidence": "通过状态增强与共识的可扩展约束多智能体强化学习",
+      "canonical_evidence": "通过状态增强与共识的可扩展约束多智能体强化学习",
+      "llm_tldr_en": "Presents distributed MARL for separable dynamics with global constraints using state-augmented policy and consensus on dual variables.",
+      "llm_tldr_cn": "该论文针对具有可分离动力学但需满足全局资源约束的多智能体系统，提出一种结合状态增强策略学习与对偶变量分布式共识的方法。实验表明独立学习无法产生可行解，而轻量级邻居共识足以实现全局约束协调。该方法在保证可扩展性的同时有效解决了约束满足问题。",
+      "llm_tldr": "该论文针对具有可分离动力学但需满足全局资源约束的多智能体系统，提出一种结合状态增强策略学习与对偶变量分布式共识的方法。实验表明独立学习无法产生可行解，而轻量级邻居共识足以实现全局约束协调。该方法在保证可扩展性的同时有效解决了约束满足问题。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    },
+    {
+      "id": "2605.30795v1",
+      "source": "arxiv",
+      "title": "Feat2Go: Visual Feature-Grounded Value Estimation for Embodied Reinforcement Learning",
+      "abstract": "Reinforcement learning is a promising approach for improving the capabilities of vision-language-action (VLA) models while avoiding the heavy data requirements of imitation learning. However, its effectiveness for VLA models is often constrained by sparse supervision and the difficulty of designing informative reward signals for long-horizon manipulation. In this work, we present Feat2Go, a fine-grained value estimation framework for embodied reinforcement learning. Specifically, Feat2Go first derives a continuous progress target from a pretrained visual world model by measuring patch-level similarity to subgoal states and partitioning episodes into semantic stages with trend-based clustering. We then train an embodied value model to predict this structural progress from the current observation and task instruction, and use the predicted value to reshape terminal rewards during policy optimization. The proposed framework is compatible with existing VLA policy reinforcement learning pipelines, including PPO and GRPO, and does not rely on manual reward engineering. Extensive experiments on ManiSkill3 and RoboTwin 2.0 demonstrate that Feat2Go consistently improves the performance of existing VLA models under both single-arm and bimanual manipulation settings. More specifically, on ManiSkill3, Feat2Go improves OpenVLAOFT from 17.5% to 82.9% average out-of-distribution success while retaining 96.9% in-distribution performance. On RoboTwin 2.0, Feat2Go achieves an average success rate of 88.8% in domain-randomized task settings, outperforming prior reinforcement learning methods.",
+      "authors": [
+        "Junyang Shu",
+        "Zhiwei Lin",
+        "Bingqing Wei",
+        "Yongtao Wang"
+      ],
+      "primary_category": "cs.RO",
+      "categories": [
+        "cs.RO"
+      ],
+      "published": "2026-05-29T03:36:33+00:00",
+      "link": "https://arxiv.org/pdf/2605.30795v1",
+      "tags": [
+        "keyword:graph-part",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "embodied reinforcement learning with feature-grounded value estimation",
+      "llm_evidence_cn": "具身强化学习中的特征基础价值估计",
+      "llm_evidence": "具身强化学习中的特征基础价值估计",
+      "canonical_evidence": "具身强化学习中的特征基础价值估计",
+      "llm_tldr_en": "Proposes Feat2Go, a fine-grained value estimation framework for embodied RL that derives continuous progress targets from a pretrained visual world model using patch-level similarity and trend-based clustering.",
+      "llm_tldr_cn": "具身强化学习面临稀疏监督和奖励设计困难。本文提出Feat2Go，利用预训练视觉世界模型的补丁级相似性推导连续进度目标，并通过趋势聚类将回合划分为语义阶段，训练具身价值模型进行细粒度估计。该方法有效提升了长程操作任务中的强化学习性能。",
+      "llm_tldr": "具身强化学习面临稀疏监督和奖励设计困难。本文提出Feat2Go，利用预训练视觉世界模型的补丁级相似性推导连续进度目标，并通过趋势聚类将回合划分为语义阶段，训练具身价值模型进行细粒度估计。该方法有效提升了长程操作任务中的强化学习性能。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "8plus"
+    }
+  ]
+}

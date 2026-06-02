@@ -1,0 +1,370 @@
+Title: Fairness-Aware Profit Maximization using Deep Reinforcement Learning
+
+URL Source: https://arxiv.org/pdf/2605.29770v1
+
+Published Time: Fri, 29 May 2026 01:23:49 GMT
+
+Number of Pages: 12
+
+Markdown Content:
+# Fairness-Aware Profit Maximization using Deep Reinforcement Learning 
+
+Poonam Sharma 1[0009 −0009 −2608 −9414] , Sanchit Virdi 2, and Suman Banerjee 1[0000 −0003 −1761 −5944]  
+
+> 1
+
+Indian Institute of Technology Jammu, Jammu & Kashmir, India 
+
+{poonam.sharma,suman.banerjee}@iitjammu.ac.in  
+
+> 2
+
+National Institute of Technology Srinagar, Jammu & Kashmir, India 
+
+virdisanchit@gmail.com 
+
+Abstract. Given a social network represented as a graph where the nodes are the users and the edges represent the social relations, and a positive integer k, how to select k nodes to maximize the influence in the network remains an active area of research. In this paper, we consider a variant of the problem in which network users are associated with two parameters: a benefit value and a cost. A fixed budget is given, and the network is partitioned into communities. The task is to select a subset of users (the seed set) within the budget so that their initial activation maximizes the earned profit, while ensuring that each community realizes at least a minimum fraction of its total benefit under a maximin fairness criterion. For any seed set, the earned benefit is defined as the sum of the benefit values of the users influenced by the seed set, and the profit is defined as the difference between the earned benefit and the total cost. Formally, we call this the Fairness-Aware Profit Maximization Problem .We propose a Deep Reinforcement Learning-based approach for solving it: we first model the problem as a Markov Decision Process and sub-sequently propose a Deep Q-Learning Algorithm . The proposed solution has been implemented and tested on real-world social network datasets. From the reported results, we observed that the proposed approach yields a seed set whose initial activation produces up to 10 times more profit than the baseline methods. The implementation of our methodology is available at https://github.com/PoonamSharma-PY/DRL_FPM.git .
+
+Keywords: Profit Maximization · Deep Reinforcement Learning · In-dependent Cascade Model · Maximin Fairness · Seed Set 
+
+1 Introduction 
+
+A social network can be defined as an interconnected structure among a group of human agents, that is formed for social interactions [3]. Due to the advent of social networks and mobile handheld devices, the use of online social networks has become ubiquitous in day-to-day life [1]. The commercial houses use these online social networks for campaigning purpose in the following way. They dis-tribute a limited number of products to influential people in the network with  
+
+> arXiv:2605.29770v1 [cs.SI] 28 May 2026 2Sharma et al.
+
+the hope that many of them will like the product and share positive feedback as a social media post. As they are influential people, they have many follow-ers and many of them will actually like the post and share it [9]. This process will continue, and at the end of the diffusion process, a significant number of users will be influenced. The key computational problem in this case is given a social network and a positive integer k, choose a k-sized subset as a seed set to maximize the influence. This problem has been referred to as the Influence Maximization Problem in the literature. There exists a significant amount of literature on this problem [2,7]. In recent times, a variant of this problem has been introduced where the users of the network are associated with two positive integers, which we call the cost and benefit associated with the user. The cost of the user signifies the amount of incentive that needs to be paid if the user is chosen as seed user, and the benefit of the user signifies the amount of benefit that can be earned if the user becomes influenced. For any subset of user, the earned benefit of the subset is defined as the sum of the benefit values of the influenced users in the network when the diffusion starts from this subset. The profit of the seed set is defined as the difference between the benefit earned by the seed set and its cost. In the context of viral marketing, the goal will be to maximize profit [14,4]. Hence, the problem becomes, for a given budget how to select the seed nodes effectively such that the earned profit by the seed set gets maximized. There are several solution methodologies in the literature. However, to the best of our knowledge, the notion of the fairness has not been considered in the existing studies. In practice, a social network consists of a number of communities, and a com-munity in a social network is defined as a subset of the users such that they are densely connected among themselves and sparsely connected among other parts of the network [11]. In this setup, it will be good to ensure fairness due to the following reason. If the ultimate objective is to maximize the total earned profit, then it may so happen that a significant amount of the earned profit is from a very few communities. This scenario signifies that in the rest of the communities, the influence is very limited. This is, of course, not a very desirable situation because in that case, many people will be unaware of the product. While deep reinforce-ment learning has been applied to fairness-aware influence maximization [10], no comparable approach exists for the profit-aware setting, where node-level costs and benefits induce a budget constraint and change the structure of the seed selection problem. This motivates us to define the Fairness-Aware Profit Maximization Problem, and we have proposed a Deep Q-Learning Algorithm to solve it. In particular, we make the following contributions in this paper: 
+
+– We have introduced and studied the Fairness-Aware Profit Maximization Problem, for which the available literature is limited. 
+
+– We have proposed a Deep Q-Learning Algorithm (RL4FPM) for solving this problem. 
+
+– We have experimented with real-world social network datasets and compared our proposed approach with the existing methodologies. Fairness-Aware Profit Maximization using Deep Reinforcement Learning 3
+
+The rest of the paper has been organized as follows. Section 2 describes the background information and formally defines the problem. Section 3 describes the formulation of our problem. The proposed solution methodology has been described in Section 4. The experimental evaluation of the proposed approach has been described in Section 5. Finally, Section 6 concludes our study and poses some future research questions. 
+
+2 Background and Problem Definition 
+
+This section describes the background of our study and formally defines our problem. Initially, we start by describing the notion of social networks and its diffusion phenomenon. 
+
+2.1 Social Network and Influence Propagation 
+
+We model a social network as an edge-weighted, (un)directed graph G(V, E, p ),where V is the set of users, E is the set of social relations, and p : E → (0 , 1] maps each edge to an influence probability. We adopt the Independent Cascade (IC) model for diffusion: starting from a seed set S ⊆ V , an influenced node has one chance to activate each of its uninfluenced neighbors, with success probability equal to the edge weight. The diffusion proceeds in discrete steps until no further activation occurs. The expected number of nodes influenced by S is denoted 
+
+σ(S), with σ : 2 V → R+0 .
+
+2.2 Profit Maximization Problem 
+
+Each user has an associated cost and benefit, given by functions C : V → R+ and 
+
+b : V → R+. For any subset S ⊆ V , the total selection cost is C(S) = P 
+
+> u∈S
+
+C(u).If S is the seed set, let I(S) denote the set of influenced nodes. The earned benefit is β(S) = P 
+
+> u∈I(S)
+
+b(u), and the profit is Π(S) = β(S) − C (S). The Profit Maximization Problem is to select a seed set within a fixed budget B that maximizes the profit: 
+
+SOP T ←− arg max  
+
+> S⊆V, C(S)≤B
+
+Π(S). (1) Setting b(v) = n and C(v) = 1 for all v, with budget B = k, reduces k-cardinality Influence Maximization to Profit Maximization (the constant −| S| term is dom-inated by n · | I(S)|). Since k-IM is NP-hard [6], so is Profit Maximization. 
+
+2.3 Network Embedding 
+
+A network embedding maps each node to a low-dimensional vector, h : V → Rd,with hv ∈ Rd for node v. We adopt Structure2Vec [12], specifically the DE-MF variant [5], which iteratively refines hv by aggregating its neighbors’ embeddings together with the node’s own features (cost and benefit). The resulting embed-dings serve as input features to the Q-network described later. 4 Sharma et al. 
+
+2.4 Markov Decision Process 
+
+A Markov Decision Process (MDP) is a tuple (S, A, P, R, γ ), where S is the state space, A the action space, P the transition function, R the reward function, and 
+
+γ ∈ [0 , 1) the discount factor. The action-value function under policy π is 
+
+Qπ (s, a ) = Eπ [Gt | St = s, A t = a], (2) and the goal of reinforcement learning is to learn an optimal policy π∗ that maximizes the expected total reward. 
+
+3 Problem Formulation 
+
+We consider that the given social network is partitioned into ℓ disjoint commu-nities denoted by C = {C1, C 2, . . . , C i, . . . , C ℓ}. Hence, each user of the network belongs to exactly one community. Given a seed set S ⊆ V and the per-node benefit b(v), let ηCi (G, S ) denote the community benefit ratio of Ci, defined as the fraction of Ci’s total benefit that is realized under the seed set S:
+
+ηCi (G, S ) = 
+
+P 
+
+> v∈Ci∩I(S)
+
+b(v)
+
+P 
+
+> v∈Ci
+
+b(v) , (3) where I(S) is the set of nodes influenced by S under the diffusion process. To quantify fairness in influence spread, we use a benefit-weighted maximin fairness criterion, which ensures that each community earns at least a minimum fraction of its total realizable benefit. This can be computed as shown in Equation 4. 
+
+f (G, S ) = min  
+
+> ∀Ci∈C
+
+ηCi (G, S ). (4) Maximin fairness ensures that the least-served community receives more benefit from the newly selected seed node, promoting equitable benefit realization across all groups. 
+
+3.1 Problem Statement 
+
+In this paper, we study the problem of selecting a seed set within a given budget that maximizes the overall profit while ensuring maximal fairness in benefit realization across communities, measured using the maximin fairness criterion. We refer to this as the Fairness-Aware Profit Maximization Problem . Formally, it is stated as follows: 
+
+max  
+
+> S⊆V
+
+Π(G, S ) (5) subject to C(S) ≤ B, (6) 
+
+f (G, S ) ≥ τ, (7) Fairness-Aware Profit Maximization using Deep Reinforcement Learning 5
+
+where Π(G, S ) is the net profit obtained from the seed set S, C(S) is the total selection cost, B is the allocated budget, and τ is the minimum acceptable community benefit ratio under the maximin criterion of Equation 4. The first constraint ensures that the cost of the seed set is within the allocated budget, and the second ensures that the worst-served community receives at least a 
+
+τ fraction of its total realizable benefit. If multiple seed sets yield the same maximum profit, any set that additionally maximizes overall outreach can be chosen. Next, we model the Fairness-Aware Profit Maximization problem using Reinforcement Learning (RL). 
+
+3.2 Formulation using Reinforcement Learning (RL) 
+
+Here, we describe different attributes of the Markov Decision Process. First, we start by describing the notion of a timestep. 
+
+– Timestep: In our study, we select seed nodes in a round-wise manner. Each round of seed selection is modeled as a discrete timestep t, with one node selected per round. The time horizon is indicated by t = 1 , . . . , T with T = k,where k is the maximum number of seed nodes allowed. Hence, k ≤ B 
+
+> Cmin
+
+,where Cmin denotes the minimum selection cost, i.e., Cmin = min  
+
+> u∈V
+
+C(u). Thus, the agent selects one node at each timestep until the seed set reaches size k.
+
+– State: At timestep t, the state St is represented by the tuple St = ( G, C, X t),where G = ( V, E ) is a graph sampled from the pool of graphs G, C is the set of communities in the network, and Xt ∈ { 0, 1}|V | is a binary vector indicating which nodes have been selected as seed nodes up to time t. Xvt = 1 if a node v is selected as a seed till the timestep t, and 0 otherwise. Initially, no node is selected, and therefore, Xv 
+
+> 1
+
+= 0 for all v ∈ V . While the MDP state St = ( G, C, X t) formally includes the binary selection vector Xt, the Q-network’s input is a compact encoding that summarizes Xt by its size |Xt|
+
+together with a Structure2Vec embedding of the candidate node. 
+
+– Action: At each timestep t, the agent selects a node to add to the seed set, and its cost is subtracted from the allocated budget. This is represented by a one-hot vector at ∈ { 0, 1}|V | with one non-zero entry indicating the chosen node i.e., P|V | 
+
+> v=1
+
+avt = 1 . The action space at the state St is constrained both by selection Xvt = 0 and by feasibility under the remaining budget 
+
+C(v) ≤ Brem,t .
+
+– State-action-transition probability: When a node is selected at timestep 
+
+t, it is added to the seed set and the state is updated accordingly as shown in Equation 8 and 9. 
+
+Xt+1 = Xt + at, t = 1 , . . . , T. (8) 
+
+Brem ,t +1 = Brem ,t − C (v), t = 1 , . . . , T, (9) 
+
+– Reward: The total reward at the end of an episode is defined as the total profit in the network G resulting from the selected seed set S. This formula-tion implies that the agent would receive a reward only at the terminal time 6 Sharma et al. 
+
+step T , not during intermediate steps. This sparsity of rewards can signif-icantly hinder the agent’s learning efficiency. To address this, we define an immediate reward at each time step using the marginal profit of the selected node, and this can be mathematically defined in Equation 10 
+
+r(G, X t, a t) = Π G, S (Xt) ∪ { v} − Π G, S (Xt), (10) where v is the node selected at time t (v ∈ V and avt = 1 ), and S(Xt) = 
+
+{u ∈ V | Xut = 1 } denotes the seed set induced by Xt. With slight abuse of notation, we write S for S(Xt) in the remainder of the paper when the timestep is clear from context. 
+
+– Enhancing Fairness: To incorporate fairness, we add a maximin term to the reward, weighted by φ ≥ 0:
+
+R(G, S ) = Π(G, S ) + φ · f (G, S ). (11) The corresponding per-step marginal reward is 
+
+r(G, X t, a t) =  Π(G, S (Xt)∪{ v})−Π(G, S (Xt)) +φ f (G, S (Xt)∪{ v})−f (G, S (Xt)) .
+
+(12) In practice, Π and f are estimated from a single Independent Cascade rollout per step; the resulting stochasticity is absorbed by replay-buffer averaging at the gradient update. 
+
+4 Proposed Solution Approach 
+
+In this section, we propose RL4FPM , a deep Q-learning approach for budget-constrained profit maximization that learns a seed-selection policy generaliz-ing across graph instances. Algorithm 1 trains a Q-network Qθ that scores the marginal value of adding any candidate node under a budget constraint. Each episode samples a fresh subgraph G from the training pool; Structure2Vec pro-duces node embeddings {hv }v∈V (collectively denoted h in the algorithm), and the agent constructs a seed set one node at a time via an ε-greedy policy over budget-feasible candidates. The reward at each step is the marginal increment of R = ΠIC + φF , where ΠIC is a single-sample IC benefit and F is the worst-community fairness term. Transitions are stored in a fixed-capacity replay buffer 
+
+M, and every Tu episodes, a uniform minibatch is drawn to perform a single gradient step on the mean squared one-step Bellman error. Because each episode samples a different subgraph, M is cross-graph, which trains Qθ toward a graph-conditional value function and allows reuse on unseen test subgraphs. 
+
+Time complexity of RL4FPM . Gradient updates are performed every Tu
+
+episodes, and the IC reward uses a single sample per step. Under these settings, the training time complexity for a pool of graphs is 
+
+O HE p (|V | · | θ| + |E|) + EpTemb |E| demb 
+
+.Fairness-Aware Profit Maximization using Deep Reinforcement Learning 7
+
+Algorithm 1 RL4FPM: Deep Q-Learning for Fairness-Aware Profit Maximiza-tion                
+
+> Require: Budget B; episodes Ep; learning rate α; discount γ;ε-schedule (ε0, ε min , ρ ); replay ca-pacity N; batch size K; update period Tu; min. cost Cmin ; fairness weight φ
+> Ensure: Trained Q-network Qθ
+
+1: Initialize Qθ with random weights θ; M ← ∅ ; ε ← ε0
+
+2: for e = 1 to Ep do 
+
+3: Sample training subgraph G = ( V, E ); load b(·), C(·), C 
+
+4: h ← Structure2Vec (G, C, b )
+
+5: X ← ∅ ; Z ← ∅ ; Brem ← B; Rprev ← 0
+
+6: while Brem ≥ C min do 
+
+7: at ← ε-Greedy (Qθ , G, X, Z, ε, h, B rem , C)
+
+8: if at = ∅ then break 
+
+9: end if 
+
+10: if C(at) > B rem then 
+
+11: Z ← Z ∪ { at}; continue 
+
+12: end if 
+
+13: Brem ← Brem − C (at); X′ ← X ∪ { at}
+
+14: Rt ← ProfitFairnessReward (G, X ′, b, φ )
+
+15: rt ← Rt − Rprev ; Rprev ← Rt
+
+16: term ← (Brem ≤ 0) 
+
+17: Store (G, X, a t, r t, X ′, term , h ) in M
+
+18: X ← X′
+
+19: end while 
+
+20: if e mod Tu = 0 and |M| ≥ K then 
+
+21: Sample minibatch B ⊂ M of size K; L ← 0
+
+22: for each (G, X, a, r, X ′, term , h ) ∈ B do 
+
+23: s ← EncodeState (G, X, a, h, B rem , C)
+
+24: if term then 
+
+25: y ← r
+
+26: else 
+
+27: y ← r + γ max v∈V \X′ Qθ 
+
+>  EncodeState (G, X ′, v, h, B rem ,C)
+
+28: end if 
+
+29: L ← L + ( y − Qθ (s)) 2
+
+30: end for 
+
+31: θ ← θ − α∇θ (L/K )
+
+32: end if 
+
+33: ε ← max( ε · ρ, ε min )
+
+34: end for 
+
+35: return Qθ
+
+Here, H is the episode horizon (bounded by B/ Cmin ), and Ep is the number of training episodes. |V | and |E| are the node and edge counts of the sampled sub-graph, and |θ| is the number of weights in the Q-network Qθ . Temb is the number of Structure2Vec iterations, and demb is its embedding dimension. The first term covers ε-greedy action selection over |V | candidates per step, along with the single-sample IC rollout. The second term covers the per-episode Structure2Vec cost. The gradient-update cost is amortized into the action-selection term and is not shown separately. In inference, the trained policy is run greedily on test graphs. The reward rollout is no longer needed, so the per-instance cost reduces to 
+
+O Temb |E| demb + H |V | · | θ|.
+
+A classical Monte Carlo greedy profit-IM solver instead costs O(H · | V | · m · | E|)
+
+per instance, where m is the number of Monte Carlo simulations. The m · | E|
+
+factor is paid once per candidate by the greedy method. RL4FPM replaces this with a single O(|V | · | θ|) Q-network evaluation per candidate, and the IC-rollout cost is paid only during training. 8 Sharma et al. 
+
+5 Experimental Details 
+
+5.1 Dataset Description 
+
+The experiments are performed on synthetic and real-world networks. All datasets are partitioned into majority and minority communities at a 20:80 ratio. The real-world networks are downloaded from SNAP: Stanford Network Analysis Project. These datasets are listed in Table 1. Table 1: Basic statistics of the datasets used in our experiments.                           
+
+> Dataset Type Source Network Sampled Instances
+> |V||E|Nodes Train Test Email-Eu-Core Directed 1,005 25 ,571 500 12 8
+> H-BA2k Undirected 30 ,000 119 ,990 2,000 50 10
+> Wiki-Vote Directed 7,115 103 ,689 1,000 12 8
+
+5.2 Experimental Setup 
+
+RL Parameters We trained RL4FPM for Ep = 720 episodes using the Adam optimizer with learning rate α = 0 .001 and discount factor γ = 0 .95 . Exploration followed an ε-greedy schedule, annealed multiplicatively by ρ = 0 .995 per episode from ε0 = 1 .0 toward a floor of εmin = 0 .05 . The updates were performed on minibatches of size K = 32 drawn uniformly from a FIFO replay buffer of capacity N = 10 ,000 , with one gradient step taken every Tu = 2 episodes. The Q-network was a feed-forward architecture with hidden dimension 128 and ReLU activations, taking as input a 67 -dimensional state vector that concatenates a 
+
+demb = 64 Structure2Vec embedding (generated with Temb = 3 message-passing iterations) with the candidate node’s cost, the remaining budget, and the current seed-set size. The reward combined the realized benefit earned from the influence of a single Independent Cascade rollout with a worst-community fairness term weighted by φ = 1 .0.
+
+Influence Probability We use two settings: (i) Uniform, with p(ui, u j ) = 0 .1
+
+for all (ui, u j ) ∈ E, and (ii) Trivalency, with each edge’s probability drawn uniformly at random from {0.1, 0.01 , 0.001 }.
+
+Budget(B) : We have experimented with the 6 different budget values: 500 ,
+
+1000 , 1500 , 2000 , 2500 and 3000 .
+
+Evaluation Metric : We evaluate the profit metric for all the algorithms over a range of budget values, averaged over m = 1 ,000 Monte Carlo simulations. 
+
+Environment Setup All experiments were conducted on a Linux workstation with a 32-core Intel processor (3.2 GHz) and 64 GiB of memory. All algorithms are implemented in a Python 3.13.5 environment, integrated with the NetworkX 3.5 and torch 2.9.0 libraries. Fairness-Aware Profit Maximization using Deep Reinforcement Learning 9
+
+5.3 Baseline Methods 
+
+We compare our approach with the following baselines: 
+
+– Random : Selects the seed nodes randomly within the given budget. 
+
+– Simple-PageRank : Selects top-k nodes based on the Pagerank centrality. 
+
+– Parity [13]: Parity seeding is a fairness-aware strategy that modifies the se-lection thresholds for different groups to balance representation in the seed set. Overall, it selects nodes based on degree, ensuring that the group pro-portions of the seed set match those of the entire population. 
+
+– High Degree : Selects the top-k nodes having the highest degree and within the given budget. 
+
+– Fair-PageRank : The parity-based seeding is applied on PageRank central-ity instead of degree, ensuring that seed nodes are fairly selected from all communities. 
+
+– Crosswalk [8]: Crosswalk generates fairness-aware network embeddings and selects the most centrally located nodes as seed nodes using the k-medoids clustering method. 
+
+5.4 Results and Discussion 
+
+In this section, we will discuss the results of our experiments. Our discussion will be through the following analysis. 
+
+Impact of Budget on Profit Earned We study profit earned by RL4FPM and the baselines across budgets, starting with the uniform probability set-ting. On Email-Eu-Core (Figure 1(a)), Random is the strongest baseline across all budgets. RL4FPM achieves improvements of 3% , 14% , 20% , and 25% over Random at budgets 1500 , 2000 , 2500 , and 3000 . On H-BA2k (Figure 1(b)), RL4FPM achieves maximum profit at every budget. Simple-PageRank is the strongest baseline (Fair-PageRank at 1500 ). The profit curve is non-monotonic. Improvements range from 60% vs Simple-PageRank at 500 to 501% at 2500 .The volatility points to training variance. On Wiki-Vote (Figure 1(c)), RL4FPM achieves maximum profit at all but one budget. The strongest baseline shifts: Parity at 500 , Fair-PageRank at 1000 , Random at 1500 , Simple-PageRank from 
+
+2000 . The single loss is at 500 (−66% vs Parity). Improvements are 23% vs Fair-PageRank at 1000 , 56% vs Random at 1500 , then 63% , 84% , and 106% vs Simple-PageRank at 2000 , 2500 , and 3000 . For the trivalency probability setting: On Email-Eu-Core (Figure 2(a)), RL4FPM achieves higher profit on most bud-gets. Simple-PageRank is the strongest baseline (Parity at 1000 ). RL4FPM loses at 500 (−90% vs Simple-PageRank) but climbs to 132% over Simple-PageRank at 3000 . On H-BA2k (Figure 2(b)), RL4FPM achieves maximum profit at every budget. This is the strongest result. High Degree is the strongest baseline at 
+
+500 and 1000 , and Simple-PageRank from 1500 . Improvements are 836% and 
+
+978% vs High Degree at 500 and 1000 , and 897% vs Simple-PageRank at 3000 .On Wiki-Vote (Figure 2(c)), RL4FPM achieves maximum profit at every bud-get with monotonic dominance. The strongest baseline shifts: Crosswalk at 500 ,10 Sharma et al. 500 1000 1500 2000 2500 3000 050k 100k 150k 200k 250k 300k Profit Earned Budget 500 1000 1500 2000 2500 3000 010k 20k 30k 40k 50k 60k 70k Profit Earned Budget 500 1000 1500 2000 2500 3000 050k 100k 150k 200k 250k 300k 350k Profit Earned Budget 
+
+Fig. 1: Budget Vs. Profit Plots for Uniform Probability settings Fair-PageRank at 1000 , Parity at 1500 , 2000 , and 2500 , and Random at 3000 .RL4FPM climbs from 55709 to 260629 while baselines stay flat around 42000 to 
+
+45000 . Improvements grow from 29% vs Crosswalk at 500 to 513% vs Random at 3000 .500 1000 1500 2000 2500 3000 050k 100k 150k 200k 250k 300k Profit Earned Budget 500 1000 1500 2000 2500 3000 05k 10k 15k 20k 25k 30k 35k 40k 45k Profit Earned Budget 500 1000 1500 2000 2500 3000 050k 100k 150k 200k 250k 300k Profit Earned Budget 
+
+Fig. 2: Budget Vs. Profit Plots for Trivalency Probability settings We restrict the seed set size and execution time analysis below to the uni-form probability setting only, as the trivalency setting yields qualitatively similar patterns and is omitted for space constraints. 
+
+Impact of Budget on Seed Set Size A natural question is whether RL4FPM earns more profit by selecting more seeds or better seeds. Figure 3 shows that the answer is dataset-dependent. On Email-Eu-Core, RL4FPM picks similar seed counts to baselines but achieves 3% to 25% higher profit, indicating smarter selection. On H-BA2k, it picks fewer seeds (e.g., 5 vs 7 at budget 500 ; 30 vs 39 at budget 3000 ) yet earns up to 200% more profit, showing that quality dominates quantity. On Wiki-Vote, it picks about 50% more seeds at roughly 52 vs 78 
+
+cost per seed, trading individual cost for coverage, with profit improvements growing from 23% to 106% over the strongest baseline. RL4FPM thus adapts its seed-set composition to the graph structure: fewer-but-better on H-BA2k, more-but-cheaper on Wiki-Vote, smarter-at-same-count on Email-Eu-Core. 
+
+Computational performance of the Algorithms Figure 4 shows execution time under the uniform setting. Baselines run within about 50 seconds of each other per dataset, while RL4FPM is the slowest in nearly every configuration. The slowdown ranges from 2.1× (Wiki-Vote, budget 500 ) to 37 .6× (H-BA2k, budget 2500 ). RL4FPM is also the most profitable from budget 1000 onward on Wiki-Vote and Email-Eu-Core, and at every budget on H-BA2k. The method Fairness-Aware Profit Maximization using Deep Reinforcement Learning 11 500 1000 1500 2000 2500 3000 010 20 30 40 50 60 70 Seed Set Size Budget 500 1000 1500 2000 2500 3000 010 20 30 40 50 Seed Set Size Budget 500 1000 1500 2000 2500 3000 010 20 30 40 50 Seed Set Size Budget 
+
+Fig. 3: Budget Vs. Seed Set Size Plots for Uniform Probability settings trades execution time for profit, with the trade-off most pronounced on the largest network. 500 1000 1500 2000 2500 3000 10 210 310 4Execution Time Budget (seconds) 500 1000 1500 2000 2500 3000 10 110 210 310 4Execution Time Budget (seconds) 500 1000 1500 2000 2500 3000 10 210 310 4Execution Time  Budget (seconds) 
+
+Fig. 4: Budget Vs. Execution Time (in Seconds) Plots for Uniform Probability settings 
+
+6 Concluding Remarks and Future Research Directions 
+
+In this paper, we have introduced and studied the Fairness-Aware Profit Max-imization Problem, where the goal is to select a seed set within an allocated budget that maximizes the earned profit while ensuring that each community’s realized benefit ratio meets a minimum threshold under the maximin fairness cri-terion. To solve this problem, we proposed RL4FPM, a deep Q-learning approach that combines Structure2Vec embeddings with an ε-greedy seed-selection policy trained over a pool of subgraphs, enabling generalization to unseen networks without retraining. We evaluated RL4FPM on one synthetic and two real-world benchmark networks against six fairness-agnostic and fairness-aware baselines under both uniform and trivalency influence-probability settings. The results show that RL4FPM achieves substantially higher profit than all baselines at moderate-to-large budgets. As future work, we plan to replace the Monte Carlo Independent Cascade rollout with a learned graph neural network surrogate, which would reduce the per-step reward-evaluation cost and allow the method to scale to substantially larger networks. 12 Sharma et al. 
+
+References 
+
+1. Azzaakiyyah, H.K.: The impact of social media use on social interaction in contem-porary society. Technology and Society Perspectives (TACIT) 1(1), 1–9 (2023) 2. Banerjee, S., Jenamani, M., Pratihar, D.K.: A survey on influence maximization in a social network. Knowledge and Information Systems 62 (9), 3417–3455 (2020) 3. Borgatti, S.P., Agneessens, F., Johnson, J.C., Everett, M.G.: Analyzing social net-works. EBOOK (2024) 4. Chen, T., Liu, B., Liu, W., Fang, Q., Yuan, J., Wu, W.: A random algorithm for profit maximization in online social networks. Theoretical Computer Science 803 ,36–47 (2020) 5. Dai, H., Dai, B., Song, L.: Discriminative embeddings of latent variable models for structured data. In: International conference on machine learning. pp. 2702–2711. PMLR (2016) 6. Kempe, D., Kleinberg, J., Tardos, É.: Maximizing the spread of influence through a social network. In: Proceedings of the Ninth ACM SIGKDD International Con-ference on Knowledge Discovery and Data Mining (KDD). pp. 137–146 (2003) 7. Li, Y., Fan, J., Wang, Y., Tan, K.L.: Influence maximization on social graphs: A survey. IEEE Transactions on Knowledge and Data Engineering 30 (10), 1852–1872 (2018) 8. Pantea, L., Blahovici, A.E.: [re] crosswalk: Fairness-enhanced node representation learning. In: ML Reproducibility Challenge 2022 (2023), https://openreview. net/forum?id=tpk45Zll8eh 
+
+9. Rachmad, Y.E.: Social media marketing mediated changes in consumer behavior from e-commerce to s-commerce at tokopedia, lazada, shopee, blibli. com, and bukalapak (2022) 10. Saxena, A., Yadav, H., Rutten, B., Jha, S.S.: Dq4fairim: Fairness-aware influence maximization using deep reinforcement learning. ArXiv abs/2512.00545 (2025), 
+
+https://api.semanticscholar.org/CorpusID:283448886 
+
+11. Singh, S.S., Muhuri, S., Mishra, S., Srivastava, D., Shakya, H.K., Kumar, N.: Social network analysis: A survey on process, tools, and application. ACM computing surveys 56 (8), 1–39 (2024) 12. Song, L.: Structure2vec: Deep learning for security analytics over graphs. In: Pro-ceedings of the Conference. USENIX Association, Atlanta, GA (May 2018) 13. Stoica, A.A., Han, J.X., Chaintreau, A.: Seeding network influence in biased net-works and the benefits of diversity. In: Proceedings of The Web Conference 2020. p. 2089–2098. WWW ’20, Association for Computing Machinery, New York, NY, USA (2020). https://doi.org/10.1145/3366423.3380275 , https://doi.org/10. 1145/3366423.3380275 
+
+14. Tang, J., Tang, X., Yuan, J.: Profit maximization for viral marketing in online social networks: Algorithms and analysis. IEEE Transactions on Knowledge and Data Engineering 30 (6), 1095–1108 (2017)
