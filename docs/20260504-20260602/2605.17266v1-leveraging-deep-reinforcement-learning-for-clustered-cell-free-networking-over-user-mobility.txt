@@ -1,0 +1,1564 @@
+Title: Leveraging Deep Reinforcement Learning for Clustered Cell-Free Networking Over User Mobility
+
+URL Source: https://arxiv.org/pdf/2605.17266v1
+
+Published Time: Tue, 19 May 2026 01:23:32 GMT
+
+Number of Pages: 17
+
+Markdown Content:
+> 1
+
+# Leveraging Deep Reinforcement Learning for Clustered Cell-Free Networking Over User Mobility 
+
+Ouyang Zhou, Student Member, IEEE , Junyuan Wang, Member, IEEE , Bo Qian, Member, IEEE ,Antonio P´ erez Yuste, Senior Member, IEEE and Yusheng Ji, Fellow, IEEE 
+
+Abstract —Clustered cell-free networking paves a new way for enabling scalable joint transmission among access points (APs) by partitioning the whole network into non-overlapping sub-networks. Previous works adopted clustering algorithms, graph partitioning methods or conventional continuous optimization theories to partition a network based on the channels between all users and all APs, resulting in huge channel measurement and computational costs. This makes these methods difficult to be implemented in practical systems since the optimal network partition could vary frequently due to user mobility. In addition, existing methods were usually designed for specific clustered cell-free networking problems with different optimization algorithms employed. In this paper, we leverage deep reinforcement learning (DRL) for clustered cell-free networking so as to rapidly adapt to user movements in dynamic environments, and propose a deep deterministic policy gradient based clustered cell-free networking (DDPG-C 2F) framework that can be adapted in various appli-cation scenarios. Moreover, in our framework, only one single channel needs to be estimated at each AP as the input of the neural network, which greatly reduces the channel measure-ment costs for clustered cell-free networking, and the training and inference costs of our framework. The proposed DDPG-C2F framework is then applied to various clustered cell-free networking problems with different objectives and constraints to demonstrate its performance. Simulation results show that our framework outperforms existing baselines in all scenarios. Moreover, we show that the proposed framework can reduce the handover cost over user mobility, and is robust to dynamic 
+
+Received 14 September 2025; revised 18 March 2026; accepted 12 May 2026. This work was supported in part by National Natural Science Foundation of China under Grant 62371344, Fundamental Research Funds for the Central Universities, and JSPS Grant-in-Aid for Early-Career Scientists under Grant 25K21195. The work of A. P´ erez Yuste was supported in part by a Seed Project Fund from UPM aimed at fostering cooperation with research groups in Asia, the United States, Canada, and Oceania. The work of Y. Ji was supported in part by JSPS KAKENHI Grant No. JP24K02937 and JST ASPIRE Grant No. JPMJAP2325. This paper was presented in part in IEEE Wireless Communications and Networking Conference (WCNC), Milan, Italy, March 2025 [1]. The associate editor coordinating the review of this article and approving it for publication was M. Erol-Kantarci (Corresponding author: Junyuan Wang) 
+
+O. Zhou is with the College of Electronic and Information Engineering, Tongji University, Shanghai 201804, China (e-mail: zoy@tongji.edu.cn). J. Wang is with the College of Electronic and Information Engineering, Shanghai Institute of Intelligent Science and Technology, and the Institute of Advanced Study, Tongji University, Shanghai, 201804, China (e-mail: junyuanwang@tongji.edu.cn). B. Qian is with the Graduate School of Information Science and Technology, The University of Tokyo, Tokyo 113-8657, Japan (e-mail: boqian@ieee.org). A. P´ erez Yuste is with the Department of Communications and Audio and Video Engineering, Technical University of Madrid, Campus Sur UPM, 28031 Madrid, Spain (e-mail: antonio.perez@upm.es). Y. Ji is with National Institute of Informatics, Tokyo 101-8430, Japan (e-mail: kei@nii.ac.jp). 
+
+scenarios with random user joining or leaving. 
+
+Index Terms —Clustered cell-free networking, network parti-tion, balance of subnetworks, deep reinforcement learning 
+
+I. I NTRODUCTION 
+
+To meet the extremely high data rate and low delay require-ments of numerous intelligent services, such as autonomous driving, digital twins and holographic communications, base-stations (BSs) would be ultra-densely deployed in the sixth-generation (6G) mobile communication systems [2]. However, ultra-dense deployment of BSs leads to escalated cell-edge problem in current cellular networks, i.e., a large number of users would be located in the cell boundary areas and experience poor services due to strong inter-cell interference. To avoid the severe cell-edge problem, one solution is to coordinate all geographically distributed access points (APs) (which can be regarded as mini BSs) to jointly serve all users on the same time-frequency resources. Such a full cooperation idea has been adopted in distributed antenna systems (DASs) [3], network multiple-input-multiple-output (MIMO) [4], cloud radio access network (C-RAN) [5] and cell-free massive MIMO [6]. It has been demonstrated that coordinating all APs can achieve seamless coverage and high capacity [6], which, however, leads to unaffordable joint processing complexity and signaling overhead. To address these issues, it was proposed to serve each user only by its nearby APs that dominate the channel [7]–[9]. Yet the serving AP sets of different users might overlap and their signal processing could be coupled with each other, complicating data transmission. In order to alleviate the cell-edge problem and provide universal services to users by facilitating joint processing of APs with tolerable complexity, a novel clustered cell-free network architecture was proposed in [10]–[12]. Specifically, the whole network is dynamically partitioned into a number of non-overlapping parallel operating subnetworks with joint processing of APs performed in each subnetwork indepen-dently. To efficiently eliminate the mutual interference via joint processing, users and APs strongly interfering with each other should be assigned into the same subnetwork. How to group users and APs to form subnetworks is a key problem, which is referred to as clustered cell-free networking [12]. AP-centric clustering strategies were proposed in [13] and [14], where APs are first clustered, followed by the association 
+
+> arXiv:2605.17266v1 [eess.SP] 17 May 2026 2
+
+of users with these AP clusters. In [13], a hierarchical clus-tering algorithm was used to group APs, whereas a Gaussian mixture model (GMM) was employed in [14]. User-centric clustering schemes were explored in [15] and [16], where users are first grouped using K-means [15] or hierarchical clustering [16], and then APs are associated with these user groups. In-stead of treating the clustered cell-free networking problem as a two-stage clustering problem, [10]–[12], [17], [18] formulated it as a graph partitioning problem and employed spectral clus-tering to solve it. However, the aforementioned clustered cell-free networking schemes often lead to imbalanced subnetworks when users are congregated at some hot spots. In this case, the signaling overhead and joint processing complexity in the largest subnetwork could be still unaffordable. To constrain subnetwork sizes, [19]–[21] proposed to bound the number of users in each subnetwork, while [22] balanced the number of APs across all subnetworks. With these constraints, the clustered cell-free networking problem was studied by relaxing it into a continuous solvable form, which usually leads to suboptimal solutions. Despite these achievements, most of the above works con-sidered a static case with fixed users. However, users move frequently in practical systems, which brings additional chal-lenges to clustered cell-free networking. In fact, as users move, the optimal network partition might vary. To maintain optimal clustered cell-free networking by adapting to the varying network topology, channels between users and APs need to be measured frequently and the clustered cell-free networking algorithm needs to be performed repeatedly. As the channel state informations (CSIs) between all users and all APs are required by the existing clustering-based algorithms [13]– [16], the graph partitioning-based algorithms [10]–[12], [17], [18] and the classical optimization-based algorithms [19]– [22], adopting these methods would lead to huge channel measurement costs. Moreover, these approaches are usually of high complexity, and thus might not be able to produce the optimal network partition promptly in high-mobility scenarios. Deep reinforcement learning (DRL) has been widely ex-plored in real-time management problems, such as resource allocation [23]–[27] and user association [28]–[34]. In rein-forcement learning (RL), an agent learns to make sequential decisions to adapt to the varying environment through trial and error, while DRL enhances RL by utilizing deep neural networks (DNNs) to automatically adjust its strategy with low computational complexity. DRL can be applied to solve both continuous and discrete control tasks. Power control is one of the most classical continuous control problems. DRL-based approaches were proposed for uplink transmit power control in [23], [24] and downlink power allocation in [25] to maximize the overall rate performance, where deep deterministic policy gradient (DDPG), a popular DRL algorithm for continuous control, was employed. It was demonstrated that DRL-based approaches significantly reduce the computational complexity while approaching or even outperforming conventional opti-mization methods. Apart from power control, DRL has also been explored for other continuous control tasks, such as distributed beamforming [26], [27]. Compared to continuous control tasks, utilizing DRL for discrete control with high-dimensional solution space is more challenging. The DRL algorithms for discrete control, such as deep Q-network (DQN), produce the optimal solution through an exhaustive search over the solution space, thereby suffering from the curse of dimensionality. For instance, [28] developed a DQN-based clustering method to group users and APs into subnetworks by evaluating all possible partitions, which is, however, infeasible for a large-scale network since the number of possible partitions grows exponentially as the network scales. To reduce the computational complexity, [29]–[31] transformed discrete user association problems into continuous ones, and employed DDPG method to select serving APs for each user by optimizing the relaxed continuous association indicators and then discretizing them. [32]–[34] applied multi-agent reinforcement learning (MARL) algorithm for user asso-ciation, where each AP acts as an agent and determines the user association independently. Although this distributed method significantly reduces the computational complexity due to the parallel operation of multiple agents with a low-dimensional solution space, running DRL algorithms on massive APs could incur huge energy consumption. Despite the above successes in leveraging DRL for user association, these approaches assumed that the serving AP sets of different users can overlap. By sharp contrast, clustered cell-free networking requires users and APs to be grouped into nonoverlapping subnetworks, posing a significant challenge for developing DRL-based approaches. This is due to the fact that DRL usually utilizes the posterior penalty to regularize the agent to meet the requirements rather than posing hard con-straints during the learning process. How to explore DRL for clustered cell-free networking still remains largely unknown. In this paper, we leverage DRL to tackle the clustered cell-free networking problem for a large-scale wireless network over user mobility. The main contributions of this paper are summarized as follows:  
+
+> •
+
+We propose a new performance metric, the balance of subnetworks, as a function of the number of users and the number of APs in each subnetwork. Simulation results corroborate that the subnetwork sizes can be effectively balanced by maximizing the defined balance metric.  
+
+> •
+
+We formulate a general clustered cell-free networking problem over a time horizon of multiple time intervals, which can be tailored to accommodate different practical requirements in different scenarios. To solve this general problem efficiently, a novel deep deterministic policy gra-dient based clustered cell-free networking (DDPG-C 2F) framework is proposed. Particularly, instead of directly learning the network partition, our proposed framework learns the features of a number of subnetwork anchors to avoid the curse of dimensionality and then affiliate users and APs with the anchors to form non-overlapping subnetworks. 3user   
+
+> AP
+> CPU
+> fronthaul link
+> Fig. 1. Graphical illustration of clustered cell-free networking.
+> •
+
+In contrast to existing methods that require the CSIs between all users and all APs, the proposed DDPG-C 2Fframework only requires the large-scale fading coefficient of the strongest channel between each AP and users as input, which significantly reduces the channel measure-ment costs yet without any performance degradation, as verified by simulations. In addition, this design reduces the dimensionality of the state space, and thus accelerates both training and inference of our DDPG-C 2F framework.  
+
+> •
+
+We apply the proposed DDPG-C 2F framework to four representative clustered cell-free networking problems with different objectives and constraints to demonstrate its effectiveness and generality. Simulation results show that the proposed DDPG-C 2F framework achieves significant performance gains over the state-of-the-art benchmarks in all scenarios.  
+
+> •
+
+Further simulations show that the proposed DDPG-C 2Fframework incurs low handover cost over user mobility, since it learns similar anchor features over consecutive time intervals. Moreover, as both the state space and the action space are independent of the number of users, our framework does not need to learn from scratch when users randomly access or leave the network. The rest of this paper is organized as follows. Section II introduces the system model and formulates the problem. The DRL-based clustered cell-free networking framework is proposed in Section III, followed by case studies with rate- and energy efficiency-oriented problems in Section IV and Section V, respectively. Discussions are provided in Section VI, and concluding remarks are summarized in Section VII. Throughout this paper, ∗ denotes the conjugate operator. E[·]
+
+is the expectation operator. ≜ represents the definition operator. 
+
+∥ · ∥ stands for the L2 norm of a vector. x ∼ CN  u, σ 2
+
+and x ∼ N  u, σ 2 denote a complex and a real Gaussian random variable, respectively, with mean u and variance σ2.
+
+|X | represents the cardinality of set X .II. S YSTEM MODEL AND PROBLEM FORMULATION 
+
+Consider a downlink large-scale wireless network with L
+
+geographically distributed single-antenna APs and K single-antenna users. The APs are connected to a central processing unit (CPU) via fronthaul links. The set of users and the set of APs are denoted by U = {u1, u 2, · · · , u K } and B =
+
+{b1, b 2, · · · , b L}, respectively, with |U| = K and |B| = L.With clustered cell-free networking, as illustrated in Fig. 1, the network is partitioned into M nonoverlapping subnetworks, in each of which the APs jointly serve the users therein under time-division duplex (TDD) operation. Let Um and Bm denote the set of users and the set of APs in the mth subnetwork with |U m| = Km and |B m| = Lm, respectively. The network partition is denoted by C = {C 1, C2, · · · , CM } with 
+
+Cm = Um ∪ B m, ∀m, (1) and 
+
+Cm ∩ C n = ∅, ∀n̸ = m. (2) 
+
+A. Signal Model 
+
+Consider user uk ∈ Um in the mth subnetwork as the reference user. The received signal yk at user uk is given by 
+
+yk = gk, Bm xk, Bm
+
+| {z }
+
+> desired signal
+
++ X  
+
+> uj∈U m,j ̸=k
+
+gk, Bm xj, Bm
+
+| {z }
+
+> intra-subnetwork interference
+
++
+
+> M
+
+X
+
+> n=1 ,n ̸=m
+
+X 
+
+> uj∈U n
+
+gk, Bn xj, Bn
+
+| {z }
+
+> inter-subnetwork interference
+
++ zk, (3) where xk, Bm ∈ CLm×1 denotes the transmitted signal from the APs in Bm to user uk. zk ∼ CN (0 , N 0) represents the additive white Gaussian noise (AWGN) with zero mean and variance N0. gk, Bm ∈ C1×Lm is the channel gain vector from the APs in Bm to user uk, given by 
+
+gk, Bm = γk, Bm ◦ hk, Bm , (4) where ◦ is the Hadamard product. γk, Bm ∈ R1×Lm denotes the corresponding large-scale fading vector. hk, Bm ∈ C1×Lm
+
+represents the small-scale fading vector with entries modeled as independent and identically distributed (i.i.d) complex Gaus-sian random variables with zero mean and unit variance. By assuming that some linear spatial precoding scheme is adopted in each subnetwork for intra-subnetwork interference mitigation, the transmitted signal from the APs in Bm to user 
+
+uk ∈ U m, xk, Bm , is written as 
+
+xk, Bm = wk, Bm · sk, (5) 
+
+Rk = log 2 1 + |gk, Bm wk, Bm |2Pk
+
+P   
+
+> uj∈U m,j ̸=k
+
+|gk, Bm wj, Bm |2Pj + PMn=1 ,n ̸=m
+
+P  
+
+> uj∈U n
+
+|gk, Bn wj, Bn |2Pj + N0
+
+!
+
+. (6) 4
+
+where wk, Bm ∈ CLm×1 denotes the precoding vector with 
+
+∥wk, Bm ∥ = 1 . sk represents the information-bearing signal for user uk with E[sks∗
+
+> k
+
+] = Pk, where Pk is the transmit power allocated to user uk. By normalizing the total system bandwidth into unity, the achievable rate Rk of user uk ∈ U m
+
+can be obtained as (6), shown at the bottom of the previous page. 
+
+B. Balance of Subnetworks 
+
+To mitigate the intra-subnetwork interference, the CSIs between users and APs in each subnetwork are required to perform spatial precoding, leading to huge channel measure-ment overhead and high joint processing complexity in a large subnetwork, both of which are undesirable in practice. There-fore, balancing subnetwork sizes to avoid large subnetworks is of great importance for clustered cell-free networking. As the channel measurement overhead and joint processing complexity increase with both the number of users and the number of APs in a subnetwork, in this paper, we define the balance of subnetworks as 
+
+ρ = ρu · ρb, (7) where ρu and ρb measure the balance of the number of users and the number of APs across all subnetworks, respectively. Inspired by the min-max ratio approach in [35], ρu and ρb are defined as 
+
+ρu = min {K1, K 2, · · · , K M }
+
+max {K1, K 2, · · · , K M } , (8) and 
+
+ρb = min {L1, L 2, · · · , L M }
+
+max {L1, L 2, · · · , L M } , (9) respectively. It can be easily seen that the balance of subnet-works ρ is maximized when both users and APs are evenly al-located to M subnetworks. In this case, the maximum number of channels that need to be measured in a single subnetwork is minimized, as we will show later in Figs. 6(a)–(b) and Figs. 11(a)–(b) that maximizing the balance of subnetworks with our proposed DDPG-C 2F framework results in smaller maximum number of measured channels across all subnetworks compared to other benchmarks. 
+
+C. Problem Formulation 
+
+As the optimal network partition could vary as users move, we aim to optimize the long-term performance over user mobility in this paper rather than focusing on a static scenario. Specifically, we consider a time horizon with T time intervals, and each user’s position may change at the end of each time interval along with its moving speed and direction. Let C(t)
+
+denote the network partition at time interval t. Then a general long-term clustered cell-free networking problem over the time horizon of T intervals can be formulated as 
+
+P1 : max    
+
+> C(t)=
+> n
+> C(t)1,C(t)2,··· ,C(t)
+> M
+> o
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+f
+
+
+
+C(t)
+
+(10) s.t. C(t) 
+
+> m
+
+∩ C (t) 
+
+> n
+
+= ∅, ∀n̸ = m, (11) 
+
+C(t) 
+
+> m
+
+∩ U̸ = ∅, ∀m, (12) 
+
+C(t) 
+
+> m
+
+∩ B̸ = ∅, ∀m, (13) 
+
+> M
+
+[
+
+> m=1
+
+U(t) 
+
+> m
+
+= U, (14) 
+
+C(t) ∈ V , (15) where f  C(t) is the general objective function that can be customized to facilitate various optimization goals. Four case studies will be presented in Sections IV and V. (11) indicates that the network is decomposed into nonoverlapping subnet-works. (12) and (13) require that each subnetwork contains at least one user and one AP to avoid trivial subnetworks. (14) ensures that all users are allocated to M subnetworks to avoid service outage. (15) is a general constraint representing the requirements imposed in the specific scenario with V collecting the requirements. Clearly, problem P1 is a combinatorial optimization prob-lem, which is hard to solve in polynomial time. Moreover, the objective function and constraint (15) are both general, while utilizing conventional optimization methods requires to specify the problem and apply different mathematical optimization techniques in different cases. In addition, to promptly update the network partition as users move, conventional optimization algorithms need to be repeatedly run, and all the channels between users and APs need to be frequently estimated, leading to prohibitively huge channel measurement and computational costs. In this paper, we will leverage DRL to tackle these issues and propose a general low-cost framework for clustered cell-free networking. III. D EEP REINFORCEMENT LEARNING FRAMEWORK FOR 
+
+CLUSTERED CELL -F REE NETWORKING 
+
+In DRL, a goal-oriented agent learns the optimal policy through trial and error, which requires no knowledge about the environmental dynamics. Thanks to this model-free nature, we will explore DRL to solve the general clustered cell-free net-working problem P1, and propose a novel deep deterministic policy gradient based clustered cell-free networking (DDPG-C2F) framework. This framework can be easily tailored to accommodate different objective functions and constraints, and notably, only a small number of channel estimates are required as the input of the framework for clustered cell-free networking optimization. 
+
+A. Motivation of DDPG 
+
+Problem P1 is a sequential decision-making problem, which can be modeled as a Markov decision process (MDP) [36] 5
+
+characterized by state space S, action space A, and reward space R. Specifically, the CPU can function as an agent, which observes the current state s(t) ∈ S of the network environment and selects an action a(t) ∈ A to partition the whole network into M subnetworks. The agent then receives the corresponding reward r(t) ∈ R and the environment transits to the next state s(t+1) . We denote π as the policy of the agent, which guides action selection during the interaction with the environment. The goal of the agent is to find the optimal policy π∗ that maximizes the expected cumulative reward, i.e., 
+
+π∗ = arg max  
+
+> π
+
+Eπ
+
+" TX
+
+> t=1
+
+ζt−1r(t)
+
+#
+
+, (16) where ζ ∈ (0 , 1) is the discount factor for future rewards. ζ →
+
+0 indicates that the agent prioritizes the immediate reward, while ζ → 1 represents the preference on the long-term reward. DRL has been shown to be an effective tool to solve MDP problems in many areas. Several popular algorithms have been proposed, which can be classified as discrete or continuous according to whether the action space is discrete or continuous. Discrete optimization algorithms, such as DQN, find the optimal policy through an exhaustive search over the discrete action space. Intuitively, our clustered cell-free net-working problem should be addressed by discrete optimization algorithms since it is combinatorial. However, there are M K+L
+
+possible network partitions in total, resulting in an extremely large action space even for a moderate number of users K and a moderate number of APs L. This makes discrete optimization algorithms difficult to converge. Therefore, we transform our problem P1 into a continuous decision problem, and resort to the continuous DDPG algorithm. 1
+
+B. Architecture of Proposed DDPG-C 2F
+
+To facilitate DDPG for clustered cell-free networking, in-stead of directly learning the network partition, we propose to learn the features of M subnetwork anchors, 2 and then affiliate each user and AP with one of the anchors to form subnetworks. The state, action and reward of the proposed DDPG-C 2F framework are defined as follows.  
+
+> •
+
+State: Note that the optimal network partition depends on the channel conditions between APs and users. In order to avoid the effect of fast-varying small-scale fading on the networking result, only large-scale fading is utilized for clustered cell-free networking. However, the large-scale fading coefficients between all APs and all users need to 
+
+> 1Note that other continuous DRL algorithms, such as twin delayed deep de-terministic policy gradient (TD3) and proximal policy optimization (PPO), can also be employed in the proposed DRL-based framework to train the agent. In this paper, we simply adopt DDPG to demonstrate that the proposed framework can tackle the difficulties in leveraging DRL for clustered cell-free networking, and reduces the signaling and computational costs of implementing clustered cell-free networking in practice. Adopting an advanced DRL algorithm and/or further improving the adopted algorithm in the proposed framework could lead to better performance, which would be carefully studied in the future.
+> 2Here, the anchor of a subnetwork can be seen as the unique representation of that subnetwork.
+
+be estimated. To reduce the channel estimation cost, we propose to utilize the highest large-scale fading coefficient between an AP and all users only as the channel feature of this AP. We will show later in Sections IV-B and V-B that employing this simple channel feature in our DDPG-C 2Fframework brings no performance degradation compared to inputting all the large-scale fading coefficients between APs and users. Specifically, the channel feature of AP bl
+
+at time interval t is set as 
+
+γ(t) 
+
+> l∗
+
+= max 
+
+n
+
+γ(t)1,l , γ (t)2,l , · · · , γ (t)
+
+> K,l
+
+o
+
+, (17) where γ(t) 
+
+> k,l
+
+is the large-scale fading coefficient from AP bl
+
+to user uk.3 Notably, with this setting, each AP only needs to estimate the strongest channel, which greatly reduces the computational cost of channel estimation. The state space can be then formalized as 
+
+s(t) =
+
+n
+
+γ(t) 
+
+> ∗
+
+, o (t−1) o
+
+, (18) where γ(t) 
+
+> ∗
+
+=
+
+n
+
+γ(t)1∗ , γ (t)2∗ , · · · , γ (t)
+
+> L∗
+
+o
+
+collects L highest large-scale fading coefficients corresponding to L APs at time interval t, and o(t−1) =
+
+n
+
+o(t−1) 1 , o(t−1) 2 , · · · , o(t−1) 
+
+> M
+
+o
+
+denotes the set of the features of M subnetwork anchors at time interval t − 1. It can be seen that employing γ(t)
+
+> ∗
+
+instead of all the large-scale fading coefficients between APs and users reduces the dimensionality of the state space, which would accelerate the training and infer-ence of the proposed framework. Moreover, the previous anchor features at time interval t − 1 are incorporated into the state space to ensure that the proposed DDPG-C2F framework strictly follows the MDP, and thus can converge with sufficient training [37].  
+
+> •
+
+Action: The action space corresponds to the feature set of 
+
+M subnetwork anchors at time interval t, which is defined as 
+
+a(t) =
+
+n
+
+o(t)o
+
+. (19) Note that an anchor’s feature could include its location as well as other essential parameters. We will show later in Sections IV-A and V-A that by customizing the anchor feature, the proposed DDPG-C 2F framework can be applied in different scenarios.  
+
+> •
+
+Reward: Following the objective function in (10) and the constraint in (15), the reward function is defined as 
+
+r(t) = f
+
+
+
+C(t)
+
+· 1
+
+
+
+C(t) ∈ V 
+
+
+
+, (20) where 1 (x) is the indicator function. 1 (x) = 1 if condition x is true, and 1 (x) = 0 otherwise. Here, the indicator function serves as a penalty term to regularize the output to meet the case-specific constraint (15). We only include constraint (15) in the penalty term because the proposed DDPG-C 2F framework has already fostered                                                                             
+
+> 3In the TDD mode, downlink CSIs can be easily obtained by exploiting the uplink-downlink channel reciprocity. 6Agent
+> Replay Memory
+> Environment
+> Mini-batch
+> Actor Network
+> ...
+> ...
+> ...
+> ...
+> Target Actor Network
+> ...
+> ...
+> ...
+> ...
+> Critic Network
+> ...
+> ...
+> ...
+> ...
+> Target Critic Network
+> ...
+> ...
+> ...
+> ...
+> 𝑟 ሺ𝑡ሻ ൌ 𝑓൫𝒞 ሺ𝑡ሻ ൯𝟙൫𝒞 ሺ𝑡ሻ ∈ 𝒱൯ 𝑠 ሺ𝑡൅ 1ሻ
+> ൫𝑠 ሺ𝑡ሻ ,𝑎 ሺ𝑡ሻ ,𝑟 ሺ𝑡ሻ ,𝑠 ሺ𝑡൅ 1ሻ൯
+> ൫𝑠 ሺ𝑖ሻ ,𝑎 ሺ𝑖ሻ ,𝑟 ሺ𝑖ሻ ,𝑠 ሺ𝑖൅ 1ሻ൯
+> 𝜋 𝜙 ൫𝑠 ሺ𝑡ሻ ൯𝑎 ሺ𝑡ሻ ൌ ൛𝒐 ሺ𝑡ሻ ൟ
+> 𝑠 ሺ𝑡ሻ ൌ ቄ𝜸 ∗ሺ𝑡ሻ ,𝒐 ሺ𝑡െ 1ሻቅ
+> Action Noise 𝑛 𝑎
+> 𝜙 𝜙 ′
+> 𝜃 𝜃 ′
+> 𝜋 𝜙 ൫𝑠 ሺ𝑖ሻ ൯
+> 𝑄 𝜃 ൫𝑠 ሺ𝑖ሻ ,𝑎 ሺ𝑖ሻ ൯
+> 𝜋 𝜙 ′′൫𝑠 ሺ𝑖൅ 1ሻ൯
+> 𝑄 𝜃 ′′൬𝑠 ሺ𝑖൅ 1ሻ,𝜋 𝜙 ′′൫𝑠 ሺ𝑖൅ 1ሻ൯൰
+> Update 𝜙 ′
+> Update 𝜃 ′
+> Update 𝜃
+> arg min
+> 𝜃 𝐿ሺ𝜃ሻ
+> 𝑄 𝜃 ቀ𝑠 ሺ𝑖ሻ ,𝜋 𝜙 ൫𝑠 ሺ𝑖ሻ ൯ቁ
+> arg max
+> 𝜙 𝐽 ሺ𝜙ሻ
+> Update 𝜙
+
+Fig. 2. Detailed architecture of the proposed DDPG-C 2F framework. 
+
+the agent to meet the constraints in (11)–(14). Specifically, constraints (11) and (14) are satisfied as each user/AP is allowed to affiliate with only one of the subnetwork an-chors. In addition, we consider the balance of subnetworks 
+
+ρ(t) as an important performance metric in this paper. By incorporating it into the objective function f  C(t),as shown later in Sections IV-A and V-A, the agent would learn to produce balanced subnetworks, i.e., the requirements in (12) and (13) would be met implicitly. 
+
+C. Training Process of Proposed DDPG-C 2F
+
+DDPG finds the optimal policy π∗ by employing separate actor and critic networks. Fig. 2 illustrates the training process of the proposed DDPG-C 2F framework. The actor network learns a policy function πϕ(s) to generate an action a with weight ϕ, and the critic network exploits a Q-function Qθ (s, a )
+
+to evaluate the expected cumulative reward of action a with weight θ. As the agent aims to maximize the expected cu-mulative reward, the objective function for training the actor network πϕ(s) can be expressed as 
+
+J (ϕ) = E
+
+h
+
+Qθ
+
+
+
+s(t), π ϕ(s(t))
+
+i 
+
+, (21) where πϕ(s(t)) = a(t). The actor network’s parameter ϕ can be then updated by the gradient ascent method with 
+
+ϕ ← ϕ + αϕ∇ϕJ (ϕ) , (22) where αϕ denotes the learning rate of the actor network. As for the critic network, it needs to estimate the true value of Qθ
+
+ s(t), π ϕ(s(t)). The loss function for training the critic network Qθ (s, a ) can be expressed as 
+
+L(θ) = E
+
+h
+
+(y(t) − Qθ (s(t), a (t))) 2i
+
+, (23) where y(t) denotes the temporal-difference (TD) target for 
+
+Qθ
+
+ s(t), a (t). To ensure the stability of the training process, 
+
+Algorithm 1 Training Process of DDPG-C 2F framework 
+
+1: Initialize the actor network πϕ(s) and the critic network 
+
+Qθ (s, a ) with weights ϕ and θ.
+
+2: Initialize the target actor network π′ 
+
+> ϕ′
+
+(s) and the target critic network Q′ 
+
+> θ′
+
+(s, a ) with ϕ′
+
+= ϕ and θ′
+
+= θ.
+
+3: Initialize the replay buffer with capacity D.
+
+4: for e = 1 to E do 
+
+5: Set the initial state s(1) and update the action noise na.
+
+6: for t = 1 to T do 
+
+7: Select the action a(t) = πϕ(s(t)) + na.
+
+8: Obtain the reward r(t) and the next state s(t+1) .
+
+9: Replace the old experience by new experience  s(t), a (t), r (t), s (t+1) .
+
+10: Sample a mini-batch of interaction experiences  s(i), a (i), r (i), s (i+1)  with size B randomly. 
+
+11: Calculate the target value: 
+
+y(i) = r(i) + ζQ ′ 
+
+> θ′
+
+(s(i+1) , π ′ 
+
+> ϕ′
+
+(s(i+1) )) .
+
+12: Update critic weights θ with gradient descent method to minimize the loss function: 
+
+L(θ) = 1
+
+> B
+
+P
+
+> i
+
+(y(i) − Qθ (s(i), a (i))) 2.
+
+13: Update actor weights ϕ with gradient ascent method to maximize the action-value function: 
+
+J(ϕ) = 1
+
+> B
+
+P 
+
+> i
+
+Qθ (s(i), π ϕ(s(i))) .
+
+14: Update the target network weights θ′
+
+and ϕ′
+
+:
+
+θ′
+
+← δθ + (1 − δ)θ′
+
+,
+
+ϕ′
+
+← δϕ + (1 − δ)ϕ′
+
+.
+
+15: end for 
+
+16: end for 
+
+DDPG adopts a target actor network π′ 
+
+> ϕ′
+
+(s) and a target critic network Q′ 
+
+> θ′
+
+(s, a ) to calculate the TD target value y(t) by 
+
+y(t) = r(t) + ζQ ′ 
+
+> θ′
+
+(s(t+1) , π ′ 
+
+> ϕ′
+
+(s(t+1) )) . (24) 7
+
+To minimize the loss function L(θ), parameter θ can be updated by the gradient descent method with 
+
+θ ← θ − αθ ∇θ L (θ) , (25) where αθ denotes the learning rate of the critic network. The parameters of the target networks, ϕ′
+
+and θ′
+
+, are updated by the Polyak averaging method [38] with 
+
+ϕ′
+
+← δϕ + (1 − δ)ϕ′
+
+, (26) and 
+
+θ′
+
+← δθ + (1 − δ)θ′
+
+, (27) where δ ∈ [0 , 1] denotes the soft update rate. As DDPG is a deterministic policy algorithm which may get stuck in local optima, to efficiently explore the solution space, we add noise na to the action during the training process with na assumed to be a |A| -dimensional sequence of entries modeled as i.i.d Gaussian random variables with zero mean and variance σ2
+
+> a
+
+. To balance exploration and exploitation, we linearly decay the standard deviation σa over training episode 
+
+e as 
+
+σa = max {σa,max − κ · e, σ a,min } , (28) where σa,max and σa,min denote the maximum and the min-imum standard deviation, respectively. κ represents the decay rate. In addition, to improve the efficiency of data utilization, a replay memory with capacity D is adopted to store inter-action experiences  s(t), a (t), r (t), s (t+1) , and a mini-batch of experiences with size B are randomly sampled from the replay memory in each training step. The complete training process of our DDPG-C 2F framework is summarized in Algorithm 1. 
+
+D. Complexity Analysis of Proposed DDPG-C 2F
+
+The computational complexity of the proposed DDPG-C 2Fframework during the inference process is determined by the forward propagation of its actor network. Let NA denote the number of hidden layers in the actor network and N na denote the number of neurons in its nth layer. Since the actor network maps the state to an action, the number of neurons in the input layer is L + |A| and the number of neurons in the output layer is |A| . The computational complexity of the proposed DDPG-C2F framework is therefore O(( L+|A| )×N 1 
+
+> a
+
++PNA−1 
+
+> n=1
+
+N na ×
+
+N n+1  
+
+> a
+
++ N NA 
+
+> a
+
+× |A| ) = O(L + |A| ).IV. C ASE STUDIES : R ATE -O RIENTED PROBLEMS 
+
+Recall that the clustered cell-free networking problem is formulated as a general problem P1, which can be tailored in different cases to accommodate different practical require-ments. In this section, we apply the proposed DDPG-C 2Fframework to two representative rate-oriented clustered cell-free networking problems to demonstrate its effectiveness. 
+
+A. Rate-Oriented Problems 
+
+Here, we consider the sum rate of the clustered cell-free network as the performance metric, expressed as 
+
+Rsum =
+
+> K
+
+X
+
+> k=1
+
+Rk, (29) where Rk is the achievable rate of user uk, and consider two representative rate-oriented problems. 
+
+1) Joint Optimization of Sum Rate and Balance of Subnet-works: With the aim of maximizing both the sum rate and the balance of subnetworks, we consider the below objective function 
+
+f
+
+
+
+C(t)
+
+= R(t) 
+
+> ρ
+
+≜ R(t) 
+
+> sum
+
+· ρ(t), (30) where R(t) 
+
+> ρ
+
+is referred to as balance-aware sum rate at time interval t. For the spatial precoding adopted in each subnet-work, there might be further requirements. For instance, zero-forcing beamforming (ZFBF) requires that the number of APs in a subnetwork is no less than the number of users in it. Such constraints can be reflected in the constraint set V as 
+
+V =
+
+n
+
+C(t) : Vpre 
+
+o
+
+. (31) 
+
+2) Maximization of Balance of Subnetworks with Sum Rate Constraint: In the scenario with certain sum rate requirement, the clustered cell-free networking problem can be formulated to maximize the balance of subnetworks under the constraint that the sum rate Rsum must be no smaller than a given threshold Rth . In this case, the objective function is given by 
+
+f
+
+
+
+C(t)
+
+= ρ(t), (32) and the constraint set is 
+
+V =
+
+n
+
+C(t) : R(t) 
+
+> sum
+
+≥ Rth ; Vpre 
+
+o
+
+. (33) Though with different objectives and constraints in these two cases, the users and APs close to each other should be assigned into the same subnetwork to improve the desired signal power and mitigate the mutual interference. Motivated by this, the feature of the anchor of the mth subnetwork at time interval t
+
+can be defined by its location as 
+
+o(t) 
+
+> m
+
+=
+
+
+
+o(t)
+
+> m,x
+
+, o (t)
+
+> m,y
+
+
+
+, (34) where o(t) 
+
+> m,x
+
+and o(t) 
+
+> m,y
+
+are the coordinates of the anchor. Users and APs can then be affiliated with their closest subnetwork anchors to form subnetworks. In this setting, the dimensionality of the action space is |A| = 2 M .
+
+B. Simulation Results 
+
+In the simulations, we consider a network with users and APs randomly distributed in a 1000 m × 1000 m square area, and employ the random walk (RW) mobility model [39] to simulate user movements. Specifically, each user moves with a random speed V ∈ [0 , V max ] in a direction randomly selected from the range of [0 , 2π] in each time interval. The time 8                                 
+
+> TABLE I SIMULATION PARAMETERS
+> Parameter Value Noise power N0-104dBm Path-loss exponent α4Shadow fading standard deviation σsh 8dB Transmission power per-AP P2W Circuit power consumption Pc1W Fixed power consumption Pf ix 0.05W Traffic-dependent power consumption Pb0.1W/bps/Hz Power amplifier efficiency τ38% Replay memory capacity D10000 Mini-batch size B128 Actor network learning rate αϕ0.0001 Critic network learning rate αθ0.001 Soft update rate δ0.001 Discount factor ζ0.99 Action noise standard deviations σa,max , σ a,min 0.25, 0.001 Action noise decay rate κ0.0001
+
+horizon includes T = 100 time intervals and each interval is of one second. The large-scale fading coefficient from AP bl to user uk is modeled as 
+
+γk,l =
+
+q
+
+d−αk,l · 10 χk,l  
+
+> 10
+
+, (35) where dk,l represents the distance between user uk and AP 
+
+bl, and α is the path-loss exponent. χk,l ∼ N (0 , σ 2
+
+> sh
+
+) denotes the shadowing factor with zero mean and standard deviation 
+
+σsh . Note that although the channel feature in the state space accounts for large-scale fading only, small-scale fading is con-sidered for performance evaluation. The average transmission power of each AP is assumed to be fixed at P and the total transmission power of the APs in a subnetwork is equally allocated to the users therein. In each subnetwork, ZFBF is adopted, and the required Vpre is specified as 
+
+Vpre =
+
+n
+
+L(t) 
+
+> m
+
+≥ K(t) 
+
+> m
+
+, ∀m
+
+o
+
+. (36) For the proposed DDPG-C 2F framework, we employ two hidden layers in the actor network with 256 and 128 neurons, respectively. The critic network has three hidden layers with 512, 256 and 128 neurons, respectively. In addition, ReLU is adopted as the activation function and Adam optimizer is applied to update the neural network parameters. We train 4000 episodes for the proposed DDPG-C 2F framework, each with 100 steps. Other essential parameters are summarized in Table I, which are used throughout this paper. All simulations are conducted on a computer with an Intel Core i7-12700K CPU and an NVIDIA GeForce RTX 3050 graphics processing unit (GPU). To demonstrate the performance of the proposed DDPG-C2F framework, we compare our framework with three existing representative clustered cell-free networking algorithms:  
+
+> •
+
+AP-centric clustering [14]: The AP-centric benchmark in [14] first groups APs with GMM algorithm, and then assigns each user to the closest AP cluster. 0 500 1000 1500 2000 2500 3000 3500 4000            
+
+> Training episode
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> R (bit/s/Hz)
+> DDPG-C 2F
+> DDPG-C 2F variant
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+> Fig. 3. Balance-aware sum rate Rρduring the training process in the case of joint optimization of sum rate and balance of subnetworks. K= 50 .L= 100 .
+> M= 5 .Vmax = 5 m/s.
+> •
+
+User-centric clustering [15]: The user-centric benchmark in [15] first clusters users with K-means algorithm, and then assign each AP to the closest user cluster.  
+
+> •
+
+Graph partitioning [12]: The graph partitioning bench-mark in [12] first merges each user and its closest AP as a meganode, and then applies spectral clustering algorithm to cluster meganodes for network partitioning. 
+
+1) Joint Optimization of Sum Rate and Balance of Subnet-works: Fig. 3 plots the balance-aware sum rate Rρ achieved during the training process with the proposed DDPG-C 2Fframework and that achieved by the benchmarks. To validate the effectiveness of selecting the large-scale fading coefficient of the strongest channel between each AP and all users as its feature in the state space, the result achieved by a variant of the proposed framework that utilizes all large-scale fading coefficients between all APs and all users is also plotted for comparison. As shown in Fig. 3, the balance-aware sum rates 
+
+Rρ with both the proposed DDPG-C 2F framework and its variant first increase and then converge at the same value after 2500 episodes, corroborating that considering the strongest channel between each AP and the users is sufficient for training the proposed DDPG-C 2F framework. That is, our DDPG-C 2F framework can significantly reduce the channel estimation costs and computational complexity without bring-ing performance degradation. Moreover, we can clearly see that the proposed DDPG-C 2F framework achieves much higher balance-aware sum rate than other baselines. Fig. 4 illustrates the clustered cell-free networking results of a random network snapshot with the proposed DDPG-C2F framework and the benchmarks. It can be observed from Figs. 4(a)–4(d) that compared to the benchmarks, the proposed DDPG-C 2F framework produces more balanced subnetworks, corroborating its superior performance in efficiently reducing the signaling overhead and computational complexity of joint transmission in each subnetwork. Fig. 5 further presents the balance-aware sum rate Rρ with the proposed DDPG-C 2F framework and the benchmarks by 90 200 400 600 800 1000 
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(a) AP-centric clustering 0 200 400 600 800 1000  
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(b) User-centric clustering 0 200 400 600 800 1000  
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(c) Graph partitioning 0 200 400 600 800 1000  
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(d) DDPG-C 2F
+
+Fig. 4. Clustered cell-free networking results of a random network snapshot with the proposed DDPG-C 2F framework and the benchmarks in the case of joint optimization of sum rate and balance of subnetworks. “ ◦” represents a user and “ △” represents an AP. “ ⋆” represents the subnetwork anchor. Users and APs in the same subnetwork are connected by lines in the same color. K = 50 . L = 100 . M = 5 . Vmax = 5 m/s. 25 50 75 
+
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> R (bit/s/Hz)
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(a) K = {25 , 50 , 75 }75 100 200  
+
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> R (bit/s/Hz)
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(b) L = {75 , 100 , 200 }3 5 7 
+
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> R (bit/s/Hz)
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(c) M = {3, 5, 7}1 5 10  
+
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> R (bit/s/Hz)
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(d) Vmax = {1, 5, 10 }m/s 
+
+Fig. 5. Balance-aware sum rate Rρ with the proposed DDPG-C 2F framework and the benchmarks in the case of joint optimization of sum rate and balance of subnetworks. By default, K = 50 , L = 100 , M = 5 and Vmax = 5 m/s. 3 5 7
+
+> M
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(a) 3 5 7 
+
+> M
+> 0
+> 300
+> 600
+> 900
+> 1200
+> 1500
+> Cmax
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(b) 3 5 7 
+
+> M
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> Rsum  (bit/s/Hz)
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(c) 
+
+Fig. 6. (a) Balance of subnetworks ρ, (b) maximum number of channels across all subnetworks Cmax and (c) sum rate Rsum versus the number of subnetworks 
+
+M in the case of joint optimization of sum rate and balance of subnetworks. K = 50 . L = 100 . Vmax = 5 m/s. 
+
+varying the number of users K, the number of APs L, the number of subnetworks M , and the maximum speed of users 
+
+Vmax , respectively. We can see from Fig. 5 that the proposed framework achieves the highest balance-aware sum rate in all cases. Particularly, Fig. 5(b) shows that more prominent gains can be achieved as the number of APs L increases. This is because the proposed framework can always balance the numbers of APs across subnetworks, while the imbalance issue of the benchmarks could be enlarged when the number of APs is large. Additionally, it is shown in Fig. 5(d) that the balance-aware sum rate Rρ achieved by the proposed DDPG-C 2Fframework with Vmax = 10 m/s is just slightly lower than that with Vmax = 1 m/s, indicating that the proposed framework can maintain its superior performance in high-mobility scenarios. To have a closer look at the balance of subnetworks and the rate performance, Fig. 6 presents the balance of subnetworks 
+
+ρ, the maximum number of channels across all subnetworks 
+
+Cmax = max m=1 ,2,··· ,M KmLm,4 and the sum rate Rsum . By comparing Fig. 6(a) and Fig. 6(b), it can be found that the proposed DDPG-C 2F framework leads to much higher balance of subnetworks ρ and much lower Cmax , corroborating that the subnetwork sizes could be effectively balanced by maximizing the defined balance metric ρ. In addition, Fig. 6(c) shows that the proposed DDPG-C 2F framework achieves similar sum rate performance as the benchmarks. The above results indicate that the proposed framework can significantly reduce the signaling overhead and joint processing complexity while maintaining similar rate performance. 
+
+4Note that instead of measuring the size of a subnetwork by the total number of users and APs in it, we are more interested in the product of the number of users and the number of APs, i.e., the number of channels in it, because the number of channels determines the channel measurement costs for implementing spatial precoding. 10 0 200 400 600 800 1000 
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(a) Rth = 250 bit/s/Hz 0 200 400 600 800 1000  
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(b) Rth = 300 bit/s/Hz 0 200 400 600 800 1000  
+
+> x (m)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> y (m)
+
+(c) Rth = 350 bit/s/Hz 
+
+Fig. 7. Clustered cell-free networking results of a random network snapshot with the proposed DDPG-C 2F framework under various rate threshold Rth in the case of maximization of balance of subnetworks with sum rate constraint. “ ◦” represents a user and “ △” represents an AP. “ ⋆” represents the subnetwork anchor. Users and APs in the same subnetwork are connected by lines in the same color. K = 50 . L = 100 . M = 5 . Vmax = 5 m/s. 260 270 280 290 300  
+
+> Rsum (bit/s/Hz)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+Fig. 8. Balance of subnetworks ρ and sum rate Rsum with the proposed DDPG-C 2F framework and the benchmarks in the case of maximization of balance of subnetworks with sum rate constraint. The results of the proposed framework are obtained by setting the rate threshold Rth as the sum rate achieved with the benchmarks in the same dashed circle. K = 50 . L = 100 .
+
+M = 5 . Vmax = 5 m/s. 
+
+2) Maximization of Balance of Subnetworks with Sum Rate Constraint: Fig. 7 illustrates the clustered cell-free networking results with the proposed DDPG-C 2F framework under various sum rate constraints. It is shown in Fig. 7(a) that with a rela-tively low threshold Rth = 250 bit/s/Hz, the whole network is partitioned into balanced subnetworks with similar subnetwork sizes. By increasing the rate threshold to Rth = 350 bit/s/Hz, a giant subnetwork appears. Intuitively, when a sufficiently high data rate is required, more and more users and APs would be grouped into the same subnetwork to increase the joint processing gain. Fig. 8 compares the proposed DDPG-C 2F framework and the benchmarks in terms of balance of subnetworks ρ and sum rate Rsum , where the rate threshold Rth in the proposed DDPG-C 2F framework is set the same as the sum rate achieved with the benchmark in the same dashed circle. We can observe from Fig. 8 that the proposed DDPG-C 2F framework meets the sum rate constraint, and notably, achieves higher sum rate and higher balance of subnetworks than the benchmarks. 
+
+TABLE II COMPARISON OF COMPUTATIONAL COMPLEXITY AND RUNNING TIME IN 
+
+RATE -O RIENTED CASES . M = 5 , K = 50 , L = 100 .
+
+Algorithms Computational complexity Running time (s) 
+
+DDPG-C 2F O(L) 0.07 AP-centric clustering O(K3L) 1.21 User-centric clustering O(KL ) 0.11 Graph partitioning O(L3) 11.04 
+
+3) Comparison of Computational Complexity and Running Time: Table II compares the computational complexity and running time of the proposed DDPG-C 2F framework with the benchmarks. As mentioned in Section IV-A, the dimensionality of the action space is |A| = 2 M . Consequently, according to Section III-D, the proposed DDPG-C 2F framework has the computational complexity O(L + 2 M ) = O(L), since the number of subnetworks M is usually much smaller than the number of APs L. The computational complexities of the AP-centric clustering and the user-centric clustering were given in [14] and [15] as O(K3L) and O(KL ), respectively, while the graph partitioning benchmark has a higher complexity of 
+
+O(L3) [12]. We can clearly see from Table II that the proposed DDPG-C 2F framework incurs much lower computational cost and running time than the benchmarks. V. C ASE STUDIES : E NERGY EFFICIENCY -O RIENTED 
+
+PROBLEMS 
+
+In this section, problem P1 is tailored for energy efficiency optimization, which is another major concern in practical wireless communication systems due to the huge power con-sumption resulting from densely deployed APs. Two represen-tative energy efficiency-oriented clustered cell-free networking problems are studied by applying the proposed DDPG-C 2Fframework. 
+
+A. Energy Efficiency-Oriented Problems 
+
+The energy efficiency ηee of the clustered cell-free network is defined as 
+
+ηee = Rsum 
+
+Ptot 
+
+, (37) 11 
+
+where Ptot denotes the total power consumption, consisting of the power consumed by the APs, PA, and the fronthaul power consumption PB , i.e., 
+
+Ptot = PA + PB . (38) The power consumption of the APs in all the M subnetworks can be modeled as [40] 
+
+PA =
+
+> M
+
+X
+
+> m=1
+
+ P L m
+
+τ + PcLm
+
+
+
+, (39) where τ represents the power amplifier efficiency, and Pc is the circuit power consumed by frequency synthesizers, mixers and transmit filters, etc. The power consumption of the fronthaul links, PB , can be written as [41] 
+
+PB = Pfix L + PbRsum , (40) where Pfix is the power consumed regardless of the fronthaul traffic, and Pb denotes the traffic-dependent power consump-tion. By substituting (39) and (40) into (38), the total power consumption Ptot can be obtained as 
+
+Ptot =
+
+ Pτ + Pc
+
+ MX
+
+> m=1
+
+Lm + Pfix L + PbRsum . (41) We then introduce the two energy efficiency-oriented problems. 
+
+1) Joint Optimization of Energy Efficiency and Balance of Subnetworks: Similar to the rate-oriented case, the objective function of simultaneously maximizing energy efficiency and the balance of subnetworks is defined as 
+
+f
+
+
+
+C(t)
+
+= η(t) 
+
+> ρ
+
+≜ η(t) 
+
+> ee
+
+· ρ(t), (42) where η(t) 
+
+> ρ
+
+is the balance-aware energy efficiency at time interval t. The constraint set V is the same as that given in (31). 
+
+2) Joint Optimization of Energy Efficiency and Balance of Subnetworks with Sum Rate Constraint: Note that maximizing energy efficiency solely might result in very low sum rate and thus poor user experience or even service outage. Therefore, we further consider the scenario with some sum rate constraint. In this case, the objective function f  C(t) remains the same as that in (42), and the constraint is the same as that in (33). Intuitively, to maximize the energy efficiency, there is no need to involve the APs far away from users for data trans-mission, as these APs contribute little to the desired signal power yet consume loads of energy and cause interference to other subnetworks. To enable the dynamic on-off switch of APs in the proposed DDPG-C 2F framework, we include an AP-selection weight into the feature of each subnetwork anchor. The anchor feature of the mth subnetwork at time interval t
+
+is now defined as 
+
+o(t) 
+
+> m
+
+=
+
+
+
+o(t)
+
+> m,x
+
+, o (t) 
+
+> m,y
+
+, o (t)
+
+> m,w
+
+
+
+, (43) where the AP-selection weight o(t) 
+
+> m,w
+
+∈ (0 , 1) is the ratio of the number of APs that should be activated to the total number of 0 500 1000 1500 2000 2500 3000 3500 4000          
+
+> Training episode
+> 0.01
+> 0.10
+> 1.00
+> (bit/Joule/Hz)
+> DDPG-C 2F
+> DDPG-C 2F variant
+> UCR-ApSel
+> UC-ApSel
+> Fig. 9. Balance-aware energy efficiency ηee during the training process in the case of joint optimization of energy efficiency and balance of subnetworks.
+> K= 50 .L= 100 .M= 5 .Vmax = 5 m/s.
+
+APs in the mth subnetwork. After learning the anchor features, users and APs are first affiliated with their closest anchors to form subnetworks, and then in each subnetwork, the APs close to users are selected for transmission according to the AP-selection weight. With this setting, the dimensionality of the action space is |A| = 3 M .
+
+B. Simulation Results 
+
+To demonstrate the performance of the proposed DDPG-C2F framework, we compare our framework with two existing clustered cell-free networking algorithms with AP selection:  
+
+> •
+
+User-centric ratio-fixed AP-selection based clustering (UCR-ApSel) [16]: The UCR-ApSel benchmark selects a given portion of APs after grouping users with hierar-chical clustering algorithm, and then assigns each AP to the cluster containing its best user with the highest large-scale fading coefficient. The ratio of the number of APs to the number of users across all subnetworks is fixed at the optimal AP-selection ratio derived in [16].  
+
+> •
+
+User-centric clustering with AP selection (UC-ApSel) 
+
+[16]: The UC-ApSel benchmark takes the same approach as the UCR-ApSel algorithm and select the same portion of APs yet without fixing the ratio of the number of APs to the number of users in each subnetwork. 
+
+1) Joint Optimization of Energy Efficiency and Balance of Subnetworks: Fig. 9 presents the balance-aware energy efficiency ηee during the training process with the proposed DDPG-C 2F framework and the benchmarks. The variant of the proposed framework utilizing all the large-scale fading coefficients is also plotted. Similarly to Fig. 3, we can clearly see from Fig. 9 that the proposed DDPG-C 2F framework performs the same as its variant, which corroborates its ability to efficiently reduce the channel estimation and computational cost with no performance degradation. Compared to the bench-marks, significantly higher balance-aware energy efficiency is achieved by the proposed DDPG-C 2F framework. 12 25 50 75   
+
+> 0.01
+> 0.10
+> 1.00
+> (bit/Joule/Hz)
+> DDPG-C 2FUCR-ApSel UC-ApSel
+
+(a) K = {25 , 50 , 75 }75 100 200    
+
+> 0.01
+> 0.10
+> 1.00
+> (bit/Joule/Hz)
+> DDPG-C 2FUCR-ApSel UC-ApSel
+
+(b) L = {75 , 100 , 200 }3 5 7   
+
+> 0.01
+> 0.10
+> 1.00
+> (bit/Joule/Hz)
+> DDPG-C 2FUCR-ApSel UC-ApSel
+
+(c) M = {3, 5, 7}1 5 10    
+
+> 0.01
+> 0.10
+> 1.00
+> (bit/Joule/Hz)
+> DDPG-C 2FUCR-ApSel UC-ApSel
+
+(d) Vmax = {1, 5, 10 }m/s 
+
+Fig. 10. Balance-aware energy efficiency ηρ with the proposed DDPG-C 2F framework and the benchmarks in the case of joint optimization of energy efficiency and balance of subnetworks. By default, K = 50 , L = 100 , M = 5 and Vmax = 5 m/s. 3 5 7
+
+> M
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> DDPG-C 2F
+> UCR-ApSel
+> UC-ApSel
+
+(a) 3 5 7 
+
+> M
+> 0
+> 150
+> 300
+> 450
+> 600
+> 750
+> Cmax
+> DDPG-C 2F
+> UCR-ApSel
+> UC-ApSel
+
+(b) 3 5 7 
+
+> M
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> ee  (bit/Joule/Hz)
+> DDPG-C 2F
+> UCR-ApSel
+> UC-ApSel
+
+(c) 
+
+Fig. 11. (a) Balance of subnetworks ρ, (b) maximum number of channels across all subnetworks Cmax and (c) energy efficiency ηee versus the number of subnetworks M in the case of joint optimization of energy efficiency and balance of subnetworks. K = 50 . L = 100 . Vmax = 5 m/s. 
+
+Fig. 10 compares the balance-aware energy efficiency ηρ
+
+achieved with the proposed DDPG-C 2F framework and the benchmarks. It can be seen from Fig. 10 that the proposed framework achieves much higher balance-aware energy ef-ficiency than the baselines in all scenarios. In addition, it can be observed in Fig. 10(a) that the balance-aware energy efficiency of the proposed DDPG-C 2F framework decreases as the number of users K increases, while the balance-aware energy efficiency with the benchmarks increases. This is because with a large number of users, more APs are selected to guarantee that ZFBF can be applied to cancel out the intra-subnetwork interference, leading to low energy efficiency and thus lower balance-aware energy efficiency with our DDPG-C 2F framework. For the benchmarks, although the energy efficiency is lower, more balanced subnetworks can be generated with the hierarchical clustering algorithm as the number of users increases, leading to slightly increased balance-aware energy efficiency. Fig. 11 presents the balance of subnetworks ρ, the maximum number of channels across all subnetworks Cmax and the energy efficiency ηee with the proposed DDPG-C 2F framework and the benchmarks. Similar to the rate-oriented case, the sim-ulation results corroborate the effectiveness of ρ in measuring the balance of subnetworks, and the superiority of the proposed DDPG-C 2F framework in balancing subnetwork sizes while achieving similar energy efficiency. 
+
+2) Joint Optimization of Energy Efficiency and Balance of Subnetworks with Sum Rate Constraint: Fig. 12 presents the balance-aware energy efficiency ηρ and the sum rate Rsum 240 250 260 270 
+
+Rsum (bit/s/Hz) 
+
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> (bit/Joule/Hz)
+> DDPG-C 2F
+> UCR-ApSel
+> UC-ApSel
+
+Fig. 12. Balance-aware energy efficiency ηρ and sum rate Rsum with the proposed DDPG-C 2F framework and the benchmarks in the case of joint optimization of energy efficiency and balance of subnetworks with sum rate constraint. The results of the proposed framework are obtained by setting the rate threshold Rth as the sum rate achieved with the benchmarks in the same dashed circle. K = 50 . L = 100 . M = 5 . Vmax = 5 m/s. 
+
+in the case with sum rate constraint. Similar to the rate-oriented case, the rate threshold Rth is set the same as the sum rate achieved with the benchmark marked in the same dashed circle. It can be seen that the proposed DDPG-C 2Fframework can successfully meet the sum rate requirement, and simultaneously improve the balance-aware energy efficiency compared to the baselines. To have a closer look at the energy efficiency and rate 13 200 220 240 260 280   
+
+> Rth (bit/s/Hz)
+> 220
+> 240
+> 260
+> 280
+> 300
+> Rsum  (bit/s/Hz)
+> Rsum
+> ee
+> 0.40
+> 0.43
+> 0.46
+> 0.49
+> 0.52 ee  (bit/Joule/Hz)
+
+Fig. 13. Sum rate Rsum and energy efficiency ηee with the proposed DDPG-C 2F framework under various rate threshold Rth in the case of joint optimization of energy efficiency and balance of subnetworks with sum rate constraint. K = 50 . L = 100 . M = 5 . Vmax = 5 m/s. TABLE III COMPARISON OF COMPUTATIONAL COMPLEXITY AND RUNNING TIME IN 
+
+ENERGY EFFICIENCY -O RIENTED CASES . M = 5 , K = 50 , L = 100 .
+
+Algorithms Computational complexity Running time (s) 
+
+DDPG-C 2F O(L) 0.08 UCR-ApSel O(K2L) 0.16 UC-ApSel O(K2L) 0.15 
+
+performance, Fig. 13 presents the sum rate Rsum and the energy efficiency ηee with the proposed DDPG-C 2F framework by varying rate threshold Rth . We can see from Fig. 13 that as Rth increases, a tradeoff between sum rate and energy efficiency is first observed and then both sum rate and energy efficiency increase. This is because when the rate requirement is relatively low, increasing Rth would activate more APs for data transmission, leading to more energy consumption and thus low energy efficiency. After all the APs are activated, keep increasing Rth would lead to a giant subnetwork for the sake of meeting the high rate requirement. As sum rate Rsum 
+
+increases with Rth while the energy consumed by the APs remains the same, energy efficiency ηee also increases. 
+
+3) Comparison of Computational Complexity and Running Time: Table III compares the computational complexity and running time of the proposed DDPG-C 2F framework with the benchmarks. In the energy efficiency-oriented cases, the dimensionality of the action space is |A| = 3 M as given in Section V-A, and hence the computational complexity of the proposed framework is O(L + 3 M ) = O(L). Both the UCR-ApSel and the UC-ApSel benchmarks have the same computational complexity of O(K2L) [16]. Similar to the rate-oriented cases, we can see from Table III that the computa-tional complexity and running time of the proposed DDPG-C2F framework is much lower than those of the benchmarks. VI. D ISCUSSIONS 
+
+Although the proposed DDPG-C 2F framework optimizes the long-term performance, the optimal clustered cell-free 1 5 10   
+
+> Vmax (m/s)
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5×10 4
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(a) Joint optimization of sum rate and balance of subnetworks 1 5 10   
+
+> Vmax (m/s)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0 ×10 4
+> DDPG-C 2F
+> UCR-ApSel
+> UC-ApSel
+
+(b) Joint optimization of energy effi-ciency and balance of subnetworks 
+
+Fig. 14. Number of handovers Φ with the proposed DDPG-C 2F framework and the benchmarks versus the maximum speed of users Vmax . K = 50 .
+
+L = 100 . M = 5 .
+
+networking result could vary from one time interval to another due to user mobility. As a result, users need to frequently reassociate with APs, bringing high handover cost. In addition, the number of users is assumed to be fixed in the previous sections, whereas users in practical systems might access or leave the network at any time. In this section, we will show that the proposed DDPG-C 2F framework is able to reduce the number of handovers compared to the benchmarks and robust in the case with dynamically varying number of users. Moreover, Sections VI-C and VI-D are added to compare our proposed DDPG-C 2F framework with DRL benchmarks and investigate the sensitivity of our framework to hyperparame-ters, respectively. 
+
+A. Handover Issues 
+
+Let us define the number of handovers Φ(t) as the number of new connections established at time interval t compared to those at time interval t − 1, i.e., 
+
+Φ(t) =
+
+> K
+
+X
+
+> k=1
+> L
+
+X
+
+> l=1
+
+ψ(t) 
+
+> k,l
+
+(1 − ψ(t−1)  
+
+> k,l
+
+), (44) where ψ(t) 
+
+> k,l
+
+is the association indicator. ψ(t) 
+
+> k,l
+
+= 1 if user uk and AP bl are in the same subnetwork, and ψ(t) 
+
+> k,l
+
+= 0 , otherwise. Fig. 14 shows the total number of handovers over the time horizon, Φ = PTt=1 Φ(t), with the proposed DDPG-C2F framework and the benchmarks versus the maximum speed of users Vmax . Due to page limit, only the results in the cases without rate constraint are presented for demon-stration purpose. It can be seen in Fig.14 that the proposed DDPG-C 2F framework requires significantly smaller number of handovers than the benchmarks. This indicates that our framework can considerably reduce the transmission delay incurred by handover and improve the service quality over user mobility. The reason is that the proposed framework partitions a network according to the features of subnetwork anchors learned from the current channel features. As channel features vary smoothly as users move, similar anchor features would be generated in consecutive time intervals. However, the inherent randomness of the benchmarking clustering and graph parti-tioning algorithms could cause significant variation in network 14 0
+
+> 50
+> 100
+> 150
+> 200
+> 250
+> R (bit/s/Hz)
+> DDPG-C 2F
+> AP-centric clustering
+> User-centric clustering
+> Graph partitioning
+
+(a) Joint optimization of sum rate and balance of subnetworks 0.01 
+
+> 0.10
+> 1.00
+> (bit/Joule/Hz)
+> DDPG-C 2F
+> UCR-ApSel
+> UC-ApSel
+
+(b) Joint optimization of energy efficiency and balance of subnet-works 
+
+Fig. 15. Comparison of the balance-aware sum rate Rρ and the balance-aware energy efficiency ηρ in a dynamic scenario with random user accessing and leaving. L = 100 . M = 5 . Vmax = 5 m/s. K(0) = 50 . K′ 
+
+> max
+
+= 5 .
+
+partitioning. Moreover, we can see from the figure that the number of handovers Φ increases with the maximum speed of users Vmax . It highlights the importance of jointly optimizing handover management and clustered cell-free networking in high-mobility scenarios, which should be carefully studied in the future. 
+
+B. Varying Number of Users 
+
+For the case with users randomly accessing and leaving the network, we model the time-varying number of users as 
+
+K(t) = K(t−1) + K′
+
+, (45) where K′
+
+∈
+
+n
+
+−K′
+
+> max
+
+, −K′ 
+
+> max
+
++ 1 , · · · , K ′
+
+> max
+
+o
+
+denotes the change of the number of users in two consecutive time in-tervals. K′
+
+> 0 indicates that new users access the network, while K′
+
+< 0 represents that existing users leave the network. Fig. 15 compares the proposed DDPG-C 2F framework and the benchmarks in the dynamic scenario with varying number of users. We can observe from Fig. 15 that the proposed framework outperforms the benchmarks, indicating that the proposed DDPG-C 2F framework can accommodate random user accessing and leaving without the need of learning from scratch. This appealing feature originates from our design that the dimensionality of the state space and the action space is independent of the number of users in the network. Since the number of neurons in the input layer and the output layer of the neural network are determined by the dimensionality of the state space and the action space, respectively, the numbers of neurons in both input and output layers are also independent of the number of users in the network. Therefore, the proposed DDPG-C 2F framework is robust to the dynamic scenario with a varying number of users. 
+
+C. Comparison with DRL Benchmarks 
+
+To further demonstrate the performance of the proposed DDPG-C 2F framework, we compare it with the following two 2 4 6
+
+> K
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> R (bit/s/Hz)
+> DDPG-C 2F
+> DQN-C 2F
+
+(a) Joint optimization of sum rate and balance of subnetworks 2 4 6
+
+> K
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> (bit/Joule/Hz)
+> DDPG-C 2F
+> DQN-C 2F
+
+(b) Joint optimization of energy effi-ciency and balance of subnetworks 
+
+Fig. 16. Comparison of the balance-aware sum rate Rρ and the balance-aware energy efficiency ηρ with the proposed DDPG-C 2F framework and the DQN-C 2F benchmark versus the number of users K. L = 8 . M = 2 .
+
+Vmax = 5 m/s. 30 50 70 
+
+> L
+> 0
+> 30
+> 60
+> 90
+> 120
+> 150
+> R (bit/s/Hz)
+> DDPG-C 2F
+> MAPPO-C 2F
+
+(a) Joint optimization of sum rate and balance of subnetworks 30 50 70 
+
+> L
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> (bit/Joule/Hz)
+> DDPG-C 2F
+> MAPPO-C 2F
+
+(b) Joint optimization of energy effi-ciency and balance of subnetworks 
+
+Fig. 17. Comparison of the balance-aware sum rate Rρ and the balance-aware energy efficiency ηρ with the proposed DDPG-C 2F framework and the MAPPO-C 2F benchmark versus the number of APs L. K = 20 . M = 3 .
+
+Vmax = 5 m/s. 
+
+DRL benchmarks that directly learn the optimal clustered cell-free networking result in this subsection.  
+
+> •
+
+Deep Q-network based clustered cell-free networking (DQN-C 2F) : The agent learns the optimal clustered cell-free networking result by evaluating all possible network partitions. The channel features in the state space and the reward function are the same as those in the proposed DDPG-C 2F framework.  
+
+> •
+
+Multi-agent proximal policy optimization based clus-tered cell-free networking (MAPPO-C 2F) : Each AP acts as an agent to learn which subnetwork it belongs to independently, and then each user is assigned to the subnetwork containing its closest AP. An AP observes the large-scale fading coefficients between itself and all users, and receives the same reward as the proposed DDPG-C 2Fframework to ensure global coordination. Since the DQN-C 2F benchmark suffers from the curse of dimensionality as the network scales, we compare the proposed DDPG-C 2F framework with the DQN-C 2F benchmark in a small-scale network. Fig. 16 presents the balance-aware sum rate Rρ and the balance-aware energy efficiency ηρ with the proposed DDPG-C2F framework and the DQN-C 2F benchmark. It can be seen from Fig. 16(a) that the proposed DDPG-C 2F framework outperforms the DQN-C 2F benchmark when the number of users K is large. This is because the DQN-C 2F benchmark could fall into local optima with a high-dimensional solution 15 0 500 1000 1500 2000 2500 3000      
+
+> Training episode
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> R (bit/s/Hz)
+> = 0.0001, = 0.001
+> = 0.001, = 0.001
+> = 0.01, = 0.001
+> = 0.0001, = 0.01
+> = 0.0001, = 0.1
+
+(a) σa,max = 0 .25 0 500 1000 1500 2000 2500 3000      
+
+> Training episode
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> R (bit/s/Hz)
+> a,max =0.001
+> a,max =0.05
+> a,max =0.15
+> a,max =0.25
+
+(b) αϕ = 0 .0001 , αθ = 0 .001 
+
+Fig. 18. Balance-aware sum rate Rρ during the training process in the case of joint optimization of sum rate and balance of subnetworks with (a) σa,max =0.25 and (b) αϕ = 0 .0001 , αθ = 0 .001 . K = 50 . L = 100 . M = 5 .
+
+Vmax = 5 m/s. 
+
+space. Moreover, Fig. 16(b) shows that more performance gains can be achieved in the energy efficiency-oriented case, as incorporating AP selection into clustered cell-free networking would greatly increase the number of possible network parti-tions, making it difficult for the DQN-C 2F benchmark to find the optimal solution. Fig. 17 compares the proposed DDPG-C 2F framework with the MAPPO-C 2F benchmark when the number of APs L =30 , 50 , and 70 . We can see from Fig. 17 that the proposed DDPG-C 2F framework achieves better performance than the MAPPO-C 2F benchmark in both rate-oriented and energy efficiency-oriented cases, and the gains become prominent as the number of APs L increases. This is because with MARL, the joint solution space of L agents grows exponentially with 
+
+L, and a large solution space makes it difficult for each agent to learn the optimal policy that maximizes the global objective. 
+
+D. Training Sensitivity to Hyperparameters 
+
+To investigate the sensitivity of the proposed DDPG-C 2Fframework to key hyperparameters, Fig. 18 presents the train-ing processes of the proposed framework under various values of the learning rate of actor network αϕ, the learning rate of critic network αθ , and the maximum standard deviation 
+
+σa,max of the action noise. Due to page limit, only the results in the case of joint optimization of sum rate and balance of subnetworks are presented. It can be observed from Fig. 18(a) that excessively large learning rates prevent the proposed framework from converging. Moreover, the actor network requires a smaller learning rate than the critic network. This is because a large learning rate for the actor network leads to significant variations in the policy of the agent, thereby degrading the training stability. By contrast, a large learning rate helps the critic network quickly learn the expected cumulative reward of the action taken by the agent. This ensures that the agent updates its policy in the direction of higher reward during the training process. Additionally, it is shown in Fig. 18(b) that by enlarging the maximum standard deviation σa,max of the action noise, the proposed DDPG-C 2Fframework achieves better performance with sufficient training, as the agent can explore the solution space more thoroughly with stronger action noise. VII. C ONCLUSION 
+
+This paper studied the clustered cell-free networking prob-lem over user mobility. To promptly produce the optimal network partition as users move, we delved into the DRL approach and proposed a DDPG-C 2F framework. In contrast to the existing works that require the channel conditions between all users and all APs, our framework only requires one single channel estimate at each AP, which reduces not only the channel estimation costs, but also the training and inference costs due to the reduced dimensionality of the state space. Moreover, the proposed framework can be adopted in various application scenarios to solve different clustered cell-free net-working problems with different objectives and constraints. In addition, our framework can reduce the handover cost incurred by user mobility, and is able to accommodate the dynamic scenario with random user accessing or leaving. Simulation results demonstrated the effectiveness of the proposed frame-work in four cases along with its superior performance over the benchmarks. The significant performance gains achieved with our framework in all scenarios showcase the potential of the proposed DRL-based clustered cell-free networking framework for practical implementation. REFERENCES [1] O. Zhou, J. Wang, and Y. Ji, “A deep reinforcement learning framework for clustered cell-free networking over user mobility,” in Proc. IEEE WCNC , Mar. 2025. [2] W. Chen, X. Lin, J. Lee, A. Toskala, S. Sun, C. F. Chiasserini, and L. Liu, “5G-advanced toward 6G: Past, present, and future,” IEEE J. Sel. Areas Commun. , vol. 41, no. 6, pp. 1592–1619, Jun. 2023. [3] J. Wang and L. Dai, “Asymptotic rate analysis of downlink multi-user systems with co-located and distributed antennas,” IEEE Trans. Wireless Commun. , vol. 14, no. 6, pp. 3046–3058, Jun. 2015. [4] H. Huh, A. M. Tulino, and G. Caire, “Network MIMO with linear zero-forcing beamforming: Large system analysis, impact of channel esti-mation, and reduced-complexity scheduling,” IEEE Trans. Inf. Theory ,vol. 58, no. 5, pp. 2911–2934, May 2012. [5] C. Pan, M. Elkashlan, J. Wang, J. Yuan, and H. Lajos, “User-centric C-RAN architecture for ultra-dense 6G networks: Challenges and method-ologies,” IEEE Commun. Mag. , vol. 56, no. 6, pp. 14–20, Jun. 2018. [6] H. A. Ammar, R. Adve, S. Shahbazpanahi, G. Boudreau, and K. V. Srinivas, “User-centric cell-free massive MIMO networks: A survey of opportunities, challenges and solutions,” IEEE Commun. Surv. Tutor. ,vol. 24, no. 1, pp. 611–652, Jan. 2022. [7] L. Dai, “An uplink capacity analysis of the distributed antenna system (DAS): From cellular DAS to DAS with virtual cells,” IEEE Trans. Wireless Commun. , vol. 13, no. 5, pp. 2717–2731, May 2014. [8] Y. Zhang, S. Bi, and Y.-J. A. Zhang, “User-centric joint transmission in virtual-cell-based ultra-dense networks,” IEEE Trans. Veh. Technol. ,vol. 67, no. 5, pp. 4640–4644, May 2018. [9] J. Wang and L. Dai, “Downlink rate analysis for virtual-cell based large-scale distributed antenna systems,” IEEE Trans. Wireless Commun. ,vol. 15, no. 3, pp. 1998–2011, Mar. 2016. [10] L. Dai and B. Bai, “Optimal decomposition for large-scale infrastructure-based wireless networks,” IEEE Trans. Wireless Commun. , vol. 16, no. 8, pp. 4956–4969, Aug. 2017. [11] J. Wang, L. Dai, L. Yang, and B. Bai, “Rate-constrained network decomposition for clustered cell-free networking,” in Proc. IEEE ICC ,May 2022, pp. 2549–2554. [12] J. Wang, L. Dai, L. Yang, and B. Bai, “Clustered cell-free networking: A graph partitioning approach,” IEEE Trans. Wireless Commun. , vol. 22, no. 8, pp. 5349–5364, Aug. 2023. [13] M. Yemini and A. J. Goldsmith, “Optimal resource allocation for cellular networks with virtual cell joint decoding,” in Proc. IEEE ISIT , Jul. 2019, pp. 2519–2523. 16 
+
+[14] P. Biswas, R. K. Mallik, and K. B. Letaief, “Optimal access point centric clustering for cell-free massive MIMO using Gaussian mixture model clustering,” IEEE Trans. Mach. Learn. Commun. Netw. , vol. 2, pp. 675– 687, May 2024. [15] F. Riera-Palou, G. Femenias, A. G. Armada, and A. P´ erez-Neira, “Clustered cell-free massive MIMO,” in Proc. IEEE Globecom , Dec. 2018. [16] O. Zhou, J. Wang, F. Liu, and J. Wang, “Energy-efficient clustered cell-free networking with access point selection,” IEEE Open J. Commun. Soc. , vol. 5, pp. 1551–1565, Mar. 2024. [17] X. Zeng, J. Wang, K. Yue, M. Dong, and B. Bai, “Tunable weighted kernel k-means for clustered cell-free networking acceleration and beam on-off control,” in Proc. IEEE ICC , Jun. 2024, pp. 4311–4316. [18] J. Wang, T. Wu, O. Zhou, and Y. Zhu, “Exploring evolutionary spectral clustering for temporal-smoothed clustered cell-free networking,” IEEE Wireless Commun. Lett. , vol. 14, no. 2, pp. 494–498, Dec. 2024. [19] F. Xia and J. Wang, “Complexity-constrained clustered cell-free network-ing for sum capacity maximization,” in Proc. IEEE ISIT , Jun. 2023, pp. 2691–2696. [20] B. Ren, H. Hao, Z. Lyu, J. Peng, J. Wang, and H. Wu, “Tight differ-entiable relaxation of sum ergodic capacity maximization for clustered cell-free networking,” in Proc. IEEE ISIT , Jul. 2024, pp. 2448–2453. [21] F. Xia, J. Wang, and L. Dai, “Optimizing clustered cell-free networking for sum ergodic capacity maximization with joint processing constraint,” 
+
+IEEE Trans. Wireless Commun. , vol. 24, no. 1, pp. 571–584, Jan. 2025. [22] C. Deng, B. Ren, Z. Lyu, J. Wang, and H. Wu, “Balanced clustered cell-free networking with individual rate guarantees,” IEEE Trans. Veh. Technol. , pp. 1–5, Apr. 2025. [23] Z. Liu, J. Zhang, Z. Liu, H. Xiao, and B. Ai, “Double-layer power control for mobile cell-free XL-MIMO with multi-agent reinforcement learning,” IEEE Trans. Wireless Commun. , vol. 23, no. 5, pp. 4658–4674, May 2024. [24] C. F. Mendoza, M. Kaneko, M. Rupp, and S. Schwarz, “Accelerated deep reinforcement learning for uplink power control in a dynamic cell-free massive MIMO network,” IEEE Wireless Commun. Lett. , vol. 13, no. 6, pp. 1710–1714, Apr. 2024. [25] L. Luo, J. Zhang, S. Chen, X. Zhang, B. Ai, and D. W. K. Ng, “Downlink power control for cell-free massive MIMO with deep reinforcement learning,” IEEE Trans. Veh. Technol. , vol. 71, no. 6, pp. 6772–6777, Mar. 2022. [26] F. Fredj, Y. Al-Eryani, S. Maghsudi, M. Akrout, and E. Hossain, “Distributed beamforming techniques for cell-free wireless networks using deep reinforcement learning,” IEEE Trans. Cogn. Commun. Netw. ,vol. 8, no. 2, pp. 1186–1201, Apr. 2022. [27] Y. Li, C. Zhang, and Y. Huang, “Distributed beam selection for millimeter-wave cell-free massive MIMO based on multi-agent deep reinforcement learning,” in Proc. IEEE WCNC , Apr. 2024. [28] Y. Al-Eryani and E. Hossain, “Self-organizing mmwave MIMO cell-free networks with hybrid beamforming: A hierarchical DRL-based design,” 
+
+IEEE Trans. Commun. , vol. 70, no. 5, pp. 3169–3185, Mar. 2022. [29] R. Y. Chang, S.-F. Han, and F.-T. Chien, “Reinforcement learning-based joint cooperation clustering and content caching in cell-free massive MIMO networks,” in Proc. IEEE VTC , Sep. 2021, pp. 1–7. [30] N. Ghiasi, S. Mashhadi, S. Farahmand, S. M. Razavizadeh, and I. Lee, “Energy efficient AP selection for cell-free massive MIMO systems: Deep reinforcement learning approach,” IEEE Trans. Green Commun. Netw. , vol. 7, no. 1, pp. 29–41, Aug. 2023. [31] Z. Gao, Q. Zhang, J. Liu, Z. Du, and Y. Li, “DRL-based AP selection in downlink cell-free massive MIMO network with pilot contamination,” 
+
+IEEE Commun. Lett. , vol. 28, no. 6, pp. 1432–1436, Apr. 2024. [32] J. Moon, S. Kim, H. Ju, and B. Shim, “Energy-efficient user association in mmwave/THz ultra-dense network via multi-agent deep reinforcement learning,” IEEE Trans. Green Commun. Netw. , vol. 7, no. 2, pp. 692–706, Jan. 2023. [33] L. Sun, J. Hou, and R. Chapman, “Multi-agent deep reinforcement learning for access point activation strategy in cell-free massive MIMO networks,” in Proc. IEEE Infocom Workshops , May. 2023. [34] B. Banerjee, R. C. Elliott, W. A. Krzymie˜ n, and M. Medra, “Access point clustering in cell-free massive MIMO using conventional and federated multi-agent reinforcement learning,” IEEE Trans. Mach. Learn. Commun. Netw. , vol. 1, pp. 107–123, Jun. 2023. [35] R. K. Jain, D.-M. W. Chiu, and W. R. Hawe, “A quantitative measure of fairness and discrimination,” Eastern Res. Lab., Digit. Equip. Corp., Hudson, MA, USA, 1984. [36] N. C. Luong, D. T. Hoang, S. Gong, D. Niyato, P. Wang, Y.-C. Liang, and D. I. Kim, “Applications of deep reinforcement learning in communications and networking: A survey,” IEEE Commun. Surveys Tuts. , vol. 21, no. 4, pp. 3133–3174, May 2019. [37] S. Singh, T. Jaakkola, M. L. Littman, and C. Szepesv´ ari, “Convergence results for single-step on-policy reinforcement-learning algorithms,” 
+
+Mach. Learn. , vol. 38, no. 3, pp. 287–308, Mar. 2000. [38] R. Sutton and A. Barto, Reinforcement Learning: An Introduction .Cambridge, MA, USA: MIT Press, 2018. [39] H. Tabassum, M. Salehi, and E. Hossain, “Fundamentals of mobility-aware performance characterization of cellular networks: A tutorial,” 
+
+IEEE Commun. Surveys Tuts. , vol. 21, no. 3, pp. 2288–2308, Mar. 2019. [40] X. Wang, F.-C. Zheng, P. Zhu, and X. You, “Energy-efficient resource allocation in coordinated downlink multicell OFDMA systems,” IEEE Trans. Veh. Technol. , vol. 65, no. 3, pp. 1395–1408, Mar. 2016. [41] T. X. Vu, S. Chatzinotas, S. ShahbazPanahi, and B. Ottersten, “Joint power allocation and access point selection for cell-free massive MIMO,” in Proc. IEEE ICC , Jul. 2020. 
+
+Ouyang Zhou received the B.S. degree from Nankai University, Tianjin, China, in 2019. He is currently pursuing the Ph.D. degree with the College of Electronic and Information Engineering, Tongji University, Shanghai China. His current research interests include clustered cell-free networking and deep reinforcement learning. 
+
+Junyuan Wang (Member, IEEE) received the B.S. degree in Communications Engineering from Xidian University, Xi’an, China, in 2010, and the Ph.D. de-gree in Electronic Engineering from City University of Hong Kong, Hong Kong, China, in 2015. From 2015 to 2017, she was a Research Associate in the School of Engineering and Digital Arts, University of Kent, Canterbury, U.K. From 2018 to 2020, she was a Lecturer (Assistant Professor) in the Department of Computer Science, Edge Hill University, Ormskirk, U.K. She is currently a Research Professor with the College of Electronic and Information Engineering and the Institute for Advanced Study, Tongji University, Shanghai, China. Her research mainly focuses on wireless communications and networking, and artificial intelligence. She was a co-recipient of the Best Paper Award from IEEE International Conference on Communications in China (ICCC) in 2024 and the Best Student Paper Award from IEEE 85th Vehicular Technology Conference–Spring (VTC-Spring) in 2017. 17 
+
+Bo Qian (Member, IEEE) received the B.S. and M.S. degrees from the College of Mathematics at Sichuan University, Chengdu, China, in 2015 and 2018, respectively, and the Ph.D. degree in Infor-mation and Communication Engineering at Nanjing University, Nanjing, China, in 2022. From 2022 to 2024, he was a Postdoctoral Fellow with the Peng Cheng Laboratory, Shenzhen, China. From 2024 to 2026, he worked as a Researcher and Assistant Professor (Special Appointment) at the Information Systems Architecture Science Research Division, National Institute of Informatics, Tokyo, Japan. From 2026, he is an Assistant Professor (Special Appointment) with the Graduate School of Information Science and Technology, The University of Tokyo, Japan. His research interests include cellular RAN, SAGIN, vehicular networks, and the industrial Internet. He received the Best Paper Award at IEEE VTC2020-Fall. 
+
+Antonio P´ erez Yuste (Senior Member, IEEE) re-ceived the B.Eng. degree in radio communications, the M.Eng. degree in telecommunications, and the Ph.D. degree (cum laude) in telecommunications engineering, all from the Universidad Polit´ ecnica de Madrid (UPM), Spain, in 1991, 1996, and 2004, respectively. He is currently a Tenured Professor in the Department of Communications and Audio and Video Engineering at UPM, where his research in-terests focus on long-range and short-range wireless communication systems. Prof. P´ erez Yuste has held several leadership roles at UPM: Vice Director of the School of Telecom-munication Systems Engineering (1997–2001), Director of the same school (2001–2004), Assistant to the Rector (2004–2012), Director of the UPM Sino-Spanish Campus in Shanghai, China (September 2012 – February 2014), and Head of the UPM Sino-Spanish Cooperation Office in Madrid (March 2014 – July 2014). In 2014, he was appointed to a three-year Guest Professorship at Tongji University in Shanghai under the Chinese Government’s prestigious National High-End Foreign Expert Program. From 2017 to 2019, he continued as a Guest Professor at the same university’s College of Electronics and Information Engineering in Shanghai. He received the UPM Medal in 2004 for his outstanding work as School Director, the UPM Prize for Innovation in Education in 2009 for his best educational practices, and the UPM Prize for Excellence in Education in 2018 for his outstanding academic career. In December 2020, he was awarded the ‘Rem´ on y Zarco del Valle’ Prize given in the UPM to the best international research paper on security and defense. 
+
+Yusheng Ji (Fellow, IEEE) received the B.E., M.E., and Ph.D. degrees in electrical engineering from The University of Tokyo. She joined the National Center for Science Information Systems (NACSIS), Tokyo, Japan, in 1990, as an Assistant Professor and then became an Associate Professor. In 2000, she was an Associate Professor and then a Professor with the National Institute of Informatics (NII), Tokyo, and has been with the Graduate University for Advanced Studies, SOKENDAI, Japan, since 2002. She has been a Professor Emeritus with NII and SOKENDAI since April 2026. She has published more than 600 refereed papers in the areas of network resource management, traffic control and performance evaluation, and mobile computing. She is a Distinguished Speaker of the IEEE Vehicular Technology Society. She has received numerous paper awards, including the IEEE Andrew P. Sage Best Transactions Paper Award and the IEEE Communications Society Outstanding Paper Award. She is the General Chair of IEEE INFOCOM 2026. She has served as the TPC Co-Chair, the Symposium Co-Chair, and the Track Co-Chair for major conferences, such as IEEE INFOCOM, ICC, GLOBECOM, and VTC. She is serving/has served editorship for transactions and magazine of IEEE, as well as IEICE and IPSJ.
