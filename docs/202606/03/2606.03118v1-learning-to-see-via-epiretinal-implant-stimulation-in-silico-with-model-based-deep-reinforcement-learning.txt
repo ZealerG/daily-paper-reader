@@ -1,0 +1,344 @@
+Title: Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning
+
+URL Source: https://arxiv.org/pdf/2606.03118v1
+
+Published Time: Wed, 03 Jun 2026 00:33:43 GMT
+
+Number of Pages: 18
+
+Markdown Content:
+# Learning to See via Epiretinal Implant Stimulation 
+
+# in silico with Model-Based Deep Reinforcement Learning 
+
+Jacob Lavoie 1, Marwan Besrour 1, William Lemaire 1, Jean Rouat 1, R´ ejean Fontaine 1, Eric Plourde 1 
+
+> 1
+
+Department of Electrical Engineering and Computer Engineering, Universit´ e de Sherbrooke, Sherbrooke, Quebec, J1K 2R1, Canada 
+
+Abstract. 
+
+Objective: Diseases such as age-related macular degeneration and retinitis pigmentosa cause the degradation of the photoreceptor layer. One approach to restore vision is to electrically stimulate the surviving retinal ganglion cells with a microelectrode array such as epiretinal implants. Epiretinal implants are known to generate visible anisotropic shapes elongated along the axon fascicles of neighboring retinal ganglion cells. Recent work has demonstrated that to obtain isotropic pixel-like shapes, it is possible to map axon fascicles and avoid stimulating them by inactivating electrodes or lowering stimulation current levels. Avoiding axon fascicule stimulation aims to remove brushstroke-like shapes in favor of a more reduced set of pixel-like shapes. Approach: In this study, we propose the use of isotropic and anisotropic shapes to render intelligible images on the retina of a virtual patient in a reinforcement learning environment named rlretina. The environment formalizes the task as using brushstrokes in a stroke-based rendering task. Main Results: We train a deep reinforcement learning agent that learns to assemble isotropic and anisotropic shapes to form an image. We investigate which error-based or perception-based metrics is adequate to reward the agent. The agent is trained in a model-based data generation fashion using the psychophysically validated axon map model to render images as perceived by different virtual patients. We show that the agent can generate more intelligible images compared to the naive method in different virtual patients. Significance: This work shares a new way to address epiretinal stimulation that constitutes a first step towards improving visual acuity in artificially-restored vision using anisotropic phosphenes. 
+
+Keywords : deep reinforcement learning, model-based, retinal implant, stroke-based rendering 
+
+> arXiv:2606.03118v1 [cs.LG] 2 Jun 2026
+
+Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 2
+
+This is the authors’ preprint version. The published article is: J. Lavoie, M. Besrour, W. Lemaire, J. Rouat, R. Fontaine and E. Plourde, “Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning,” Biomedical Physics & Engineering Express 10 , 025006 (2024). DOI: 10.1088/2057-1976/acf1a5. Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 3
+
+1. Introduction 
+
+Vision loss has a serious impact on quality of life. Epidemiological studies reveal that vision loss also has an important global burden of disease on society [ 1]. There are effective treatments for common eye diseases such as myopia, glaucoma, and cataracts. However, treatments aimed at prevalent diseases affecting the retina, such as age-related macular degeneration and retinitis pigmentosa, can slow the disease at best. Age-related macular degeneration accounts for 15.85% of incurable vision loss cases [ 1]. Therefore, it is the most prevalent untreatable disease that causes vision loss in developed countries [ 1]. Retinitis pigmentosa is a rare disease with a worldwide prevalence of 1/4000 that causes vision impairment to complete loss during adolescence and young adult life [ 2]. The early onset of retinitis pigmentosa increases the detrimental burden of the disease and remains one of the leading causes of blindness in the 20-year-old to 64-year-old age group [3, 4]. Age-related macular degeneration and retinitis pigmentosa cause degeneration of the retina’s photoreceptor layer. Therefore, patients gradually lose their sensitivity to light, leaving subsequent layers of neurons with an aberrant signal. One treatment is to electrically stimulate the surviving neurons to artificially restore a certain visual acuity. This can be performed with the use of microelectrode arrays (MEA) that can be implanted to target different layers of the retina [ 5]. These devices were developed based on the observation that focal electrical stimulation of the retina generates a dot-shaped visual perception called phosphene [ 6]. Phosphenes are spatially preserved along the visual pathway as a result of the retinotopic organization of the visual system. An ensemble of phosphenes caused by retinal stimulation is Implant Epiretinal implant Subretinal implant Damaged photoreceptor Retinal ganglion cells Inner layer Middle layer Outer layer 
+
+Figure 1: Epiretinal and subretinal implan-tation sites are illustrated in the anatomical context of the retina. referred to as a percept. The main focus of the work presented in this article is to train a reinforcement learning (RL) agent that selects phosphenes to generate a percept similar to a digital image in different virtual patients, thus restoring visual acuity. Before presenting the proposed approach, we go through the train of thought that led to our attempt to leverage anisotropic phosphenes instead of mitigating them. 
+
+1.1. Stimulation sites 
+
+There are two MEA implantation sites, shown in figure 1, which are often found in the literature [ 5, 7]: the subretinal and epiretinal implantation sites. In addition to the aforementioned sites, suprachoroidal, lateral geniculate nucleus, and visual cortex implants are also potential stimulation sites that target different parts of the visual pathway [ 8]. The epiretinal implantation site stimulates retinal ganglion cells (RGC), while the subretinal implantation site stimulates bipolar cells. Subretinal implants hold great promise in terms of visual acuity as a result of the lower-level signal encoded by bipolar neurons compared to subsequent layers [ 9]. However, Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 4the insertion point makes its deployment more complex. In fact, to be installed, the subretinal implant must be surgically implanted between the pigment epithelium and the outer retina. Therefore, its use is limited to patients with intact inner and middle layers of the retina [10 ]. In addition, data and power are generally transmitted through wires and an induction coil to the subretinal implant. Epiretinal implants can be placed on the retinal surface, allowing the use of optical power and data transmission [ 11 , 7]. In this study, we focus mainly on epiretinal implant stimulation due to its potential to help more patients and be less invasive. 
+
+1.2. Psychophysical study of anisotropic phosphenes in epiretinal stimulation 
+
+Recent experiments with patients using an epiretinal implant revealed that phosphenes are not always dot-shaped [ 12 ]. In fact, although the epiretinal implant aims to stimulate the RGCs, it also stimulates the peripheral axons of the RGCs that are sufficiently close to the stimulating electrode. The stimulation of peripheral RGC axons causes the patient’s visual system to render irregular shapes as shown in figure 2 [ 13 , 12 ]. Axons are organized in fascicles, also known as axon bundles, which converge to the blind spot to form the optic nerve. Epiretinal electrical stimulation, therefore, generates an elongated shape parallel to the axon fascicles [ 12 ] as shown in figure 2. The phosphene is elongated along the axons, causing a perfect isotropic phosphene to become anisotropic. 
+
+1.3. Naive stimulation algorithm 
+
+The Naive Stimulation Algorithm (NSA) for the epiretinal implant described in [ 15 ] is tested in patients with the Argus II epiretinal implant. 
+
+Figure 2: Comparison between anisotropic and isotropic phosphenes shapes. (Left) Subject 2 drawings from [ 12 ] show anisotropic phosphenes perceived during single-electrode stimulation with an Argus II implant. (Center) Axon map model predicts the anisotropic shaped caused by extracellular axon stimulation. (Right) Scoreboard model does not include extracellular axon stimulation resulting in ideal isotropic phosphenes. Phosphenes and images are generated using the pulse2percept Python module [14]. Many improvements to the original algorithms that use more advanced image processing meth-ods such as Difference of Gaussian [ 16 ], con-strained optimization [ 17 ], and deep learning [ 18 , 19 ] obtained better results in simulation [ 20 ]. The NSA algorithm for epiretinal implant most tested in patients is transforming a dig-ital image into electrical stimulation using a downscaling operation of a camera image that matches the intensity of a pixel to the amplitude or frequency. This results in a pixelated im-age having the dimension of the microelectrode array. Electrical stimulations are proportional to the intensity of the pixels. These electri-cal stimulations are delivered in a temporal sequence of single-electrode stimulations in an experimental setup preventing eye movement. Simultaneous stimulation with multiple elec-trodes causes more irregular phosphene shapes [ 21 ]. Therefore, the NSA stimulation algorithm does not consider the fact that RGC axons are stimulated, leading to anisotropic phosphene [15]. Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 5
+
+1.4. Mitigating axon bundle stimulation 
+
+As indicated above, axon bundle stimulation produces anisotropic phosphenes. Previous work attempted to minimize the impact of anisotropic shapes on the percept quality. One such approach consists of modifying the electrode configuration to attenuate this impact [22 , 23 ]. Other approaches adopt different stimulation techniques, such as RGC mapping and current steering, creating virtual electrodes between electrodes, resulting in more consistent isotropic phosphenes with a healthy retina in situ [24 , 25 , 26 , 27 , 28 ,29 , 30 , 31 ]. These approaches offer better control over RGC spiking and collateral axon stimulation. In addition, both tend to limit the number of usable electrodes and the range of possible stimulation intensity, thus reducing the diversity of shapes that can be generated by epiretinal implants [25, 23]. 
+
+1.5. Leveraging axons bundle stimulation with stroke-based rendering 
+
+Data acquired from patients with epiretinal implants and anatomical studies allow the development of a psychophysically validated model of end-to-end visual processing in the degenerated retina [ 12 ]. These models help to visualize the perceived anisotropic shapes created by stimulation of axon bundles in an epiretinal stimulation setting, as shown in figure 2. Instead of designing a retinal stimulation algorithm that mitigates anisotropic shapes, it is possible to use the available shapes produced by all possible stimulations to form the desired image to be perceived. Choosing anisotropic shapes to generate an image is referred to in the computer vision community as stroke-based rendering (SBR). More precisely, SBR is a non-photorealistic method to create imagery from discrete elements called strokes, such as paint strokes or ripples [ 32 ]. An analogy that illustrates the problem is that of the painter reproducing a photograph on a canvas. In this paper, the phosphene is considered equivalent to one brushstroke, and the retina is the canvas. 
+
+1.6. Reinforcement learning in stroke-based rendering 
+
+Recent successful SBR algorithms such as SPIRAL [ 33 ], StrokeNet [ 34 ], Doodle-SDQ [ 35 ], Sketch-RNN [36 ] and other model-based approaches [ 37 ] showed high-quality picture reproduction. All successful attempts mentioned the use of deep reinforcement learning (DRL) paradigm for paint stroke decomposition and/or Generative Adversarial Networks (GAN) for quality assessment. Thinking of epiretinal stimulation as an SBR problem allows us to train a deep reinforcement learning agent to use the full diversity of shapes produced by all electrodes. This new perspective offers the use of anisotropic shapes rather than mitigating them as in the aforementioned approaches in section 1.4. 
+
+1.7. Reinforcement learning and retinal stimulation 
+
+Previous work using reinforcement learning (RL) to adjust epiretinal stimulation param-eters used the center-surround RGC receptive field model as a premise to simulate the retina [ 38 , 39 ]. The center-surround RGC receptive field is the accepted model for RGC neural coding. It consists of a circular area of the retina called the center and the surrounding region that respond oppositely to light expo-sure. However, it does not consider the stimu-lation of axon bundles in the context of epireti-nal stimulation. Some more recent work us-Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 6ing DRL is promising but does not include anisotropic phosphene in the percept genera-tion [ 40 ]. Nonetheless, as the author notes in [ 38 ], RL is a very appealing framework to use patient’s feedback as a learning signal to auto-mate adaptation to different patients in vivo 
+
+[41]. For each patient, the best ensemble of phosphenes that render a particular target image on the retina is not known. The current virtual patient models mentioned in figure 2 can only generate a percept from electrode stimulation. One way to find the best electrode stimulation combination from a target image is to evaluate the perception of the predicted percept compared to the target image. A brute-force approach could be to try every combination of electrodes, generate the percept, and then calculate the similarity between the percept and the target image. This approach becomes more tedious as the state-space, or in this case, the number of electrodes increases in complexity [ 42 ]. Therefore, it is difficult to generate a complete dataset to leverage supervised learning methods. RL allows for searching the state-space of electrode combinations more efficiently [ 42 ]. A DRL agent that interacts with an environment gets direct feedback through a reward as it approaches a solution. The agent learns to associate a particular state of the environment with an action it can take. RL is therefore a suitable paradigm for epiretinal stimulation because there exists a model of epiretinal stimulation with which an agent can interact, but there is no optimal solution to transform a target image into an electrode combination. 
+
+1.8. Proposed approach 
+
+This work bridges the gap between the previous attempt [38 ] to find optimal stimulation parameters with an epiretinal implant using RL and the latest anatomical knowledge and lessons learned from trials of human epiretinal implants [ 12 ]. It is the only attempt to improve visual acuity for the implanted patient by leveraging anisotropic phosphene in a SBR problem. More specifically, we want to investigate whether a DRL agent can learn to generate a sequence of single-electrode stimulation from a target image, thus increasing visual acuity for different virtual patients with an epiretinal implant. This paper proposes the following contributions: 
+
+• We formalize the transformation of the original image into a stimulation pattern as an SBR problem implemented in a new reinforcement learning environment named rlretina available at https:// github.com/NECOTIS/rlretina.git .
+
+• We compare a pixel-based distance and distance between probability distributions as a proxy of a perceptual metric in the reward design of the new environment. 
+
+• We build a model-based DRL agent that can explore the available anisotropic phosphene space to increase visual acuity in virtual patients with different epiretinal implant settings. 
+
+• Finally, we investigate perceptual metrics to circumvent pixel-based metric limita-tions to better compare the percepts re-sulting from different algorithms. In addition, we demonstrate pixel-based error limitations as a reward in this perceptual task. We compare the proposed DRL agent with the NSA stimulation algorithm using the mean structural similarity index measure (MSSIM) as an evaluation metric presented Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 7in section 2.2.2. We show that the proposed agent better reproduces the original images in the virtual patient’s percepts than the NSA stimulation methods. It also performs better with different virtual patient implant settings than the NSA stimulation algorithm. 
+
+1.8.1. Using a model-based approach A model-free RL approach to epiretinal stimulation in an in vivo system is presented in figure 3. The state st contains only the digital image 
+
+I. It is the reward rt that indirectly provides information about the similarity between I and the percept P . The virtual patient’s visual system illustrated in figure 3 is conceptualized as part of the environment (see section 2.1.1). This approach was used in previous work presented in section 1.7. In the present work, we adopt a model-based approach to data generation explained in section 2.1.2 by including P in st as shown later in figure 4. Using an external world model to generate the data for the agent, in this case, the percept P , is derived from the recurrent World Models proposed in [ 43 ]. It alleviates the agent’s burden of modeling the environment that can be composed of any real-world image. Instead, it uses the axon map model to generate the image. 
+
+1.8.2. Epiretinal stimulation as Markov Decision Process A Markov Decision Process (MDP) allows one to formalize the interaction between the agent and the environment in a RL task. The proposed approach is inspired by the way the SBR task is formalized as a MDP where the goal is to maximize the similarity between a target image and a stroke-based rendered image equivalent respectively to I and P in figure 3. Selecting single-electrode stimulation in a sequence is a decision-making task that V1 
+
+> LGN
+> I
+> P
+> st
+> rt
+> at
+
+Figure 3: A model-free environment simulates a virtual patient’s retina and its visual system. The agent is defined as the implant controller and is in charge of transforming a camera image into a single-electrode stimulation pattern. The single-electrode stimulation excite the retina. The signal propagates to the lateral geniculate nucleus (LGN) and through the visual cortex (V1) and subsequent visual areas (Not illustrated). The environment returns a state st. The agent must interact with the environment through an action 
+
+at corresponding here to the electrode’s stimulation. The environment then gives a reward rt according to the similarity between the target image I and the visual perception P
+
+resulting from the electrical stimulation. can be modeled as a MDP. A finite MDP is a decision-making process that satisfies the Markov property stipulating that the action influences not only the immediate reward rt,but also the probability that the process moves into its new state s′ at t+1 [ 44 ]. A finite MDP is defined by sets with a finite number of elements for states S, actions A, and rewards R. Given 
+
+st the state at time t, and at the action at time 
+
+t, the dynamic or state transition function of the environment p is defined in (1) [45]. 
+
+p(s′, r |s, a ) .
+
+= P r {st+1 = s′, r t+1 = r|st, a t} (1) for all s′ where s ∈ S, r ∈ R and a ∈A(t). In other words, the next state st+1 and the associated reward rt+1 are functions of the probability P r of taking action at in the Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 8previous state st. The state st given to the agent is defined as the target image I, and the percept P that exposes the internal dynamics of the retina model. The agent must then decide on an action at, namely, a single-electrode stimulation. As mentioned previously, single-electrode stimulation generates anisotropic shapes perceived here by the virtual patient. The percepts of the virtual patient are simulated with a psychophysically validated model developed from a human patient implanted with an Argus epiretinal implant [ 12 ]. This model of human epiretinal vision is used by the environment that simulates a virtual patient. 
+
+2. Materials and methods 
+
+The following sections present the implant stimulation algorithm and the experiences that result in the generation of intelligible percepts. The algorithm takes the form of a DRL agent detailed in section 2.1.2 estimating the best sequence of action at to maximize the similarity between I and P to increase the visual acuity of the patient. 
+
+2.1. Materials 2.1.1. Environment We developed a new environment to train reinforcement learning agents. The environment follows the OpenAI gym specifications [ 46 ]. Section 2.1.1 presents the underlying assumptions in the environment. 
+
+From single-electrode stimulation to percept 
+
+The environment uses the axon map model that accurately reproduces the drawings of the phosphene perceived by real patients during an epiretinal single-electrode stimulation [ 12 ]. It is important to note that the axon map model was developed in a control clinical set-up that prevented eye movements and used only single-electrode stimulation without superimposition of multiple stimulations. Therefore, it serves as an anisotropic phosphene rendering tool to simulate the virtual patient. The axon map model, detailed in the section below, renders anisotropic phosphenes as observed in implanted patients rather than ideal isotropic phosphenes. Rendered phosphenes are assembled to form the percept P . In the case at hand, an episode of agent-environment interaction is defined as a sequence of single-electrode stimulations. At the beginning of the episode, a new target image I is selected from the image dataset. At each step or single-electrode stimulation of an episode, the agent produces a vector with probabilities of selecting each electrode. The number of activated electrodes and their normalized stimulation values are set in the environment configuration. The environment uses single-electrode stimulation equivalent to the action 
+
+a of the agent to update the virtual patient’s percept P .
+
+Axon map model An electrical stimulation is assumed to generate focal dots of light that decay exponentially with the distance between the location of the stimulating electrode and the location of the stimulated retina ( xstim , y stim )and the spatial decay constant ρ. These assumptions are included in the calculation of the scoreboard model to estimate the intensity profile Iscore (x, y ; ρ) [ 12 ]. Equation (2) corresponds to the scoreboard model presented in figure 2 [12]. 
+
+Iscore (x, y ; ρ) = exp 
+
+
+
+− (x−xstim )2+( y−ystim )2
+
+> 2ρ2
+
+
+
+(2) The axon map model estimates the contribution of axon stimulation to the virtual patient’s perception based on anatomic observation of Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 9axonal growth [ 47 ]. The axonal trajectories are represented with a modified polar coordinate system with its center at the optical disc. The contribution of axon stimulation to a phosphene decays exponentially along the axon bundles with the distance between the location of the stimulating electrode and the soma (xsoma , y soma ). The impact of axon stimulation on the intensity profile Iaxon (x, y ; λ)is estimated using (3). 
+
+Iaxon (x, y ; λ) = exp 
+
+
+
+− (x−xsoma )2+( y−ysoma )2
+
+> 2λ2
+
+
+
+(3) where λ is a constant that modulates spatial decay along the axon. Therefore, we can combine (2) and (3) to predict the intensity profile Imap (x, y ; ρ, λ ) of anisotropic phosphenes perceived by virtual patients implanted with an epiretinal implant: 
+
+Imap (x, y ; ρ, λ ) = Iscore (x, y ; ρ)Iaxon (x, y ; λ) (4) The values of parameters ρ and λ can be set to simulate implant placement relative to the retina of different virtual patients, as demonstrated with real patients in [12]. 
+
+Implant simulation A model of the commer-cialized ArgusII implant [ 15 ] is used in the sim-ulations presented in the current work to fa-cilitate the reproducibility of the experiments and further comparisons with other stimulation algorithms. The implant is placed on the sur-face of the retina according to the coordinates centered on the fovea. The angle of insertion is set through the environment configuration. The implant placement parameters of subjects in [ 12 ] are also available in the environment. All single-electrode pulse waveforms consist of a biphasic, cathodic-first, charge-balanced, square-wave pulse. 
+
+Reward definition The reward is defined as follows: 
+
+r(st, a t) = Lt+1 − Lt
+
+Lt0
+
+(5) where Lt is a given distance between the target image I and the percept P at time t and 
+
+t0 indicates the beginning of the experiment. The difference in two subsequent time steps, 
+
+Lt+1 − Lt, is used to signal the agent if it is getting closer or farther from the target. 
+
+Dataset The MNIST [ 48 ] dataset used in the experiments serves as a proxy for visual acuity tasks often used in optometry, such as the Snellen chart [ 49 ]. It contains 70 000 28 ×
+
+28 handwritten number images split into a 60 000 image training set and a 10 000 image test set. 
+
+2.1.2. Agent Building of a model-based agent 
+
+The agent architecture is the Soft Actor-Critic (SAC) algorithm [ 50 ]. An actor-critic agent is made up of two parts; (1) the actor who learns a policy π(at|st) that maps a state st ∈ S to actions a and (2) the critic who approximates a value function that gives an evaluative feedback based on the agent’s action at in state st. The SAC algorithm uses a Q-function in the critic in a similar way to recent agent algorithms such as the Deep Deterministic Policy Gradient (DDPG)[ 51 , 52 ]. This allows the agent to be trained in an off-policy manner and, therefore, reuse data efficiently compared to the standard policy iteration used in the classic actor-critic formulation [ 44 ]. The SAC algorithm uses a stochastic actor and maximizes the entropy of the actor with an entropy maximization objective. This results in a more stable and scalable algorithm that exceeds the efficiency Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 10 Environment Agent 
+
+> Actor
+> Critic
+> Axon map model
+> Lt
+> model
+> LLLLLLt
+> TD error
+
+P
+
+I
+
+st
+
+rt I
+
+at
+
+P
+
+Figure 4: In contrast to figure 3, the SAC agent receives the percept P as well as the original image I. This model-based data generation scheme makes use of the predictive model of the retina to give access to the internal state Lt of the environment model. Electrical stimulations are transformed into a visual percept using the axon map model from pulse2percept library. The SAC agent is composed of an actor and a critic that takes I and P as input st. The actor is in charge of estimating the action 
+
+at equivalent to a single-electrode stimulation. The critic gives an evaluative feedback to the actor taking action at at state st.and final performance of DDPG [ 50 ]. The associated SAC cost function is as follows : 
+
+J(π) = 
+
+> T
+
+X
+
+> t=0
+
+E(st, a t)∼ρπ [r(st, a t)+ αH (π(at|st))](6) where the parameter α controls the stochas-ticity of the optimal policy during training and E denotes the mathematical expectation [ 50 ]. Like in standard RL, the SAC algo-rithm maximizes the expected sum of rewards 
+
+PTt=0 E(st, a t)∼ρπ [r(st, a t)]. As mentioned above, the SAC algorithm also includes the expected entropy PTt=0 E(st, a t)∼ρπ [H(π( ˙|st))] of the policy over ρπ(st) in the loss function 
+
+J(π) as shown in (6). In the proposed approach, both the actor and the critic are approximated using a convolutional neural network (CNN) with a CoordConv [53] layer (See Table 1). Table 1: SAC hyperparameters.               
+
+> Parameters Values Learning rate 3·10 −4
+> Discount factor ( γ)0.99 Replay buffer 10 6
+> Number of hiddens layers 3Number of hidden units by layers 512 Number of samples by minibatch 32 Nonlinearity ReLU Reward scale 200 Target smooth coefficient ( τ)0.0005 Target update interval 1
+
+As illustrated in figure 4, the actor and the critic take the state st composed of the target image I and the percept P at time t. The agent does not need to model the environment implicitly, as opposed to a model-free approach. The transition dynamic of the environment corresponds to the axon map model that generates the percept P . The percept is then given directly to the agent in st. Therefore, the agent uses model-based data generation. 
+
+Training of the agent This section presents the details of the agent’s training implemented with the Ray RLlib deep reinforcement learning library [ 54 ]. All hyperparameters to replicate the agent are collected in table 1. The agent interacts with the environment until it reaches the N steps corresponding to N single-electrode stimulation. N steps form an episode. The agent is trained tabula rasa with batches of 32 episodes over 1000 iterations. The agent’s replay memory buffer that allows for more stable learning and off-policy training is set to hold the latest 10 6 steps [ 55 ]. The Adam [ 56 ]optimizer is used to train the neural networks of the actor and the critic. The agent is trained on two AMD Milan 7413 with 24 cores running at 2.65 GHz and one NVidia A100 GPU. Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 11 
+
+2.2. Methods 
+
+To validate the reward design of the environ-ment and compare the agent with the NSA approach, two experiments were carried out (1) a pivotal experiment using pixel-based and perception-based metrics as reward to obtain a readable percept produced by the agent and (2) an experiment that demonstrates the agent’s ability to adapt to different patients. 
+
+2.2.1. Effect of reward shaping on agent’s learning Having a suitable metric to measure the pixel and perceptual similarities between the percept and the target image is critical to the agent’s training. The reward defined in (5) gives the agent a clear signal of whether it is getting closer to the target image faster or slower. We compared both 
+
+l2 and Wasserstein distances to estimate Lt
+
+in (5) in the hope of accelerating learning with better reward shaping [ 57 ]. l2 distance is used as a reference metric similar to the pixel-based metrics commonly used in computer vision. Wasserstein distance is a probability distribution-based metric. It is an estimate of the distance between two probability distributions. The Wasserstein distance is estimated using the Sinkhorn iteration algorithm from a maximum entropy perspective between the two probability distributions [58]. Optimizing for pixel-error such as l2 distance encourages finding pixel-wise averages for a plausible solution. It typically results in the loss of high-frequency details, giving overly smooth images with poor perceptual quality [ 59 , 60 ]. Wasserstein distance allows one to better preserve the probability distribution of the light in the image [ 57 ]. Performances of the two metrics in training a DRL agent in the environment are presented in section 3.1. 
+
+2.2.2. Percept quality in different virtual patients Pixel-based versus perceptual-based comparison 
+
+Agent-generated percepts are compared to the NSA algorithm described in section 1.3. The images are resized according to the Argus II layout of 10 by 6 electrodes. The intensity of the pixels is uniformly assigned to the amplitude of the electrical pulse described in section 2.1.1. We use the l2 norm and the mean squared error (MSE), which are two de facto standard in image restoration [ 61 ] to compare percepts generated by the agent and the NSA algorithm. We define the metrics for M by N images as follows: 
+
+l2 =
+
+> M,N
+
+X
+
+> i=0 ,j =0
+
+q
+
+(Ii,j − Pi,j )2 (7) 
+
+M SE =
+
+> M,N
+
+X
+
+> i=0 ,j =0
+
+(Ii,j − Pi,j )2
+
+M N (8) However, they do not correlate well with image quality as perceived by the human visual system [ 61 ]. Therefore, we use the mean structural similarity index measure (MSSIM), which is a perceptually motivated metric [ 62 ]. We calculate the MSSIM with non-negative image patches x and y of size 7 by 7 as follows : 
+
+M SSIM (x, y) = (2 μxμy + c1)(2 σxy + c2)(μ2 
+
+> x
+
++ μ2 
+
+> y
+
++ c1)( σ2 
+
+> x
+
++ σ2 
+
+> y
+
++ c2)(9) 
+
+c1 = 0 .01 and c2 = 0 .03 are small constants that add numerical stability when the means 
+
+μ or the standard deviation σ are close to zero [ 62 ]. MSSIM takes into account the local characteristics of the image in a way similar to that of the human visual system. On the contrary, pixel-based metrics, such as the l2 norm and MSE, evaluate the difference between the corresponding pixels of two images Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 12 independently of the nearby pixels. 
+
+Adaptation to different virtual patients Two SAC agents are trained on two virtual patients with different ρ constant and N single-electrode stimulation. The spatial decay constant ρ is varied to simulate two realistic virtual patients with different distances between the electrodes and the retina. To ensure that a phosphene is anisotropic, its shape must be dominated by axon fascicle stimulation ( λ > ρ ). The number of steps in an episode equivalent to the number of single-electrode stimulation N
+
+also increases. The high ρ and high N make the task more difficult for both approaches because the algorithms must deal with many large phosphenes. 
+
+3. Results 
+
+3.1. Effect of reward shaping on agent’s learning 
+
+Figure 5 shows that the reward estimated by the l2 distance quickly saturates to a reward value after only 1000 episodes, while the reward estimated by the Wasserstein distance slowly progresses. The results with a conventional l2
+
+distance as an estimator of Lt are very limited. Looking at the samples as shown in figure 5 reveals that the l2 distance only taught the agent to represent low spatial frequencies of the dataset, while the Wasserstein distance preserves the particularity of each character. The agent’s reward then saturates as shown in figure 5 since it fails to learn to use the finer structures of the image to increase its reward. The behavior persists in experiments (not presented here) that include data augmentation in an effort to remove bias from the MNIST dataset toward high-luminance in the center. A Wasserstein-based reward stabilizes learn-0.00 0.25 0.50 0.75 1.00   
+
+> 0500 1000
+> Episodes Average reward
+
+Figure 5: Comparison of the episode average reward of two SAC agents during training using respectively l2 (red) and Wasserstein (green) based reward obtained by the SAC agent. Representative samples of percept produced by the agents early during training are shown. The reward average are normalized over a training iteration for the comparison. ing and allows more exploration without catas-trophic failures as opposed to the l2-based re-ward. Wasserstein-based reward gives useful positional information regarding the distance of the phosphene from the high-luminance region of the image. l2 distance fails to give this infor-mation through the reward since it is calculated pixel-wise. Therefore, the use of a Wasserstein-based reward results in more persistent elec-trode stimulation outside the high-luminance region. Random single-electrode stimulation is added to table 2 to better understand the results, as no other reference can be used as a benchmark. Random stimulation helps to better grasp the range of values specific to each metric in the environment. It also helps to contextualize pixel-based metrics with a tighter range, such as the l2 norm and MSE, with per-ceptual metrics such as MSSIM. Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 13 
+
+3.2. Percept quality in different virtual patients 
+
+The experiment presented in the previous section establishes that the best metric to evaluate the similarity between I and P is the Wasserstein distance as an estimator Lt.Therefore, the percepts generated by the SAC agent in figure 6 are obtained by training the agent with the Wasserstein distance. In section 3.2.2, the agent is trained in different virtual patients to demonstrate the flexibility of the proposed approach over the NSA stimulation algorithm. 
+
+3.2.1. Pixel-based versus perceptual-based com-parison Table 2 shows the image reconstruc-tion metrics for the ρ = 200 and λ = 500 exper-iment in which the implant is close enough to the retina to obtain intelligible percepts with the NSA algorithm. Samples of the percept generated for this virtual patient are shown in figure 6a. NSA single-electrode stimulations are, by default, limited to the high-luminance region of the image. However, the SAC agent has the freedom to choose any single-electrode stimulation. This is particularly visible when comparing the NSA and SAC agent samples in the second rows of 6a and 6b. This results in single-electrode stimulation in the out-of-high luminance region, thus increasing the l2
+
+distance and MSE for the SAC agent (See ta-ble 2). However, the SAC agent significantly outperforms the NSA algorithm in preserving the structural integrity of the image measured with MSSIM ( p < 0.0001) as observed in fig-ure 6. NSA has significantly lower error-based metrics than the SAC agent ( l2; p < 0.0001 and MSE: p < 0.0001). It shows that an SAC agent, despite higher values in error-based metrics, in-creases the readability of the digits, in contrast to the NSA algorithm. Table 2: Metric evaluating the percept and target image. Only the experiment in which NSA obtains readable percept ( ρ = 200 and 
+
+λ = 500) is shown. Lower l2 and MSE is better. A higher MSSIM is better. The mean and standard deviation are calculated on 1000 MNIST images.              
+
+> Metric Random NSA [15] SAC Agent
+> l2norm 13.54(1.67) 11.69(1.63) 12.58(2.07) MSE 0.11(0.02) 0.08(0.02) 0.09(0.03) MSSIM 0.07(0.05) 0.28(0.08) 0.35(0.11)
+
+3.2.2. Adaptation to different virtual patients 
+
+These experiments were carried out to demon-strate the limits of NSA algorithms in the condi-tion often observed in implanted patients where the implant is relatively far from the retina [ 12 ]. A high distance between the stimulating elec-trode and the retina (or a high ρ) produces larger phosphenes that result in low resolution [ 63 ], as shown in figure 6b. The NSA generated percepts are only readable with the implant close to the retina (low ρ) and with fewer single-electrode stimulations (low N ), as observed by comparing figure 6a and figure 6b. SAC agent better preserves the readability of characters in figure 6b when the implant is further from the retina (high ρ) and a large number of single-electrode stimulations (high N ). Therefore, the SAC agent can better adapt to more restric-tive implant placements in patients in terms of resolution. 
+
+4. Discussion 
+
+In this paper, we propose to address the anisotropic phosphene problem in epiretinal stimulation as an SBR task. We present a DRL agent that can improve visual perception of numbers in the context of epiretinal Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 14 Target image SAC Agent NSA 
+
+> (a)
+> (b)
+
+Figure 6: Two virtual patient’s percepts with different axon map model and single-electrode stimulation parameters. Columns from left to right are respectively the initial MNIST target image, the NSA generated percept and the SAC agent generated percept. (a) Samples generated with ρ = 315, λ =500 and N = 32. (b) Samples generated with ρ = 200, λ = 500 and N = 16. Axon map model parameters are influenced by experiments realised with implanted subjects. Single-electrode stimulation is a biphasic pulse with a fixed amplitude of 10 μA. stimulation. We emphasize the fact that the reward design of the new environment and the evaluation of the agent’s performances must take into account the perceptual nature of the task. We address this limitation found in the reward design by comparing the l2 and Wasserstein distances to assess the differences between the percept and the target image. The agent rewarded with the l2 distance as an estimator uses only the electrodes near the center of the image, resulting in indistinguishable characters. A Wasserstein-based reward thus outperforms the l2-based reward, as it conveys information about the distance between the distribution of light of I and P rather than the pixel-sharp 
+
+l2-based reward. This phenomenon is similar to the mode collapse phenomenon observed in GAN [ 64 ]. Using a perceptual-based metric as a reward, such as Wasserstein, allows learning to stabilize and avoid mode collapse observed with a pixel-based metric. More research is needed to assess whether the Wasserstein-based distance eliminates this phenomenon, as does the Wasserstein GAN algorithm [65]. The limitation of pixel-based metrics to evaluate the agent’s performance is solved by proposing the more perceptually relevant MSSIM index. These results align with other recent SBR approaches that account for the human perception instead of pixel-wise error metrics in the loss function [ 59 , 60 , 57 ]. This is a first attempt to introduce human perception metrics in the design of a DRL stimulation algorithm for epiretinal implants. Future work aimed at improving and restoring vision in patients should use metrics that account for human perception instead of methods that use pixel-based accuracy. The SAC agent outperforms the NSA algorithm in preserving the similarity between target images and the generated percepts in different virtual patients. It shows that the SAC Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 15 agent adapts to different difficulty levels of the task as opposed to the NSA algorithm. This is important in the context of the real patient. It has been shown to be difficult to simultaneously modulate the size and brightness of phosphene [ 66 ]. The SAC agent allows one to circumvent certain limitations of the NSA algorithm, such as decreasing the intensity or inactivating electrodes in the case of anisotropic phosphenes or too large phosphenes. Moreover, it automatically learns an optimal single-electrode stimulation sequence without human percept inspection and tuning. It only requires standard hyperparameter tuning of the DRL agent. However, previous conclusions are limited by the fact that single-electrode stimulations are assumed to be independent of each other based on the protocol used to develop the axon map model [12]. Limitations regarding the speed of the implementation of the axon map model during these experiments considerably slowed data generation. Recent work [ 67 ] by the authors of the axon map model offers hope to replace the current implementation with a neural network. This approach uses an approximation of the axon map model with a neural network which allows experiments to use only a GPU, eliminating the need for data transfer between the CPU and GPU memory. This could significantly increase the percept generation process and the calculation of the reward in the proposed environment. Therefore, accelerating the agent training process. The training procedure could be further improved with imitation learning. The agent currently learns from its interaction with the environment. Using a dataset generated with the NSA algorithm could serve as a baseline training before training directly in the environment. This could potentially improve the out-of-high luminance stimulation observed in the samples presented in figure 6. 
+
+5. Conclusion 
+
+In summary, this paper demonstrates that the formalization of epiretinal stimulation as an SBR problem allows for the full diversity of anisotropic phosphenes to be exploited, as opposed to the current NSA approach. Previously unwanted phosphene shapes can now expand the complexity of possible percepts for patients with an epiretinal implant. Further studies introducing metrics based on human perception into algorithm design could enhance the quality of recovered vision. This allows us to better personalize the algorithm for each patient and create a better user experience. This opens new ways to significantly improve the visual acuity of patients implanted with an epiretinal implant. 
+
+Acknowledgments 
+
+The support of the Digital Research Alliance of Canada and NSERC are gratefully acknowl-edged. 
+
+Declaration of competing interest 
+
+The authors declare that they have no competing interests. 
+
+Data availability 
+
+The MNIST [48 ] dataset used in these experiments is obtained through the PyTorch Python library [ 68 ]. The proposed environment to reproduce the experiments is available at rlretina. Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 16 
+
+References 
+
+[1] Olusanya BO, Davis AC, Wertlieb D, Boo NY, Nair MKC, Halpern R, et al. Developmental disabilities among children younger than 5 years in 195 countries and territories, 1990–2016: a systematic analysis for the Global Burden of Disease Study 2016. The Lancet Global Health. 2018;6(10):e1100 e1121. [2] Hartong DT, Berson EL, Dryja TP. Retinitis pigmentosa. The Lancet. 2006;368(9549):1795 1809. [3] Buch H, Vinding T, La Cour M, Appleyard M, Jensen GB, Nielsen NV. Prevalence and causes of visual impairment and blindness among 9980 Scandinavian adults: the Copenhagen City Eye Study. Ophthalmology. 2004;111(1):53-61. [4] Klaver CCW, Wolfs RCW, Vingerling JR, Hofman A, de Jong PTVM. Age-Specific Prevalence and Causes of Blindness and Visual Impairment in an Older Population: The Rotterdam Study. Archives of Ophthalmology. 1998 05;116(5):653-8. [5] Chuang AT, Margo CE, Greenberg PB. Retinal implants: a systematic review. British Journal of Ophthalmology. 2014;98(7):852-6. [6] Humayun MS, De Juan E, Dagnelie G, Greenberg RJ, Propst RH, Phillips DH. Visual perception elicited by electrical stimulation of retina in blind humans. Archives of ophthalmology. 1996;114(1):40-6. [7] Zrenner E. Will retinal implants restore vision? Science. 2002;295(5557):1022-5. [8] Kleinlogel S, Vogl C, Jeschke M, Neef J, Moser T. Emerging approaches for restoration of hearing and vision. Physiological reviews. 2020;100(4):1467-525. [9] Palanker D, Le Mer Y, Mohand-Said S, Sahel JA. Simultaneous perception of prosthetic and natural vision in AMD patients. Nature Communications. 2022;13(1):1-6. [10] Pavlova P, Boneva J, Shandurkov I. Epiretinal vs. subretinal implant in surgical treatment of retinitis pigmentosa–a review. Bulgarian Review of Ophthalmology. 2019;63(1):13-8. [11] Lemaire W, Benhouria M, Koua K, Besrour M, Gauthier LP, Martin-Hardy G, et al. Retinal Stimulator ASIC Architecture Based on a Joint Power and Data Optical Link. IEEE Journal of Solid-State Circuits. 2021;56(7):2158-70. [12] Beyeler M, Nanduri D, Weiland JD, Rokem A, Boynton GM, Fine I. A model of ganglion axon pathways accounts for percepts elicited by retinal implants. Scientific reports. 2019;9(1):1-16. [13] Tsai D, Chen S, Protti DA, Morley JW, Suaning GJ, Lovell NH. Responses of retinal ganglion cells to extracellular electrical stimulation, from single cell to population: model-based analysis. PloS One. 2012;7(12):e53357. [14] Beyeler M, Boynton GM, Fine I, Rokem A. pulse2percept: A Python-based simulation framework for bionic vision. BioRxiv:101101/148015. 2017:148015. [15] Luo YHL, Da Cruz L. The Argus ® II retinal prosthesis system. Progress in Retinal and Eye Research. 2016;50:89-107. [16] Guo F, Duan J, Huang S, Xiao Y, Chu R. Edge detection algorithm based on difference of gaussian for visual prosthesis. In: 2023 IEEE 6th Information Technology, Networking, Electronic and Automation Control Conference (ITNEC). vol. 6. IEEE; 2023. p. 1331-4. [17] Spencer MJ, Kameneva T, Grayden DB, Meffin H, Burkitt AN. Global activity shaping strategies for a retinal implant. Journal of Neural Engineering. 2019;16(2):026008. [18] Wu Y, Karetic I, Stegmaier J, Walter P, Merhof D. A Deep Learning-based in silico Framework for Optimization on Retinal Prosthetic Stimulation. arXiv preprint arXiv:230203570. 2023. [19] Granley J, Relic L, Beyeler M. Hybrid Neural Autoencoders for Stimulus Encoding in Visual and Other Sensory Neuroprostheses. In: Oh AH, Agarwal A, Belgrave D, Cho K, editors. Advances in Neural Information Processing Systems; 2022. Available from: https:// openreview.net/forum?id=9xVWIHFSyfl .[20] Borda E, Ghezzi D. Advances in visual prostheses: engineering and biological challenges. Progress in Biomedical Engineering. 2022;4(3):032003. [21] Rizzo JF, Wyatt J, Loewenstein J, Kelly S, Shire D. Perceptual efficacy of electrical stimulation of human retina with a microelectrode array during short-term surgical trials. Investigative Ophthal-mology & Visual Science. 2003;44(12):5362-9. [22] Esler TB, Kerr RR, Tahayori B, Grayden DB, Meffin H, Burkitt AN. Minimizing activation of overlying axons with epiretinal stimulation: The role of fiber orientation and electrode configuration. PloS one. 2018;13(3):e0193598. [23] Bruce A, Beyeler M. Greedy Optimization of Electrode Arrangement for Epiretinal Prostheses. Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 17 
+
+arXiv:220302493. 2022. [24] Jepson LH, Hottowy P, Mathieson K, Gunning DE, Dabrowski W, Litke AM, et al. Spatially patterned electrical stimulation to enhance resolution of retinal prostheses. Journal Of Neuroscience. 2014;34(14):4871-81. [25] Grosberg LE, Ganesan K, Goetz GA, Madugula SS, Bhaskhar N, Fan V, et al. Activation of ganglion cells and axon bundles using epiretinal electrical stimulation. Journal of Neurophysiology. 2017;118(3):1457-71. [26] Tandon P, Bhaskhar N, Shah N, Madugula S, Grosberg L, Fan VH, et al. Automatic Identification of Axon Bundle Activation for Epiretinal Prosthesis. IEEE Transactions on Neural Systems and Rehabilitation Engineering. 2021;29:2496-502. [27] Vilkhu RS, Madugula SS, Grosberg LE, Gogli-ettino AR, Hottowy P, Dabrowski W, et al. Spatially patterned bi-electrode epiretinal stim-ulation for axon avoidance at cellular res-olution. Journal of Neural Engineering. 2021;18(6):066007. [28] Tong W, Stamp M, Apollo NV, Ganesan K, Meffin H, Prawer S, et al. Improved visual acuity using a retinal implant and an optimized stimulation strategy. Journal of Neural Engineering. 2019;17(1):016018. [29] Gonzalez-Calle A, Weiland JD. Evaluation of effects of electrical stimulation in the retina with Optical Coherence Tomography. vol. 2016; 2016. p. 6182-5. [30] Chang YC, Ghaffari DH, Chow RH, Weiland JD. Stimulation strategies for selective activation of retinal ganglion cell soma and threshold reduction. Journal of neural engineering. 2019;16(2):026017. [31] Ghaffari DH, Finn KE, Jeganathan VSE, Patel U, Wuyyuru V, Roy A, et al. The effect of waveform asymmetry on perception with epiretinal prostheses. Journal of neural engineering. 2020;17(4):045009. [32] Hertzmann A. A survey of stroke-based rendering. In: Inst. of Electrical and Electronics Engineers; 2003. . [33] Mellor JFJ, Park E, Ganin Y, Babuschkin I, Kulkarni T, Rosenbaum D, et al. Unsupervised Doodling and Painting with Improved SPIRAL. arXiv:191001007. 2019. [34] Zheng N, Jiang Y, Huang D. StrokeNet: ANeural Painting Environment. In: Int. Conf. on Learning Representations; 2019. . [35] Zhou T, Fang C, Wang Z, Yang J, Kim B, Chen Z, et al. Learning to Doodle with Stroke Demonstrations and Deep Q-Networks. In: British Machine Vision Conf.; 2018. . [36] Ha D, Eck D. A Neural Representation of Sketch Drawings. arXiv:170403477. 2017. [37] Huang Z, Heng W, Zhou S. Learning to Paint With Model-based Deep Reinforcement Learning. arXiv:190304411. 2019. [38] Becker M, Braun M, Eckmiller R. Retina implant adjustment with reinforcement learning. In: Proc. of the 1998 IEEE Int. Conf. on Acoustics, Speech and Signal Processing, ICASSP’98 (Cat. No. 98CH36181). vol. 2. IEEE; 1998. p. 1181-4. [39] Eckmiller R, Neumann D, Baruth O. Tunable retina encoders for retina implants: why and how. Journal Of Neural Engineering. 2005;2(1):S91-S104. [40] K¨ u¸ c¨ ukoglu B, Rueckauer B, Ahmad N, de Ruyter van Steveninck J, G ¨”u¸ cl ¨”u U, van Gerven M. Optimization of neuroprosthetic vision via end-to-end deep reinforcement learning. bioRxiv. 2022:2. [41] Becker M, Eckmiller R. Spatio-temporal filter adjustment from evaluative feedback for a retina implant. In: Int. Conf. on Artificial Neural Networks; 1997. p. 1181-6. [42] Barto AG, Dietterich TG. Reinforcement learning and its relationship to supervised learning. Handbook of learning and approximate dynamic programming. 2004;10:9780470544785. [43] Ha D, Schmidhuber J. Recurrent World Models Facilitate Policy Evolution. arXiv:180901999. 2018. [44] Sutton RS, Barto AG. Reinforcement learning: an introduction. Cambridge, MA: The MIT Press; 2018. [45] Sutton RS, Barto AG. Reinforcement learning: An introduction. Cambridge MA: MIT press; 2018. [46] Brockman G, Cheung V, Pettersson L, Schneider J, Schulman J, Tang J, et al. OpenAI Gym. arXiv:160601540. 2016. [47] Jansonius NM, Nevalainen J, Selig B, Zangwill LM, Sample PA, Budde WM, et al. A mathematical description of nerve fiber bundle trajectories and their variability in the human retina. Vision Research. 2009;49(17):2157-63. [48] Deng L. The mnist database of handwritten digit images for machine learning research. IEEE Learning to See via Epiretinal Implant Stimulation in silico with Model-Based Deep Reinforcement Learning 18 
+
+Signal Processing Magazine. 2012;29(6):141-2. [49] Snellen H. Probebuchstaben zur bestimmung der sehscharfe. Ultrecht: Van de Weijer; 1862. [50] Haarnoja T, Zhou A, Abbeel P, Levine S. Soft Actor-Critic: Off-Policy Maximum Entropy Deep Reinforcement Learning with a Stochastic Actor. arXiv:180101290. 2018. [51] Silver D, Lever G, Heess N, Degris T, Wierstra D, Riedmiller M. Deterministic policy gradient algorithms. In: Int. conf. on machine learning. PMLR; 2014. p. 387-95. [52] Lillicrap TP, Hunt JJ, Pritzel A, Heess N, Erez T, Tassa Y, et al. Continuous control with deep reinforcement learning. arXiv:150902971. 2019. [53] Liu R, Lehman J, Molino P, Petroski Such F, Frank E, Sergeev A, et al. An intriguing failing of convolutional neural networks and the coordconv solution. Advances in neural information processing systems. 2018;31. [54] Liang E, Liaw R, Nishihara R, Moritz P, Fox R, Goldberg K, et al. RLlib: Abstractions for distributed reinforcement learning. In: Int. Conf. on Machine Learning. PMLR; 2018. p. 3053-62. [55] Mnih V, Kavukcuoglu K, Silver D, Rusu AA, Veness J, Bellemare MG, et al. Human-level control through deep reinforcement learning. Nature. 2015;518(7540):529-33. [56] Kingma DP, Ba J. Adam: A method for stochastic optimization. arXiv:14126980. 2014. [57] Arjovsky M, Chintala S, Bottou L. Wasserstein Generative Adversarial Networks. In: Precup D, Teh YW, editors. Proc. of the 34th Int. Conf. on Machine Learning. vol. 70 of Proceedings of Machine Learning Research. PMLR; 2017. p. 214-23. [58] Cuturi M. Sinkhorn Distances: Lightspeed Computation of Optimal Transport. In: Burges CJ, Bottou L, Welling M, Ghahramani Z, Weinberger KQ, editors. Advances in Neural Information Processing Systems. vol. 26. Curran Associates, Inc.; 2013. . [59] Bruna J, Sprechmann P, LeCun Y. Super-resolution with deep convolutional sufficient statistics. arXiv:151105666. 2015. [60] Ledig C, Theis L, Husz´ ar F, Caballero J, Cunningham A, Acosta A, et al. Photo-realistic single image super-resolution using a generative adversarial network. In: Proc. of the IEEE conf. on computer vision and pattern recognition; 2017. p. 4681-90. [61] Zhao H, Gallo O, Frosio I, Kautz J. Loss Functions for Neural Networks for Image Processing. arXiv:151108861. 2015. [62] Wang Z, Bovik AC, Sheikh HR, Simoncelli EP. Image quality assessment: from error visibility to structural similarity. IEEE Transactions on Image Processing. 2004;13(4):600-12. [63] Palanker D, Huie P, Vankov A, Aramant R, Seiler M, Fishman H, et al. Migration of retinal cells through a perforated membrane: implications for a high-resolution prosthesis. Investigative ophthalmology & visual science. 2004;45(9):3266-70. [64] Metz L, Poole B, Pfau D, Sohl-Dickstein J. Unrolled generative adversarial networks. arXiv:161102163. 2016. [65] Arjovsky M, Chintala S, Bottou L. Wasserstein GAN. arXiv:170107875. 2017. [66] Nanduri D, Fine I, Horsager A, Boynton GM, Humayun MS, Greenberg RJ, et al. Frequency and amplitude modulation have different effects on the percepts elicited by retinal stimulation. Investigative ophthalmology & visual science. 2012;53. [67] Relic L, Zhang B, Tuan YL, Beyeler M. Deep Learning–Based Perceptual Stimulus Encoder for Bionic Vision. In: Assoc. for Computing Machinery: Augmented Humans 2022; 2022. p. 323–325. [68] Paszke A, Gross S, Massa F, Lerer A, Bradbury J, Chanan G, et al. PyTorch: An Imperative Style, High-Performance Deep Learning Library. In: Advances in Neural Information Processing Systems 32; 2019. p. 8024-35.
