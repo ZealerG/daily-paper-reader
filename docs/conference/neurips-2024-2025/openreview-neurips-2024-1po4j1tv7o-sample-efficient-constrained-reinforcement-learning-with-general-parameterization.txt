@@ -1,0 +1,3019 @@
+Title: 6591_Sample_Efficient_Constrai.pdf
+
+URL Source: https://openreview.net/pdf?id=1po4j1Tv7O
+
+Number of Pages: 26
+
+Markdown Content:
+# Sample-Efficient Constrained Reinforcement Learning with General Parameterization 
+
+Washim Uddin Mondal 
+
+Department of Electrical Engineering Indian Institute of Technology Kanpur Kanpur, UP, India 208016 
+
+wmondal@iitk.ac.in 
+
+Vaneet Aggarwal 
+
+School of IE and ECE Purdue University West Lafayette, IN, USA 47906 
+
+vaneet@purdue.edu 
+
+## Abstract 
+
+We consider a constrained Markov Decision Problem (CMDP) where the goal of an agent is to maximize the expected discounted sum of rewards over an infinite horizon while ensuring that the expected discounted sum of costs exceeds a certain threshold. Building on the idea of momentum-based acceleration, we develop the Primal-Dual Accelerated Natural Policy Gradient (PD-ANPG) algorithm that ensures an ϵ global optimality gap and ϵ constraint violation with ˜O((1 − γ)−7ϵ−2)
+
+sample complexity for general parameterized policies where γ denotes the discount factor. This improves the state-of-the-art sample complexity in general parameter-ized CMDPs by a factor of O((1 − γ)−1ϵ−2) and achieves the theoretical lower bound in ϵ−1.
+
+## 1 Introduction 
+
+Reinforcement learning (RL) is a framework where an agent repeatedly interacts with an unknown Markovian environment to find a policy that maximizes the expected discounted sum of its observed rewards. Such problems, often modeled via Markov Decision Processes (MDPs), find applications in many areas, including transportation [ 1 ], communication networks [ 2], robotics [ 3], etc. In many applications, however, the agents must also obey certain constraints. For example, in a food delivery network, the orders must be delivered within a stipulated time window; the marketing decisions of a firm must satisfy its budget constraints, etc. Such constraints are incorporated into RL by introducing a cost function. In constrained MDPs (CMDPs), the agents not only maximize the expected sum of discounted rewards but also ensure that the expected sum of discounted costs does not cross a predefined boundary. Finding an optimal policy for a CMDP is a challenging problem, especially when the environment, i.e., the state transition function, is unknown. The efficiency of a solution to a CMDP is measured by its sample complexity, which essentially states how many state-transition samples it takes to yield a policy that is ϵ close to the optimal one while also ensuring that the expected sum of discounted costs does not violate the imposed boundary by more than ϵ amount. Many articles in the literature solve the CMDP with an unknown environment. Most of these works, however, focus on the tabular case where the number of states is finite. These solutions cannot be applied to many real-life scenarios where the state space is either large or infinite. To tackle this issue, the concept of policy parameterization must be invoked. Unfortunately, as exhibited in Table 1, only a few works are available on CMDPs with parameterized policies. While, for softmax parameterization, the state-of-the-art (SOTA) sample complexity is O(ϵ−2), the same for the general parameterization is ˜O(ϵ−4) which is far from the lower bound Ω( ϵ−2). It should be noted that the number of parameters needed in softmax parameterization is O(SA ) where S, A are the sizes of the state and action spaces of the underlying CMDP. On the other hand, general parameterization uses d ≪ SA number of parameters, which makes it appropriate 
+
+38th Conference on Neural Information Processing Systems (NeurIPS 2024). Algorithm Sample Complexity Parameterization PMD-PD [9] O(ϵ−3) Softmax PD-NAC [10] O(ϵ−6) Softmax NPG-PD [5] O((1 − γ)−5ϵ−2) Softmax CRPO [6] O((1 − γ)−7ϵ−4) Softmax NPG-PD [5] O((1 − γ)−8ϵ−6) General CRPO [6] O((1 − γ)−13 ϵ−6) General C-NPG-PDA [4] ˜O((1 − γ)−8ϵ−4)1 General 
+
+PD-ANPG (This Work) ˜O((1 − γ)−7ϵ−2) General Lower Bound [11] Ω((1 − γ)−5ϵ−2) −
+
+Table 1: Summary of sample complexity results on CMDP with parameterized policies. The parameter 
+
+γ indicates the discount factor. The dependence of the sample complexities of PMD-PD and PD-NAC on γ is not depicted in [9, 10]. for dealing with large or infinite states. Given the importance of general parameterization for large state space CMDPs, the following question naturally arises: "Is it possible to solve CMDPs with general parameterization and achieve a sample complexity better than the SOTA ˜O(ϵ−4) bound?" 
+
+In this article, we provide an affirmative answer to the above question. We propose a Primal-Dual-based Accelerated Natural Policy Gradient (PD-ANPG) algorithm to solve γ-discounted CMDPs with general parameterization. We theoretically prove that PD-ANPG achieves ϵ optimality gap and ϵ
+
+constraint violation with ˜O((1 − γ)−7ϵ−2) sample complexity (Theorem 1) that improves the SOTA 
+
+˜O((1 − γ)−8ϵ−4) sample complexity result of [ 4]. It closes the gap between the theoretical upper and lower bounds of sample complexity in general parameterized CMDPs (in terms of ϵ−1), which was an open problem for quite some time (see the results of [5], [6], [4] in Table 1). 
+
+1.1 Challenges and Key Insights 
+
+Our algorithm builds upon the idea of primal dual-based NPG [ 7, 4]. However, unlike the previous works, we use accelerated stochastic gradient descent (ASGD) in the inner loop to compute the estimate of the NPG. The improvement in the sample complexity results from two key observations. Firstly, we establish a global-to-local convergence lemma (Lemma 3), which dictates how the global convergence of the Lagrange function is related to the first and second-order estimation error of the NPG. Here, via careful analysis, we show that the first-order term can be written as the expected bias of the NPG estimator (i.e., the difference between the true NPG and the expectation of its estimate). Secondly, we show (Lemma 5 and its subsequent discussion) that the bias of the NPG estimate can be interpreted as the convergence error of an ASGD program with non-stochastic (i.e., deterministic) gradients. These, combined with the ASGD convergence result provided by [ 8], lead to a convergence result of the Lagrange function (Corollary 1). Finally, Theorem 1 segregates the objective and constraint violation rates from Lagrange convergence. Corollary 1 shows that Lagrange convergence error is bounded by an independent function of ζ (the dual learning rate). One might, hence, be tempted to make ζ arbitrarily small. However, our analysis shows that although small ζ leads to better objective convergence, it worsens the constraint violation rate. We demonstrate how to optimally choose ζ to reach the middle ground which eventually leads us to ˜O(ϵ−2) sample complexity. 
+
+1.2 Related Works Unconstrained RL: Many algorithms solve MDPs with exact gradients [ 12 , 13 , 14 , 15 , 16 ]. More-over, many works use generative models to show either first-order [ 17 , 18 , 19 , 20 , 21 ] or global convergence [22, 23, 24, 25, 7, 26, 27].        
+
+> 1We would like to point out that the sample complexity of C-NPG-PDA reported in [ 4] is ˜O((1 −γ)−6ϵ−4).However, the result is erroneous. The authors have subsequently corrected their result, and the sample complexity has been modified to ˜O((1 −γ)−8ϵ−4)in the arXiv version (updated May 2024).
+
+2Constrained RL: The tabular setting is well investigated, and many model-based [ 28 , 29 , 30 , 31 ] and model-free [ 6, 30 , 32 , 33 ] algorithms are available in the literature. In comparison, there are relatively fewer works on parameterized policies. Policy mirror descent-primal dual (PMD-PD) algorithm was proposed by [ 9] that achieves O(ϵ−3) sample complexity for softmax policies. For the same parameterization, [ 10 ] achieved O(ϵ−6) sample complexity via their proposed Online Primal-Dual Natural Actor-Critic Algorithm. The primal-dual Natural Policy Gradient algorithm suggested by [ 5 ]yields O(ϵ−2) and O(ϵ−6) sample complexities for softmax and general parametrization respectively. [ 6] also proposed a primal policy-based algorithm that works for both the softmax and general function approximation cases. The state of the art for the general parameterization is given by [ 4], where the ˜O(ϵ−4) sample complexity is obtained. This work improves upon this direction to obtain 
+
+˜O(ϵ−2) sample complexity. The comparisons are summarized in Table 1. 
+
+## 2 Formulation 
+
+Let us consider a constrained Markov Decision Process (CMDP) characterized by the tuple M =(S, A, r, c, P, γ, ρ ) where S, A denote the state space and the action space respectively, r : S × A → 
+
+[0 , 1] defines the reward function, c : S × A → [−1, 1] is the cost function, P : S × A → ∆( S)
+
+indicates the state transition kernel (where ∆( S) is the collection of all probability distributions over 
+
+S), γ is the discount factor, and ρ ∈ ∆( S) is the initial state distribution. Note that the state space S,in our setting, can potentially be a compact set of infinite size. However, for simplicity, we assume it to be countable. The action space, A, is assumed to be of finite size. The range of the cost function is chosen to be [−1, 1] , rather than [0 , 1] , to ensure that the constraint in our central optimization problem (defined later in (2) ) is non-trivial. A policy, π : S → ∆( A) is defined as a distribution over the action space for a given state of the environment. For a given policy, π, and a state-action pair 
+
+(s, a ), we define the Q-value associated with g ∈ { r, c } as follows. 
+
+Qπg (s, a ) ≜ Eπ
+
+" ∞X
+
+> t=0
+
+γtg(st, a t) s0 = s, a 0 = a
+
+#
+
+where Eπ is the expectation computed over all π-induced trajectories {(st, a t)}∞ 
+
+> t=0
+
+where st+1 ∼
+
+P (st, a t) and at ∼ π(st), ∀t ∈ { 0, 1, · · · } . Similarly, the V -value associated with policy π, state s,and g ∈ { r, c } is defined below. 
+
+V πg (s) ≜ Eπ
+
+" ∞X
+
+> t=0
+
+γtg(st, a t) s0 = s
+
+#
+
+= X
+
+> a
+
+π(a|s)Qπg (s, a )
+
+Below we define the advantage value for a policy π, a state-action pair (s, a ), and g ∈ { r, c }.
+
+Aπg (s, a ) ≜ Qπg (s, a ) − V πg (s)
+
+Define a function Jπg,ρ , ∀g ∈ { r, c } as follows. 
+
+Jπg,ρ ≜ Es∼ρ[V πg (s)] = 11 − γ
+
+X
+
+> s,a
+
+dπρ (s)π(a|s)g(s, a )
+
+where dπρ ∈ ∆( S) is the state occupancy measure given by, 
+
+dπρ (s) = (1 − γ)
+
+> ∞
+
+X
+
+> t=0
+
+γtPr( st = s|s0 ∼ ρ, π ), ∀s ∈ S 
+
+Similarly, the state-action occupancy measure is defined as, 
+
+νπρ (s, a ) = dπρ (s)π(a|s), ∀(s, a ) ∈ S × A (1) Our goal is to maximize the function Jπr,ρ over all policies π while ensuring that Jπc,ρ does not lie below a predefined threshold. Without loss of generality, we can formally express this problem as, 
+
+max  
+
+> π
+
+Jπr,ρ subject to: Jπc,ρ ≥ 0 (2) If the state space, S, is large or infinite (which is the case in many application scenarios), the policies can no longer be represented in the tabular format; rather, they are indexed by a parameter, θ ∈ Θ. In 3this paper, we assume Θ = Rd. Such indexing can be done via, for example, neural networks (NNs). Let Jg,ρ (θ) ≜ Jπθ
+
+> g,ρ
+
+. This allows us to redefine the constrained optimization problem as follows. 
+
+max  
+
+> θ∈Θ
+
+Jr,ρ (θ) subject to: Jc,ρ (θ) ≥ 0 (3) We assume the existence of at least one interior point solution of the above optimization. This is also known as Slater condition which can be formally expressed as follows. 
+
+Assumption 1. There exists ¯θ such that Jc,ρ (¯θ) ≥ cslater for some cslater ∈ (0 , 11−γ ].
+
+## 3 Algorithm 
+
+The dual problem associated with the constraint optimization (3) can be written as follows. 
+
+min  
+
+> λ≥0
+
+max  
+
+> θ∈Θ
+
+JL,ρ (θ, λ ) where JL,ρ (θ, λ ) ≜ Jr,ρ (θ) + λJ c,ρ (θ) (4) The function, JL,ρ (·, ·) is called the Lagrange function while λ is said to be the Lagrange multiplier. The above problem can be solved by iteratively applying the following update rule ∀k ∈ { 0, · · · , K −
+
+1}, starting with (θ0, λ 0) where θ0 ∈ Θ is arbitrary and λ0 = 0 .
+
+θk+1 = θk + ηF ρ(θk)†∇θ JL,ρ (θk, λ k) (5) 
+
+λk+1 = PΛ [λk − ζJ c,ρ (θk)] (6) where η, ζ are learning rates, PΛ denotes the projection function onto the set, Λ ≜ [0 , λ max ], and † is the Moore-Penrose pseudoinverse operator. The choice of λmax will be specified later. Note that the update rule of θ is similar to that of the standard policy gradient method except here the learning rate, 
+
+η is modulated by the inverse of the Fisher matrix, Fρ(θ) which is defined below. 
+
+Fρ(θ) ≜ E(s,a )∼νπθρ [∇θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s)] (7) where ⊗ indicates the outer product. Using a variation of the classical policy gradient theorem [ 34 ], one can obtain the gradient of the Lagrange function as follows. 
+
+∇θ JL,ρ (θ, λ ) = 11 − γ Hρ(θ, λ ), where Hρ(θ, λ ) ≜ E(s,a )∼νπθρ
+
+h
+
+Aπθ
+
+> L,λ
+
+(s, a )∇θ log πθ (a|s)
+
+i
+
+and Aπθ
+
+> L,λ
+
+(s, a ) ≜ Aπθ 
+
+> r
+
+(s, a ) + λA πθ 
+
+> c
+
+(s, a )
+
+(8) In most application scenarios, the learner is unaware of the state transition function, P , and thereby, of the advantage function, Aπθ 
+
+> L,λ
+
+and the occupancy measure, νπθ 
+
+> ρ
+
+. This makes the exact computation of Fρ(θ) and Hρ(θ, λ ) an impossible task. Fortunately, there is a way to obtain an approximate value of the natural policy gradient ω∗ 
+
+> θ,λ
+
+≜ Fρ(θ)†∇θ JL,ρ (θ, λ ) that does not require the knowledge of P .Invoking (8), one can prove that ω∗ 
+
+> θ,λ
+
+is a solution of a quadratic optimization. Formally, we have, 
+
+ω∗ 
+
+> θ,λ
+
+∈ arg min ω∈Rd Lνπθρ (ω, θ, λ ),
+
+where Lνπθρ (ω, θ, λ ) ≜ 12 E(s,a )∼νπθρ
+
+" 11 − γ Aπθ
+
+> L,λ
+
+(s, a ) − ωT∇θ log πθ (a|s)
+
+2# (9) The above reformulation opens up the possibility to compute ω∗ 
+
+> θ,λ
+
+via a gradient descent-type iterative procedure. Observe that the gradient of Lνπθρ (·, θ, λ ) can be calculated as follows. 
+
+∇ω Lνπθρ (ω, θ, λ ) = Fρ(θ)ω − 11 − γ Hρ(θ, λ ) (10) Algorithm 1 describes a procedure to obtain unbiased estimates of this gradient. This is inspired by Algorithm 3 of [ 12 ]. Additionally, observe from (6) that the update of the Lagrange variable, λ
+
+requires the computation of Jc,ρ (θ) which is also difficult to accomplish without having an explicit knowledge about P . Algorithm 1 also provides an unbiased estimation of the above quantity. Algorithm 1 first samples a horizon length, T , from the geometric distribution with success probability 
+
+(1 − γ) and executes the CMDP for T instances following the policy, πθ , starting from a state s0 ∼ ρ.4Algorithm 1 Unbiased Sampling 
+
+1: Input: Parameters (θ, ω, λ, γ ), Initial Distribution ρ
+
+2: T ∼ Geo(1 − γ), s0 ∼ ρ, a0 ∼ πθ (s0)
+
+3: for j ∈ { 0, · · · , T − 1} do 
+
+4: Execute aj , observe sj+1 ∼ P (sj , a j ) and sample aj+1 ∼ πθ (sj+1 )
+
+5: ˆJc,ρ (θ) ← PTj=0 c(sj , a j ), (ˆ s, ˆa) ← (sT , a T )
+
+6: T ∼ Geo(1 − γ), (s0, a 0) ← (ˆ s, ˆa) ▷ Q-function Estimation 
+
+7: for j ∈ { 0, · · · , T − 1} do 
+
+8: Execute aj , observe sj+1 ∼ P (sj , a j ), and sample aj+1 ∼ πθ (sj+1 )
+
+9: for g ∈ { r, c } do 
+
+10: ˆQπθ 
+
+> g
+
+(ˆ s, ˆa) ← PTj=0 g(sj , a j )
+
+11: T ∼ Geo(1 − γ), s0 ← ˆs, a0 ∼ πθ (s0) ▷ V-function Estimation 
+
+12: for j ∈ { 0, · · · , T − 1} do 
+
+13: Execute aj , observe sj+1 ∼ P (sj , a j ), and sample aj+1 ∼ πθ (sj+1 )
+
+14: for g ∈ { r, c } do 
+
+15: ˆV πθ 
+
+> g
+
+(ˆ s) ← PTj=0 g(sj , a j )
+
+16: ˆAπθ 
+
+> g
+
+(ˆ s, ˆa) ← ˆQπθ 
+
+> g
+
+(ˆ s, ˆa) − ˆV πθ 
+
+> g
+
+(ˆ s)
+
+17: ▷ Estimation of Relevant functions 
+
+ˆAπθ
+
+> L,λ
+
+(ˆ s, ˆa) ← ˆAπθ 
+
+> r
+
+(ˆ s, ˆa) + λ ˆAπθ 
+
+> c
+
+(ˆ s, ˆa) (11) 
+
+ˆFρ(θ) ← ∇ θ log πθ (ˆ a|ˆs) ⊗ ∇ θ log πθ (ˆ a|ˆs) (12) 
+
+ˆHρ(θ, λ ) ← ˆAπθ
+
+> L,λ
+
+(ˆ s, ˆa)∇θ log πθ (ˆ a|ˆs) (13) 
+
+18: ▷ Gradient Estimate 
+
+ˆ∇ω Lνπθρ (ω, θ, λ ) ← ˆFρ(θ)ω − 11 − γ ˆHρ(θ, λ ) (14) 
+
+19: Output: ˆJc,ρ (θ), ˆ∇ω Lνπθρ (ω, θ, λ )
+
+The total cost observed in the resulting trajectory is assigned as the estimate ˆJc,ρ (θ). The state-action pair (sT , a T ) can be assumed to be an arbitrary sample (ˆ s, ˆa) chosen from the occupancy measure 
+
+νπθ 
+
+> ρ
+
+. The algorithm then generates a πθ -induced trajectory of length T ∼ Geo(1 − γ), taking (ˆ s, ˆa) as the starting point. The total reward and cost observed in this trajectory are assigned as ˆQπθ 
+
+> r
+
+(ˆ s, ˆa) and 
+
+ˆQπθ 
+
+> c
+
+(ˆ s, ˆa) respectively. Next, another πθ -induced trajectory of length T ∼ Geo(1 − γ) is generated assuming the state, ˆs as the initiation point. The total reward and cost of this trajectory are assigned as 
+
+ˆV πθ 
+
+> r
+
+(ˆ s) and ˆV πθ 
+
+> c
+
+(ˆ s) respectively. For g ∈ { r, c }, an estimate of the advantage value is computed as 
+
+ˆAπθ 
+
+> g
+
+(ˆ s, ˆa) = ˆQπθ 
+
+> g
+
+(ˆ s, ˆa) − ˆV πθ 
+
+> g
+
+(ˆ s). Finally, the estimates of Fρ(θ) and Hρ(θ, λ ) are obtained via (12) and (13) respectively which produces an estimation of the desired gradient in (14) . The following Lemma demonstrates that the estimates produced by Algorithm 1 are unbiased. 
+
+Lemma 1. Let ˆJc,ρ (θ), ˆ∇ω Lνπθρ (ω, θ, λ ) be the estimates produced by Algorithm 1 for a predefined set of parameters (ω, θ, λ ). The following equations hold. 
+
+E
+
+h ˆJc,ρ (θ) θ
+
+i
+
+= Jc,ρ (θ) and E
+
+h ˆ∇ω Lνπθρ (ω, θ, λ ) ω, θ, λ 
+
+i
+
+= ∇ω Lνπθρ (ω, θ, λ )
+
+In the absence of knowledge about the transition model, P , one can utilize the estimates generated by Algorithm 1 as good proxies for their true values. In particular, one can obtain an approximate value of the natural policy gradient ω∗ 
+
+> θ,λ
+
+by iteratively minimizing the function Lνπθρ (·, θ, λ ) using the gradient estimate ˆ∇ω Lνπθρ (ω, θ, λ ). On the other hand, using the estimate ˆJc,ρ (θ), an approximate update equation of the Lagrange parameter can be formed. Algorithm 2 uses these two ideas to obtain a policy that is close to the optimal one. 5Algorithm 2 Primal-Dual Accelerated Natural Policy Gradient (PD-ANPG)  
+
+> 1:
+
+Input: Parameters (θ0, λ 0), Distribution ρ, Run-time Parameters K, H , Learning Parameters 
+
+η, ζ, α, β, ξ, δ  
+
+> 2:
+
+for k ∈ { 0, · · · , K − 1} do ▷ Outer Loop  
+
+> 3:
+
+x0, v0 ← 0 
+
+> 4:
+
+for h ∈ { 0, · · · , H − 1} do ▷ Inner Loop  
+
+> 5:
+
+▷ Accelerated Stochastic Gradient Descent 
+
+yh ← αxh + (1 − α)vh (15)  
+
+> 6:
+
+ˆG ← ˆ∇ω Lνπθkρ
+
+(ω, θ k, λ k) ω=yh
+
+(Algorithm 1) 
+
+xh+1 ← yh − δ ˆG (16) 
+
+zh ← βyh + (1 − β)vh (17) 
+
+vh+1 ← zh − ξ ˆG (18)  
+
+> 7:
+
+Tail Averaging: 
+
+ωk ← 2
+
+H
+
+X 
+
+> H
+> 2<h ≤H
+
+xh (19)  
+
+> 8:
+
+Obtain ˆJc,ρ (θk) via Algorithm 1.  
+
+> 9:
+
+Parameter Updates: 
+
+θk+1 ← θk + ηω k (20) 
+
+λk+1 ← P Λ[λk − ζ ˆJc,ρ (θk)] (21)  
+
+> 10:
+
+Output: {θk}K−1
+
+> k=0
+
+Algorithm 2 has a nested loop structure. The outer loop runs K number of times. At a given instance, 
+
+k, of the outer loop, the policy parameter θk and the Lagrange parameter, λk are updated via (20) and (21) . The estimate, ˆJc,ρ (θk) is computed via Algorithm 1. On the other hand, ωk, the approximate value of the natural policy gradient ω∗  
+
+> θk,λ k
+
+is obtained by iteratively minimizing Lνπθkρ
+
+(·, θ k, λ k) in 
+
+H number of inner loop steps via the Accelerated Stochastic Gradient Descent (ASGD) procedure as stated in [ 8]. ASGD comprises the iterative updates (15) −(18) with tunable learning parameters 
+
+(α, β, ξ, δ ) followed by a tail-averaging step (19) . The gradient estimate utilized in (16) and (18) is obtained via Algorithm 1. It is worth mentioning that existing NPG algorithms such as that given in [ 7] typically apply the SGD, rather than the ASGD procedure, to obtain ωk. The difference between these subroutines is that while SGD uses only the current gradient estimate to update ωk,ASGD considers the contribution of all previous gradient estimates (momentum) using its convoluted iteration and tail-averaging steps. 
+
+## 4 Analysis 
+
+Our goal in this section is to characterize the rate of convergence of the objective function and the constraint violation if policy parameters are generated via Algorithm 2. We start by stating a few assumptions needed for the analysis. 
+
+Assumption 2. The log-likelihood function is G-Lipschitz and B-smooth where B, G > 0. Formally, the following relations hold ∀θ, θ 1, θ 2 ∈ Θ, and ∀(s, a ) ∈ S × A .
+
+∥∇ θ log πθ (a|s)∥ ≤ G, and ∥∇ θ log πθ1 (a|s) − ∇ θ log πθ2 (a|s)∥ ≤ B∥θ1 − θ2∥
+
+Remark 1. Assumption 2 is commonly applied in proving convergence guarantees of policy gradient-type algorithms [ 35 , 12 , 7 ]. This assumption is obeyed by many widely used policy classes such as the class of neural networks with bounded weights. 
+
+6Assumption 2 implies the boundedness of the gradient of the Lagrange function. This can be formally expressed as follows. 
+
+Lemma 2. If Assumption 2 holds, then the following inequality is true ∀θ ∈ Θ and ∀λ ∈ Λ.
+
+∥∇ θ JL,ρ (θ, λ )∥ ≤ G(1 + λmax )(1 − γ)2
+
+Proof. Statement (a) can be proven using (8) along with Assumption 2 and the facts that |Aπθ
+
+> L,λ
+
+(s, a )|
+
+is bounded by (1 + λ)/(1 − γ) and λ ≤ λmax , ∀λ ∈ Λ.The result established by Lemma 2 will be pivotal in our further analysis. 
+
+Assumption 3. The compatible function approximation error defined in (9) satisfies the inequality 
+
+Lνπ∗ 
+
+> ρ
+
+(ω∗
+
+> θ,λ
+
+, θ, λ ) ≤ ϵbias /2, ∀θ ∈ Θ and ∀λ ∈ Λ where π∗ is a solution to the original constrained optimization problem (2) and ω∗ 
+
+> θ,λ
+
+is defined in (9) . The term ϵbias is a non-negative constant. The factor 2 is used for notational convenience. 
+
+Remark 2. The term ϵbias quantifies the expressivity of the parameterized policy class. For example, if the parameterization is complete i.e., includes all possible policies (such as in direct or softmax parameterization), then ϵbias = 0 [ 12 ]. A similar result can be proven for linear MDPs [ 36 ]. For incomplete policy classes, we have ϵbias > 0. However, if the class is sufficiently rich (such as neural networks with a large number of parameters), ϵbias can be assumed to be negligibly small [37]. 
+
+Assumption 4. There exists a positive constant μF such that Fρ(θ) − μF Id is positive semidefinite i.e., Fρ(θ) ⪰ μF Id, ∀θ ∈ Θ where Id is a d × d identity matrix and Fρ(·) is defined in (7) .
+
+The property of the policy classes laid out in Assumption 4 is called Fisher Non-Degeneracy (FND) which essentially ensures that ∀θ ∈ Θ, the Fisher matrix Fρ(θ) is away from the zero matrix by a certain amount. Observe that the Hessian of the function, lθ,λ (·) ≜ Lνπθρ (·, θ, λ ) is Fρ(θ). Therefore, Assumption 4 also indicates that lθ,λ is μF -strongly convex. This assumption is commonly applied in analyzing policy-gradient algorithms [ 4 , 38 , 7 ]. Assumption 4 also ensures that the matrix Fρ(θ)
+
+is invertible, which, in turn, implies the uniqueness of the maximizer ω∗ 
+
+> θ,λ
+
+= arg min ω∈Rd lθ,λ (ω).[39] describes a concrete set of policies that obeys Assumption 2 − 4.
+
+4.1 Local-to-Global Convergence Lemma 
+
+Recall that our goal is to establish the global convergence rates. Lemma 3 (stated below) is the first step in that direction. Specifically, it demonstrates how the average optimality gap of the Lagrange function can be bounded by the first and second-order error of the gradient estimates. 
+
+Lemma 3. If the parameters {θk, λ k}K−1 
+
+> k=0
+
+are updated via (20) and (21) and assumptions 2 − 4
+
+hold, then the following inequality holds for any K.
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)
+
+
+
+≤ √ϵbias + GK
+
+> K−1
+
+X
+
+> k=0
+
+E∥(E ωk θk, λ k
+
+ − ω∗
+
+> k
+
+)∥
+
++ Bη 
+
+2K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ωk∥2 + 1
+
+ηK Es∼dπ∗ 
+
+> ρ
+
+[KL (π∗(·| s)∥πθ0 (·| s))] 
+
+(22) 
+
+where ω∗ 
+
+> k
+
+≜ ω∗  
+
+> θk,λ k
+
+, ω∗  
+
+> θk,λ k
+
+is the natural policy gradient defined in (9) , and π∗ is the solution to the constrained optimization (2) . Finally, ωk is the approximation of ω∗ 
+
+> k
+
+given by (19) and KL (·∥· ) is the KL-divergence. 
+
+Note the presence of the term, ϵbias in (22) . It shows that due to the incompleteness of the param-eterized policy class, the average optimality error cannot be made arbitrarily small. It is worth mentioning that many existing CMDP analyses (such as [ 4]) follow a path similar to that of Lemma 3. However, while the first order term in those works turns out to be E∥ωk − ω∗
+
+> k
+
+∥, we improved it to 
+
+E∥E[ωk|θk, λ k] − ω∗
+
+> k
+
+∥. Such seemingly insignificant improvement has important ramifications for 7our analysis as explained later in the paper. The second order term in (22) can be expanded as, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ωk∥2 ≤ 2
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ωk − ω∗
+
+> k
+
+∥2 + 2
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ω∗
+
+> k
+
+∥2(a)
+
+≤ 2
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ωk − ω∗
+
+> k
+
+∥2 + 2
+
+μ2 
+
+> F
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E ∥∇ θ JL,ρ (θk, λ k)∥2(b)
+
+≤ 2
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ωk − ω∗
+
+> k
+
+∥2 + 2G2(1 + λmax )2
+
+μ2 
+
+> F
+
+(1 − γ)4
+
+(23) where (a) utilises ω∗ 
+
+> k
+
+= Fρ(θk)†∇θ JL,ρ (θk, λ k) and Assumption 4. The second inequality applies Lemma 2 together with the fact that λk ∈ Λ. Our next subsection provides a bound on E∥ωk − ω∗
+
+> k
+
+∥2
+
+and the first order term E∥E[ωk|θk, λ k] − ω∗
+
+> k
+
+∥.
+
+4.2 Local Convergence of the Natural Policy Gradient 
+
+To deliver the promised bounds, we first provide some characterization of the gradient estimate. 
+
+Lemma 4. Let ˆ∇ω Lνπθρ (ω, θ, λ ) be the estimate produced by Algorithm 1. Under assumptions 2 and 4, the following semidefinite inequality holds for any θ ∈ Θ and λ ∈ Λ.
+
+E
+
+h ˆ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ ) ⊗ ˆ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ )
+
+i
+
+⪯ σ2Fρ(θ)
+
+where ω∗
+
+> θ,λ
+
+, Fρ(θ) are given by (9) and (7) respectively and σ2 is defined below. 
+
+σ2 ≜ 1(1 − γ)4
+
+ 2G4
+
+μ2
+
+> F
+
++ 32 
+
+
+
+(1 + λmax )2 (24) The term σ2 defined in Lemma 4 can be described as the scaled variance of the gradient estimate, 
+
+ˆ∇ω Lνπθρ (ω, θ, λ ). Note that if the estimates were non-stochastic (i.e., deterministic), we would have 
+
+σ2 = 0 since ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ ) = 0 . The last equation can be proved using the definition of ω∗
+
+> θ,λ
+
+given in (9) , the gradient expression provided in (10) , and observing that the Fisher matrix, Fρ(θ) is invertible due to Assumption 4. The above information is crucial in bounding the first-order error, as stated in the following lemma. 
+
+Lemma 5. If assumptions 2 and 4 hold, then the following relations are satisfied ∀k ∈ { 0, · · · , K −1}
+
+with learning rates α = 3√5G2  
+
+> μF+3 √5G2
+
+, β = μF 
+
+> 9G2
+
+, ξ = 13√5G2 , and δ = 15G2 provided that the inner loop length of Algorithm 2 obeys H > ¯C G2 
+
+> μF
+
+log 
+
+√d G2
+
+> μF
+
+
+
+for some universal constant, ¯C.
+
+E∥ωk − ω∗
+
+> k
+
+∥2 ≤ 22 σ2d
+
+μF H + C exp 
+
+
+
+− μF
+
+20 G2 H
+
+  (1 + λmax )2
+
+μF (1 − γ)4
+
+
+
+, (25) 
+
+E∥E ωk θk, λ k
+
+ − ω∗
+
+> k
+
+∥ ≤ √C exp 
+
+
+
+− μF
+
+40 G2 H
+
+  1 + λmax 
+
+√μF (1 − γ)2
+
+
+
+(26) 
+
+where C denotes a universal constant, ωk is given by (19) , and σ2 is defined in (24) .
+
+The first bound (25) is a consequence of Lemma 4 and the ASGD convergence result provided in [ 8 ](Corollary 2). To gain intuition about the second result (26) , note that by taking the conditional ex-pectation E[·| θk, λ k] on both sides of the ASGD iterations (15) −(18) , and applying the unbiasedness of the gradient estimate (Lemma 1) we obtain the following ∀h ∈ { 0, · · · , H − 1}.
+
+¯yh = α¯xh + (1 − α)¯ vh,
+
+¯xh+1 = ¯ yh − δ∇ω Lνπθkρ
+
+(ω, θ k, λ k) ω=¯ yh
+
+¯zh = β ¯yh + (1 − β)¯ vh,
+
+¯vh+1 = ¯ zh − ξ∇ω Lνπθkρ
+
+(ω, θ k, λ k) ω=¯ yh
+
+(27) 8where ¯lh = E[lh|θk, λ k], l ∈ { v, x, y, z}. Moreover, taking conditional expectation on both sides of the tail averaging process (19), we arrive at the following. 
+
+¯ωk ≜ E ωk θk, λ k
+
+ = 2
+
+H
+
+X 
+
+> H
+> 2<h ≤H
+
+¯xh (28) Note that the steps (27) −(28) resemble the iterative updates of a deterministic ASGD. This allows us to obtain E∥¯ωk − ω∗
+
+> k
+
+∥ by substituting σ2 = 0 in (25) and applying the Cauchy-Schwarz inequality. 
+
+4.3 Global Convergence of the Lagrange 
+
+Combining Lemma 3, (23) and using the expected gradient errors provided by Lemma 5, we bound the average Lagrange optimality gap as a function of tunable parameters H and K as stated in the following corollary. 
+
+Corollary 1. Consider the same setup and the choice of parameters described in Lemma 3 − 5. The following inequality holds if assumptions 2 −4 are met. 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)
+
+
+
+≤ √ϵbias +
+
+"
+
+G√C(1 + λmax )
+
+√μF (1 − γ)2
+
+#
+
+exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ Bη 
+
+ 22 σ2d
+
+μF H + exp 
+
+
+
+− μF
+
+20 G2 H
+
+  C(1 + λmax )2
+
+μF (1 − γ)4
+
+
+
++ G2(1 + λmax )2
+
+μ2 
+
+> F
+
+(1 − γ)4
+
+
+
++ 1
+
+ηK Es∼dπ∗ 
+
+> ρ
+
+[KL (π∗(·| s)∥πθ0 (·| s))] 
+
+(29) Corollary 1 bounds the optimality error of the Lagrange function as O(√ϵbias + exp ( −C0H) + η + 
+
+> 1
+> ηK
+
+) where C0 is some problem specific constant. Interestingly, the dual learning parameter, ζ does not appear in this bound. However, the next section shows that ζ plays a pivotal role in deciding the objective and constraint violation rates. 
+
+4.4 Decoupling the Objective and the Constraint Violation Rates 
+
+The goal of the following theorem is to choose optimal values of the tunable parameters and decouple the objective and constraint violation rates from the Lagrange convergence result given in (29). 
+
+Theorem 1. Consider the same setup and the choice of parameters given in Lemma 3 − 5. Assume 
+
+η = (1 − γ)2(1 + λmax )−1/√K, ζ = λmax (1 − γ)/√K, and λmax = 2 /[(1 − γ)cslater ]. For sufficiently small ϵ > 0, the following inequalities hold 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
+≤ √ϵbias + ϵ, 
+
+E
+
+"
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+−Jc,ρ (θk)
+
+#
+
+≤ (1 − γ)cslater 
+
+√ϵbias + ϵ
+
+(30) 
+
+whenever assumptions 1 −4 are met, H = O(log( ϵ−1)) and K = O((1 − γ)−6ϵ−2). Therefore, the sample complexity to ensure (30) is O((1 − γ)−1HK ) = ˜O((1 − γ)−7ϵ−2). It is to be clarified that the (1 − γ)−1 factor in the sample complexity calculation appears due to the fact that it requires 
+
+O((1 − γ)−1) samples on an average to obtain a gradient estimate via Algorithm 1. 
+
+Theorem 1 dictates that, with appropriate choice of the parameters, the rate of convergence of the objective and that of constraint violation can be bounded as O(√ϵbias + ϵ) with ˜O((1 − γ)−7ϵ−2)
+
+samples. This beats the SOTA ˜O(ϵ−4) sample complexity of [ 4] and achieves the theoretical lower bound. Our derived sample complexity is also dependent on cslater . However, this is not explicitly mentioned in Theorem 1. Interested readers can find such details in the appendix. 9Remark 3. Note the importance of the nested expectation in the first-order term E∥E[ωk|θk, λ k] −
+
+ω∗
+
+> k
+
+∥ in Lemma 3. Lemma 5 bounds this term as O(exp( −C0H)) where C0 is a problem dependent constant. Other terms in the Lagrange optimality bound (Lemma 3) can be expressed as O(η + 1 
+
+> ηK
+
+).Moreover, following the proof of Theorem 1, one sees that decoupling the objective optimality error and constraint violation bounds incurs additional O(ζ + 1 
+
+> ζK
+
+) terms. Choosing η, ζ as prescribed in Theorem 1, makes both the objective and constraint violation errors as O(√ϵbias + exp( −C0H) + 
+
+K−0.5). This allows us to take H = ˜O(1) and K = O(ϵ−2), leading to ˜O(ϵ−2) sample complexity. Had the first-order term been E∥ωk − ω∗
+
+> k
+
+∥, it would have resulted in O(√ϵbias + H−0.5 + K−0.5)
+
+objective and constraint violation errors which would have lead to O(ϵ−4) sample complexity. 
+
+## 5 Conclusions and Limitations 
+
+This paper considers the problem of learning a CMDP where the goal is to maximize the objective value function while guaranteeing that the cost value exceeds a predefined threshold. We propose an acceleration-based primal-dual natural policy gradient algorithm that ensures ϵ optimality gap and ϵ constraint violation with ˜O(ϵ−2) sample complexity. This improves upon the previous state-of-the-art sample complexity of O(ϵ−4) and achieves the theoretical lower bound. Future works include applying the idea of acceleration-based NPG to improve sample complexities in other related domains of constrained reinforcement learning, e.g., non-linear CMDP, average reward CMDP, etc. 
+
+## References 
+
+[1] Al-Abbasi, A. O., A. Ghosh, V. Aggarwal. Deeppool: Distributed model-free algorithm for ride-sharing using deep reinforcement learning. IEEE Transactions on Intelligent Transportation Systems , 20(12):4714–4727, 2019. [2] Geng, N., T. Lan, et al. A multi-agent reinforcement learning perspective on distributed traffic engineering. In 2020 IEEE 28th International Conference on Network Protocols (ICNP) , pages 1–11. IEEE, 2020. [3] Gonzalez, G., M. Balakuntala, M. Agarwal, et al. Asap: A semi-autonomous precise system for telesurgery during communication delays. IEEE Transactions on Medical Robotics and Bionics ,5(1):66–78, 2023. [4] Bai, Q., A. S. Bedi, V. Aggarwal. Achieving zero constraint violation for constrained reinforce-ment learning via conservative natural policy gradient primal-dual algorithm. In Proceedings of the AAAI Conference on Artificial Intelligence , vol. 37, pages 6737–6744. 2023. [5] Ding, D., K. Zhang, T. Basar, M. Jovanovic. Natural policy gradient primal-dual method for constrained markov decision processes. Advances in Neural Information Processing Systems ,33:8378–8390, 2020. [6] Xu, T., Y. Liang, G. Lan. Crpo: A new approach for safe reinforcement learning with con-vergence guarantee. In International Conference on Machine Learning , pages 11480–11491. 2021. [7] Liu, Y., K. Zhang, T. Basar, W. Yin. An improved analysis of (variance-reduced) policy gradient and natural policy gradient methods. Advances in Neural Information Processing Systems ,33:7624–7636, 2020. [8] Jain, P., S. M. Kakade, R. Kidambi, P. Netrapalli, A. Sidford. Accelerating stochastic gradient descent for least squares regression. In Conference On Learning Theory , pages 545–604. 2018. [9] Liu, T., R. Zhou, D. Kalathil, P. Kumar, C. Tian. Policy optimization for constrained mdps with provable fast global convergence. arXiv preprint arXiv:2111.00552 , 2021. [10] Zeng, S., T. T. Doan, J. Romberg. Finite-time complexity of online primal-dual natural actor-critic algorithm for constrained markov decision processes. In 2022 IEEE 61st Conference on Decision and Control (CDC) , pages 4028–4033. IEEE, 2022. [11] Vaswani, S., L. Yang, C. Szepesvári. Near-optimal sample complexity bounds for constrained mdps. Advances in Neural Information Processing Systems , 35:3110–3122, 2022. 10 [12] Agarwal, A., S. M. Kakade, J. D. Lee, G. Mahajan. On the theory of policy gradient methods: Optimality, approximation, and distribution shift. The Journal of Machine Learning Research ,22(1):4431–4506, 2021. [13] Bhandari, J., D. Russo. On the linear convergence of policy gradient methods for finite mdps. In International Conference on Artificial Intelligence and Statistics , pages 2386–2394. 2021. [14] Cen, S., C. Cheng, Y. Chen, Y. Wei, Y. Chi. Fast global convergence of natural policy gradient methods with entropy regularization. Operations Research , 70(4):2563–2578, 2022. [15] Lan, G. Policy mirror descent for reinforcement learning: Linear convergence, new sampling complexity, and generalized problem classes. Mathematical programming , 198(1):1059–1106, 2023. [16] Zhan, W., S. Cen, B. Huang, Y. Chen, J. D. Lee, Y. Chi. Policy mirror descent for regularized reinforcement learning: A generalized framework with linear convergence. SIAM Journal on Optimization , 33(2):1061–1091, 2023. [17] Xu, P., F. Gao, Q. Gu. An improved convergence analysis of stochastic variance-reduced policy gradient. In Uncertainty in Artificial Intelligence , pages 541–551. 2020. [18] Gargiani, M., A. Zanelli, A. Martinelli, T. Summers, J. Lygeros. Page-pg: A simple and loopless variance-reduced policy gradient method with probabilistic gradient estimation. In International Conference on Machine Learning , pages 7223–7240. 2022. [19] Huang, F., S. Gao, J. Pei, H. Huang. Momentum-based policy gradient methods. In International conference on machine learning , pages 4422–4433. 2020. [20] Salehkaleybar, S., M. Khorasani, N. Kiyavash, N. He, P. Thiran. Momentum-based policy gradient with second-order information. Transactions on Machine Learning Research , 2024. [21] Shen, Z., A. Ribeiro, H. Hassani, H. Qian, C. Mi. Hessian aided policy gradient. In International conference on machine learning , pages 5729–5738. 2019. [22] Chen, Z., S. Khodadadian, S. T. Maguluri. Finite-sample analysis of off-policy natural actor– critic with linear function approximation. IEEE Control Systems Letters , 6:2611–2616, 2022. [23] Chen, Z., S. T. Maguluri. Sample complexity of policy-based methods under off-policy sampling and linear function approximation. In International Conference on Artificial Intelligence and Statistics , pages 11195–11214. 2022. [24] Khodadadian, S., T. T. Doan, J. Romberg, S. T. Maguluri. Finite sample analysis of two-time-scale natural actor-critic algorithm. IEEE Transactions on Automatic Control , 2022. [25] Fatkhullin, I., A. Barakat, A. Kireeva, N. He. Stochastic policy gradient methods: Improved sample complexity for fisher-non-degenerate policies. In International Conference on Machine Learning , pages 9827–9869. 2023. [26] Masiha, S., S. Salehkaleybar, N. He, N. Kiyavash, P. Thiran. Stochastic second-order methods improve best-known sample complexity of SGD for gradient-dominated functions. Advances in Neural Information Processing Systems , 35:10862–10875, 2022. [27] Mondal, W. U., V. Aggarwal. Improved sample complexity analysis of natural policy gradient algorithm with general parameterization for infinite horizon discounted reward Markov decision processes. In International Conference on Artificial Intelligence and Statistics , pages 3097–3105. 2024. [28] Efroni, Y., S. Mannor, M. Pirotta. Exploration-exploitation in constrained mdps. arXiv preprint arXiv:2003.02189 , 2020. [29] Liu, T., R. Zhou, D. Kalathil, P. Kumar, C. Tian. Learning policies with zero or bounded constraint violation for constrained mdps. Advances in Neural Information Processing Systems ,34:17183–17193, 2021. [30] Ding, D., X. Wei, Z. Yang, Z. Wang, M. Jovanovic. Provably efficient safe exploration via primal-dual policy optimization. In International Conference on Artificial Intelligence and Statistics , pages 3304–3312. 2021. [31] He, J., D. Zhou, Q. Gu. Nearly minimax optimal reinforcement learning for discounted mdps. 
+
+Advances in Neural Information Processing Systems , 34:22288–22300, 2021. 11 [32] Wei, H., X. Liu, L. Ying. Triple-q: A model-free algorithm for constrained reinforcement learning with sublinear regret and zero constraint violation. In International Conference on Artificial Intelligence and Statistics , pages 3274–3307. 2022. [33] Bai, Q., A. S. Bedi, M. Agarwal, A. Koppel, V. Aggarwal. Achieving zero constraint violation for constrained reinforcement learning via primal-dual approach. In Proceedings of the AAAI Conference on Artificial Intelligence , vol. 36, pages 3682–3689. 2022. [34] Sutton, R. S., D. McAllester, S. Singh, Y. Mansour. Policy gradient methods for reinforcement learning with function approximation. Advances in neural information processing systems , 12, 1999. [35] Zhang, J., C. Ni, C. Szepesvari, M. Wang. On the convergence and sample efficiency of variance-reduced policy gradient method. Advances in Neural Information Processing Systems ,34:2228–2240, 2021. [36] Jin, C., Z. Yang, Z. Wang, M. I. Jordan. Provably efficient reinforcement learning with linear function approximation. In J. Abernethy, S. Agarwal, eds., Proceedings of Thirty Third Conference on Learning Theory , vol. 125 of Proceedings of Machine Learning Research , pages 2137–2143. PMLR, 2020. [37] Wang, L., Q. Cai, Z. Yang, Z. Wang. Neural policy gradient methods: Global optimality and rates of convergence. In International Conference on Learning Representations . 2019. [38] Zhang, K., A. Koppel, H. Zhu, T. Basar. Global convergence of policy gradient methods to (almost) locally optimal policies. SIAM Journal on Control and Optimization , 58(6):3586–3612, 2020. [39] Mondal, W. U., V. Aggarwal, S. Ukkusuri. Mean-field control based approximation of multi-agent reinforcement learning in presence of a non-decomposable shared global state. Transac-tions on Machine Learning Research , 2023. [40] Ding, D., K. Zhang, J. Duan, T. Ba¸ sar, M. R. Jovanovi´ c. Convergence and sample com-plexity of natural policy gradient primal-dual methods for constrained mdps. arXiv preprint arXiv:2206.02346 , 2022. 12 A Helper Lemma 
+
+Lemma 6. With slight abuse of notation, define JL,ρ (π, λ ) ≜ Jπr,ρ + λJ πc,ρ . The following relation holds for any two policies π1, π 2 and λ ∈ Λ.
+
+JL,ρ (π1, λ ) − JL,ρ (π2, λ ) = 11 − γ E(s,a )∼νπ1
+
+> ρ
+
+h
+
+Aπ2
+
+> L,λ
+
+(s, a )
+
+i
+
+(31) 
+
+Proof. This can be proved using Lemma 2 of [12] and the definition of the Lagrange function. 
+
+## B Proof of Lemma 1 
+
+Proof. Fix arbitrary θ and λ. Note that the following equation holds due to the definition of ˆJc,ρ (θ).
+
+E
+
+h ˆJc,ρ (θ) θ
+
+i
+
+= (1 − γ)E
+
+
+
+> ∞
+
+X
+
+> t=0
+
+γttX
+
+> j=0
+
+c(sj , a j ) s0 ∼ ρ, π θ
+
+
+
+= (1 − γ)E
+
+
+
+> ∞
+
+X
+
+> j=0
+
+c(sj , a j )
+
+> ∞
+
+X
+
+> t=j
+
+γt s0 ∼ ρ, π θ
+
+
+
+= E
+
+
+
+> ∞
+
+X
+
+> j=0
+
+γj c(sj , a j ) s0 ∼ ρ, π θ
+
+ = Jc,ρ (θ)
+
+(32) To prove the unbiasedness of the gradient, we first prove that the distribution of the sample pair (ˆ s, ˆa)
+
+produced by Algorithm 1 is indeed νπθ 
+
+> ρ
+
+. Observe the following. 
+
+Pr(ˆ s = s, ˆa = a|ρ, π θ ) = (1 − γ)
+
+> ∞
+
+X
+
+> t=0
+
+γtPr( st = s, a t = a|s0 ∼ ρ, π θ ) = νπθ 
+
+> ρ
+
+(s, a ) (33) Next, we show that for a given pair (s, a ), the estimate ˆQπθ 
+
+> g
+
+(s, a ), g ∈ { r, c } is unbiased. 
+
+E
+
+h ˆQπθ 
+
+> g
+
+(s, a ) θ, s, a 
+
+i
+
+= (1 − γ)E
+
+
+
+> ∞
+
+X
+
+> t=0
+
+γttX
+
+> j=0
+
+g(si, a i) s0 = s, a 0 = a, π θ
+
+
+
+= (1 − γ)E
+
+
+
+> ∞
+
+X
+
+> j=0
+
+g(si, a i)
+
+> t
+
+X
+
+> t=j
+
+γt s0 = s, a 0 = a, π θ
+
+
+
+= E
+
+
+
+> ∞
+
+X
+
+> j=0
+
+γig(si, a i) s0 = s, a 0 = a, π θ
+
+ = Qπθ 
+
+> g
+
+(s, a )
+
+(34) In a similar fashion, one can establish that E[ ˆV πθ 
+
+> g
+
+(s) θ, s ] = V πθ 
+
+> g
+
+(s), ∀g ∈ { r, c }. Combining this with (34) leads to: E[ ˆAπθ
+
+> L,λ
+
+(s, a )|θ, λ, s, a ] = Aπθ
+
+> L,λ
+
+(s, a ). We arrive at, 
+
+E
+
+h ˆFρ(θ) θ
+
+i
+
+= E(ˆ s, ˆa)∼νπθρ
+
+∇θ log πθ (ˆ a|ˆs) ⊗ ∇ θ log πθ (ˆ a|ˆs) θ = Fρ(θ), (35) 
+
+E
+
+h ˆHρ(θ, λ ) θ, λ 
+
+i
+
+= E(ˆ s, ˆa)∼νπθρ
+
+
+
+E
+
+
+
+ˆAπθ
+
+> L,λ
+
+(ˆ s, ˆa) θ, λ, ˆs, ˆa
+
+
+
+∇θ log πθ (ˆ a|ˆs) θ, λ 
+
+
+
+= E(ˆ s, ˆa)∼νπθρ
+
+h
+
+Aπθ
+
+> L,λ
+
+(ˆ s, ˆa)∇θ log πθ (ˆ a|ˆs) θ, λ 
+
+i
+
+= Hρ(θ, λ )
+
+(36) Finally, we arrive at the following by utilizing the definitions (10) and (14). 
+
+E
+
+h ˆ∇ω Lνπθρ (ω, θ, λ ) ω, θ, λ 
+
+i
+
+= E
+
+h ˆFρ(θ) θ
+
+i
+
+ω − 11 − γ E
+
+h ˆHρ(θ, λ ) θ, λ 
+
+i
+
+= Fρ(θ)ω − 11 − γ Hρ(θ, λ ) = ∇ω Lνπθρ (ω, θ, λ )
+
+(37) This concludes the proof. 13 C Proof of Lemma 3 
+
+Proof. Invoking the definition of KL divergence, we arrive at the following series of inequalities. 
+
+Es∼dπ∗ 
+
+> ρ
+
+[KL (π∗(·| s)∥πθk (·| s)) − KL (π∗(·| s)∥πθk+1 (·| s))] = E(s,a )∼νπ∗
+
+> ρ
+
+
+
+log πθk+1 (a|s)
+
+πθk (a|s)
+
+
+
+> (a)
+
+≥ E(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · (θk+1 − θk)] − B
+
+2 ∥θk+1 − θk∥2
+
+= ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · ωk] − Bη 2
+
+2 ∥ωk∥2
+
+= ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · ω∗
+
+> k
+
+] + ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · (ωk − ω∗
+
+> k
+
+)] − Bη 2
+
+2 ∥ωk∥2
+
+= η[JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)] + ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · ω∗
+
+> k
+
+]
+
+− η[JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)] + ηE(s,a )∼νπ∗ [∇θ log πθk (a|s) · (ωk − ω∗
+
+> k
+
+)] − Bη 2
+
+2 ∥ωk∥2(b)
+
+= η[JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)] + ηE(s,a )∼νπ∗
+
+> ρ
+
+
+
+∇θ log πθk (a|s) · ω∗ 
+
+> k
+
+− 11 − γ Aπθk 
+
+> L,λ k
+
+(s, a )
+
+
+
++ ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · (ωk − ω∗
+
+> k
+
+)] − Bη 2
+
+2 ∥ωk∥2(c)
+
+≥ η[JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)] − η
+
+s
+
+E(s,a )∼νπ∗
+
+> ρ
+
+
+
+∇θ log πθk (a|s) · ω∗ 
+
+> k
+
+− 11 − γ Aπθk 
+
+> L,λ k
+
+(s, a )
+
+2
+
++ ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · (ωk − ω∗
+
+> k
+
+)] − Bη 2
+
+2 ∥ωk∥2(d)
+
+≥ η[JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)] − η√ϵbias 
+
++ ηE(s,a )∼νπ∗ 
+
+> ρ
+
+[∇θ log πθk (a|s) · (ωk − ω∗
+
+> k
+
+)] − Bη 2
+
+2 ∥ωk∥2
+
+(38) where the step (a) holds by Assumption 2 and step (b) holds by Lemma 6. Step (c) uses the convexity of the function f (x) = x2. Finally, step (d) comes from the Assumption 3. Rearranging the terms and taking expectations on both sides, we have, 
+
+E [JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)] ≤ − E(s,a )∼νπ∗ 
+
+> ρ
+
+E ∇θ log πθk (a|s) · (E ωk θk, λ k
+
+ − ω∗
+
+> k
+
+)
+
++ Bη 
+
+2 E∥ωk∥2 + 1
+
+η Es∼dπ∗
+
+> ρ
+
+E [KL (π∗(·| s)∥πθk (·| s))] − E KL (π∗(·| s)∥πθk+1 (·| s))  + √ϵbias (a)
+
+≤ √ϵbias + GE (E ωk θk, λ k
+
+ − ω∗
+
+> k
+
+) + Bη 
+
+2 E∥ωk∥2
+
++ 1
+
+η Es∼dπ∗
+
+> ρ
+
+E [KL (π∗(·| s)∥πθk (·| s))] − E KL (π∗(·| s)∥πθk+1 (·| s))  
+
+(39) where (a) follows from Assumption 2. Summing from k = 0 to K − 1, using the non-negativity of KL divergence and dividing the resulting expression by K, we obtain, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)
+
+
+
+≤ √ϵbias + GK
+
+> K−1
+
+X
+
+> k=0
+
+E∥(E ωk θk, λ k
+
+ − ω∗
+
+> k
+
+)∥
+
++ Bη 
+
+2K
+
+> K−1
+
+X
+
+> k=0
+
+E∥ωk∥2 + 1
+
+ηK Es∼dπ∗ 
+
+> ρ
+
+[KL (π∗(·| s)∥πθ0 (·| s))] 
+
+(40) This concludes the proof. 14 D Proof of Lemma 4 
+
+Proof. Fix a θ ∈ Θ and a λ ∈ Λ. Observe the following equation. 
+
+E
+
+h ˆ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ ) ⊗ ˆ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ )
+
+i
+
+= E(s,a )∼νπθρ
+
+
+
+E
+
+
+
+∇θ log πθ (a|s) · ω∗ 
+
+> θ,λ
+
+− 11 − γ ˆAπθ
+
+> L,λ
+
+(s, a )
+
+| {z }
+
+> ≜ζθ,λ (s,a )
+
+2
+
+∇θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s)
+
+
+
+To prove the lemma, it is sufficient to demonstrate that E[ζθ,λ (s, a )] ≤ σ2, ∀(s, a ). Notice the chain of inequalities stated below. 
+
+E
+
+
+
+∇θ log πθ (a|s) · ω∗ 
+
+> θ,λ
+
+− 11 − γ ˆAπθ
+
+> L,λ
+
+(s, a )
+
+2
+
+≤ 2 ∇θ log πθ (a|s) · ω∗
+
+> θ,λ
+
+2 + 2(1 − γ)2 E
+
+h ˆAπθ
+
+> L,λ
+
+(s, a )
+
+i2(a)
+
+≤ 2∥∇ θ log πθ (a|s)∥2∥ω∗
+
+> θ,λ
+
+∥2 + 4(1 + λ)2
+
+(1 − γ)2 max 
+
+> g∈{ r,c }
+
+
+
+E
+
+h ˆAπθ 
+
+> g
+
+(s, a )
+
+i2
+
+> (b)
+
+≤ 2G2∥Fρ(θ)†∇θ JL,ρ (θ, λ )∥2 + 8(1 + λ)2
+
+(1 − γ)2 max 
+
+> g∈{ r,c }
+
+
+
+E
+
+h ˆQπθ 
+
+> g
+
+(s, a )
+
+i2
+
++ E
+
+h ˆV πθ 
+
+> g
+
+(s, a )
+
+i2
+
+> (c)
+
+≤ 2G4(1 + λ)2
+
+μ2 
+
+> F
+
+(1 − γ)4 + 32(1 + λ)2
+
+(1 − γ)4 ≤ 1(1 − γ)4
+
+ 2G4
+
+μ2
+
+> F
+
++ 32 
+
+
+
+(1 + λmax )2
+
+(41) Inequality (a) follows from the Cauchy-Schwarz inequality and the fact that (a + b)2 ≤ 2( a2 + b2)
+
+for any two numbers a, b . The same argument is also applied in inequality (b). Additionally, it uses Assumption 2 and the definition of ω∗
+
+> θ,λ
+
+. Finally, (c) is a consequence of Assumption 4, Lemma 2, and the following two bounds. 
+
+E
+
+h ˆQπθ 
+
+> g
+
+(s, a )
+
+i2
+
+≤ 2(1 − γ)2 , and E
+
+h ˆV πθ 
+
+> g
+
+(s)
+
+i2
+
+≤ 2(1 − γ)2 , ∀(s, a ) ∈ S × A , ∀g ∈ { r, c } (42) To establish the first bound, note that | ˆQπθ 
+
+> g
+
+(s, a )| is assigned a value of at most (j +1) with probability 
+
+(1 − γ)γj , ∀g ∈ { r, c }. Therefore, 
+
+E
+
+h ˆQπθ 
+
+> g
+
+(s, a )
+
+i2
+
+≤
+
+> ∞
+
+X
+
+> j=0
+
+(1 − γ)( j + 1) 2γj = (1 + γ)(1 − γ)2 < 2(1 − γ)2 (43) The second bound in (42) can be proven similarly. This concludes the lemma. 
+
+## E Proof of Lemma 5 
+
+We establish Lemma 5 applying Corollary 2 of [8]. Note the following statements. 
+
+S1 : The following quantities exist and are finite ∀θ ∈ Θ.
+
+Fρ(θ) ≜ E(s,a )∼νπθρ
+
+∇θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s), (44) 
+
+Gρ(θ) ≜ E(s,a )∼νπθρ
+
+∇θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s) (45) 
+
+S2 : There exists σ2 such that the following is obeyed ∀θ ∈ Θ where ω∗ 
+
+> θ,λ
+
+minimizes Lνπθρ (·, θ, λ ).
+
+E
+
+h ˆ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ ) ⊗ ˆ∇ω Lνπθρ (ω∗
+
+> θ,λ
+
+, θ, λ )
+
+i
+
+≼ σ2Fρ(θ) (46) 15 S3 : There exists μF , G > 0 such that the following statements hold ∀θ ∈ Θ.
+
+(a) Fρ(θ) ≽ μF Id, (47) 
+
+(b) E(s,a )∼νπθρ
+
+∥∇ θ log πθ (a|s)∥2∇θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s) ≼ G2Fρ(θ), (48) 
+
+(c) E(s,a )∼νπθρ
+
+h
+
+∥∇ θ log πθ (a|s)∥2 
+
+> Fρ(θ)†
+
+∇θ log πθ (a|s) ⊗ ∇ θ log πθ (a|s)
+
+i
+
+≼ G2
+
+μF
+
+Fρ(θ) (49) Statement S1 follows from Assumption 2 whereas S2 is a consequence of Lemma 4. Statement 
+
+S3 (a) is identical to Assumption 4, S3 (b) results from Assumption 2, and finally, S3 (c) follows from Assumption 2 and 4. We can, therefore, apply Corollary 2 of [ 8] with κ = ˜ κ = G2/μ F and deduce the following convergence result whenever H > ¯C√κ˜κ log( √d√κ˜κ) and the learning rates are set as α = 3√5√κ˜κ 
+
+> 1+3 √5κ˜κ
+
+, β = 19√κ˜κ , ξ = 13√5μF 
+
+> √κ˜κ
+
+, and δ = 15G2 .
+
+E [lk(ωk)] − lk(ω∗
+
+> k
+
+) ≤ C
+
+2 exp 
+
+
+
+− H
+
+20 √κ˜κ
+
+
+
+[lk(0) − lk(ω∗
+
+> k
+
+)] + 11 σ2d
+
+H ,
+
+where lk(ω) ≜ Lνπθkρ
+
+(ω, θ k, λ k), ∀ω ∈ Rd
+
+(50) The term, C is a universal constant. Note that lk(ω∗
+
+> k
+
+) ≥ 0 and lk(0) is bounded above as follows. 
+
+lk(0) = 12 E(s,a )∼νπθkρ
+
+ 11 − γ Aπθk 
+
+> L,λ k
+
+(s, a )
+
+2 (a)
+
+≤ (1 + λmax )2
+
+2(1 − γ)4 (51) where (a) is a result of the fact that |Aπθ
+
+> L,λ
+
+(s, a )| ≤ (1 + λmax )/(1 − γ), ∀(s, a ) ∈ S × A , ∀θ ∈ Θ,and ∀λ ∈ Λ. Combining (50), (51), and the fact that lk(·) is μF -strongly convex, we establish, 
+
+E∥ωk − ω∗
+
+> k
+
+∥2 ≤ 2
+
+μF
+
+E [lk(ωk)] − lk(ω∗
+
+> k
+
+) ≤ 22 σ2d
+
+μF H + C exp 
+
+
+
+− μF
+
+20 G2 H
+
+  (1 + λmax )2
+
+μF (1 − γ)4
+
+
+
+(52) This proves the first statement. We get the following for noiseless ( σ2 = 0 ) gradient updates. 
+
+E∥(E[ωk|θk] − ω∗
+
+> k
+
+)∥2 ≤ C exp 
+
+
+
+− μF
+
+20 G2 H
+
+  (1 + λmax )2
+
+μF (1 − γ)4
+
+
+
+(53) The second statement can be established from (53) by applying Jensen’s inequality on the function 
+
+f (x) = x2.
+
+## F Proof of Theorem 1 
+
+Applying the inequalities H ≥ 1, exp( −(μF /20 G2)H) ≤ 1 and substituting the values of σ2 and η
+
+(as stated in Lemma 4 and Theorem 1 respectively), we can rewrite (29) as follows. 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+JL,ρ (π∗, λ k) − JL,ρ (θk, λ k)
+
+
+
+≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ f1
+
+(1 + λmax )(1 − γ)2
+
+1
+
+√K
+
+(54) The terms f0 and f1 are defined below. 
+
+f0 ≜ G√C
+
+√μF
+
+,f1 ≜ B
+
+ 44d 
+
+μF
+
+ G4
+
+μ2
+
+> F
+
++ 16 
+
+
+
++ CμF
+
++ G2
+
+μ2
+
+> F
+
+
+
++ Es∼dπ∗ 
+
+> ρ
+
+[KL (π∗(·| s)∥πθ0 (·| s))] 
+
+(55) Using the definition of JL,ρ (·, ·), one can write, 
+
+JL,ρ (π∗, λ k) − JL,ρ (θk, λ k) = ( Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)) + λk(Jπ∗ 
+
+> c,ρ
+
+− Jc,ρ (θk)) 
+
+> (a)
+
+≥ (Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)) + λk(−Jc,ρ (θk)) 
+
+(56) 16 where (a) follows from the fact that λk ≥ 0 and Jπ∗ 
+
+> c,ρ
+
+≥ 0 due to feasibility. Combining (54) and (56) ,we obtain the following. 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
++ 1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+− λkJc,ρ (θk)
+
+
+
+≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ f1
+
+(1 + λmax )(1 − γ)2
+
+1
+
+√K
+
+(57) 
+
+F.1 Convergence Rate of the Objective Function 
+
+Note that (57) can be alternatively written as, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
+≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ f1
+
+(1 + λmax )(1 − γ)2
+
+1
+
+√K + 1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+λkJc,ρ (θk)
+
+ (58) To obtain the convergence rate of the objective function, we need to bound the last term in the above expression. Observe the following chain of inequalities. 
+
+0 ≤(λK )2 (a)
+
+=
+
+> K−1
+
+X
+
+> k=0
+
+
+
+(λk+1 )2 − (λk)2
+
+
+
+> (b)
+
+≤
+
+> K−1
+
+X
+
+> k=0
+
+λk − ζ ˆJc,ρ (θk)2 − (λk)2
+
+
+
+= −2ζ
+
+> K−1
+
+X
+
+> k=0
+
+λk ˆJc,ρ (θk) + ζ2
+
+> K−1
+
+X
+
+> k=0
+
+ˆJ2
+
+> c,ρ
+
+(θk)
+
+(59) where (a) uses λ0 = 0 and (b) follows from the contraction property of the projection operator, PΛ.Using the above inequality, one can write, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+λk ˆJc,ρ (θk)
+
+
+
+≤ ζ
+
+2K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+ˆJ2
+
+> c,ρ
+
+(θk)
+
+
+
+(60) Using the unbiasedness of ˆJc,ρ (θk) (Lemma 1), we deduce the following. 
+
+E
+
+
+
+λk ˆJc,ρ (θk)
+
+ (a)
+
+= E
+
+
+
+λkE
+
+h ˆJc,ρ (θk) θk
+
+i 
+
+= E
+
+
+
+λkJc,ρ (θk)
+
+
+
+(61) where (a) is a consequence of the fact that ˆJc,ρ (θk) and λk are conditionally independent given θk.Note that, ˆJ2
+
+> c,ρ
+
+(θk) is assigned a value of at most (j + 1) 2 with probability (1 − γ)γj , j ∈ { 0, 1, · · · } .Therefore, the RHS of (60) can be bounded as follows. 
+
+E
+
+
+
+ˆJ2
+
+> c,ρ
+
+(θk)
+
+
+
+≤
+
+> ∞
+
+X
+
+> j=0
+
+(1 − γ)( j + 1) 2γj = 1 + γ
+
+(1 − γ)2 < 2(1 − γ)2 (62) Combining (58), (60), (61), and (62), we finally obtain, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
+≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ f1
+
+(1 + λmax )(1 − γ)2
+
+1
+
+√K + ζ
+
+(1 − γ)2(a)
+
+= √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ f1
+
+(1 + λmax )(1 − γ)2
+
+1
+
+√K + λmax 
+
+(1 − γ)1
+
+√K
+
+≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ ( f1 + 1) (1 + λmax )(1 − γ)2
+
+1
+
+√K
+
+(63) where (a) uses the substitution ζ = λmax (1 − γ)/√K.17 F.2 Rate of Constraint Violation 
+
+The following inequality is satisfied for any k ∈ { 0, 1, · · · , K − 1}.
+
+|λk+1 − λmax |2 = |P Λ(λk − ζ ˆJc,ρ (θk)) − λmax |2(a)
+
+≤ λk − ζ ˆJc,ρ (θk) − λmax  
+
+> 2
+
+= λk − λmax  
+
+> 2
+
+− 2ζ ˆJc,ρ (θk) λk − λmax 
+
+ + ζ2 ˆJ2
+
+> c,ρ
+
+(θk)
+
+(64) where (a) is due to the contractive property of PΛ. Performing an average over k ∈ { 0, · · · , K − 1},and applying expectations on both sides, we get, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+h
+
+(λk − λmax ) ˆJc,ρ (θk)
+
+i (a)
+
+≤ |λmax |2 − | λK − λmax |2
+
+2ζK + ζ
+
+2K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+h ˆJ2
+
+> c,ρ
+
+(θk)
+
+i
+
+> (b)
+
+≤ λ2max 
+
+2ζK + ζ
+
+(1 − γ)2(c)
+
+= 3λmax 
+
+2(1 − γ)1
+
+√K
+
+(65) where (a) utilises λ0 = 0 , (b) applies (62) , and (c) is derived using ζ = λmax (1 − γ)/√K. Note that one can write the following using Lemma 1 and the observation that ˆJc,ρ (θk) and λk are conditionally independent given θk.
+
+E
+
+h
+
+(λk − λmax ) ˆJc,ρ (θk)
+
+i
+
+= E
+
+h
+
+(λk − λmax )E
+
+h ˆJc,ρ (θk) θk
+
+ii 
+
+= E
+
+
+
+(λk − λmax )Jc,ρ (θk)
+
+
+
+(66) Combining (65) and (66), we get, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+(λk − λmax )Jc,ρ (θk)
+
+
+
+≤ 3λmax 
+
+2(1 − γ)1
+
+√K ≤ 2(1 + λmax )(1 − γ)2√K (67) Finally, combining (58) and (67), we arrive at, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
++ λmax 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+− Jc,ρ (θk)
+
+
+
+≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ ( f1 + 2) (1 + λmax )(1 − γ)2
+
+1
+
+√K
+
+(68) Since the functions {Jg,ρ (θk)}, g ∈ { r, c }, k ∈ { 0, · · · , K − 1} are linear in occupancy measure, there exists a policy ¯π such that the following holds ∀g ∈ { r, c }.
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+Jg,ρ (θk) = J ¯πg,ρ 
+
+This allows us to rewrite (68) as, 
+
+Jπ∗ 
+
+> r,ρ
+
+− EJ ¯πr,ρ 
+
+ + λmax E − J ¯πc,ρ 
+
+ ≤ √ϵbias + f0
+
+(1 + λmax )(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ ( f1 + 2) (1 + λmax )(1 − γ)2
+
+1
+
+√K
+
+(69) Applying Lemma 9 and verifying (via Lemma 8) that λmax ≥ 2λ∗ where λ∗ is the non-negative minimizer of the dual function corresponding to the unparameterized constrained optimization (2) ,we can write the constraint violation rate as follows. 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E [−Jc,ρ (θk)] ≤ 2√ϵbias 
+
+λmax 
+
++ 2 f0
+
+(1 + λmax )
+
+λmax (1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ 2( f1 + 2) (1 + λmax )
+
+λmax (1 − γ)2
+
+1
+
+√K
+
+(70) 18 F.3 Final Result 
+
+Substituting λmax = 2 /[(1 − γ)cslater ] ≥ 2 in (63) , we get the rate of convergence of the objective as follows. 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
+≤ √ϵbias + 3f0c−1slater 
+
+(1 − γ)3 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ 3( f1 + 1) c−1slater 
+
+(1 − γ)3
+
+1
+
+√K
+
+(71) Similarly, we obtain the constraint violation rate as, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E [−Jc,ρ (θk)] 
+
+≤ (1 − γ)cslater 
+
+√ϵbias + 3f0
+
+(1 − γ)2 exp 
+
+
+
+− μF
+
+40 G2 H
+
+
+
++ 3( f1 + 2) (1 − γ)2
+
+1
+
+√K
+
+(72) Let, H and K are chosen as follows for an arbitrary ϵ > 0.
+
+H = 40 G2
+
+μF
+
+log 
+
+
+
+max 
+
+ 6f0c−1slater 
+
+(1 − γ)3 ϵ−1, 6f0
+
+(1 − γ)2 ϵ−1
+
+ 
+
+= O(log( ϵ−1)) ,K = max 
+
+ 36( f1 + 1) 2c−2slater 
+
+(1 − γ)6 ϵ−2, 36( f1 + 2) 2
+
+(1 − γ)4 ϵ−2
+
+
+
+= O((1 − γ)−6ϵ−2)
+
+(73) For the above choice of H and K, we have, 
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+E
+
+
+
+Jπ∗ 
+
+> r,ρ
+
+− Jr,ρ (θk)
+
+
+
+≤ √ϵbias + ϵ, 
+
+E
+
+"
+
+1
+
+K
+
+> K−1
+
+X
+
+> k=0
+
+−Jc,ρ (θk)
+
+#
+
+≤ (1 − γ)cslater 
+
+√ϵbias + ϵ
+
+(74) Note that the expected number of steps required in Algorithm 1 is O((1 − γ)−1). Therefore, the sample complexity required to ensure (74) is O((1 − γ)−1HK ) = ˜O((1 − γ)−7ϵ−2). Finally, note that Lemma 5 requires H > ¯C G2 
+
+> μF
+
+log 
+
+√d G2
+
+> μF
+
+
+
+. This can be ensured if ϵ is sufficiently small. 
+
+## G Strong Duality and Related Lemmas 
+
+Define the dual function associated with the unparameterized constrained optimization (2) as follows. 
+
+Jλ 
+
+> D,ρ
+
+= max  
+
+> π
+
+{Jπr,ρ + λJ πc,ρ } (75) The following lemma formally describes the strong duality result. 
+
+Lemma 7. [40 ] [Lemma 3] If λ∗ ≜ arg min λ≥0Jλ 
+
+> D,ρ
+
+and π∗ is a solution of (2) , then the following holds whenever Assumption 1 is true. 
+
+Jπ∗ 
+
+> r,ρ
+
+= Jλ∗ 
+
+> D,ρ
+
+(76) It is to be mentioned that strong duality, in general, does not hold for the parameterized optimization (3) . The following lemma established a bound on λ∗ which becomes the foundation for choosing the value of λmax in Algorithm 2. 
+
+Lemma 8. [ 40 ][Lemma 3] Let λ∗ be the optimal dual variable as defined in Lemma 7. The following inequalities hold where cslater is defined in Assumption 1. 
+
+0 ≤ λ∗ ≤ 1(1 − γ)cslater 
+
+19 The following lemma is the main tool in decoupling the objective and constraint violation rates. 
+
+Lemma 9. Let Slater’s condition (Assumption 1) hold. If C ≥ 2λ∗ where λ∗ is defined in Lemma 7 and ¯π is a policy such that Jπ∗ 
+
+> r,ρ
+
+− J ¯πr,ρ + C[−J ¯πc,ρ ] ≤ ζ for some ζ > 0 then 
+
+−J ¯πc,ρ ≤ 2ζC (77) 
+
+Proof. Define the function v(·) as follows. 
+
+v(τ ) = max 
+
+> π
+
+Jπr,ρ Jπc,ρ ≥ τ , τ ∈ Rd (78) Let τ = J ¯πc,ρ . Therefore, one can write the following chain of inequalities. 
+
+J ¯πr,ρ 
+
+> (a)
+
+≤ v(τ ) = max 
+
+> π
+
+Jπr,ρ Jπc,ρ ≥ τ (b)
+
+≤ max 
+
+> π
+
+Jπr,ρ + λ∗(Jπc,ρ − τ ) Jπc,ρ ≥ τ
+
+= max 
+
+> π
+
+Jπr,ρ + λ∗Jπc,ρ Jπc,ρ ≥ τ − τ λ ∗
+
+> (c)
+
+≤ Jλ∗ 
+
+> D,ρ
+
+− τ λ ∗ (d)
+
+= Jπ∗ 
+
+> r,ρ
+
+− τ λ ∗
+
+(79) where (a) follows from the definition of v(τ ), (b) uses λ∗ ≥ 0, (c) follows from the definition of the dual function, and (d) is a result of the strong duality (Lemma 7). Utilizing (79), we get, 
+
+(C − λ∗)( −τ ) ≤ Jπ∗ 
+
+> r,ρ
+
+− J ¯πr,ρ + C(−τ ) ≤ ζ (80) This leads to −τ ≤ ζ/ (C − λ∗) ≤ 2ζ/C .20 NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: The abstract and introduction clearly state the paper’s contribution and scope. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: Some limitations of the paper have been discussed in the conclusion sec-tion. Moreover, some assumptions are also accompanied by elaborate discussion on their limitations. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory Assumptions and Proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? 21 Answer: [Yes] Justification: We have clearly stated the required assumptions and an accompanying com-plete proof in the appendix for each theory result. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental Result Reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [NA] Justification: Our paper is primarily of theoretical nature and does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+22 Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [NA] Justification: Our paper is primarily of theoretical nature and does not include experiments. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental Setting/Details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [NA] Justification: Our paper is primarily of theoretical nature and does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment Statistical Significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [NA] Justification: Our paper is primarily of theoretical nature and does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) 23 • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments Compute Resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [NA] Justification: Our paper is primarily of theoretical nature and does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code Of Ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: Our research conforms, in every respect, to the NeurIPS Code of Ethics. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader Impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [NA] Justification: Our work is primarily of theoretical nature and has no immediate societal impact. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. 24 • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: No high risk data or model have been used. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [NA] Justification: No existing asset has been used in the paper. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. 25 • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New Assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [NA] Justification: No new asset is introduced in the paper. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and Research with Human Subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: No experiments with human subjects were conducted. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional Review Board (IRB) Approvals or Equivalent for Research with Human Subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: We conducted no experiments with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 26

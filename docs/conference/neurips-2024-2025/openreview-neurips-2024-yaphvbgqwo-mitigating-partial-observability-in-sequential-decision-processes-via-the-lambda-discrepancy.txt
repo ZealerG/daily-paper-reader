@@ -1,0 +1,1832 @@
+Title: 12090_Mitigating_Partial_Obser.pdf
+
+URL Source: https://openreview.net/pdf?id=YaPhvbGqwO
+
+Number of Pages: 41
+
+Markdown Content:
+# Mitigating Partial Observability in Sequential Decision Processes via the Lambda Discrepancy 
+
+Cameron Allen ∗
+
+UC Berkeley †
+
+Aaron Kirtland ∗
+
+Brown University 
+
+Ruo Yu Tao ∗
+
+Brown University 
+
+Sam Lobel 
+
+Brown University 
+
+Daniel Scott 
+
+Georgia Tech 
+
+Nicholas Petrocelli 
+
+Brown University 
+
+Omer Gottesman 
+
+Amazon ‡
+
+Ronald Parr 
+
+Duke University 
+
+Michael L. Littman 
+
+Brown University 
+
+George Konidaris 
+
+Brown University 
+
+# Abstract 
+
+Reinforcement learning algorithms typically rely on the assumption that the envi-ronment dynamics and value function can be expressed in terms of a Markovian state representation. However, when state information is only partially observable, how can an agent learn such a state representation, and how can it detect when it has found one? We introduce a metric that can accomplish both objectives, without requiring access to—or knowledge of—an underlying, unobservable state space. Our metric, the λ-discrepancy, is the difference between two distinct temporal dif-ference (TD) value estimates, each computed using TD( λ) with a different value of 
+
+λ. Since TD( λ=0 ) makes an implicit Markov assumption and TD( λ=1 ) does not, a discrepancy between these estimates is a potential indicator of a non-Markovian state representation. Indeed, we prove that the λ-discrepancy is exactly zero for all Markov decision processes and almost always non-zero for a broad class of partially observable environments. We also demonstrate empirically that, once de-tected, minimizing the λ-discrepancy can help with learning a memory function to mitigate the corresponding partial observability. We then train a reinforcement learning agent that simultaneously constructs two recurrent value networks with different λ parameters and minimizes the difference between them as an auxiliary loss. The approach scales to challenging partially observable domains, where the resulting agent frequently performs significantly better (and never performs worse) than a baseline recurrent agent with only a single value network. 
+
+# 1 Introduction 
+
+The dominant modeling frameworks for reinforcement learning [Sutton and Barto, 2018] define environments in terms of an underlying Markovian state representation. This modeling choice, called the Markov assumption , is nearly ubiquitous in reinforcement learning, because it allows environment dynamics, rewards, value functions, and policies all to be expressed as functions that are independent of the past given the most recent state. In principle, an environment can be modeled as either a Markov decision process (MDP) [Puterman, 1994], or its partially observable counterpart, a POMDP 
+
+> ∗
+
+These authors contributed equally and are ordered alphabetically. Please send any correspondence to 
+
+camallen@berkeley.edu , aaron kirtland@brown.edu , and ruoyutao@brown.edu .
+
+> †
+
+Some of this work was completed while at Brown University. 
+
+> ‡
+
+Work completed while outside of Amazon. 38th Conference on Neural Information Processing Systems (NeurIPS 2024). [Kaelbling et al., 1998], as long as the underlying state representation contains enough information to satisfy the Markov assumption. The POMDP framework is more general, but POMDPs are typically much harder to solve than MDPs [Zhang et al., 2012], so it is important to know when it is appropriate to use the simpler MDP framework. Ideally, a system designer can ensure that their reinforcement learning agent is configured to use the appropriate problem model. If an environment is partially observable, the designer may manually add relevant decision-making features to the agent’s state representation, either by concatenating observa-tions together [Mnih et al., 2015] or by using other types of feature engineering [Bellemare et al., 2020, Galataud, 2021, Tao et al., 2023]. Alternatively, the designer can manually specify a set of pos-sible environment states over which the agent can maintain a Markovian belief distribution [Kaelbling et al., 1998]. The challenge is that it is not always obvious when the designer has supplied sufficient information to satisfy the Markov assumption. These approaches require the person deploying the agent to know details about the very problem the agent is supposed to help them solve. An alternative approach—that we explore in this paper—is to let the agent learn a good state representation for the problem it is solving. The conventional deep-learning-era wisdom is that the best problem representations come from training a system to solve a task, rather than from human designers. When faced with a potentially partially observable environment, if we provide the agent with a large enough recurrent neural network (RNN), it can perhaps discover an internal state representation “end-to-end” that maximizes reward via gradient descent [Bakker, 2001, Hausknecht and Stone, 2015, Ni et al., 2022, Dong et al., 2022]. Indeed, end-to-end RNN architectures work well for many problems and are both general-purpose and scalable. However, these techniques only implicitly address the problem of learning a Markovian state representation; in this paper, we show that we can achieve much better learning performance when we explicitly tackle the problem of partial observability. In our approach, the agent learns a state representation by directly minimizing a metric that assesses whether the environment is fully or partially observable. We call our metric the λ-discrepancy , and define it as the difference between two distinct value functions estimated using temporal difference learning (TD) [Sutton, 1988]. Specifically, the TD( λ) method defines a smooth trade-off between one-step TD (i.e., λ = 0 ), which makes an implicit Markov assumption, and Monte Carlo (MC) estimation ( λ = 1 ), which does not, and intermediate λ values interpolate between these extremes. By comparing value estimates for two distinct values of λ, we can check that the agent’s observations support Markovian value prediction, and augment them with memory if we find they are incomplete. Our main contributions 4 are as follows: 1. We introduce and formally define the λ-discrepancy and prove that it is exactly zero for MDPs and almost always non-zero for a broad class of POMDPs that we characterize. This analysis tells us that our metric reliably detects partial observability. 2. We then consider a tabular, proof-of-concept experiment that adjusts the parameters of a memory function to minimize the λ-discrepancy via gradient descent. For this experiment, we compute the λ-discrepancy in closed form. Our results demonstrate that minimizing the 
+
+λ-discrepancy is a viable path to mitigating partial observability. 3. Finally, we integrate our approach into a deep reinforcement learning agent and evaluate on a set of large and challenging POMDP benchmarks. We find that minimizing the λ-discrepancy between two learned value functions, as an auxiliary loss alongside traditional reinforcement learning, is often significantly more effective (and never worse) than training the same agent with just a single value function. Overall, we find that the λ-discrepancy is a simple yet powerful metric for detecting and mitigating partial observability. The metric is also practical, since it can be computed directly from value functions, which are ubiquitous in reinforcement learning. Furthermore, such value functions need only consider observable parts of the environment, so the λ-discrepancy remains applicable even without the common assumption that the agent knows the full set of possible POMDP states.   
+
+> 4Code: https://github.com/brownirl/lambda_discrepancy
+> Videos: https://lambda-discrepancy.github.io
+
+22 Background 
+
+We consider two frameworks for modeling sequential decision processes: MDPs and POMDPs. The MDP framework [Puterman, 1994] consists of a state space S, action space A, reward function R :
+
+S×A → R, transition function T : S×A → ∆S mapping to a distribution over states, discount factor 
+
+γ ∈ [0 , 1] , and initial state distribution p0 ∈ ∆S. The agent’s goal is to find a policy πS : S → ∆A
+
+that selects actions to maximize return , gt, the discounted sum of future rewards starting from timestep 
+
+t: gπS 
+
+> t
+
+= P∞ 
+
+> i=0
+
+γirt+i, where ri is the reward at timestep i. We denote the expectation of these returns as value functions VπS (s) = EπS [gt | st = s] and QπS (s, a ) = EπS [gt | st = s, a t = a].The POMDP framework [Kaelbling et al., 1998] additionally includes a set of observations Ω and an observation function Φ : S → ∆Ω that describes the probability Φ( ω|s) of seeing observation 
+
+ω in latent state s. POMDPs are a more general model of the world, since they contain MDPs as a special case: namely, when observations have a one-to-one correspondence with states. Similarly, POMDPs where states correspond to disjoint sets of observations are called block MDPs [Du et al., 2019]. However, such examples are rare; in typical POMDPs, a single observation ω does not contain enough information to fully resolve the state s. While agents need not fully resolve the underlying state to behave optimally, they must retain at least enough information across timesteps that the optimal policy becomes clear. We are interested in the learning setting, where the agent has no knowledge of the underlying state s
+
+nor even the set of possible states S (let alone the transition, reward, and observation functions). It receives an observation ωt ∈ Ω at each timestep and must find a way to maximize expected return. One way to do this is to construct a state representation , perhaps using some form of memory, on which it can condition its behavior. A state representation z ∈ Z is Markovian if at any timestep t,the representation zt and action at together are a sufficient statistic for predicting the reward rt and next representation zt+1 , instead of requiring the agent’s whole history: 
+
+Pr( zt+1 , r t|zt, a t) = Pr( zt+1 , r t|zt, a t, . . . , z 0, a 0). (1) The definition can be applied to states ( s), observations ( ω), and even memory-augmented obser-vations (defined in Sec. 4), by replacing z with the relevant quantity. States and observations are equivalent in MDPs, and this property is satisfied for both by definition, but in POMDPs it typically only holds for the underlying, unobserved state s—not the observations. Markovian state representations have several desirable implications. First, if the Markov property holds then so does the Bellman equation: VπS (s) = P 
+
+> a∈A
+
+πS (a | s) R(s, a ) + γ P 
+
+> s′∈S
+
+T (s′ |
+
+s, a )VπS (s′). The Bellman equation allows agents to estimate the value of a policy, from experiences, and without knowing T or R, via a recurrence relation over one-step returns, 
+
+V (i+1)  
+
+> πS
+
+(s) = EπS
+
+h
+
+rt + γV (i) 
+
+> πS
+
+(st+1 ) | st = s
+
+i
+
+, (2) which converges to the unique fixed point VπS . A second implication is that the transition and reward functions, and consequently the value functions VπS and QπS , have fixed-sized inputs and are therefore easy to parameterize, learn, and reuse. Finally, it follows from the Markov property that the optimal policy π∗S can be expressed deterministically and does not require memory [Puterman, 1994]. We can unroll the Bellman equation over multiple timesteps to obtain a similar estimator that uses 
+
+n-step returns: VπS (s) = EπS [gt:t+n | st = s], where gt:t+n := rt + γr t+1 + γ2rt+2 + · · · +
+
+γnVπS (st+n), with gt:t+n := gt if the episode terminates before t + n has been reached. The same process works for weighted combinations of such returns, including the exponential average: 
+
+V λπS (s) = EπS
+
+h
+
+(1 − λ)
+
+> ∞
+
+X
+
+> n=1
+
+λn−1gt:t+n st = s
+
+i
+
+, (3) with V λ=1  
+
+> πS
+
+(s) = EπS [gt | st = s] as a special case. Equation (3) defines the TD( λ) value function as an expectation over the so-called λ-return [Sutton, 1988]. Low values of λ give more weight to shorter returns where the value term VπS (st+n) is discounted less (and thus has greater significance), whereas larger λ values put more weight on longer returns where the value term is more heavily discounted. Given an MDP and a fixed policy, the recurrence relations for all TD( λ) value functions share the same fixed point for any λ ∈ [0 , 1] ; however, if the Markov property does not hold, different 
+
+λ may have different TD( λ) fixed points. In this work, we seek to characterize this phenomenon and leverage it for detecting and mitigating partial observability. 3Figure 1: T-maze decision process. The agent must remember the initial observa-tion to earn the maximum reward (+1). 
+
+Figure 2: λ-discrepancy augmented network architec-ture and training objectives. 
+
+# 3 Detecting Partial Observability 
+
+Before introducing our partial observability metric, let us first consider the T-maze example of Figure 1 under our two candidate decision-making frameworks: MDPs and POMDPs. In the T-maze, the agent only observes the color of its current square, and must remember the start square color (sampled uniformly from BLUE /RED ) to select the action at the junction that leads to the positive reward. To model the T-maze as a POMDP, the state must include the agent’s position and the goal location. The transitions are deterministic; each action moves the agent in the corresponding direction. The goal location is sampled at the start of an episode, and defines both the reward function and the observation for the initial square. The observation function uniquely identifies these starting states, but all corridor states are aliased together (they map to the same observation), as are the two junction states. We can convert our POMDP model into an MDP model by using observations Ω as the MDP’s “states”. This requires new transition and reward functions, TΩ and RΩ, which we define as: TΩ(ω′ |
+
+ω, a ) := P 
+
+> s,s ′∈S
+
+Φ( ω′ | s′)TS (s′ | s, a ) Pr( s | ω) and RΩ(ω, a ) := P 
+
+> s∈S
+
+RS (s, a ) Pr( s | ω),where Pr( s | ω) is policy-dependent and describes how each hidden state si ∈ S contributes to the overall environment behavior when we see observation ω. While there are several sensible choices of weighting scheme for this type of state aggregation (uniform over states, relative frequency, etc.), only one of these choices coincides with the distribution Pr( s | ω). That particular weighting scheme is the one that averages the time-dependent Pr( st | ωt) over all timesteps, weighted by visitation probability under the agent’s policy, and discounted by γ.5 We explain how to construct this expression in Appendix C. We call the MDP defined in this way the effective MDP model for a given POMDP. The effective MDP model marginalizes over histories (and POMDP hidden states). For example, the model predicts that going UP from the junction will reach the goal exactly half the time, because the transition dynamics marginalize over (equally likely) starting observations. Note that the POMDP model does no such averaging: if the agent initially observes BLUE , then going UP from the junction will always reach the goal, but DOWN never will. Thus, we see that, for the T-maze, there is a mismatch between the POMDP model and the effective MDP model. In other words, the POMDP’s hidden states S are a Markovian representation, but its observations Ω are not, despite the fact that the effective MDP model treats them as Markovian “states”. In principle, an agent could measure partial observability by simultaneously modeling its environment as both a POMDP and an MDP, and comparing the models’ predictions. Unfortunately, since the agent lacks any information about the unobserved state space S, the POMDP model would require variable-length history inputs at each time step, and would come with computational and memory costs that grow exponentially with history length. Instead, we propose a model-free approach, using value functions conditioned only on observations, to approximate this comparison in a tractable way. 
+
+3.1 Value Function Estimation under Partial Observability 
+
+The Bellman equation and its sample-based recurrence relations (2) and (3) are defined for Markovian states. If we apply them to the observations of a POMDP, we are actually working with the effective MDP model of that POMDP, instead of the POMDP itself. To see this, consider one-step TD ( λ = 0 ),              
+
+> 5One intuitive way to think about Pr( s|ω)is that it reflects the relative frequency of trajectories matching both sand ωversus those just matching ω:Eτ[P∞
+> t=0 γt1[st=s,ω t=ω]]
+> Eτ[P∞
+> t=0 γt1[ωt=ω]] .
+
+4where we use the same recurrence relation (2) but now our expectation is sampling from the POMDP: 
+
+V λ=0 Ω (ω) = X
+
+> s∈S
+
+Pr( s | ω) X
+
+> a∈A
+
+π(a | ω)
+
+
+
+RS (s, a ) + γ X
+
+> s′∈S
+
+X
+
+> ω′∈Ω
+
+Φ( ω′ | s′)TS (s′ | a, s )V λ=0 Ω (ω′)
+
+
+
+= X
+
+> a∈A
+
+π(a | ω)
+
+
+
+RΩ(ω, a ) + γ X
+
+> ω′∈Ω
+
+TΩ(ω′ | a, ω )V λ=0 Ω (ω′)
+
+
+
+, (4) where we have suppressed VΩ’s dependence on the observation-based policy π for ease of notation. We see from Equation (4) that the value function TD computes for a POMDP is the fixed point of the Bellman operator for the effective MDP model. 6 By contrast, the Monte Carlo value estimator (λ = 1 ) does not exploit the Bellman equation at all; it simply averages over returns: V λ=1  
+
+> π
+
+(s) = 
+
+Eπ [gt | st = s]. Translating the Monte Carlo estimator to POMDPs merely requires one additional expectation to convert from states to observations: 
+
+V λ=1 Ω (ω) = Eπ [gt | ωt = ω] = X
+
+> s∈S
+
+Pr( s | ω) Eπ [gt | st = s] = X
+
+> s∈S
+
+Pr( s | ω)V λ=1  
+
+> S
+
+(s). (5) This means MC ( λ = 1 ) effectively takes the hidden-state value function VS of the POMDP and projects it into observation space, whereas TD ( λ = 0 ) directly computes the value function for the projected model as an MDP, by treating observations as states. Interpolating λ between 0 and 1 smoothly varies the value estimate’s reliance on the effective MDP model. For generality, we derive an expression (see Appendix C) for Qλπ -values in terms of a given λ
+
+parameter (expressed in tensor notation for compactness) to reveal how λ trades off between the projected state value function and the value function of the projected model: 
+
+Qλπ = W (I − γT K λπ )−1 ..R SA , where Kλπ = λΠS + (1 − λ)Φ W Π, (6) where the tensor product .. contracts two indices instead of one, 7 with tensors defined as follows: 
+
+Qλπ (Ω × A ) is a matrix of Q-values; 
+
+W (Ω × S ) contains the state-blending weights given by Pr( s | ω) for observation ω;
+
+I (S × A × S × A ) is an identity tensor with Isas ′a′ = 1[s = s′]1[a = a′];
+
+T (S × A × S ) contains the hidden-state transition probabilities T (s′ | a, s );
+
+ΠS (S × S × A ) contains the policy spread over hidden states (see below); 
+
+Φ (S × Ω) is the observation function, containing probabilities Φ( ω | s);
+
+W Π (Ω × S × A ) combines W with ΠS to obtain probabilities Pr( s, a | ω);
+
+RSA (S × A ) contains the hidden-state rewards R(s, a ).Let us take a moment to parse this equation. First, ΠS and ΦW Π are mappings from states to state-action pairs. We call the former the MC policy spread , ΠS 
+
+> s,s ′,a
+
+= 1[s = s′] P 
+
+> ω
+
+Φs,ω πω,a , which maps states to the expected policy under their observation distribution. We call the latter the TD policy spread , (Φ W Π)s,s ′,a = P 
+
+> ω
+
+Φs,ω πω,a Wω,s ′ , which reallocates the policy probabilities for a given observation ω across all states s′ that produce that observation, weighted by W . Kλπ is a convex combination of these two policy spread tensors, parameterized by λ. Multiplying a policy spread tensor on the left by T produces an (S ×A×S ×A ) transition-policy tensor, describing the probability of each state-action transition (s, a ) 7 → ∆( s′, a ′) under the policy. Intuitively, Equation (6) says that TD( λ) computes Q-values for a POMDP as though state-action pairs are evolving according to 
+
+T K λπ = λT ΠS + (1 − λ)T ΦW Π, which is a mixture of the policy dynamics under two transition models: the MC transition-policy ( T ΠS ) and the TD transition-policy ( T ΦW Π). The expression (I −
+
+γT K λπ )−1 ..R computes the state-space Q-values for this hybrid transition model. Finally, these are projected through W to compute the observation-space Q-values. (See Appendix C for more details.) 
+
+3.2 λ-Discrepancy 
+
+We have shown that, under partial observability, Qλπ value functions may differ for different λ
+
+parameters, due to varying reliance on the effective MDP model in the TD( λ) estimator. We call this difference the λ-discrepancy , and we propose to use it as a measure of partial observability.                    
+
+> 6This equivalence justifies our choice of Pr( s|ω)when defining TΩand RΩfor the effective MDP model, since states appear in precisely this proportion when we generate experiences in the POMDP.
+> 7For 3-dimensional tensors Aand B,(AB )ijlm =P
+> kAijk Bklm , and (A..B )il =P
+> jk Aijk Bjkl .
+
+5Figure 3: T-Maze λ-discrepancy, mixing between full and partial observability. (Left) MDP observa-tion function ΦPerfect . (Right) Various POMDP observation functions ΦAliased that produce aliased observations at the corridor states, junction states, or both. State indices correspond to starting states (0, 1), hallway (2–11), junctions (12, 13), and terminal state (14). Brighter squares indicate higher probability. (Center) λ-discrepancy has a minimum at zero for full observability and increases with partial observability. We interpolate between perfect observations and aliased ones, where the obser-vation function is Φ = (1 − p) · ΦPerfect + p · ΦAliased .
+
+Definition 1 For a given POMDP model P and policy π, the λ-discrepancy Λλ1,λ 2 
+
+> P,π
+
+is the weighted norm of the difference between the Q-functions estimated by TD( λ) for λ ∈ { λ1, λ 2}:
+
+Λλ1,λ 2 
+
+> P,π
+
+:= Qλ1 
+
+> π
+
+− Qλ2 
+
+> π
+
+= W
+
+  I − γT K λ1
+
+> π
+
+−1 −  I − γT K λ2
+
+> π
+
+−1 ..R SA .
+
+The choice of norm can be arbitrary, as can the norm weighting scheme, as long as it assigns positive weight to all reachable observation-action pairs. We discuss choices of weighted norm in Appendix G.2. For brevity, we suppress the P subscript when the POMDP model is clear from context. A useful property (that we will prove in Theorem 2) is that if the POMDP has Markovian observations, the λ-discrepancy is exactly zero for all policies. However, for it to be a useful measure of partial observability, we must also show that the λ-discrepancy is reliably non-zero when observations are non-Markovian. For this, we have the following theorem. 
+
+Theorem 1 Given a POMDP model P and distinct λ̸ = λ′, if there exists a policy π : Ω → ∆A
+
+such that Λλ,λ ′
+
+> P,π
+
+̸ = 0 , then Λλ,λ ′
+
+> P,π
+
+̸ = 0 for all policies except at most a set of measure zero. Proof sketch: We formulate the λ-discrepancy of a given policy as the norm of an analytic function, then use the fact that analytic functions are zero everywhere or almost nowhere, along with the fact that norms preserve this property. The full proof is given in Appendix D. Intuitively, Theorem 1 says that the λ-discrepancy can detect non-Markovian observations. If it is possible to reveal that a POMDP’s observation-space value function does not match that of its effective MDP model, then almost all policies will do so. The theorem further suggests that even if a particular policy has zero λ-discrepancy, small perturbations to that policy will almost surely detect partial observability if it is present. We also find that increasing amounts of partial observability lead to larger λ-discrepancy. In Figure 3 we interpolate between Markovian and aliased T-Maze environments, and consider three types of state aliasing. Here we use a fixed policy that goes RIGHT until the junction, then UP with probability 
+
+2/3 and DOWN w.p. 1/3. To avoid artifacts due to interactions between the discount factor, weighted norm, and changing observation function, we set γ ≈ 1 and use the (policy-weighted) maximum norm (see Appendix G.2). 8 The results confirm that the λ-discrepancy is a useful indicator of partial observability, provided that it is non-zero for at least one policy. 
+
+3.3 What conditions cause the λ-discrepancy to be zero? 
+
+We can characterize the cases in which the λ-discrepancy is zero for all policies by inspecting Definition 1. Because norms are positive definite, it suffices to consider the expression inside the norm. The only ways for this expression to equal zero are either when the difference between policy spread tensors  Kλ1 
+
+> π
+
+− Kλ2
+
+> π
+
+ is zero (which we will show implies Markovian observations), or it 
+
+> 8Such artifacts are not a concern in normal environments, since the observation function is fixed.
+
+6Figure 4: (Left) The Parity Check environment, a POMDP with zero λ-discrepancy for every policy. (Center) Almost any randomly-initialized 1-bit memory function reveals a λ-discrepancy. (Right) Memory optimization increases normalized return of subsequent policy learning, whereas memoryless policy optimization fails to beat the uniform random baseline. is non-zero but is projected away by T , RSA , and/or W . We first consider when the policy spread tensors—which are the only terms that depend on λ—are equal, i.e. Kλ1 
+
+> π
+
+= Kλ2 
+
+> π
+
+.
+
+Theorem 2 For any POMDP P and any λ1̸ = λ2, Kλ1 
+
+> π
+
+= Kλ2 
+
+> π
+
+if and only if P is a block MDP. Proof sketch: Using Eq. (6), Kλ1 
+
+> π
+
+= Kλ2 
+
+> π
+
+can be simplified to ΠS = Φ W Π, which is satisfied if and only if ΦW = I, i.e. each observation is generated by exactly one hidden state. Proof in Appendix E. Thus, when the policy spread tensors are equal, it means there is no state aliasing and P is a block MDP. Now consider the cases where the difference between Kλπ is projected away by T , RSA , and/or 
+
+W , starting from the policy spread tensors in Definition 1 and working our way outwards. If the policy spread tensors differ, the transition tensor may project these differences away ( T K λ1 
+
+> π
+
+=
+
+T K λ2 
+
+> π
+
+), for example, if the transition probabilities leading to the aliased states always occur in some fixed proportion. In such cases, we can collapse the aliased states to non-aliased ones without any loss of information by reformulating the incoming transition probabilities to the aliased states as stochastic transition dynamics (and possibly rewards) after the non-aliased states. In other words, P is equivalent to an MDP. We prove this claim and provide an example of such an environment in Appendix F. Finally, differences between transition-policies may be projected away by the state-blending weights 
+
+W , the reward function RSA , or both. W (I − γT K λ1 
+
+> π
+
+)−1 ..R SA = W (I − γT K λ2 
+
+> π
+
+)−1 ..R SA . In this case, the effective MDP may be lossy, which is a limitation of the λ-discrepancy metric. Fortunately, such environments appear to be rare, and they are easy to handle, as we show in the example below. 
+
+Parity Check Environment. The Parity Check POMDP of Figure 4 has four equally likely starting states, each associated with a pair of colors that the agent will see during the first two timesteps. At the subsequent (white) junction state, the agent must decide based on these colors whether to go UP 
+
+(black arrow) or DOWN (white arrow). The rewards are defined such that UP is optimal if and only if the color family matches (i.e. RED → PINK or BLUE → CYAN ). The transition-policies for the first eight states differ with and without aliasing, but the differences are perfectly symmetric with respect to rewards and observations. 9 Every observation has zero expected return, and so the λ-discrepancy is zero for all policies. Our analysis in Appendix H.5 suggests such edge-cases are the exception and not the rule. Even so, such examples are easy to handle: we can simply add a small amount of memory. If the environment is truly an MDP, adding memory should have no effect, but if it is a POMDP, a randomly initialized memory function (defined in the next section) may be enough to break symmetry and produce a λ-discrepancy (as seen in Figure 4, center). Taken together, Theorems 1 and 2 suggest that the λ-discrepancy could be a useful measure for detecting partial observability. In the next section, we demonstrate the efficacy of using the λ-discrepancy to learn memory functions that mitigate partial observability. 
+
+# 4 Memory Learning with the λ-Discrepancy 
+
+The λ-discrepancy can identify that we need memory, but it cannot yet tell us what to remember. For that, we must replace the POMDP P in Definition 1 with a memory-augmented version. In general,      
+
+> 9This environment requires projection by both Wand RSA to zero the differences; neither alone is sufficient.
+
+7Figure 5: Memory optimization increases normalized return of subsequent policy gradient learning. Performance is calculated as the expected start-state value, and is normalized between a random policy ( y = 0 ) and the optimal belief state policy ( y = 1 ) found with a POMDP solver [Cassandra, 2003]. Error bars are 95% confidence intervals over 30 seeds. a memory can be any mapping from agent histories (ω0, a 0, ..., a t−1, r t−1, ω t) to internal memory states m within some set of memory states M. For practical reasons, we restrict our attention to recurrent memories that update an internal representation incrementally from fixed-size inputs. We define a memory function μ : Ω × A × M → M as a mapping from an observation, action, and memory state, (ω, a, m ), to a next memory state m′ = μ(ω, a, m ). Given a POMDP P, a memory function μ induces a memory-augmented POMDP Pμ, with extended states SM = S × M ,actions AM = A × M , and observations ΩM = Ω × M . The augmented transition dynamics TM
+
+preserve the original transition dynamics T for states S while allowing the agent full observability and control over memory states M. Memory functions naturally lead to memory-augmented policies 
+
+πμ : Ω M → ∆AM and value functions Vπ,μ : Ω M → R and Qπ,μ : Ω M × A M → R that reflect the expected return under such policies. For details, see Appendix G.1. The λ-discrepancy (Definition 1) applies equally well to memory-augmented POMDPs, and can thus be used to determine whether a particular memory function μ induces a POMDP Pμ with a Markovian observation space ΩM. We can also use it as a training objective for learning such a memory function. We conduct a proof-of-concept experiment on several classic POMDPs for which we can obtain closed-form gradients of the λ-discrepancy with respect to a parametrized memory function. In each domain, we randomly generate a set of stochastic policies, select the one with maximal λ-discrepancy Λ0,1 
+
+> P
+
+, and adjust the parameters of a memory function μ to minimize Λ0,1 
+
+> Pμ
+
+via gradient descent. Figure 5 shows the improvement in policy gradient performance due to the resulting memory function for increasing memory sizes. The details of this experiment are provided in Appendix H. We also run the same experiment on the Parity Check example, and provide results in Figure 4 (right). We see that the λ-discrepancy can help mitigate partial observability, but it is somewhat inconveniently defined in terms of the closed-form value function fixed-points. Fortunately, with the appropriate choice of weighted norm, we can estimate the λ-discrepancy purely from sampled observation-action pairs (or, in the case of memory, observation-memory-action tuples): 
+
+Λλ1,λ 2 
+
+> P,π
+
+:= Qλ1 
+
+> π
+
+− Qλ2 
+
+> π
+
+=
+
+
+
+E(ω,a )∼π
+
+h Qλ1 
+
+> π
+
+(ω, a ) − Qλ2 
+
+> π
+
+(ω, a )2i 1/2
+
+. (7) The norm is taken over the on-policy joint observation-action distribution Pr( ω)π(a|ω), which allows us to estimate the metric using samples generated by the agent’s interaction with the environment. We show how to use it as an optimization objective in the following section. 
+
+# 5 A Scalable, Online Learning Objective 
+
+So far, we have shown that the λ-discrepancy can detect partial observability in theory and can mitigate it under certain idealized conditions. Now we demonstrate how to integrate our metric into sample-based deep reinforcement learning to solve problems requiring large, complex memory functions. 
+
+5.1 Combining the λ-Discrepancy with PPO 
+
+To minimize the λ-discrepancy, we augment a recurrent version of the proximal policy optimization (PPO) algorithm [Schulman et al., 2017] with an auxiliary loss. We use recurrent PPO as our base algorithm due to its strong performance in many POMDPs [Ni et al., 2022], and since the λ-discrepancy is a natural extension of generalized advantage estimation [Schulman et al., 2016], which 8Figure 6: (Left) The λ-discrepancy auxiliary objective (LD) improves performance over recurrent (RNN) and memoryless PPO. Learning curves shown are the mean and 95% confidence interval over 30 runs. (Right) PacMan memory visualization. The agent moves within the maze (middle), and we reconstruct the dot locations from the agent’s memory. RNNs (bottom) benefit from the λ-discrepancy auxiliary loss (LD, top). is used in PPO. In this algorithm, a recurrent neural network [Amari, 1972] (specifically a gated recurrent unit, or GRU [Cho et al., 2014]) is used as the memory function μ that returns a latent state representation given previous latent state and an observation. This latent representation is used as input to an actor network to return a distribution over actions, as well as a critic. The critic is usually a value function network which learns a truncated TD( λ) value estimate for its advantage estimate. To estimate the λ-discrepancy, we learn two TD( λ) value function networks with different λ, parame-terized by θV, 1 and θV, 2 respectively, and minimize their mean squared difference as an auxiliary loss: 
+
+LΛ(θ) = Eπ
+
+
+
+V λ1 
+
+> θV, 1
+
+(zt) − V λ2 
+
+> θV, 2
+
+(zt)
+
+2
+
+, (8) where zt = μθRNN (ωt, z t−1) is the latent state output by the GRU, and θ represents all parameters. We train this neural network end-to-end with the standard PPO actor-critic losses and backpropagation through time [Mozer, 1995]. Full details of the algorithm are provided in Appendix I.1. Any algorithm that uses value functions could, in principle, also leverage the λ-discrepancy. However, the theoretical results in Section 3 only hold for value function fixed points and not necessarily for estimated values prior to convergence. Inaccurate value functions may lead to an inaccurate λ-discrepancy. Fortunately, value functions often provide a useful learning signal before convergence, and we observe in the following sections that the λ-discrepancy is also useful during learning. 
+
+5.2 Large Partially Observable Environments 
+
+We evaluate our approach on a suite of four hard partially observable environments that require complex memory functions. Battleship [Silver and Veness, 2010] requires reasoning about unknown ship positions and remembering previous shots. Partially observable PacMan [Silver and Veness, 2010] requires localization within the map while tracking dot status and avoiding ghosts with only short-range sensors. RockSample (11, 11) and RockSample (15, 15) [Smith and Simmons, 2004] have stochastic sensors and require remembering which rocks have been sampled. While these environments were originally used to evaluate partially observable planning algorithms in large-scale POMDPs [Silver and Veness, 2010], we use them to test our sample-based learning algorithms due to the complexity of their required memory functions. 10 See Appendix I.2 for more details.     
+
+> 10 These domains have extremely large state spaces: Battleship has ∼2100 states, without accounting for possible ship locations, and PacMan has ∼5400 states, even when ignoring food dot configurations.
+
+95.3 Experiments 
+
+We conduct experiments with regular PPO, recurrent PPO, and our λ-discrepancy-augmented recur-rent PPO in Figure 6. We also visualize the agent’s memory for the partially observable PacMan environment by reconstructing the dot locations from the RNN latent state to show where the agent “thinks” it has been (see Appendix I.5). We performed a hyperparameter sweep for each method and report learning curves for undiscounted return (see Appendix I.3 for discounted learning curves and Appendix I.4 for additional experimental details). The λ-discrepancy objective leads to significantly better final performance and learning rate versus recurrent and memoryless PPO in all environments. In RockSample (15 , 15) , the baseline agents quickly learn to exit immediately (for +10 reward), but never improve on this. By contrast, minimizing 
+
+λ-discrepancy helps the agent learn the missing features that allow it to express better policies. We also run experiments on the classic POMDPs from Section 4, but due to the size of these problems, both baseline and our proposed approach performed almost optimally (see Appendix I.6). We also observe that the best performing hyperparameters from our sweep offer further evidence for the theory developed in Section 3. Our theory suggests the λ parameters should be well separated in order to see the largest λ-discrepancy. Indeed, we find that a large difference between λ1 and λ2
+
+was beneficial, with optimal λs close to either 0 or 1. In addition to this, our hyperparameter sweep also includes a PPO variant with two different TD( λ) value functions but without the λ-discrepancy auxiliary loss described in Section 5.1. These agents were never selected in the sweep; using the loss in Equation 8 seems to only help with performance in tested environments. 
+
+# 6 Related Work 
+
+There is an interesting connection between state abstraction [Li et al., 2006], which selectively removes information from state, and partial observability mitigation, which aims to recover state from incomplete observations. Allen et al. [2021] investigated the state abstraction perspective and characterized the properties under which abstract state representations of MDPs either do or do not preserve the Markov property. Several other approaches characterize and measure partial observability and POMDPs. While POMDPs have been shown to be computationally intractable in general [Papadimitriou and Tsitsiklis, 1987], various works have studied complexity measures [Zhang et al., 2012] and defined subclasses with tractable solutions [Littman, 1993, Liu et al., 2022]. The most common strategies for mitigating partial observability are memory-based approaches that summarize history. Early approaches relied on discrete representations of history, including tree rep-resentations [McCallum, 1996] or finite-state controllers [Meuleau et al., 1999]. Modern approaches mostly use RNNs [Amari, 1972] trained via backpropagation through time (BPTT) [Mozer, 1995] to tackle non-Markovian decision processes [Schmidhuber, 1990]. Various approaches use recurrent function approximation to learn better state representations. One successful approach is learning a re-current value function [Lin and Mitchell, 1993, Bakker, 2001, Hausknecht and Stone, 2015] that uses TD error as a learning signal for memory. Policy gradient methods, including PPO (which we com-pare to), have also been used with recurrent learning to mitigate partial observability [Wierstra et al., 2007, Heess et al., 2015]. Model-based methods can learn a recurrent dynamics model [Hafner et al., 2020] to facilitate planning alongside reinforcement learning. These approaches learn their represen-tations implicitly to improve prediction error, rather than explicitly to mitigate partial observability. 
+
+# 7 Conclusion 
+
+We introduce the λ-discrepancy: an observable and differentiable measure of non-Markovianity suitable for mitigating partial observability. The λ-discrepancy is the difference between two distinct value functions estimated using TD( λ), for two different λ values. We characterize the λ-discrepancy and prove that it reliably distinguishes MDPs from POMDPs. We then use it as a memory learning objective and demonstrate that minimizing it in closed-form helps learn useful memory functions in small-scale POMDPs. Finally, we propose a deep reinforcement learning algorithm which leverages the λ-discrepancy as an auxiliary loss, and show that it significantly improves the performance of a baseline recurrent PPO agent on a set of large and challenging partially observable tasks. 10 Author Contributions 
+
+CA, AK and RYT led the project. CA, OG, GK, MLL and SL came up with the initial idea. CA, OG, MLL, SL, and DS conducted the first conceptual investigations and proof-of-concept experiments. AK led the theoretical work, with support from CA, SL, RP, and RYT. RYT led the algorithm development, with support from CA, SL, and GK. CA and RYT led the implementation and experiments, with support from SL, NP, and DS. RP discovered the class of parity check examples and showed that they have zero λ-discrepancy. CA led the writing, with support from AK and RYT. OG, GK, MLL, SL, and RP advised on the project and provided regular feedback. 
+
+# Acknowledgments and Disclosure of Funding 
+
+Many thanks to Saket Tiwari, Anita de Mello Koch, Sam Musker, Brad Knox, Michael Dennis, Stuart Russell, and our colleagues at Brown University and UC Berkeley for their valuable advice and discussions towards completing this work. Additional thanks to our reviewers for comments on earlier drafts. This work was generously supported under NSF grant 1955361 and CAREER grant 1844960 to George Konidaris, NSF fellowships to Aaron Kirtland and Sam Lobel, ONR grant N00014-22-1-2592, a gift from Open Philanthropy to the Center for Human-Compatible AI at Berkeley, and an AI2050 Senior Fellowship for Stuart Russell from the Schmidt Fund for Strategic Innovation. 
+
+# References 
+
+Cameron Allen, Neev Parikh, Omer Gottesman, and George Konidaris. Learning Markov state abstractions for deep reinforcement learning. In Advances in Neural Information Processing Systems , volume 34, pages 8229–8241, 2021. Shun-ichi Amari. Learning patterns and pattern sequences by self-organizing nets of threshold elements. IEEE Transactions on Computers , C-21(11):1197–1206, 1972. Bram Bakker. Reinforcement learning with long short-term memory. In Advances in Neural Information Processing Systems , volume 14, 2001. Marc G. Bellemare, Salvatore Candido, Pablo Samuel Castro, Jun Gong, Marlos C. Machado, Subhodeep Moitra, Sameera S. Ponda, and Ziyu Wang. Autonomous Navigation of Stratospheric Balloons using Reinforcement Learning. Nature , 588(7836):77–82, 2020. Cl ´ement Bonnet, Daniel Luo, Donal John Byrne, Shikha Surana, Sasha Abramowitz, Paul Duckworth, Vincent Coyette, Laurence Illing Midgley, Elshadai Tegegn, Tristan Kalloniatis, Omayma Mahjoub, Matthew Mac-farlane, Andries Petrus Smit, Nathan Grinsztajn, Raphael Boige, Cemlyn Neil Waters, Mohamed Ali Ali Mimouni, Ulrich Armel Mbou Sob, Ruan John de Kock, Siddarth Singh, Daniel Furelos-Blanco, Victor Le, Arnu Pretorius, and Alexandre Laterre. Jumanji: a diverse suite of scalable reinforcement learning environ-ments in JAX. In International Conference on Learning Representations , 2024. James Bradbury, Roy Frostig, Peter Hawkins, Matthew James Johnson, Chris Leary, Dougal Maclaurin, George Necula, Adam Paszke, Jake VanderPlas, Skye Wanderman-Milne, and Qiao Zhang. JAX: composable transformations of Python+NumPy programs, 2018. Anthony R. Cassandra. The POMDP page. https://www.pomdp.org/ , 2003. Anthony R. Cassandra, Leslie P. Kaelbling, and Michael L. Littman. Acting optimally in partially observable stochastic domains. In Proceedings of the Twelfth AAAI Conference on Artificial Intelligence , pages 1023– 1028, 1994. Kyunghyun Cho, Bart van Merri ¨enboer, Caglar Gulcehre, Dzmitry Bahdanau, Fethi Bougares, Holger Schwenk, and Yoshua Bengio. Learning phrase representations using RNN encoder–decoder for statistical machine translation. In Alessandro Moschitti, Bo Pang, and Walter Daelemans, editors, Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP) , pages 1724–1734, 2014. Lonnie Chrisman. Reinforcement learning with perceptual aliasing: The perceptual distinctions approach. In 
+
+Proceedings of the Tenth AAAI Conference on Artificial Intelligence , pages 183–188, 1992. Shi Dong, Benjamin Van Roy, and Zhengyuan Zhou. Simple agent, complex environment: Efficient reinforce-ment learning with agent states. Journal of Machine Learning Research , 23:1–54, 2022. 
+
+11 Simon Du, Akshay Krishnamurthy, Nan Jiang, Alekh Agarwal, Miroslav Dudik, and John Langford. Provably efficient rl with rich observations via latent state decoding. In International Conference on Machine Learning ,pages 1665–1674. Proceedings of Machine Learning Research, 2019. Antoine Galataud. HVAC processes control: Can AI help?, 2021. Danijar Hafner, Timothy Lillicrap, Jimmy Ba, and Mohammad Norouzi. Dream to control: Learning behaviors by latent imagination. In International Conference on Learning Representations , 2020. Matthew Hausknecht and Peter Stone. Deep recurrent q-learning for partially observable MDPs. In Proceedings of the 2015 American Association for Artificial Intelligence , 2015. Nicolas Heess, Jonathan J. Hunt, Timothy P. Lillicrap, and David Silver. Memory-based control with recurrent neural networks. Deep Reinforcement Learning Workshop at NeurIPS , 2015. Herbert Jaeger. Tutorial on training recurrent neural networks, covering bppt, rtrl, ekf and the echo state network approach. GMD-Forschungszentrum Informationstechnik, 2002. , 5, 2002. Leslie P. Kaelbling, Michael L. Littman, and Anthony R. Cassandra. Planning and acting in partially observable stochastic domains. Artificial Intelligence , 101(1-2):99–134, 1998. Diederik P. Kingma and Jimmy Ba. Adam: A method for stochastic optimization. In International Conference on Learning Representations , 2015. Steven G. Krantz and Harold R. Parks. A primer of real analytic functions . Springer Science & Business Media, 2002. Nicholas Kushmerick, Steve Hanks, and Daniel S. Weld. An algorithm for probabilistic planning. Artificial Intelligence , 76(1-2):239–286, 1995. Lihong Li, Thomas J. Walsh, and Michael L. Littman. Towards a unified theory of state abstraction for MDPs. In Proceedings of the Ninth International Symposium on Artificial Intelligence and Mathematics , 2006. Long-Ji Lin and Tom M. Mitchell. Reinforcement learning with hidden states. From animals to animats , 2: 271–280, 1993. Michael L. Littman. An optimization-based categorization of reinforcement learning environments. In From Animals to Animats 2: Proceedings of the Second International Conference on Simulation of Adaptive Behavior . The MIT Press, 1993. ISBN 9780262287159. Qinghua Liu, Alan Chung, Csaba Szepesvari, and Chi Jin. When is partially observable reinforcement learning not scary? In Proceedings of Thirty Fifth Conference on Learning Theory , volume 178 of Proceedings of Machine Learning Research , pages 5175–5220, 2022. Chris Lu, Jakub Kuba, Alistair Letcher, Luke Metz, Christian Schroeder de Witt, and Jakob Foerster. Discovered policy optimisation. Advances in Neural Information Processing Systems , 35:16455–16468, 2022. Andrew Kachites McCallum. Reinforcement learning with selective perception and hidden state . University of Rochester, 1996. Nicolas Meuleau, Leonid Peshkin, Kee-Eung Kim, and Leslie P. Kaelbling. Learning finite-state controllers for partially observable environments. In Proceedings of the 15th Conference on Uncertainty in Artificial Intelligence , page 427–436, 1999. Boris Samuilovich Mityagin. The zero set of a real analytic function. Matematicheskie Zametki , 107(3):473– 475, 2020. Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Andrei A Rusu, Joel Veness, Marc G Bellemare, Alex Graves, Martin Riedmiller, Andreas K Fidjeland, Georg Ostrovski, Stig Petersen, Charles Beattie, Amir Sadik, Ioannis Antonoglou, Helen King, Dharshan Kumaran, Daan Wierstra, Shane Legg, and Demis Hassabis. Human-level control through deep reinforcement learning. Nature , 518:529–533, 2015. Volodymyr Mnih, Adria Puigdomenech Badia, Mehdi Mirza, Alex Graves, Timothy Lillicrap, Tim Harley, David Silver, and Koray Kavukcuoglu. Asynchronous methods for deep reinforcement learning. In Proceedings of The 33rd International Conference on Machine Learning , volume 48 of Proceedings of Machine Learning Research , pages 1928–1937, 2016. Michael Mozer. A focused backpropagation algorithm for temporal pattern recognition. Complex Systems , 3, 1995. 
+
+12 Vinod Nair and Geoffrey E. Hinton. Rectified linear units improve restricted boltzmann machines. In Proceedings of the 27th International Conference on International Conference on Machine Learning , page 807–814, 2010. Tianwei Ni, Benjamin Eysenbach, and Ruslan Salakhutdinov. Recurrent model-free RL can be a strong baseline for many POMDPs. In Proceedings of the 39th International Conference on Machine Learning , volume 162, pages 16691–16723, 2022. Christos H. Papadimitriou and John N. Tsitsiklis. The complexity of Markov decision processes. Mathematics of Operations Research , 12(3):441–450, 1987. Ronald Parr and Stuart Russell. Approximating optimal policies for partially observable stochastic domains. In Proceedings of the Fourteenth International Joint Conference on Artificial Intelligence - Volume 2 , page 1088–1094, 1995. Razvan Pascanu, Tomas Mikolov, and Yoshua Bengio. On the difficulty of training recurrent neural networks. In 
+
+Proceedings of the 30th International Conference on Machine Learning , volume 28, pages 1310–1318, 2013. Martin L. Puterman. Markov Decision Processes . Wiley, 1994. J ¨urgen Schmidhuber. Reinforcement learning in Markovian and non-Markovian environments. In Advances in Neural Information Processing Systems , volume 3, 1990. John Schulman, Philipp Moritz, Sergey Levine, Michael I. Jordan, and Pieter Abbeel. High-dimensional continu-ous control using generalized advantage estimation. In International Conference on Learning Representations ,2016. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms, 2017. David Silver and Joel Veness. Monte-Carlo planning in large POMDPs. In Advances in Neural Information Processing Systems , 2010. Trey Smith and Reid Simmons. Heuristic search value iteration for POMDPs. In Proceedings of the 20th Conference on Uncertainty in Artificial Intelligence , page 520–527, 2004. Richard S. Sutton. Learning to predict by the methods of temporal differences. Machine learning , 3(1):9–44, 1988. Richard S. Sutton and Andrew G. Barto. Reinforcement Learning: An Introduction . A Bradford Book, 2018. Richard S. Sutton, David McAllester, Satinder Singh, and Yishay Mansour. Policy gradient methods for reinforcement learning with function approximation. In Advances in Neural Information Processing Systems ,volume 12, pages 1057–1063, 1999. Ruo Yu Tao, Adam White, and Marlos C. Machado. Agent-state construction with auxiliary inputs. Transactions on Machine Learning Research , 2023. Daan Wierstra, Alexander Foerster, Jan Peters, and J ¨urgen Schmidhuber. Solving deep memory POMDPs with recurrent policy gradients. In Artificial Neural Networks – ICANN 2007 , pages 697–706, 2007. Zongzhang Zhang, Michael L. Littman, and Xiaoping Chen. Covering number as a complexity measure for POMDP planning and learning. In Proceedings of the Twenty-Sixth AAAI Conference on Artificial Intelligence ,2012. 
+
+13 A Limitations 
+
+The main theoretical limitations of our work come from the class of POMDPs that the λ-discrepancy is relevant to. The λ-discrepancy is capable of detecting non-Markovian observations in a “large” class of POMDPs, which we have described using an analytic almost-all characterization. However, there do exist POMDPs in which the fact that observations are non-Markovian cannot be detected by the λ-discrepancy, and we provide one such example in Section 3.2. The examples of such POMDPs we have found seem to exist on a “knife’s edge”, meaning that slightly perturbing the parameters of the POMDP results in a non-zero λ-discrepancy. Furthermore, incorporating memory into the value function seems to reliably produce a λ-discrepancy, without having to modify the underlying decision process. The recurrent deep reinforcement learning algorithm we develop is also limited in that it only approximates the λ-discrepancy. The auxiliary loss in Section 5 is only an approximation of the λ-discrepancy. It minimizes the difference in value function estimates as opposed to the difference in fixed points that we consider in Section 3. The loss function is therefore a departure from our theoretical analysis, though the empirical results suggest that the value functions need not have fully converged for the discrepancy to be useful. Future work ought to investigate why this works so well in practice. 
+
+# B Broader Impact 
+
+As a work studying the foundations of partially observable reinforcement learning, this paper does not have any particular negative societal applications. Application domains could include robotics and tasks such as navigation. The risk for misuse of this work are no different than any other works aimed towards algorithmic improvements for reinforcement leanring. Negative impact mitigation strategies are likewise the same as other similar works. 14 C TD( λ) Fixed Point 
+
+Here we derive the fixed point of the TD( λ) action-value update rule in a POMDP, following the Markov version by Sutton [1988]. First, define the expected return given initial observation ω0 and initial action a0 as 
+
+Eπ (Gn|ω0, a 0)= X
+
+> s0
+
+Pr( s0|ω0)X
+
+> r0
+
+Pr( r0|s0, a 0)r0
+
++ γX
+
+> s0
+
+Pr( s0|ω0)X
+
+> s1
+
+Pr( s1|s0, a 0)X
+
+> ω1
+
+X
+
+> a1
+
+Pr( ω1|s1)Pr( a1|ω1)X
+
+> r1
+
+Pr( r1|s1, a 1)r1
+
++ γ2X
+
+> s0
+
+Pr( s0|ω0)X
+
+> s1
+
+Pr( s1|s0, a 0)X
+
+> ω1
+
+X
+
+> a1
+
+X
+
+> s2
+
+Pr( ω1|s1)Pr( a1|ω1)Pr( s2|s1, a 1)
+
+∗ X
+
+> ω2
+
+X
+
+> a2
+
+Pr( ω2|s2)Pr( a2|ω2)X
+
+> r2
+
+Pr( r2|s2, a 2)r2
+
++ . . . 
+
+We can define the n-step bootstrapped update rule from this given a value matrix Qπ by replacing part of the term with coefficient γn with a Qπ value, e.g. for the n = 2 case, we get 
+
+Q(i+1)  
+
+> π
+
+(ω0, a 0) = X
+
+> s0
+
+Pr( s0|ω0)X
+
+> r0
+
+Pr( r0|s0, a 0)r0
+
++ γX
+
+> s0
+
+Pr( s0|ω0)X
+
+> s1
+
+Pr( s1|s0, a 0)X
+
+> ω1
+
+X
+
+> a1
+
+Pr( ω1|s1)Pr( a1|ω1)
+
+∗ X
+
+> r1
+
+Pr( r1|s1, a 1)r1
+
++ γ2X
+
+> s0
+
+Pr( s0|ω0)X
+
+> s1
+
+Pr( s1|s0, a 0)X
+
+> ω1
+
+X
+
+> a1
+
+Pr( ω1|s1)Pr( a1|ω1)
+
+∗ X
+
+> s2
+
+Pr( s2|s1, a 1)X
+
+> ω2
+
+X
+
+> a2
+
+Pr( ω2|s2)Pr( a2|ω2)Q(i) 
+
+> π
+
+(ω2, a 2).
+
+Translating these expressions into matrix notation, we have 
+
+Eπ (Gn|ω0, a 0) = X
+
+> s0
+
+Wω0,s 0 Rs0,a 0
+
++ γX
+
+> s0
+
+Wω0,s 0
+
+X
+
+> s1
+
+Ts0,a 0,s 1
+
+X
+
+> ω1
+
+X
+
+> a1
+
+Φs1,ω 1 πω1,a 1 Rs1,a 1
+
++ γ2X
+
+> s0
+
+Wω0,s 0
+
+X
+
+> s1
+
+Ts0,a 0,s 1
+
+X
+
+> ω1
+
+X
+
+> a1
+
+X
+
+> s2
+
+Φs1,ω 1 πω1,a 1 Ts1,a 1,s 2
+
+∗ X
+
+> ω2
+
+X
+
+> a2
+
+Φs2,ω 2 πω2,a 2 Rs2,a 2
+
++ . . . , 
+
+where the terms W , T , R, and Φ are as in Equation 6, and π is the Ω → ∆A policy written as an Ω × A tensor with entries in [0 , 1] . In particular, Wω,s = Pr( s|ω), which averages Pr( st|ωt)
+
+over all timesteps, weighted by visitation probability and discounted by γ. This is a well-defined stationary quantity, and it can be computed as follows. First solve the system Cx = b to find the discounted state occupancy counts x = c(s), where b = p0 is the initial state distribution over S, and 
+
+C = ( I −γ(T π )⊤) accounts for the policy-dependent state-to-state transition dynamics T π defined by 
+
+T πs,s ′ = P
+
+> ω
+
+P 
+
+> a
+
+Pr( ω|s) Pr( a|ω) Pr( s′|s, a ). Then Pr( s|ω) ∝ c(s)∗Φ( ω|s), so we can just multiply these terms together and renormalize. For the 2-step bootstrapped update rule above, we have: 
+
+Q(i+1)  
+
+> π
+
+(ω0, a 0) = X
+
+> s0
+
+Wω0,s 0 Rs0,a 0
+
++ γX
+
+> s0
+
+Wω0,s 0
+
+X
+
+> s1
+
+Ts0,a 0,s 1
+
+X
+
+> ω1
+
+X
+
+> a1
+
+Φs1,ω 1 πω1,a 1 Rs1,a 1
+
++ γ2X
+
+> s0
+
+Wω0,s 0
+
+X
+
+> s1
+
+Ts0,a 0,s 1
+
+X
+
+> ω1
+
+X
+
+> a1
+
+X
+
+> s2
+
+Φs1,ω 1 πω1,a 1 Ts1,a 1,s 2
+
+∗ X
+
+> ω2
+
+Φs2,ω 2
+
+X
+
+> a2
+
+Πω2,a 2 Q(i) 
+
+> π
+
+(ω2, a 2).
+
+15 Let Π be an Ω×Ω×A representation of the Ω×A policy π with Πω,ω ′,a = 1[ω = ω′]πω,a . Likewise, let ΠS be the effective policy over latent states, an S×S×A representation of the matrix Φπ, i.e. 
+
+ΠS 
+
+> s,s ′,a
+
+= 1[s = s′](Φ π)s,a . Given a matrix of action-values Q(i) 
+
+> π
+
+, the n-step update rule is: 
+
+Q(i+1)  
+
+> π
+
+= Qπ,n (Q(i) 
+
+> π
+
+) := W
+
+Xn−1 
+
+> k=0
+
+(γT ΠS )k ..R SA + γ(γT ΠS )n−1 ..T ΦΠ ..Q (i)
+
+> π
+
+
+
+,
+
+where RSA is the matrix of reward values as described in Equation 6, and we use .. to denote double tensor contraction, while all other tensor products contract a single index. We also have the standard definition of the TD( λ) update rule as: 
+
+Q(i+1)  
+
+> π
+
+= (1 − λ)X∞
+
+> n=1
+
+λn−1Qn(Q(i) 
+
+> π
+
+).
+
+We are concerned with the fixed point of this update rule, which we refer to as Qλπ :
+
+Qλπ = (1 − λ)X∞
+
+> n=1
+
+λn−1W
+
+Xn−1 
+
+> k=0
+
+(γT ΠS )k ..R SA + γ(γT ΠS )n−1 ..T ΦΠ ..Q λπ
+
+
+
+.
+
+Separating this into a reward part with factor RSA and a value part with factor Qλπ , we find that the value part is 
+
+(1 − λ)W
+
+X ∞
+
+> n=1
+
+(λγT ΠS )n−1..γT ΦΠ ..Q λπ
+
+= (1 − λ)W (I − λγT ΠS )−1 ..γT ΦΠ ..Q λπ ,
+
+and for the reward part, we have the coefficients of RSA in the table below for values of n and kk = 0 1 2 . . . n = 1 1 . . . 
+
+2 λ λγT ΠS . . . 
+
+3 λ2 λ2γT ΠS λ2(γT ΠS )2 . . . 
+
+... ... ... ... . . .where each term is multiplied by (1 − λ)W in front. We can then see by summing over rows before columns that the reward part is: 
+
+(1 − λ)W X∞
+
+> k=0
+
+11 − λ (λγT ΠS )k ..R SA 
+
+= W (I − λγT ΠS )−1 ..R SA .
+
+So we rewrite Qλπ as follows: 
+
+Qλπ = W
+
+ ISA − λγT ΠS −1 .. RSA + (1 − λ)γT ΦΠ ..Q λπ
+
+
+
+.
+
+Now let W A = W ⊗IA, which is Ω × A × S × A , and W Π = Π ..W A, which is Ω × S × A . Here, 
+
+⊗ means the Kronecker product. This essentially repeats the W matrix |A| times to incorporate actions into the tensor. Note that for any S×A tensor G, (W A ..G ) = W G . This is because 
+
+(W A ..G )ωa = P 
+
+> s,a ′
+
+W A 
+
+> ωasa ′
+
+Gsa ′ , and the only nonzero terms in this sum are those such that a = a′.For these indices, W A 
+
+> ωasa ′
+
+= Wωs , so P 
+
+> s,a ′
+
+W A 
+
+> ωasa ′
+
+Gsa ′ = P
+
+> s
+
+Wωs Gsa = ( W G )ωa .Also, let F =  ISA − λγT ΠS −1, which is S × A × S × A . Then we find: 
+
+Qλπ = W A .. I − λγT ΠS −1 .. RSA + (1 − λ)γT ΦΠ ..Q λπ
+
+
+
+= W A .. F .. RSA + (1 − λ)γT ΦΠ ..Q λπ
+
+ 
+
+= W A ..F ..R SA + W A ..F ..(1 − λ)γT ΦΠ ..Q λπ .
+
+16 At this point, we can subtract the second term on the right hand side from both sides, factor out Qλπ
+
+on the right, and multiply by  IΩA − (1 − λ)γW A ..F ..T ΦΠ −1 on the left of both sides to obtain: 
+
+Qλπ =  IΩA − (1 − λ)γW A ..F ..T ΦΠ −1 W A ..F ..R SA 
+
+= W A .. ISA − (1 − λ)γF ..T ΦΠ ..W A−1 ..F ..R SA 
+
+= W  ISA − (1 − λ)γF ..T ΦW Π−1 ..F ..R SA 
+
+= W
+
+
+
+F + (1 − λ)γF ..T ΦW Π ..F + . . . 
+
++ (1 − λ)kγk(F ..T ΦW Π)k ..F + . . . 
+
+..R SA ,
+
+where the last equality follows from expanding the geometric series. Now we use the identity 
+
+(A − B)−1 = P∞
+
+> k=0
+
+(A−1B)kA−1 to find: 
+
+Qλπ = W  F −1 − (1 − λ)γT ΦW Π−1 ..R SA 
+
+= W  I − γT  λΠS + (1 − λ)Φ W Π −1 ..R SA .
+
+To recap our previous definitions, W is an Ω×S tensor, I is an S×A×S×A tensor, T is an S×A×S 
+
+tensor, ΠS is an S×S×A tensor, Φ is an S× Ω tensor, W Π is an Ω×S×A tensor, and RSA is an 
+
+S×A tensor. Lastly, we briefly note that one can get the V λπ values by replacing W in the above equation with 
+
+W Π and using a double contraction: 
+
+V λπ = W Π .. I − γT  λΠS + (1 − λ)Φ W Π −1 ..R SA .
+
+We can confirm that V λπ = P 
+
+> a
+
+πω,a Qω,a , by rewriting the expression on the right as follows: 
+
+X
+
+> a
+
+πω,a Qω,a = X
+
+> a
+
+πω,a 
+
+X
+
+> s,a ′
+
+W A 
+
+> ω,a,s,a ′
+
+Bs,a ′
+
+= X
+
+> a
+
+πω,a 
+
+X
+
+> s
+
+W A
+
+> ω,a,s,a
+
+Bs,a 
+
+= X
+
+> a
+
+πω,a 
+
+X
+
+> s
+
+Wω,s Bs,a 
+
+= X
+
+> s,a
+
+πω,a Wω,s 
+
+| {z } 
+
+> WΠ
+> ω,s,a
+
+Bs,a 
+
+= V λπ ,
+
+where B =  I − γT  λΠS + (1 − λ)Φ W Π −1 ..R SA is an S × A tensor. 17 D Proof of Theorem 1 (Almost All) 
+
+In this section we prove Theorem 1, that there is either a λ-discrepancy for almost all policies or for no policies. Fix λ and λ′. Recall that we define the λ-discrepancy as follows: 
+
+Λπ := Qλπ − Qλ′ 
+
+> π2,π
+
+= W
+
+
+
+(I − γT K λπ )−1 − (I − γT K λ′ 
+
+> π
+
+)−1..R SA ,
+
+where Kλπ = λΠS + (1 − λ)Φ W Π. Let Y be the largest open set in the space of stochastic Ω × A 
+
+matrices, considered as a subset of R|Ω|(|A|− 1) . Now consider the λ-discrepancy as a function of the policy π. In other words, we define 
+
+Λ : Y → R,π 7 → Qλπ − Qλ′ 
+
+> π
+
+.
+
+Let X be an open subset of Rn. We say that a function f : X → R is real analytic on X if for all 
+
+x ∈ X, f can be written as a convergent power series in some neighborhood of x. For this proof, we will utilize the following facts: 1. the composition of analytic functions is analytic [Krantz and Parks, 2002], 2. the quotient of two analytic functions is analytic where the denominator is nonzero, 3. a real analytic function on a domain X is either identically zero or only zero on a set of measure zero [Mityagin, 2020]. We will also use the fact that for an invertible matrix A, each entry A−1 
+
+> ij
+
+is analytic in the entries of A where the entries of A yield a nonzero determinant. We can prove this by first writing 
+
+A−1 = det( A)−1 adj( A) = det( A)−1cof( A)⊤ where adj A is the adjugate of A and cof( A) is the cofactor matrix of A. Each entry of the cofactor matrix is a cofactor that is polynomial in the entries of A, and is therefore analytic in them. Therefore, each entry of A−1 is the quotient of two analytic functions and is therefore analytic except where det A = 0 .Next, we will show that Λ is an analytic function. Note that the variable terms in the equation are W ,
+
+W Π, RSA , T , ΠS , and Φ. Of these, RSA , T , and Φ are constant with respect to π. ΠS 
+
+> ilj
+
+= P 
+
+> k
+
+1[i =
+
+l]Φ ik πkj , so each entry of ΠS is analytic on Y in the entries of π. Likewise, Pij = P 
+
+> k,a
+
+Φik πka Tiaj 
+
+is analytic on Y . Therefore, the state-occupancy counts c = p0 + γP ⊤p0 + γ2(P ⊤)2p0 + · · · =(I − γP ⊤)−1p0, where p0 contains the initial state probabilities, are the composition of analytic functions and thus analytic on Y . Wωs = Φsω csP   
+
+> s′Φs′ωcs′
+
+is analytic on Y for the same reason, and the denominator of Wωs , P 
+
+> s′
+
+Φs′ω cs′ , is nonzero for all observations able to be observed with nonzero probability. Finally, Λ is then a composition of analytic functions on Y and thus analytic itself. To handle the norm weighting, we note that wπ is analytic in π as wπ = (1 , π (a|ω)) , and the dot product of wπ with Λ is also analytic. Now, we use the fact mentioned above that the zero set of a nontrivial analytic function is of measure zero. Therefore, the zero set of Λ · wπ is either zero for all policies or zero only on a set of measure zero. To finish, we note that because norms are positive definite, Λπ = 0 if and only if Λ · wπ = 0 , so this result extends to the normed λ-discrepancy as well. 18 E Proof of Theorem 2 (Block MDP) 
+
+In this section, we prove Theorem 2 concerning when the system is a block MDP. Recall that in Equation 6 we define Kλπ = λΠS + (1 − λ)Φ W Π. Suppose Kλπ = Kλ′ 
+
+> π
+
+. We can rewrite this as (λ −
+
+λ′)Π S −(λ−λ′)Φ W Π = ( λ−λ′)(Π S −ΦW Π) = 0 . This implies that either λ = λ′ or ΠS = Φ W Π.Recall the definition of ΠS and W Π in Section C. Expanding the equation ΠS = Φ W Π using these definitions, we have that 
+
+ΠS 
+
+> s,s ′,a
+
+= 1[s = s′](Φ π)s,a = 1[s = s′]X 
+
+> ω
+
+Pr( ω|s)Pr( a|ω); (Φ W Π)s,s ′,a = X
+
+> ω
+
+Φs,ω W Π 
+
+> ω,s ′,a
+
+= X
+
+> ω
+
+Pr( ω|s)Pr( a|ω)Pr( s′|ω).
+
+Then by setting the rightmost expression in each equation equal and simplifying with the indicator function, we have that for all i, j, k ,
+
+X 
+
+> ω
+
+Pr( ω|si)Pr( ak|ω)Pr( sj |ω) = 
+
+P  
+
+> ω
+
+Pr( ω|si)Pr( ak|ω) i = j, 
+
+0 i̸ = j. 
+
+We will first consider the case where i̸ = j. We have that for all i̸ = j and all k,P 
+
+> ω
+
+Pr( ω|si) Pr( ak|ω)Pr( sj |ω) = 0 . Because each term in the sum is nonnegative, this is equiva-lent to the statement that for all i̸ = j, all k, and all ω, Pr( ω|si)Pr( ak|ω)Pr( sj |ω) = 0 . Now note that for all observations ω, there exists some k′ such that Pr( ak′ |ω) > 0. Therefore, we have that for all i̸ = j and all ω, there exists a k′ such that Pr( ak′ |ω) > 0. This implies that for all i̸ = j and all ω, Pr( ω|si) Pr( ak′ |ω)Pr( sj |ω) = 0 and thus Pr( ω|si)Pr( sj |ω) = 0 . This means that if state si
+
+produces an observation ω, then ω cannot be produced by any other reachable state sj̸ = si, where two states are said to be reachable if there exists a sequence of actions sampled from the policy that enable the agent to reach state si from sj with nonzero probability. In other words, each observation uniquely identifies the hidden state, and the POMDP is a block MDP with corresponding Markovian observations. Next, we consider the case where i = j. We have that for all i, k , P 
+
+> ω
+
+Pr( ω|si)Pr( ak|ω)(1 −
+
+Pr( si|ω)) = 0 . Because each term is nonnegative, this is equivalent to Pr( ω|si)Pr( ak|ω)(Pr( si|ω)−
+
+1) = 0 . Because we again have that for all observations there exists an action ak′ with nonzero probability, this means we can choose k = k′ to find Pr( ω|si) = 0 or Pr( si|ω) = 1 for all 
+
+ω, s i. This means that either the state si does not produce an observation ω, or the observation 
+
+ω uniquely determines which state the agent is in. For all ω and i = j, either Pr( ω|si) = 0 or 
+
+Pr( sj |ω) = 1 , so if we restrict our focus to the set O(si) := {ω ∈ Ω : Pr( ω|si) > 0}, we see that P 
+
+> ω∈O (si)
+
+Pr( ω|si) Pr( sj |ω) = P 
+
+> ω∈O (si)
+
+Pr( ω|si) · 1 = 1 . For the remaining ω / ∈ O (si),
+
+Pr( ω|si) = 0 .To recap, the first case tells us that for all ω and i̸ = j, P 
+
+> ω∈Ω
+
+Pr( ω|si) Pr( sj |ω) = 0 . The second case tells us that for all ω and i = j, P 
+
+> ω∈Ω
+
+Pr( ω|si) Pr( sj |ω) = 1 . Combining both these cases, we see that P 
+
+> ω
+
+Pr( ω|si) Pr( sj |ω) = 1[si = sj ], which we can write more succinctly as: ΦW = I. We call ΦW the state confusion matrix. For block MDPs, observations cause no confusion about which state the agent is in. Lastly, by going backwards through the proof, we see that the converse is also true. If the system is a block MDP, then ΠS = Φ W Π and so Kλπ = Kλ′ 
+
+> π
+
+.19 F Proof that matching transition-policies is equivalent to an MDP. 
+
+Assume that T K = T K ′. We can reduce this as follows: 
+
+0 = T K − T K ′ = T (λΠS + (1 − λ)Φ W Π) − T (λ′ΠS + (1 − λ′)Φ W Π) = ( λ − λ′)T (Π S − ΦW Π)
+
+which implies either λ = λ′ or T ΠS = T ΦW Π.Claim: if P is a POMDP such that T ΠS = T ΦW Π for any policy, then P is equivalent to an MDP. Recall that the transition function of the effective MDP model is W T Φ, and the rewards are W R SA .Intuitively, if T and W T Φ are equivalent transition functions, it means they induce the same visitation after any number of steps. Note that due to the premise, the following quantities are equal: 
+
+W I SA = IΩA ..W A;
+
+W (T ΠS ) = W (T ΦW Π) = W T ΦΠ ..W A = ( W T ΦΠ) ..W A;
+
+W (T ΠS )2 = W (T ΠS ..T ΠS ) = W (T ΦW Π ..T ΦW Π) = W (T ΦΠ ..W A ..T ΦΠ ..W A)= W (T ΦΠ ..W T ΦΠ ..W A) = ( W T ΦΠ) ..(W T ΦΠ) ..W A = ( W T ΦΠ) 2 ..W A;
+
+W (T ΠS )3 = W (T ΠS ..T ΠS ..T ΠS ) = W (T ΦW Π ..T ΦW Π ..T ΦW Π)= W (T ΦΠ ..W A ..T ΦΠ ..W A ..T ΦΠ ..W A) = W (T ΦΠ ..W T ΦΠ ..W T ΦΠ ..W A)= ( W T ΦΠ) ..(W T ΦΠ) ..(W T ΦΠ) ..W A = ( W T ΦΠ) 3 ..W A;
+
+and so on. Multiplying each successive equation by γi and summing the results gives: 
+
+W (ISA − γT ΠS )−1 = ( IΩA − γ(W T Φ)Π) −1 ..W A.
+
+For any given observation, the POMDP model and the effective MDP model make the same predic-tions about the expected discounted visitation to future state-action pairs. In other words, they have the same successor representation. Multiplying both sides on the right by an arbitrary reward function RSA ,
+
+W (ISA − γT ΠS )−1 ..R SA = ( IΩA − γ(W T Φ)Π) −1 ..W A ..R SA 
+
+= ( IΩA − γ(W T Φ)Π) −1 ..(W R SA ),
+
+we see that the MC value according to the POMDP model (left hand side) is equal to the TD value under the effective MDP model (right hand side). Both models make the same value predictions for any reward function, therefore the models are equivalent. We show an example of such a POMDP and its equivalent MDP in Figure 7. 
+
+Figure 7: (Left) A POMDP with six states and two actions, where T ΦW Π = T ΠS . From state s0,both actions transition to states s1, sx, and s2 with the labeled probabilities. State sx produces two observations (equivalent to those of s1 and s2) with equal probability. (Right) An equivalent five-state MDP model that behaves identically to the POMDP for any policy. 20 G Memory Augmentation and Norm Details 
+
+In this section, we clarify theoretical details in augmenting a POMDP with memory and the λ-discrepancy norm. 
+
+G.1 Memory-Augmented POMDP 
+
+As referenced in Section 4, here we will explain how to define a memory-augmented POMDP from a base POMDP (S, A, T, R, Ω, Φ, γ ). Given a set of memory states M, we will augment the POMDP as follows: 
+
+SM := S × M AM := A × M 
+
+ΩM := Ω × M 
+
+TM : SM × A M → ∆SM; (s0, m 0, a 1, m 1) 7 → T (·| s0, a 1) × δm1 (·)
+
+RSMAM : SM × A M → R; (s0, m 0, a 1, m 1) 7 → R(s0, a 1)ΦM : SM → ∆Ω M; (s0, m 0) 7 → Φ( · | s0) × δm0 (·)
+
+γM := γ, 
+
+where δx0 (·) is the discrete point distribution centered at x0, and × between two distributions denotes the product distribution. To demonstrate what this means, the notation above is equivalent to seeing TM instead as a function mapping to [0 , 1] and defining TM : SM × A M × S M →
+
+[0 , 1] , (s0, m 0, a 1, m 1, s 2, m 2) 7 → T (s2|s0, a 1)1[m1 = m2], where a memory-augmented action 
+
+(a1, m 1) means to take action a1 and set the memory state to m1.This augmentation scheme uses the memory states M in three ways: as augmentations of states, actions, and observations. The state augmentation concatenates the environment state S with the agent’s internal memory state M. Meanwhile, the action augmentation AM provides the agent with a means of managing its internal memory state. Together, these augmentations allow writing the augmented transition dynamics TM, which are defined so as to preserve the underlying state-transition dynamics T while allowing the agent full control to select its desired next memory state. The observation augmentation ΩM provides the agent with additional context with which to make policy decisions, and the observation function ΦM preserves the original behavior of the observation function Φ while giving the agent complete information about the internal memory state. We define an augmented policy πM and its tensor counterparts ΠM and ΠSM over observations and states, respectively, as follows: 
+
+πM : Ω M → ∆AM;ΠM is of size (Ω M × ΩM × A M); ΠSM is of size (SM × S M × A M); 
+
+where 
+
+ΠM(ω0, m 0, ω 1, m 1, a 2, m 2) = 1[( ω0, m 0) = ( ω1, m 1)] πM(a2, m 2|ω1, m 1); ΠSM (s0, m 0, s 1, m 1, a 2, m 2) = 1[( s0, m 0) = ( s1, m 1)] X
+
+> (ω,m )∈ΩM
+
+ΦM(ω, m |s0, m 0)πM(a2, m 2|ω, m ).
+
+We extend the Pr( s|ω) tensors to SM and ΩM as follows: 
+
+WM is of size (Ω M × S M); 
+
+W Π 
+
+> M
+
+is of size (Ω M × S M × A M); 
+
+where 
+
+WM(ω0, m 0, s 1, m 1) = 1[m0 = m1] Pr( s1|ω0); 
+
+W Π
+
+> M
+
+(ω0, m 0, s 1, m 1, a 2, m 2) = 1[m0 = m1] Pr( s1|ω0)πM(a2, m 2|ω0, m 0).
+
+21 One appealing aspect of the above augmentation process is that it makes the agent’s control over its memory function explicit, via “memory-augmented actions” AM = A × M . However, it is perhaps a bit unusual to combine the agent’s policy and memory together. An equivalent and perhaps more intuitive formulation decomposes this action-memory policy into a separate action policy 
+
+πμ : Ω × M → ∆A and a memory function μ : Ω × M × A → ∆M:
+
+πM(a, m ′ | ω, m ) = πμ(a | ω, m )μ(m′ | ω, m, a ).
+
+Note that we define memory functions as distributions of next memory states for generality. There are two ways to view this augmentation procedure. In the first view, outlined above, the agent selects both an action a and a next memory state m′, and the environment TM responds by sampling the next state s′ ∼ T (·| s, a ) while deterministically setting the next memory state to m′. In the second (equivalent) view, the agent selects only action a, with the agent’s memory function behavior folded into the transition dynamics Tμ. This view leads to the following POMDP quantities: 
+
+Tμ : SM × A → ∆SM; (s0, m 0, a 0) 7 → T (· | s0, a 0)μS (· | s0, m 0, a 0),RSMA 
+
+> μ
+
+: SM × A → R; (s0, m 0, a 0) 7 → R(s0, a 0),
+
+where μS (·| s0, m 0, a 0) := P 
+
+> ω∈Ω
+
+Φ( ω|s0)μ(·| ω0, a 0, m 0) is the effective memory function for states. The μ-specific policy and weight tensors are defined as follows: 
+
+Πμ is of size (Ω M × ΩM × A ); ΠSM 
+
+> μ
+
+is of size (SM × S M × A ); 
+
+W Π 
+
+> μ
+
+is of size (Ω M × S M × A ); 
+
+where 
+
+Πμ(ω0, m 0, ω 1, m 1, a 2) = 1[( ω0, m 0) = ( ω1, m 1)] πμ(a2|ω1, m 1); ΠSM 
+
+> μ
+
+(s0, m 0, s 1, m 1, a 2) = 1[( s0, m 0) = ( s1, m 1)] X
+
+> (ω,m )∈ΩM
+
+ΦM(ω, m |s0, m 0)πμ(a2|ω, m ); 
+
+W Π 
+
+> μ
+
+(ω0, m 0, s 1, m 1, a 2) = 1[m0 = m1] Pr( s1|ω0)πμ(a2|ω0, m 0).
+
+To recap, the first augmentation scheme transforms the POMDP P = ( S, A, Ω, T, R SA , Φ, p M0 , γ )
+
+into PM = ( SM, AM, ΩM, T M, R SMAM , ΦM, p M0 , γ ). The second view forms an equivalent POMDP Pμ = ( SM, A, ΩM, T μ, R SMA 
+
+> μ
+
+, ΦM, γ ), which folds the agent’s memory function μ into the transition dynamics. Since both of these are valid POMDPs and we already have a general expression for the TD( λ) value function of a POMDP, we can immediately write down the corresponding value functions for each of these types of augmentation. For PM, we have: 
+
+QλπM = WM
+
+
+
+ISMAM − γT M
+
+ λΠSM + (1 − λ)Φ MW Π
+
+> M
+
+−1 ..R SMAM ; (9) and for Pμ, we have: 
+
+Qλπμ = WM
+
+
+
+ISMA − γT μ
+
+ λΠSM 
+
+> μ
+
++ (1 − λ)Φ MW Π
+
+> μ
+
+−1 ..R SMA 
+
+> μ
+
+. (10) We provide pseudocode for taking this memory-Cartesian product of a given POMDP in Ap-pendix H.3, Algorithm 3. The pseudocode uses the view that aligns with Equation (10), since that view matches our implementation. 
+
+G.2 λ-Discrepancy Norm Weighting 
+
+The λ-discrepancy as introduced in Definition 1 contains a weighted norm ∥C · x∥p over the observa-tions ω and actions a of the decision process. We use several choices of norm p and weighting C in our experiments. For p, we use both the p = 2 or L2 norm, and the p = ∞ or max norm, as described below. For C, we have policy-weighted and occupancy weighted cases. In the policy-weighted case, 22 we assign the (ω, a ) entry of C the weight (1 , π (a|ω)) . In the occupancy-weighted case, we assign the (ω, a ) entry of C the weight (Pr( ω), π (a|ω)) , where Pr( ω) is proportional to the discounted ob-servation occupancy. In Figure 4 and Figure 5, we use the policy-weighted L2 norm. We use this norm due to issues with performing closed-form gradient descent on the T-maze POMDP. In T-maze, states are aliased in two ways: aliasing between the two hallways (goal up or down), and aliasing between the hallway states. Occupancy weighting puts more weight on discriminating between the hallway states, since the hallway observations appear more frequently for most policies. Uniformly weighting the λ-discrepancy puts more weight on the initial observations, which results in memory functions that place more emphasis on resolving λ-discrepancy due to the starting observations. Closed-form experiments with occupancy weighting yielded less consistent results for T-maze. This seems to only be an issue for closed-form calculation of λ-discrepancy, as we show in Appendix I.6 that occupancy weighting in the sample-based setting does not detract from performance in these environments. In Figure 3, we use the occupancy-weighted max norm to avoid artifacts due the changing observation function (see text in Section 3.2). In our sample-based settings in Figures 6, 11, 12, and 14, and Table 2, we use the occupancy-weighted 
+
+L2 norm, since it is the simplest choice when using samples as it does not require re-weighting or importance sampling. Regardless of which norm we choose, we can estimate gradients as in Equation 7 because: 
+
+Λλ1,λ 2 
+
+> P,π
+
+:= Qλ1 
+
+> π
+
+− Qλ2
+
+> π
+
+= X
+
+> ω,a
+
+Pr( ω) Pr( a|ω)( Qλ1 
+
+> π
+
+(ω, a ) − Qλ2 
+
+> π
+
+(ω, a )) 2
+
+!1/2
+
+= X
+
+> ω,a
+
+Pr( ω, a )( Qλ1 
+
+> π
+
+(ω, a ) − Qλ2 
+
+> π
+
+(ω, a )) 2
+
+!1/2
+
+=
+
+
+
+E(ω,a )∼π
+
+h Qλ1 
+
+> π
+
+(ω, a ) − Qλ2 
+
+> π
+
+(ω, a )2i 1/2
+
+.
+
+In practice, when optimizing the λ-discrepancy, we omit the outer square root and simply compute the mean squared difference between Q-values, since the square-root function is a monotonic transformation and its argument is non-negative. 23 H Environments and Experimental Details for Closed-Form Memory Optimization 
+
+We now describe the proof-of-concept experiments from Section 4 involving closed-form memory optimization on a range of small-scale classic POMDPs. The environments are: T-maze [Bakker, 2001], the Tiger problem [Cassandra et al., 1994], Paint [Kushmerick et al., 1995], Cheese Maze, Network, Shuttle [Chrisman, 1992], and the partially observable version of the 4 × 3 maze [Parr and Russell, 1995]. We first begin by detailing the small-scale POMDPs we use. Then we describe the algorithm used to calculate closed-form λ-discrepancy gradients, as well as procedures for policy improvement after learning a memory function. Apart from the T-maze, all other POMDPs used in Section 4 were taken from pre-defined POMDP definitions [Cassandra, 2003]. We made one slight modification to the Tiger environment that preserves the original environment behavior but adapts the domain specification to match our formalism such that observations are only a function of state. The original Tiger domain used a hand-coded initial belief distribution that was uniform over the two states L/R, and did not emit an observation until after the first action was selected. Thereafter, the observation function was action-dependent, with state-action pair 
+
+(L, listen ) emitting observations left and right with probability 0.85 and 0.15 respectively, and other actions (L, *) emitting uniform observations and returning to the initial belief distribution. Since our agent does not have access to the set of states, it cannot use an initial belief distribution. To achieve the same behavior, we modified the domain by splitting each state L/R into an initial state L1/R1 that always emits an initial observation, and a post-listening state L2/R2 that uses the 
+
+0.85 /0.15 probabilities. We visualize these changes in Figure 8. This type of modification is always possible for finite POMDPs and does not change the underlying dynamics. 
+
+Figure 8: Visualizations of the Tiger POMDP. In the original version (left) the observation function was action-dependent, whereas in our modified version (right) observations only depend on state. The state color for the domain on the right represents the distinct state-dependent observation functions: purple states use the initial observation, while the other states are biased towards either left 
+
+(blue) or right (red) observations with probability 0.85 .
+
+H.1 T-maze Details 
+
+We use T-maze with corridor length 5 as an instructive example (see Figure 1). The environment has 18 underlying MDP states: one initial state for each reward configuration (reward is either up or down), five for each corridor, one for each junction, and finally one for each terminal state. 11 
+
+There are 5 observations in this environment - one for each of the initial states, a corridor observation shared by all corridor states, a junction observation shared by both junction states, and a terminal observation. The action space is defined by movement in the cardinal directions. If the agent tries to move into a wall, it remains in the current state. From the junction state, the agent receives a reward of +4 for going north, and −0.1 for going south in the first reward configuration. The rewards are flipped for the second configuration. The environment has a discount rate of γ = 0 .9.
+
+> 11 Technically, we group the four terminal states into a single state for conciseness, which is functionally equivalent.
+
+24 Figure 9: Visualizations of value functions computed using MC (left) and TD (right). MC averages over entire trajectories, so it can associate the blue observation with the upward goal. By contrast, TD computes value by bootstrapping; its value estimates for subsequent observations ignore any prior history. This environment makes it easy to see the differences between MC and TD approaches to value function estimation. We visualize these differences in Figure 9. MC computes the average value for each observation by averaging the return over all trajectories starting from that observation. By contrast, TD averages over the 1-step observation transition dynamics and rewards, and bootstraps off the value of the next observation. For a policy that always goes directly down the corridor and north at the junction, this leads to an average (undiscounted) return for the blue observation of +4 
+
+with MC and (4 − 0.1) /2 = 1 .95 with TD. 
+
+H.2 Analytical Memory-Learning and Policy Improvement Algorithm 
+
+Algorithm 1 describes our memory optimization procedure, which reduces the λ-discrepancy to learn a memory function, then learns an optimal memory-augmented policy. 
+
+Algorithm 1 Memory Optimization with Value Improvement 
+
+Input: Randomly initialized policy parameters θπ , where Π = softmax( θπ ), randomly initialized memory parameters θμ, POMDP parameters P := ( S, A, T, R SA , Ω, Φ, p 0, γ ), number of memory improvement steps nsteps ,μ , number of policy iteration steps nsteps ,π , learning rate α ∈ [0 , 1] , and number of initial random policies n.
+
+Output: Optimized memory-augmented policy parameters θπμ and memory parameters θμ.// Initialize random policies and select policy to fix for memory learning. 
+
+{θ0, . . . , θ n−1} ← randomly init n policies (n)
+
+θπ ← select argmax lambda discrepancy (θ0, . . . , θ n−1})
+
+// Repeat policy over all memory states. 
+
+θπμ ← repeat (θπ , |M| )
+
+// Improve memory function. 
+
+θμ ← memory improvement (θμ, θ πμ , P, n steps ,μ )
+
+// Augment POMDP with memory function. 
+
+Pμ ← expand over memory (P, θ μ)
+
+// Improve memory-augmented policy over memory-augmented POMDP 
+
+θπμ ← policy improvement (θπμ , Pμ, n steps ,π )
+
+return θπμ , θ μ
+
+In Algorithm 1, the policy improvement function can be any function which improves a pa-rameterized policy. We use an analytical version of the policy gradient [Sutton et al., 1999] algo-rithm. The randomly init n policies function returns n randomly initialized policies, and the 
+
+select argmax lambda discrepancy function picks the one with the largest λ-discrepancy. The 
+
+memory improvement and expand over memory functions are defined in Appendices H.2.1 and H.3, respectively. We have noticed that a larger λ-discrepancy tends to provide a better signal for learning memory functions. Sampling random policies for memory improvement is highly likely to reveal a λ-discrepancy, as suggested by the theory in Section 3.2. For this reason, we consider many random policies ( n = 100 ), then use the policy which had maximum λ-discrepancy as the basis for memory optimization. 25 H.2.1 Memory Improvement Algorithm 
+
+In this section we provide pseudocode (Algorithm 2) for the memory-learning algorithm described in Section 4 and used in Algorithm 1. This function takes as input a POMDP P and memory parameters 
+
+θμ, and minimizes the λ-discrepancy of Definition 1. This minimization is achieved through a gradient descent update computed using the auto-differentiation package JAX [Bradbury et al., 2018]. 
+
+Algorithm 2 Memory Improvement 
+
+Input: Fixed policy parameters θπμ , where ΠSM 
+
+> μ
+
+(SM × S M × A ) is the expanded effective policy over state for the policy πμ = softmax( θπμ ) ( SM × A ), memory parameters θμ, POMDP parameters P := ( S, A, T, R SA , Ω, Φ, p 0, γ ), number of improvement steps nsteps ,μ , learning rate 
+
+α ∈ [0 , 1] .
+
+Output: Optimized memory parameters θμ.
+
+for i = 0 to nsteps ,μ − 1 do 
+
+// Augment POMDP with memory parameters θμ
+
+(SM, A, ΩM, T μ, R SMA 
+
+> μ
+
+, ΦM, p M0 , γ ) ← expand over memory (P, θ μ)
+
+// Compute TD value function (with memory augmentation) 
+
+Q0 
+
+> πμ
+
+= WM
+
+
+
+I − γT μΦMW Π
+
+> μ
+
+−1 ..R SMA
+
+> μ
+
+// Compute MC value function (with memory augmentation) 
+
+Q1 
+
+> πμ
+
+= WM
+
+
+
+I − γT MΠSM
+
+> μ
+
+−1 ..R SMA
+
+> μ
+
+// Calculate the λ-discrepancy 
+
+Λπμ = || Q0 
+
+> πμ
+
+− Q1 
+
+> πμ
+
+|| πμ,2
+
+// Calculate the gradient of Λπμ w.r.t. θμ, update memory parameters 
+
+θμ ← update params (α, θ μ, ∇θμ Λπμ )
+
+end for return θμ
+
+Here, update params() is any gradient-descent-like update, such as stochastic gradient descent, Adam, etc. As a note, all parameters θ in these experiments are initialized with a Gaussian distribution, with mean 0 and standard deviation 0.5.
+
+H.3 Memory Cartesian Product 
+
+In this section, we define the memory-Cartesian product function, expand over memory() , used by Algorithms 1 and 2. This function computes the Cartesian product of the POMDP P and the memory state space M, as described in Appendix G.1. 
+
+Algorithm 3 Memory Cartesian Product ( expand over memory )
+
+Input: Memory parameters θμ (with corresponding memory function μ), POMDP parameters 
+
+P := ( T, R SA , Φ, p 0, γ ), number of memory states |M| 
+
+// Repeat reward function for each state over each memory m ∈ M (SM × A ).
+
+RSMA 
+
+> μ
+
+← repeat over states (RSA , |M| )
+
+// Calculate transition function memory cross product. 
+
+// First, calculate the effective memory function over state (S × A × M × M ).
+
+μS ← einsum (′ij, jklm → iklm ′, Φ, μ )
+
+// Now expand the state transition function to include memory state transitions (SM × A × S M).
+
+Tμ ← einsum (′iljk, lim → lijmk ′, μ S , T )
+
+// Calculate observation function memory cross product (SM × ΩM). I|M| is the identity function over |M| .
+
+ΦM ← kron (Φ , I |M| )
+
+// Finally, calculate the initial state distribution (SM).
+
+pM0 ← [p0(s) if m = 0 else 0 for s, m ∈ S , M]
+
+return Pμ = ( SM, A, ΩM, T μ, R SMA 
+
+> μ
+
+, ΦM, p M0 , γ )
+
+26 Note that einsum is the Einstein summation, and kron is the Kronecker product. The augmented initial state distribution is simply the same distribution as p0, except with 0 probability mass over all non-zero memory states, since the memory state always initializes to memory state 0. 
+
+H.4 Closed-Form Memory Learning Experiment Details 
+
+For all experiments in Section 4, we run memory optimization on the suite of POMDPs with the following hyperparameters. We optimize memory for nsteps ,μ = 20 K steps and run policy iteration for nsteps ,π = 10 K steps. For all gradient-based experiments, we use the Adam optimizer [Kingma and Ba, 2015]. For the belief-state baselines, solutions were calculated using a POMDP solver from the 
+
+pomdp-solve package [Cassandra, 2003]. The performance of the belief-state optimal policy was calculated by taking the dot product between the initial belief state and the maximal alpha vector for that belief state. This returns a metric comparable to the initial state distribution weighted value function norm, which we use as a performance metric for our memory-augmented agents. The belief-state solution for the 4 × 3 maze was solved using an epsilon parameter of ϵ = 0 .01 , due to convergence issues with the environment when utilizing the POMDP solver. 
+
+H.5 Closed-Form Experiments on Parity Check 
+
+In Section 3.3 we introduced the Parity Check environment as an example of a POMDP with zero 
+
+λ-discrepancy for all policies. There we showed that in such environments, we can still detect partial observability by using randomly initialized memory functions. But the question remains: how prevalent are such environments? We find that these sorts of environments appear to be quite rare. The symmetry disappears if we modify the example even slightly, such as by changing the start state probabilities or by introducing a “stay-in-place” action at any one color. These modifications lead to the λ-discrepancies in Figure 10, which offer some reassurance that such edge cases are the exception and not the rule. Besides modifications to the POMDP itself, adding memory can induce a non-zero λ-discrepancy. In particular, random memory functions reveal a λ-discrepancy in the system that can be minimized to learn memory, as demonstrated in Figure 4. We now describe this memory optimization procedure. 
+
+Memory Learning Memory optimization for the Parity Check experiments in Figure 4 (right) followed almost the same procedure as Algorithm 1 except for selecting the initial policy. In this case, any randomly initialized memoryless policy has zero λ-discrepancy, but augmenting with a randomly initialized memory function reveals a non-zero measure. Thus, for this experiment, we augment our POMDP with a random memory function before choosing the initial policy that maximizes the λ-discrepancy. All other algorithmic details remained the same. 
+
+Figure 10: (Left) The Parity Check environment (reproduced from Figure 4). (Right) Minor mod-ifications to the transition dynamics (left) or initial state distribution (right) result in non-zero λ-discrepancy for almost all policies. 27 I Scaling the λ-Discrepancy with PPO and RNNs 
+
+I.1 Algorithm Details 
+
+We build our λ-discrepancy minimizing reinforcement learning algorithm on top of online recurrent PPO. Normally, PPO would have two losses: one for the actor and one for the critic. 
+
+LPPO (θ) = Eπ
+
+LCLIP (θActor , θ RNN ) − cV LV (θCritic , θ RNN ) + cEnt H[πμ(· | ωt, z t−1)] . (11) Here, LCLIP is the clipped surrogate loss for the actor, defined by: 
+
+LCLIP (θActor , θ RNN ) = Eπ
+
+h
+
+min( ρt(θ) ˆAt, clip( ρt(θ), 1 − ϵ, 1 + ϵ)) 
+
+i
+
+, (12) where ρt(θ) is the ratio between policy probabilities of the old policy and new policy, ˆAt is the estimated advantage at timestep t, and cV and LV are the value coefficient and value function loss, respectively. LV is the mean-squared TD error, with targets calculated using a truncated version of λ-return [Sutton and Barto, 2018]. Finally, cEnt and H[πμ(· | ωt, z t−1)] are the entropy coefficient and entropy of the policy πμ that is parameterized by θRNN and θActor . This term is used for exploration through entropy maximization [Mnih et al., 2016]. For our memoryless baseline, we use a non-recurrent architecture that is a function of only the current observation (and optionally the most recent action). Our proposed algorithm replaces LV with LV,λ 1,λ 2 , which has three components: two value losses for two separate value heads (each estimating λ-returns for different λs), and our λ-discrepancy auxiliary loss. 
+
+LV,λ 1,λ 2 (θCritic , θ RNN ) = βL Λ(θ) + (1 − β) ( LV,λ 1 (θCritic1 , θ RNN ) + LV,λ 2 (θCritic2 , θ RNN )) ,
+
+where LΛ(θ) is our λ-discrepancy loss, as defined in Equation 8, and LV,λ is the λ-return-as-target TD error for a given λ. Here, β ∈ [0 , 1] is a hyperparameter trading off between the λ-discrepancy loss and the value losses. Finally, the agent only uses Vλ1 as its value estimate for its advantage function. The computational and memory requirements for PPO with and without the λ-discrepancy auxiliary loss are similar. While the λ-discrepancy loss requires training a second value head, this only adds two additional layers to the critic network and results in a small number of additional parameters (about 12% overhead). As for computation, the addition of this auxiliary loss only adds a small constant factor to the backpropagation of gradients, since we learn everything end-to-end. Overall, the wall-clock time of runs between the baseline algorithm and our algorithm is comparable. 
+
+I.2 Environment Details 
+
+All four of the environments used for evaluation in Section 5 were all re-implementations of envi-ronments used in Silver and Veness [2010], in JAX [Bradbury et al., 2018], allowing for massive hardware acceleration. We now give details of these environments. 
+
+I.2.1 Battleship 
+
+Partially observable Battleship, a one-player, limited observation variant of the popular two-player board game, was first introduced as a benchmark for partially observable Monte-Carlo planning [Silver and Veness, 2010]. This variant is particularly challenging since the agent has to reason about the unknown positions of the ship and keep track of past shots. The observation space is Ω = {0, 1};at every step, the agent receives a binary observation: 0 if the last shot missed a ship, and 1 if the last shot hit a ship. The state space in this game contains all possible board states, which is astronomically large. The action space is A = {1, . . . , 10 } × { 1, . . . , 10 }, or all possible grid locations. The agent is only allowed to take valid actions at every step (no position can be selected twice), which is achieved through action masking of the actor. This makes the problem a finite horizon problem, with a horizon at most 10 × 10 = 100 . The environment terminates when all positions on the grid with a ship are hit. The rewards at every step are -1, with a positive reward of 10 × 10 = 100 when all ships are hit/the environment terminates. The discount factor γ is set to 1 here, since we are in the finite horizon setting. At every environment reset, 4 ships of length (5 , 4, 3, 2) are uniformly randomly placed on a 10 × 10 
+
+grid. At every step, to allow for easier learning of all agents, we concatenate the last action to the observation, so that our RNN conditions on the entire history, as opposed to only observations. 28 I.2.2 Partially Observable PacMan 
+
+Partially observable PacMan (a.k.a. PocMan ), a variant of the popular arcade game, was also introduced to test partially observable Monte-Carlo planning with a simulator [Silver and Veness, 2010]. In this version, the agent can only observe indicators of its surroundings, including walls in its cardinal directions, whether there is a ghost in its line of sight, a power pellet nearby, or food nearby. These highly obscured agent-centric observations require the agent to localize within the map, seek food and power pellets, and avoid ghosts with only local sensor information. Concretely, the observation space is an 11-dimensional binary vector. The first four values are 1 if there is a wall in each of the four cardinal directions of the agent. The next element is 1 if there is food Manhattan distance 2 or less away from the agent. The next value is 1 if there is a ghost a Manhattan distance 2 or less away. The next four elements are 1 if there is at least one ghost in the line of sight in each of the four cardinal directions. The last element is if the agent currently has a power pellet. As with Battleship, the state space in PocMan is also very large. The map is a 19 × 21 sized map defined in the original instantiation of the environment [Silver and Veness, 2010], and the state consists of the agent and ghost locations, as well as the binary status of every dot and power pill. The action space has four actions, corresponding to moving in the four cardinal directions. The agent receives a reward of +200 if it eats a ghost, +10 if it collects a pellet, and +20 if it collects a power pellet. The discount factor is set to γ = 0 .95 .The episode terminates when the agent is killed by a ghost, the agent collects all pellets, or the timer for the environment elapses. At the beginning of each episode, all ghost locations are reset, and the agent is placed in the same fixed starting position. In this setting, we also append the agent’s most recent action to its observation. In our work, we implement this domain by adding the observation function on top of the PacMan environment in the Jumanji reinforcement learning framework [Bonnet et al., 2024]. 
+
+I.2.3 RockSample 
+
+RockSample [Smith and Simmons, 2004], a well-known partially observable benchmark in POMDP planning literature, is a rock-collecting problem simulating a rover scanning potential rock samples and collecting them if they are desirable. RockSample (n, k ) is a problem with a grid of size n × n,and k rocks distributed randomly throughout the environment. The two variants we test on have a grid size of 11 × 11 and 15 × 15 , as well as 11 and 15 rocks in each environment, respectively. When instantiated, each RockSample environment for each seed randomly samples rock positions. At the reset of each environment, each of these rocks are uniformly randomly assigned to be either a good or bad rock. The action space in this environment is 4 + 1 + k = 5 + k. The first 4 actions correspond to moving in the cardinal directions. Action 5 corresponds to sampling in the current position. The last k actions correspond to checking each of the k rocks. Checking a rock will probabilistically tell the agent the correct parity of the rock, depending on the half-efficiency distance dhed and the l2
+
+distance di(s) between the agent’s position and the rock being checked, given the current state s:
+
+Pr (accurate | s, a = check i) = 12
+
+
+
+1 + 2 −di(s)/d hed 
+
+
+
+. (13) In this work, we simply set dhed to be the maximum possible distance between any two points in the grid. Traversing to and then sampling a good rock gives a reward of +10. Sampling a bad rock gives a reward of -10. Exiting to the east border of the environment will terminate the environment and result in a reward of +10. After sampling a good rock, sampling the same rock again will result in a reward of -10. This environment has a discount rate of γ = 0 .99 
+
+The state space of this environment is all the possible combinations of rock positions, as well as agent positions and rock parities. The agent receives observations of the form of a vector of size 2n + k
+
+binary values, where the first 2n elements are a two-hot representation of the xy -coordinates of the agent. The final k observations are set after choosing a check action, and set a 1 at the position of the checked rock if it appears to be good, and a 0 if it appears to be bad. This observation function is a slight departure from the previous RockSample problem definition [Smith and Simmons, 2004, Silver and Veness, 2010] in two aspects, based on an implementation of RockSample that is used to test RNNs [Tao et al., 2023], as opposed to model-based planning algorithms. The first is that after an agent checks a rock and the agent receives a positive sensor reading, the observation bit corresponding 29 to this rock is set to 1, and remains 1 until sampled. This makes the memory learning portion of the problem easier, but the agent is still required to remember which rocks it has sampled before, and also deal with the stochasticity of checking. The second change is to not have an explicit negative sensor reading. Instead, after checking a rock, the observation bit corresponding to the sensor reading of the rock remains 0. This makes the problem harder, since the agent has to infer the negative sensor reading, and disambiguate it from a null sensor reading, when the agent takes non-check actions. 30 I.3 Discounted Return RNN Results 
+
+In the main text (Section 5), we follow the common practice of reporting results for undiscounted returns. However, since our optimization objective considers discounted returns, we also include learning curves for discounted returns in Figure 11. For ease of comparison, we also duplicate the undiscounted learning curves (from Figure 6) in Figure 12. Note that Battleship is unchanged, since that domain is finite-horizon and undiscounted. 
+
+Figure 11: The λ-discrepancy (LD) performance in discounted returns over recurrent (RNN) and memoryless PPO. Learning curves shown are the mean and 95% confidence interval over 30 runs. 
+
+Figure 12: Larger version of Figure 6. The λ-discrepancy (LD) performance (undiscounted returns) over recurrent (RNN) and memoryless PPO. Learning curves shown are the mean and 95% confidence interval over 30 runs. 31 I.4 Experimental and Hyperparameter Details 
+
+Our base PPO algorithm is an online PPO algorithm that trains over a vectorized environment, all parallelized using JAX [Bradbury et al., 2018] and the PureJaxRL batch experimentation library [Lu et al., 2022] with hardware acceleration. The hyperparameter sweep was performed on a cluster of NVIDIA 3090 GPUs, and the best seeds presented were run on one GPU for each algorithm, running for 1 to 12 hours, depending on the domain. Our environment is vectorized over 4 copies, and we use truncated-backpropogation through time [Jaeger, 2002] as our gradient descent algorithm, with a truncation length of 128 . Our LCLIP clipping ϵ is set to 0.2. The value loss coefficient is set to 
+
+cV = 0 .5. We also anneal our learning rate over all training steps, and clip gradients when the norm is larger than 0.5 by their global norm [Pascanu et al., 2013]. We now detail the hyperparameters swept across all environments and all algorithms. We do so in Table 1. Hyperparameter Step size [2 .5 × 10 −3, 2.5 × 10 −4, 2.5 × 10 −5, 2.5 × 10 −6]
+
+λ1 [0 .1, 0.5, 0.7, 0.9, 0.95] 
+
+λ2 (λ-discrepancy) [0 .1, 0.5, 0.7, 0.9, 0.95] 
+
+β (λ-discrepancy) [0 , 0.125 , 0.25 , 0.5] 
+
+Table 1: Hyperparameters swept across all algorithms. Rows labelled with λ-discrepancy are hyperparameters swept specific to our algorithm. We conduct this sweep across all environments for 5 seeds each, and use the highest area under the learning curve (AUC) score in each environment to select the best hyperparameters for each environment. Note, we swept over 10 seeds for recurrent PPO and λ-discrepancy-augmented recurrent PPO for the PocMan environment, due to high variance in returns. After hyperparameter selection, we re-run all algorithms on all environments with the best selected hyperparameters for 30 different seeds to produce the learning curves in Figure 6. We present the best hyperparameters found for both algorithms in Figure 2. Step size λ1 λ2 β
+
+Battleship 2.5 × 10 −4 0.1 0.95 0.5 PocMan 2.5 × 10 −4 0.95 0.5 0.5 RockSample (11 , 11) 2.5 × 10 −4 0.1 0.95 0.5 RockSample (15 , 15) 2.5 × 10 −4 0.1 0.5 0.25  
+
+> (a) Best hyperparameters found for λ-discrepancy-augmented recurrent PPO.
+
+Step size λ1
+
+Battleship 2.5 × 10 −5 0.7 PocMan 2.5 × 10 −5 0.7 RockSample (11 , 11) 2.5 × 10 −4 0.7 RockSample (15 , 15) 2.5 × 10 −5 0.5 
+
+> (b) Best hyperparameters found for the recurrent PPO baseline.
+
+Step size λ1
+
+Battleship 2.5 × 10 −5 0.1 PocMan 2.5 × 10 −4 0.7 RockSample (11 , 11) 2.5 × 10 −4 0.1 RockSample (15 , 15) 2.5 × 10 −5 0.1 
+
+> (c) Best hyperparameters found for the memoryless PPO baseline.
+
+Table 2: Best hyperparameters for each environment and each algorithm. Hyperparameters were found using 5 seeds, and taking the maximum AUC. Our network architectures are standard multi-layer perceptions (MLPs). Both actor and critic networks are two-layer MLPs with ReLU [Nair and Hinton, 2010] activations between layers. The actor network applies a softmax function to its output logits. Our recurrent neural network is a dense layer, followed by ReLU activation, then the GRU cell, then another dense layer. For Battleship, to better condition on the hit-or-miss observation, we add an additional dense layer after the first dense layer of the RNN (which has 2× latent size for this environment), that takes as input the outputs of the previous layer 32 concatenated with the hit-or-miss bit (a residual connection). For our memoryless baseline, we replace the recurrent neural network with a 3-layer MLP with ReLU activations between each layer. Put together, our actor-critic network takes in an input observation (and optionally, the previous action) and passes it, as well as the previous latent state, through the GRU for a new latent state. For the memoryless baseline, the 3-layer MLP simply encodes the observation (and potentially action) into the latent state, with no recurrence. It uses this new latent state as inputs to both the actor and critic. We now detail environment-specific hyperparameters in Table 3. All hidden layer latent sizes are the same sizes as the latent sizes. The full implementation of algorithms, experiments, and environments are available at https://github.com/brownirl/lambda_discrepancy .Latent size cEnt 
+
+Battleship 512 0.05 PocMan 512 0.05 RockSample (11 , 11) 128 0.35 RockSample (15 , 15) 256 0.35 Table 3: Environment-specific hyperparameters, set across all algorithms. We set the entropy coefficient to a higher value in RockSample because the environment requires more exploration. 
+
+I.5 P.O. PacMan Pellet Probe Visualization Details 
+
+We train two RNN hidden state probes in order to generate the memory visualizations in Figure 2. Probes were trained on the hidden state outputs of the RNN + PPO and RNN + PPO + LD agents. Training was done over 2M time steps, where 1M steps were collected from each of these agents. After collection, all trajectories were run through both agents to collect 2M time steps to collect both RNN + PPO hidden states and the RNN + PPO + LD hidden states. With this dataset, the each probe was trained with the corresponding RNN hidden states as inputs, with the pellet occupancy of all potential pellet positions as the target for the prediction. Both probes are 3-layer neural networks with ReLU activations [Nair and Hinton, 2010] between each layer, and a sigmoid function over the final logits to map outputs to 0 and 1. We use a binary cross entropy loss between these predictions and the pellet occupancy targets. The hidden size of the network was 1024, with a step size of 0.0001. At every step of training, a batch of 32 time steps are uniformly randomly sampled from the dataset, and the binary cross entropy loss was minimized. The agent performs 10M steps of training to reach the performance visualized. 
+
+I.6 Small-Scale POMDP Experiments 
+
+We also run both recurrent PPO and our λ-discrepancy-augmented PPO algorithm on the small-scale POMDPs evaluated in the analytical experiments in Section 4. For these experiments, all agents had a latent state size of 32 , with cEnt = 0 .05 , and the same hyperparameters swept as in Appendix I.4. We show results in Figure 14. These results imply that the baseline algorithm is already sufficient for solving these tasks, and any additional auxiliary losses cannot help with performance, since performance is already near optimal. We would like to note that, as with the results in Figure 6, adding our λ-discrepancy auxiliary loss never harms the performance of PPO. 33 Figure 14: The λ-discrepancy performance over recurrent PPO on small-scale POMDPs. Learning curves show mean and 95% confidence interval over 30 seeds. 34 NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: The theoretical claims posed in the abstract and introduction such as “the λ-discrepancy is exactly zero for all Markov decision processes and almost always non-zero for a broad class of partially observable environments” are presented with linked proofs in Section 3. Our analytical results that show mitigation of partial observability are presented in Section 4. Our RNN-based results in Section 5 show that minimizing the λ-discrepancy between two learned value functions as an auxiliary loss alongside traditional reinforcement learning, is often significantly more effective (and never worse) than training the same agent with just a single value function. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: We describe limitations in Appendix A. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate ”Limitations” section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 35 3. Theory Assumptions and Proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] Justification: Theorem 1 is briefly justified just below the statement and is given in full in Appendix D. We prove Theorem 2 in Appendix E. We also prove one additional claim in Appendix F. We explain the memory augmentation process in Section G.1. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental Result Reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main experimental results of the paper to the extent that it affects the main claims and/or conclu-sions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: All details of experimental and environment set up are described in depth in the paper, to allow for reproducibility of all experiments. Appendix H gives full detail of the proof-of-concept experiments run in Section 4, and all details of the experiments in Section 5 are described in Appendix I.2 (for the environments) and Appendix I.4 (for the experiment set up and details). Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). 36 (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [Yes] Justification: As stated in Section 1, our code is available at https://github.com/ brownirl/lambda_discrepancy . This repository both has detailed instructions on how to conduct the sweeps, as well as the best runs over the 30 seeds mentioned in both experiments. All experiments were done by setting seeds for the pseudo-random number generator, so results are deterministic with respect to the seed and exactly reproducible. Data from our runs are also provided in the repo. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental Setting/Details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyperpa-rameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [Yes] Justification: These are present in Appendix H and Appendix I. Specifically, in I.4. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment Statistical Significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [Yes] 37 Justification: Throughout the work, all error bars are included for 95% confidence intervals over 30 runs, as described in Sections 4 and 5. Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer ”Yes” if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments Compute Resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [Yes] Justification: Details of compute usage, hardware and time taken for experiments are discussed in Appendix I.4. Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code Of Ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: We followed the Code of Ethics in its entirety. No human research subjects or participants were utilized. We used no datasets that contained personally identifiable information, required participant consent, or were deprecated. We violated no copyright or fair use licenses, and representative evaluation was not a concern. Our work is of a fundamental nature that has no specific negative impact for safety as com-pared to other fundamental reinforcement learning works. It contains no particular threats towards security, discrimination, surveillance, deception and harassment, the environment, human rights, or bias and fairness. The POMDP environments used and the models using them are described in Section 4 and Section 5. There is no sensitive data requiring strong security measures. Standard 38 security measures are in place as provided through GitHub. Our models do not have a high risk for misuse. Information required to understand research artifacts and reproduce all results in this paper are provided at the code repository. Legal compliance has been ensured. An Apache License v2.0 is provided for the code at https://github.com/brownirl/ lambda_discrepancy .Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader Impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [Yes] Justification: We discuss the broader impacts of this paper in Appendix B. Our paper, as a work on the foundations of reinforcement learning, is not tied to any particular applications. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: Our work focuses on the foundations of reinforcement learning and does not entail a high risk for misuse. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. 39 • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [Yes] Justification: Open-source repositories used in this work have been cited, particularly in Appendix I.4. In addition, our code is open-sourced with the Apache 2.0 license. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New Assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [Yes] Justification: The released codebase is well documented, with proper READMEs on experi-mentation and data parsing. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and Research with Human Subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: Neither crowdsourcing nor research with human subjects was required. Guidelines: 40 • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional Review Board (IRB) Approvals or Equivalent for Research with Human Subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: Neither crowdsourcing nor research with human subjects was required. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 41

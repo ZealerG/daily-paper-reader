@@ -1,0 +1,1456 @@
+Title: 20836_Offline_Goal_conditioned.pdf
+
+URL Source: https://openreview.net/pdf?id=P23UMiw7iJ
+
+Number of Pages: 26
+
+Markdown Content:
+# Offline Goal-conditioned Reinforcement Learning with Quasimetric Representations 
+
+Vivek Myers Bill Chunyuan Zheng Benjamin Eysenbach † Sergey Levine 
+
+UC Berkeley †Princeton University 
+
+## Abstract 
+
+Approaches for goal-conditioned reinforcement learning (GCRL) often use learned state representations to extract goal-reaching policies. Two frameworks for rep-resentation structure have yielded particularly effective GCRL algorithms: (1) 
+
+contrastive representations , in which methods learn “successor features” with a contrastive objective that performs inference over future outcomes, and (2) tem-poral distances , which link the (quasimetric) distance in representation space to the transit time from states to goals. We propose an approach that unifies these two frameworks, using the structure of a quasimetric representation space (triangle inequality) with the right additional constraints to learn successor representations that enable optimal goal-reaching. Unlike past work, our approach is able to exploit a quasimetric distance parameterization to learn optimal goal-reaching distances, even with suboptimal data and in stochastic environments. This gives us the best of both worlds: we retain the stability and long-horizon capabilities of Monte Carlo contrastive RL methods, while getting the free stitching capabilities of quasimetric network parameterizations. On existing offline GCRL benchmarks, our representation learning objective improves performance on stitching tasks where methods based on contrastive learning struggle, and on noisy, high-dimensional environments where methods based on quasimetric networks struggle. 
+
+## 1 Introduction 
+
+Learning temporal distances lies at the heart of many important problems in both control theory and reinforcement learning. In control theory, such distances form important Lyapunov functions [ 1] and control barrier functions [ 2], and are at the core of reachability analysis [ 3] and safety filtering [ 4]In Reinforcement Learning (RL), such distances are important not just for safe RL [ 5 ], but also for forming value functions in tasks ranging from navigation [ 6 ] to combinatorial reasoning [ 7] to robotic manipulation [ 8 , 9]. Ideally, these learned distances have two important properties: (i) they can encode paths that are shorter than those demonstrated in the data (i.e., stitching); and (ii) they can capture long-horizon distances with low variance. Current methods for learning temporal distances typically only achieve one of these properties. Methods based on Q-learning [ 10 , 11 , 12 ] stitch trajectories with Temporal Difference (TD) updates to find shortest paths, but often produce compounding errors that make it challenging to apply to long-horizon tasks [ 13 ]. Monte Carlo methods [ 14 , 15 ] can directly learn goal-reaching value functions, which can be connected to temporal distances [16], but their ability to find shortest paths remains limited. Methods based on learning a quasimetric geometry [ 17 , 18 , 16 ], which impose a triangle inequality over distances as an architectural invariance, do find shortest paths and don’t require dynamic programming with compounding errors, but fail in stochastic settings and/or when learning from off-policy (suboptimal) data.  
+
+> Website and code: https://tmd-website.github.io/
+> 39th Conference on Neural Information Processing Systems (NeurIPS 2025).
+
+Extract goal-reaching policy Learn temporal distance representations 
+
+ω(s, a 2)
+
+ω(s, a 1)
+
+ω(s, a 3)
+
+ω(g)a2
+
+# ω(s) → a2⇒
+
+# min a dω(s, a)→ε(g)
+
+ω, ε  
+
+> triangle inequality with
+> quasimetric architecture
+
+ω(g)
+
+ω(s→)
+
+ω(w)temporal   
+
+> invariance
+> (T)
+> action
+> invariance
+> (I)
+> →
+> + time-contrastive MC loss
+> predicts ω(st, a )ω(st+k)
+
+(P-invariance )
+
+# +≤dω(s→) → ω(g) dω(s→) → ω(w) dω(w) → ω(g)
+
+ω(s) ω(s, a 2)
+
+> ω(s, a 3)
+> ω(s, a 1)
+
+Figure 1: (Left) TMD learns a temporal distance dθ that satisfies the triangle inequality and action invariance. It does this by minimizing the distance between the learned distance and the distance between the successor features of the states and actions in the dataset. (Right) The learned distance is used to extract a goal-conditioned policy. The aim of this paper is to build a method for learning temporal distances that retains the long-horizon estimation capabilities of Monte Carlo methods but nonetheless is able to compute shortest paths. We take an invariance perspective to do this. Temporal distances satisfy various invariance properties. Because they are value functions, they satisfy the Bellman equations. Prior work has also shown that they satisfy the triangle inequality, even in stochastic settings [ 18 , 16 ]. The triangle inequality, also a form of invariance [ 19 ], is powerful because it lets us architecturally winnow down the hypothesis space of temporal distances by only considering neural network architectures that satisfy the triangle inequality [17, 20]. Importantly, the fact that temporal distances satisfy the triangle inequality holds for any temporal distance, including both optimal temporal distances and those learned by Monte Carlo methods. This raises an important question: might there be an additional invariance that is satisfied by optimal temporal distances, but not those learned by Monte Carlo methods? Identifying such invariance properties that would enable us to use Monte Carlo methods to architecturally winnow the hypothesis space, and then use this additional invariance property to identify optimal temporal distances within that space. Our key contribution is a method for learning optimal goal-reaching distances that combines the long-horizon, probabilistic inference of Monte Carlo temporal distances with the optimality and stitching capabilities of quasimetric architectures. We use a quasimetric architecture that imposes the triangle inequality as an architectural constraint, combined with two additional invariance properties that apply at the transition level. When these invariances are enforced as constraints on features learned with Monte Carlo estimation, they impose a structure roughly similar to the Bellman optimality equations across the space of goal-conditioned (Kroenecker Delta) reward functions. We translate these invariance properties into a practical method for Goal-Conditioned Reinforcement Learning (GCRL) that we call Temporal Metric Distillation (TMD). To the best of our knowledge, TMD is the first GCRL method that uses a quasimetric value parameterization to implicitly stitch behaviors, while also learning optimal policies in stochastic settings with suboptimal data. On bench-mark tasks of up to 21-dimensions as well as visual observations, we demonstrate that our method achieves results that considerably outperforms that of similar baselines. Additional experiments reveal the importance of the enforced invariances and contrastive learning objective. Given the importance of long-horizon reasoning in many potential applications of RL today, we believe our work is useful for thinking about how to learn optimal temporal distances. 2Stochastic Dynamics  Optimal Policies  Metric Architecture 
+
+> ω(s, a )
+> ω(s→)
+
+ω  
+
+> ω(s)
+> P( s→|s, a )
+
+dωdωdω +≤  
+
+> suboptimal
+> demos πβ
+> optimal 𝜋 *
+
+TMD (Ours)  TMD (Ours)  TMD (Ours) 
+
+CMD 
+
+GCIQL 
+
+QRL  CMD 
+
+CRL 
+
+QRL 
+
+GCIQL CRL 
+
+CMD 
+
+> prior work
+> this work
+
+QRL 
+
+CRL GCIQL Figure 2: TMD enables key capabilities over prior work: (Left) handling stochastic transition dynamics, (Center) learning optimal policies from offline data, and (Right) stitching behaviors as a property of network architecture. 
+
+## 2 Related Work 
+
+Our method provides a unifying framework connecting temporal distance learning to (optimal) offline GCRL. The resulting method gets the benefits of both, learning optimal goal-reaching policies from offline data with stochastic dynamics, and using a quasimetric architecture to optimally stitch together behaviors without the compounding errors of TD learning. 
+
+2.1 Temporal Distances 
+
+We build on prior approaches to learning temporal distances, which reflect the reachability of states [ 16 ]. Temporal distances are usually defined as the expected number of time steps to transit from one state to another [ 21 , 22 ]. Recent work has provided probabilistic definitions that are also compatible with continuous state spaces and stochastic transition dynamics [ 16 ]. A key consideration when thinking about temporal distance is which policy they reflect: is this an estimate of the number of time steps under our current policy or under the optimal policy? We will use optimal temporal distance to mean the temporal distance under the optimal (distance-minimizing) policy. Algorithmically, this choice is often reflected in the algorithm one uses for learning temporal distances. Methods based on Q-learning typically estimate optimal temporal distances [ 11 , 23 , 24 ], and are often structurally similar to popular actor-critic methods. Some quasimetric methods also learn optimal temporal distances in deterministic MDPs by enforcing the triangle inequality as an architectural constraint, effectively computing shortest paths in a directed graph [ 17 , 18 ]. Prior work has shown that temporal distance learning can be important for finding paths that are better than those demonstrated in the data, and can enable significantly more data efficient learning [ 25 ] (akin to standard results in the theory of Q-learning [26]). Methods based on Monte Carlo learning typically operate by sampling pairs of states that occur nearby in time (though not necessarily temporally-adjacent); distances are minimized for such positive pairs, and maximize for pairs of states that appear on different trajectories [ 27 , 15 ]. These Monte Carlo methods often estimate the temporal distance corresponding to the policy that collected the data. Methods for goal-conditioned behavioral cloning [ 28 , 29 ], though not directly estimating temporal distances, are effectively working with this same behavioral temporal distance [ 7]. Despite the fact that Monte Carlo methods do not estimate optimal temporal distances, they often outperform their Q-learning counterparts, suggesting that it is at least unclear whether the errors from learning the behavioral (rather than optimal) temporal distance are larger or smaller than those introduced by TD learning’s compounding errors. Our work bridges these two notions of temporal distance, 3providing a method that learns optimal temporal distances while reducing the reliance on TD learning to propagate values (and accumulate errors). 
+
+2.2 Offline Reinforcement Learning 
+
+Our investigation into temporal distances closely mirrors discussions in the offline RL literature about 2-step RL methods [ 30 ], which often use Monte Carlo value estimation, versus multi-step RL methods [ 31 ], which often use Q-learning value estimation. These 1-step RL methods avoid the compounding errors of Q-learning, yet are limited by their capacity to learn Q∗ 
+
+> g
+
+(s, a ) rather than Qβ .However, their strong performance over the years [ 32 , 15 ] suggests it is an open question whether the compounding errors of Q-learning outweigh the benefits of learning the behavioral value function, rather than the value function of the optimal policy. 
+
+## 3 Temporal Metric Distillation (TMD) 
+
+In this section, we formally define TMD in terms of the invariances it must enforce to recover optimal distances, and by extension, the optimal policy. In Section 4 we will then show how these invariances can be converted into losses which can be optimized with a quasimetric architecture that enforces the triangle inequality. 
+
+3.1 Notation 
+
+We consider a controlled Markov process M with state space S, action space A, and dynamics 
+
+P( s′ | s, a ). The agent interacts with the environment by selecting actions according to a policy 
+
+π(a | s), i.e., a mapping from S to distributions over A. We further assume the state and action spaces are compact. Policies π ∈ Π are defined as distributions π(a | s) for s ∈ S , a ∈ A . When applicable, for a fixed policy π, we can denote the state and action at step t as random variables st and at, respectively. We will also use the shorthand 
+
+s+ 
+
+> t
+
+≜ st+K for K ∼ Geom(1 − γ). (1) We equip M with an additional notion of distances between states. At the most basic level, a distance 
+
+S × S → R must be non-negative and equal zero only when passed two identical states. We will denote the set of all distances as D, defined as 
+
+D ≜ {d : S × S → R : d(s, s ) = 0 , d (s, s ′) ≥ 0 for each s, s ′ ∈ S} .
+
+A desirable property for distances to satisfy is the triangle inequality, which states that the distance between two states is no greater than the sum of the distances between the states and a waypoint [ 18 ]. A distance satisfying this property is known as a quasimetric . Formally, we construct 
+
+Q ≜ {d ∈ D : d(s, g ) ≤ d(s, w ) + d(w, g ) for all s, g, w ∈ S} . (2) If we further restrict distances to be symmetric ( d(x, y ) = d(y, x )), we obtain the set of traditional metrics over S.
+
+3.2 TMD Operators 
+
+TMD learns a distance parameterization that is made to satisfy two constraints: (i) the triangle inequality ,
+
+d(x, z ) ≤ d(x, y ) + d(y, z ) for any x, y, z ∈ S × A ∪ S , (3) and (ii) action invariance ,
+
+d s, (s, a ) = 0 for any s ∈ S and a ∈ A . (4) We will show that to ensure that we recover the optimal distance dSD [ 16 ] given the learned (backward NCE) contrastive critic distance, the missing additional constraint is a form of consistency over the environment dynamics with respect to the expected (exponentiated) distances. This constraint 4resembles the “SARSA”-style Bellman consistency, which backs up values by averaging over dynamics to learn on-policy values. So, what TMD is doing with these additional constraints is weakening the form of Bellman consistency that is required to recover the optimal distance from the standard max a∈A Bellman operator to the weaker on-policy SARSA Bellman operator. TMD thus turns on-policy SARSA into an off-policy algorithm through the metric constraints. We can define this additional constraint as the fixed point of the following operator: 
+
+T (d)( x, y ) = 
+
+− log EP( s′|s,a )
+
+e−d(s′,y ) − log γ if x = ( s, a ) ∈ S × A ,d(x, y ) otherwise. (5) The triangle inequality Eq. (3) and action invariance Eq. (4) properties can also be written in terms of operator fixed points: 
+
+P(d)( x, z ) ≜ min 
+
+> y∈S
+
+d(x, y ) + d(y, z ) (6) 
+
+Id(s, x ) ≜
+
+0 if x = ( s, a )
+
+I(d)( s, x ) otherwise. (7) 
+
+3.3 Properties of path relaxation 
+
+Path relaxation P [ 19 ] (Eq. 6) enforces invariance to the triangle inequality, i.e., P(d) = d if and only if d ∈ Q .
+
+Theorem 1. Take d ∈ D and consider the sequence 
+
+dn = Pn(d).
+
+Then, dn converges uniformly to a fixed point d∞ ∈ Q .
+
+In light of Theorem 1 we denote by P∗ = lim n→∞ Pn the fixed point operator of P, and note that 
+
+P∗ is in fact a projection operator onto Q.Proofs of Lemmas 5 to 7 and Theorem 1 can be found in Appendix C. 
+
+3.4 The modified successor distance 
+
+The modified successor distance dπ 
+
+> SD
+
+∈ D can be defined by [16]: 11.5 
+
+dπ 
+
+> SD
+
+(x, y ) ≜
+
+
+
+0 if x = y, 
+
+− log pπ   P( s+=g|s0=s, a0=a)P( s+=g|s0=g)
+
+ for K ∼ γ if x = ( s, a ) ∈ S × A , y = g ∈ S − log Eπ(a|s)
+
+e−dπ 
+
+> SD (( s,a ),g )
+
+ − log γ if x = s ∈ S , x ̸ = ydπ 
+
+> SD
+
+(s, g ) − log π(a | g) if y = ( g, a ) ∈ S × A .
+
+(8) The optimal successor distance d∗ 
+
+> SD
+
+can then be stated as 
+
+d∗ 
+
+> SD
+
+(x, y ) ≜ min  
+
+> π∈Π
+
+dπ 
+
+> SD
+
+(x, y ). (9) This distance is useful since it lets us recover optimal goal-reaching policies. For any s, g ∈ S , a ∈ A ,the distance is proportional to the optimal goal-reaching value function 
+
+d∗ 
+
+> SD
+
+(( s, a ), g ) ∝a −Q∗ 
+
+> g
+
+(s, a ) (10) where Q∗ 
+
+> g
+
+(s, a ) is defined as the standard optimal Q-function for reaching goal g [15]: 
+
+Q∗ 
+
+> g
+
+(s, a ) ≜ max  
+
+> π∈Π
+
+E{si,ai}∼ π
+
+h ∞X
+
+> t=0
+
+γt P( st = g | s0 = s, a0 = a)
+
+i
+
+. (11) and 
+
+V ∗ 
+
+> g
+
+(s) ≜ max  
+
+> a∈A
+
+Q∗ 
+
+> g
+
+(s, a ). (12) 5In fact, we can equivalently define d∗
+
+> SD
+
+ (s, a ), g  in terms of Q∗:
+
+d∗
+
+> SD
+
+ (s, a ), g  = log V ∗ 
+
+> g
+
+(g) − log Q∗ 
+
+> g
+
+(s, a ). (13) Similar to Myers et al. [16], we argue that contrastive learning can recover these distances, i.e., 
+
+C(π) = dSD (14) Then, through the operators in Section 3.2, we will extend this to the optimal distance d∗ 
+
+> SD
+
+.For convenience, we also define the set of realized successor distances 
+
+eD ≜ {dπ 
+
+> SD
+
+: π ∈ Π}. (15) Note that eD does not necessarily contain the optimal distance d∗ 
+
+> SD
+
+, as no single policy is generally optimal for reaching all goals. 
+
+Remark 2. The optimal successor distance d∗ 
+
+> SD
+
+satisfies 
+
+dSD (s, (s, a )) = 0 for all s ∈ S and a ∈ A .
+
+3.5 Convergence to the optimal successor distance 
+
+Applying the invariances in Section 3.2 to the contrastive distance Eq. (14), the TMD algorithm can be defined symbolically as 
+
+M(π) ≜ (P∗ ◦ T ◦ I )∞ C(π). (16) In other words, TMD computes the initial πβ distance C(π), and then enforces the invariance (architecturally or explicitly), as expressed with the iterative application of T ◦ I followed by projection onto Q by P∗.
+
+Theorem 3. The TMD algorithm converges pointwise to the optimal successor distance d∗ 
+
+> SD
+
+for any policy π with full state and action coverage, i.e., 
+
+lim 
+
+> n→∞
+
+(P∗ ◦ T ◦ I )n C(π) = d∗ 
+
+> SD
+
+. (17) Our approach for proving Theorem 3 will be to analyze the convergence properties of (P∗ ◦ T ◦ I )
+
+over the space of “suboptimal” distances D∗
+
+> +
+
+, defined as 
+
+D∗ 
+
+> +
+
+≜ {d ∈ D : d(x, y ) ≥ d∗ 
+
+> SD
+
+(x, y ) for all x, y ∈ S × A ∪ S} . (18) Unfortunately, (P∗ ◦ T ◦ I ) is not a contraction on D∗
+
+> +
+
+, so we cannot directly apply the Banach fixed-point theorem as we would for the standard Bellman (optimality) operator. Instead, we will show this operator induces a “more aggressive” form of tightening over D∗
+
+> +
+
+, which will allow us to prove convergence to d∗ 
+
+> SD
+
+. We start by showing that d∗ 
+
+> SD
+
+is a fixed point of (P∗ ◦ T ◦ I ) in Lemma 4. 
+
+Lemma 4. The optimal successor distance d∗ 
+
+> SD
+
+is the unique fixed point of P∗ ◦ T ◦ I on D∗
+
+> +
+
+.
+
+Proofs are in Appendix B. 
+
+## 4 Implementing TMD 
+
+We show that the backward NCE contrastive learning algorithm can recover an initial estimate of 
+
+dSD  
+
+> πβ
+
+. As justified by Theorem 3, we can then enforce the invariances to recover the optimal distance 
+
+d∗ 
+
+> SD
+
+.The algorithm learns a distance dθ parameterized by a quasimetric neural network θ such as Metric Residual Network (MRN) [ 17 ]. By construction, this distance is a quasimetric that is invariant to P,i.e., Pdθ = dθ .64.1 Initializing the Distance with Contrastive Learning 
+
+Defining the critic 
+
+f (s, a, g ) ≜ −dθ
+
+ (s, a ), g ,
+
+the core contrastive objective is the backward NCE loss: 
+
+LNCE 
+
+ ϕ, ψ ; {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i=1
+
+log 
+
+ ef (si,a i,g i )
+
+PNj=1 ef (sj ,a j ,g i)
+
+
+
+(19) which is enforced across batches of triplets {si, a i, s i+k}Ni=1 for k ∼ Geom(1 − γ) sampled from the dataset generated by policy πβ .The optimal solution to this objective is 
+
+f (s, a, g ) = log 
+
+ P( s+ = g | s = s, a = a)P( s+ = g)C(g)
+
+
+
+. (20) for some C(g) [33]. The parameterization f (s, a, g ) = −dθ
+
+ (s, a ), g  where dθ is a quasimetric-enforcing parameteriza-tion (see [17, 18]) ensures that 
+
+C(g) = P( s+ = g | s = g)P( s+ = g) ,
+
+so the only valid quasimetric satisfying Eq. (20) is dθ = dSD  
+
+> πβ
+
+.Optimality of L in Eq. (19) implies that the learned distance dθ = C(πβ ) = dSD  
+
+> πβ
+
+.The additional invariance constraints I and T can be directly enforced by regressing ∥dθ − I dθ ∥∞
+
+and ∥dθ − T dθ ∥∞ to zero. Theorem 3 guarantees that if we can enforce those constraints and enforce invariance to P by using a quasimetric architecture (e.g., MRN [ 17 ]), we can recover the optimal distance d∗ 
+
+> SD
+
+.In practice, we will directly enforce the constraints across the batches used in our contrastive loss. We will use the MRN parameterization for dθ for θ = ( ψ, ϕ ) on learned representations of states ( ψ)and state-action pairs ( ϕ): 
+
+dθ
+
+ s, g  ≜ dMRN (ψ(s), ψ (g)) dθ
+
+ (s, a ), g  ≜ dMRN (ϕ(s, a ), ψ (g)) 
+
+dθ
+
+ s, (s, a ) ≜ dMRN (ψ(s), ϕ (s, a )) dθ
+
+ (s, a ), (s′, a ′) ≜ dMRN (ϕ(s, a ), ϕ (s′, a ′)) 
+
+where 
+
+dMRN (x, y ) ≜ 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+max  
+
+> m=1 ...M
+
+max(0 , x kM +m − ykM +m) (21) 
+
+4.2 Action Invariance ( I)
+
+Invariance to the I backup operator in Eq. (7) gives the following update across s, a ∈ S × A 
+
+dθ
+
+ ψ(s), ϕ (s, a ) ← 0, (22) which can be directly enforced with the following loss across the batch: 
+
+LI
+
+ ϕ, ψ ; {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i,j =1
+
+dMRN 
+
+ ψ(si), ϕ (si, a j ). (23) 
+
+4.3 Temporal Invariance ( T )
+
+Invariance to the T backup operator in Eq. (5) corresponds to the following update performed with respect to ϕ(s, a ):
+
+e−dMRN (ϕ(s,a ),ψ (g)) ← EP( s′|s,a )
+
+elog γ−dMRN (ψ(s′),ψ (g)) . (24) 7This update is enforced by minimizing a divergence between the LHS and samples from the RHS expectation. Classic approaches for backups in deep RL include the ℓ2 distance to the target (RHS) [34], or when values can be interpreted as probabilities, a binary cross-entropy loss [35]. We use the following Bregman divergence [ 36 ], which we find empirically is more stable for learning the update in Eq. (24) (c.f. the Itakura-Saito distance [37] and Linex losses [38, 39]). 
+
+DT (d, d ′) ≜ exp( d − d′) − d. (25) We discuss this divergence and prove correctness in Appendix E. With the divergence, the T -invariance loss is: 
+
+LT
+
+ ϕ, ψ ; {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i=1
+> N
+
+X
+
+> j=1
+
+DT
+
+ dMRN (ϕ(si, a i), ψ (gj )) , d MRN (ψ(s′
+
+> i
+
+), ψ (gj )) − log γ
+
+(26) We minimize this loss only with respect to ϕ, stopping the gradient through ψ. This avoids the moving target that classically necessitates learning separate target networks in RL [34]. 
+
+4.4 The Overall Distance Learning Objective 
+
+We can express the overall critic loss as: 
+
+LTMD 
+
+ ϕ, ψ ; ψ, B = LNCE (ϕ, ψ ; B) + ζ
+
+
+
+LI (ϕ, ψ ; B) + LT
+
+ ϕ, ψ ; B
+
+(27) for batch B ∼ πβ = {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+We minimize Eq. (27) with respect to ϕ and ψ, where ψ is a separate copy of the representation network ψ (stop-gradient). Here, ζ controls the weight of the contrastive loss and invariance constraints, and batches are sampled 
+
+{si, a i, s ′
+
+> i
+
+, g i}Ni=1 ∼ πβ ,
+
+for s′ 
+
+> i
+
+the state following si, and gi the state K steps ahead of si for K ∼ Geom(1 − γ). In theory, 
+
+ζ−1 should be annealed between 1 at the start of training (to extract the distance C(π)), toward 0 at the end of training to enforce invariance to (T ◦ I ), though in practice we find it suffices to keep ζ
+
+constant in the environments we tested. In practice, we pick ζ based on how much stitching and stochasticity we expect in the environment — when ζ is large, we more aggressively try and improve on the initial distance C(πβ ) describing the dataset policy πβ .
+
+4.5 Policy Extraction 
+
+We finally extract the goal-conditioned policy π(s, g ) : S2 → A with the learned distance dθ :
+
+min  
+
+> π
+
+E{si,a i,s ′
+
+> i,g i}Ni=1 ∼πβ
+
+h NX
+
+> i,j =1
+
+dθ
+
+ (si, π (si, g j )) , g j
+
+i
+
+. (28) For conservatism [ 40 ], we augment Eq. (28) with a behavioral cloning loss against πβ via behavior-constrained deep deterministic policy gradient [ 41 ]. Using additional goals gi sampled from the same trajectory as si in Eq. (28) could also be done through an extra tuned parameter (cf. Bortkiewicz et al. [42] , Park et al. [43] ). Denoting these hyperparameters as λ and α respectively, the overall policy extraction objective is: 
+
+min  
+
+> π
+
+E{si,a i,s ′
+
+> i,g i}Ni=1 ∼πβ
+
+Lπ
+
+ π; ϕ, ψ, {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ (29) 
+
+Lπ ≜
+
+> N
+
+X
+
+> i,j =1
+
+(1 − λ)dMRN 
+
+ ϕ(si, ˆaij ), ψ (gj )) , ψ (gj ) + λd MRN 
+
+ ϕ(si, ˆaii ), ψ (gi) + α ˆaii − ai
+
+> 22
+
+where ˆaij = π(si, g j ). (30) Prior offline RL methods use similar α and λ hyperparameters, which must be tuned per environ-ment [43]. 8Table 1: OGBench Evaluation 
+
+Methods Dataset TMD CMD CRL QRL GCBC GCIQL GCIVL 
+
+humanoidmaze_medium_navigate 64.6 (±1.1 ) 61.1 (±1.6 ) 59.9 (±1.3 ) 21.4 (±2.9 ) 7.6 (±0.6 ) 27.3 (±0.9 ) 24.0 (±0.8 )
+
+humanoidmaze_medium_stitch 68.5 (±1.7 ) 64.8 (±3.7 ) 36.2 (±0.9 ) 18.0 (±0.7 ) 29.0 (±1.7 ) 12.1 (±1.1 ) 12.3 (±0.6 )
+
+humanoidmaze_large_stitch 23.0 (±1.5 ) 9.3 (±0.7 ) 4.0 (±0.2 ) 3.5 (±0.5 ) 5.6 (±1.0 ) 0.5 (±0.1 ) 1.2 (±0.2 )
+
+humanoidmaze_giant_navigate 9.2 (±1.1 ) 5.0 (±0.8 ) 0.7 (±0.1 ) 0.4 (±0.1 ) 0.2 (±0.0 ) 0.5 (±0.1 ) 0.2 (±0.1 )
+
+humanoidmaze_giant_stitch 6.3 (±0.6 ) 0.2 (±0.1 ) 1.5 (±0.5 ) 0.4 (±0.1 ) 0.1 (±0.0 ) 1.5 (±0.1 ) 1.7 (±0.1 )
+
+pointmaze_teleport_stitch 29.3 (±2.2 ) 15.7 (±2.9 ) 4.1 (±1.1 ) 8.6 (±1.9 ) 31.5 (±3.2 ) 25.2 (±1.0 ) 44.4 (±0.7 )
+
+antmaze_medium_navigate 93.6 (±1.0 ) 92.4 (±0.9 ) 94.9 (±0.5 ) 87.9 (±1.2 ) 29.0 (±1.7 ) 12.1 (±1.1 ) 12.3 (±0.6 )
+
+antmaze_large_navigate 81.5 (±1.7 ) 84.1 (±2.1 ) 82.7 (±1.4 ) 74.6 (±2.3 ) 24.0 (±0.6 ) 34.2 (±1.3 ) 15.7 (±1.9 )
+
+antmaze_large_stitch 37.3 (±2.7 ) 29.0 (±2.3 ) 10.8 (±0.6 ) 18.4 (±0.7 ) 3.4 (±1.0 ) 7.5 (±0.7 ) 18.5 (±0.8 )
+
+antmaze_teleport_explore 49.6 (±1.5 ) 0.2 (±0.1 ) 19.5 (±0.8 ) 2.3 (±0.7 ) 2.4 (±0.4 ) 7.3 (±1.2 ) 32.0 (±0.6 )
+
+antmaze_giant_stitch 2.7 (±0.6 ) 2.0 (±0.5 ) 0.0 (±0.0 ) 0.4 (±0.2 ) 0.0 (±0.0 ) 0.0 (±0.0 ) 0.0 (±0.0 )
+
+scene_noisy 19.6 (±1.7 ) 4.0 (±0.7 ) 1.2 (±0.3 ) 9.1 (±0.7 ) 1.2 (±0.2 ) 25.9 (±0.8 ) 26.4 (±1.7 )
+
+visual_antmaze_teleport_stitch 38.5 (±1.5 ) 36.0 (±2.1 ) 31.7 (±3.2 ) 1.4 (±0.8 ) 31.8 (±1.5 ) 1.0 (±0.2 ) 1.4 (±0.4 )
+
+visual_antmaze_large_stitch 26.6 (±2.8 ) 8.1 (±1.3 ) 11.1 (±1.3 ) 0.6 (±0.3 ) 23.6 (±1.4 ) 0.1 (±0.0 ) 0.8 (±0.3 )
+
+visual_antmaze_giant_navigate 40.1 (±2.6 ) 37.3 (±2.4 ) 47.2 (±0.9 ) 0.1 (±0.1 ) 0.4 (±0.1 ) 0.1 (±0.2 ) 1.0 (±0.4 )
+
+visual_cube_triple_noisy 17.7 (±0.7 ) 16.1 (±0.7 ) 15.6 (±0.6 ) 8.6 (±2.1 ) 16.2 (±0.7 ) 12.5 (±0.6 ) 17.9 (±0.5 )
+
+We bold the best performance. Success rate (%) is presented with the standard error across six seeds. All datasets contain 5 separate tasks each. We record the aggregate across all 5 tasks. 
+
+## 5 Experiments 
+
+In our experiments, we evaluate the performance of TMD on tasks from the OGBench benchmark [ 43 ]. We aim to answer the following questions: 1. Do the invariance terms in Eq. (6) improve performance quantitatively in offline RL settings? 2. Is the contrastive loss in Eq. (19) necessary to facilitate learning these tasks? 3. What capabilities does TMD enable for compositional task learning? 
+
+5.1 Experimental Results 0 70  140 
+
+Predicted Distance to Goal ( )
+
+Figure 3: An example distance heatmap learned by TMD in pointmaze_large_stitch . Darker colors indicate larger distances. We evaluate TMD across evaluation tasks in OG-Bench for the environments and datasets listed in Table 1. The experiments use 6 seeds in all environments, and report the success rates ag-gregated across the 5 evaluation tasks (goals) provided with each environment. Of particular interest are the “ teleport ” and “ stitch ” en-vironments, which respectively test the ability to handle stochasticity and composition. We compare against the Goal-Conditioned Behavioral Cloning (GCBC), Goal-Conditioned Implicit Q-Learning (GCIQL), Goal-Conditioned Implicit Value Learning (GCIVL), Contrastive Reinforcement Learning (CRL), and Quasimetric Reinforcement Learning (QRL) algorithms, using the reference results provided by OGBench [ 43 ]. We implement and evaluate Contrastive Metric Distillation (CMD) [ 16 ], which also learns a quasimetric temporal distance, but does not enforce the constraint of T or I invariance and uses a separate critic architecture. GCBC uses imitation learning to learn a policy that follows the given trajectories within a dataset [ 44 ]. CRL [ 15 ] performs policy improvement by fitting a value function via contrastive learning. QRL [ 18 ] learns a quasimetric value function to recover optimal 9distances in deterministic settings. GCIQL and GCIVL use expectile regression to fit a value function [45]. TMD consistently outperforms QRL and CRL in the stitching environments. In the stochastic 
+
+teleport environments, TMD outperforms both CRL and QRL by a considerable margin — in 
+
+pointmaze_teleport_stitch TMD outperforms CRL and QRL by over 3x. An example distance learned by TMD in antmaze_large_stitch is visualized as a heatmap in Fig. 3. 
+
+5.2 Ablation Study 0 0.1 0.2 0.3
+
+no T loss no I loss no LNCE loss no LT stopgrad 
+
+TMD (Ours) 
+
+Success Rate Ablations of the LTMD loss 
+
+Figure 4: We ablate the loss components of TMD in the 
+
+pointmaze_teleport_stitch environment. We perform an ablation study on the pointmaze_teleport_stitch 
+
+environment to evaluate the impor-tance of the invariance terms and the contrastive initialization loss in TMD. We separately disable the contrastive, 
+
+T invariance, and I invariance com-ponent during training and observe its effects. We also examine the em-pirical effects of stopping gradients when calculating LT . We log the cor-responding success rate for each of the ablations in 4. Our ablation studies answer questions 2 and 3, in which we demonstrate that by removing some of the invariances or removing the contrastive loss, the performance of TMD decreases to lev-els similar to CRL and QRL. Simi-larly, we see the importance of keeping the contrastive objective, as the performance of TMD degrades even more despite the presence of other loss components. We also note the empirical performance of TMD is better when we stop gradients on LT . We provide further ablation details in Appendix D.2. 
+
+## 6 Discussion 
+
+In this work, we introduce Temporal Metric Distillation (TMD), an offline goal-conditioned rein-forcement learning method that learns representations which exploit the quasimetric structure of temporal distances. Our approach unifies quasimetric, temporal-difference, and Monte Carlo learning approaches to GCRL by enforcing a set of invariance properties on the learned distance function. To the best of our knowledge, TMD is the first method that can exploit the quasimetric structure of temporal distances to learn optimal policies from offline data, even in stochastic settings (see Fig. 2). On a standard suite of offline GCRL benchmarks, TMD outperforms prior methods, in particular on long-horizon tasks that require stitching together trajectories across noisy dynamics and visual observations. 
+
+6.1 Limitations and Future Work 
+
+Future work could examine more principled ways to set the ζ parameter in our method, or if there are ways to more directly integrate the contrastive and invariance components of the loss function. Future work could also explore integrating the policy extraction objective more directly into the distance learning to enable desirable properties (stitching through architecture, horizon generalization) at the level of the policy. While we used the MRN [ 17 ] architecture in our experiments, alternative architectures such as Interval Quasimetric Embedding (IQE) [ 20 ] that enforce the triangle inequality could be more expressive. While the size of models studied in our experiments make them unlikely to pose any real-world risks, methods which implicitly enable long-horizon decision making could have unintended consequences or poor interpretability. Future work should consider these implications. 10 Acknowledgements 
+
+We would like to thank Seohong Park, Qiyang (Colin) Li, Catherine Ji, Cameron Allen, and Kyle Stachowicz for relevant discussions and feedback on this work. This research was partly supported by AFOSR FA9550-22-1-0273, DARPA TIAMAT, and the DoD NDSEG fellowship. 
+
+## References 
+
+[1] Eduardo D. Sontag. A ‘Universal’ Construction of Artstein’s Theorem on Nonlinear Stabiliza-tion. Systems & Control Letters , 13(2):117–123, 1989. [2] Aaron D. Ames, Samuel Coogan, Magnus Egerstedt, Gennaro Notomista, Koushil Sreenath, and Paulo Tabuada. Control Barrier Functions: Theory and Applications. European Control Conference , pp. 3420–3431, 2019. [3] Matthias Althoff. Reachability Analysis and Its Application to the Safety Assessment of Au-tonomous Cars . phdthesis, 2010. [4] Kai-Chieh Hsu, Haimin Hu, and Jaime F Fisac. The Safety Filter: A Unified View of Safety-Critical Control in Autonomous Systems. Annual Review of Control , 7, 2023. [5] Shangding Gu, Long Yang, Yali Du, Guang Chen, Florian Walter, Jun Wang, and Alois Knoll. A Review of Safe Reinforcement Learning: Methods, Theory and Applications. arXiv:2205.10330, 2022. [6] Dhruv Shah, Blazej Osinski, Brian Ichter, and Sergey Levine. LM-Nav: Robotic Navigation With Large Pre-Trained Models of Language, Vision, and Action. Conference on Robot Learning , 2022. [7] Raj Ghugare, Matthieu Geist, Glen Berseth, and Benjamin Eysenbach. Closing the Gap Between TD Learning and Supervised Learning – a Generalisation Point of View. International Conference on Learning Representations , 2024. [8] Yecheng Jason Ma, Shagun Sodhani, Dinesh Jayaraman, Osbert Bastani, Vikash Kumar, and Amy Zhang. VIP: Towards Universal Visual Reward and Representation via Value-Implicit Pre-Training. International Conference on Learning Representations , 2023. [9] Suraj Nair, Aravind Rajeswaran, Vikash Kumar, Chelsea Finn, and Abhinav Gupta. R3m: A Universal Visual Representation for Robot Manipulation. Conference on Robot Learning , pp. 892–909, 2022. [10] Long-Ji Lin. Self-Improving Reactive Agents Based on Reinforcement Learning, Planning and Teaching. 1992. [11] Marcin Andrychowicz, Filip Wolski, Alex Ray, Jonas Schneider, Rachel Fong, Peter Welinder, Bob McGrew, Josh Tobin, OpenAI Pieter Abbeel, and Wojciech Zaremba. Hindsight Experience Replay. Neural Information Processing Systems , volume 30, 2017. [12] Vitchyr Pong, Shixiang Gu, Murtaza Dalal, and Sergey Levine. Temporal Difference Mod-els: Model-Free Deep RL for Model-Based Control. International Conference on Learning Representations , 2018. [13] Aviral Kumar, Justin Fu, Matthew Soh, George Tucker, and Sergey Levine. Stabilizing Off-Policy Q-Learning via Bootstrapping Error Reduction. Neural Information Processing Systems ,32, 2019. [14] Alexey Dosovitskiy and Vladlen Koltun. Learning to Act by Predicting the Future. International Conference on Learning Representations , 2017. [15] Benjamin Eysenbach, Tianjun Zhang, Ruslan Salakhutdinov, and Sergey Levine. Contrastive Learning as Goal-Conditioned Reinforcement Learning. Neural Information Processing Systems ,volume 35, pp. 35603–35620, 2022. [16] Vivek Myers, Chongyi Zheng, Anca Dragan, Sergey Levine, and Benjamin Eysenbach. Learn-ing Temporal Distances: Contrastive Successor Features Can Provide a Metric Structure for Decision-Making. International Conference on Machine Learning , 2024. [17] Bo Liu, Yihao Feng, Qiang Liu, and Peter Stone. Metric Residual Network for Sample Efficient Goal-Conditioned Reinforcement Learning. AAAI Conference on Artificial Intelligence ,volume 37, pp. 8799–8806, 2023. 11 [18] Tongzhou Wang, Antonio Torralba, Phillip Isola, and Amy Zhang. Optimal Goal-Reaching Reinforcement Learning via Quasimetric Learning. International Conference on Machine Learning , pp. 36411–36430, 2023. [19] Vivek Myers, Catherine Ji, and Benjamin Eysenbach. Horizon Generalization in Reinforcement Learning. International Conference on Learning Representations , 2025. [20] Tongzhou Wang and Phillip Isola. Improved Representation of Asymmetrical Distances With Interval Quasimetric Embeddings. NeurIPS 2022 NeurReps Workshop Proceedings Track , 2022. [21] Junik Bae, Kwanyoung Park, and Youngwoon Lee. TLDR: Unsupervised Goal-Conditioned RL via Temporal Distance-Aware Representations. Conference on Robot Learning , 2024. [22] Stephen Tian, Suraj Nair, Frederik Ebert, Sudeep Dasari, Benjamin Eysenbach, Chelsea Finn, and Sergey Levine. Model-Based Visual Planning With Self-Supervised Functional Distances. 
+
+International Conference on Learning Representations , 2021. [23] Scott Fujimoto, Herke van Hoof, and David Meger. Addressing Function Approximation Error in Actor-Critic Methods. International Conference on Machine Learning , 2018. [24] Leslie Pack Kaelbling. Learning to Achieve Goals. International Joint Conference on Artificial Intelligence , volume 2, pp. 1094–1098, 1993. [25] Chongyi Zheng, Ruslan Salakhutdinov, and Benjamin Eysenbach. Contrastive Difference Predictive Coding. International Conference on Learning Representations , 2023. [26] Alekh Agarwal, Nan Jiang, Sham M Kakade, and Wen Sun. Reinforcement Learning: Theory and Algorithms. CS Dept , 32:96, 2019. [27] Kristian Hartikainen, Xinyang Geng, Tuomas Haarnoja, and Sergey Levine. Dynamical Distance Learning for Semi-Supervised and Unsupervised Skill Discovery. International Conference on Learning Representations , 2020. [28] Dibya Ghosh, Abhishek Gupta, Ashwin Reddy, Justin Fu, Coline Devin, Benjamin Eysenbach, and Sergey Levine. Learning to Reach Goals via Iterated Supervised Learning. International Conference on Learning Representations , 2021. [29] Vivek Myers, Andre He, Kuan Fang, Homer Walke, Phillipe Hansen Estruch, Ching-An Cheng, Mihai Jalobeanu, Andrey Kolobov, Anca Dragan, and Sergey Levine. Goal Representations for Instruction Following: A Semi-Supervised Language Interface to Control. Conference on Robot Learning , 2023. [30] Benjamin Eysenbach, Matthieu Geist, Sergey Levine, and Ruslan Salakhutdinov. A Connection Between One-Step RL and Critic Regularization in Reinforcement Learning. Th International Conference on Machine Learning , pp. 9485–9507, 2023. [31] John Schulman, Philipp Moritz, Sergey Levine, Michael Jordan, and Pieter Abbeel. High-Dimensional Continuous Control Using Generalized Advantage Estimation. arXiv:1506.02438, 2018. [32] Cassidy Laidlaw, Banghua Zhu, Stuart Russell, and Anca Dragan. The Effective Horizon Explains Deep RL Performance in Stochastic Environments. International Conference on Learning Representations , 2024. [33] Zhuang Ma and Michael Collins. Noise Contrastive Estimation and Negative Sampling for Conditional Models: Consistency and Statistical Efficiency. Empirical Methods in Natural Language Processing , pp. 3698–3707, 2018. [34] Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Andrei A. Rusu, Joel Veness, Marc G. Bellemare, Alex Graves, Martin Riedmiller, et al. Human-Level Control Through Deep Rein-forcement Learning. Nature , volume 518, pp. 529–533, 2015. [35] Dmitry Kalashnikov, Alex Irpan, Peter Pastor, Julian Ibarz, Alexander Herzog, Eric Jang, Deirdre Quillen, Ethan Holly, Mrinal Kalakrishnan, Vincent Vanhoucke, and Sergey Levine. Scalable Deep Reinforcement Learning for Vision-Based Robotic Manipulation. Conference on Robot Learning , pp. 651–673, 2018. [36] L. M. Bregman. The Relaxation Method of Finding the Common Point of Convex Sets and Its Application to the Solution of Problems in Convex Programming. USSR Computational Mathematics and Mathematical Physics , 7(3):200–217, 1967. [37] Fumitada Itakura. Analysis Synthesis Telephony Based on the Maximum Likelihood Method. 
+
+Reports of the 6th Int. Cong. Acoust , 1968. 12 [38] Divyansh Garg, Joey Hejna, Matthieu Geist, and Stefano Ermon. Extreme Q-Learning: MaxEnt RL Without Entropy. International Conference on Learning Representations , 2023. [39] Ahmad Parsian and Snua Kirmani. Estimation Under LINEX Loss Function. Handbook of Applied Econometrics and Statistical Inference , pp. 75–98. CRC Press, 2002. [40] Aviral Kumar, Aurick Zhou, George Tucker, and Sergey Levine. Conservative Q-Learning for Offline Reinforcement Learning. Neural Information Processing Systems , volume 33, pp. 1179–1191, 2020. [41] Scott Fujimoto and Shixiang Shane Gu. A Minimalist Approach to Offline Reinforcement Learning. arXiv:2106.06860, 2021. [42] Michał Bortkiewicz, Władek Pałucki, Vivek Myers, Tadeusz Dziarmaga, Tomasz Arczewski, Łukasz Kuci´ nski, and Benjamin Eysenbach. Accelerating Goal-Conditioned RL Algorithms and Research. International Conference on Learning Representations , 2025. [43] Seohong Park, Kevin Frans, Benjamin Eysenbach, and Sergey Levine. OGBench: Bench-marking Offline Goal-Conditioned RL. International Conference on Learning Representations ,2025. [44] Yiming Ding, Carlos Florensa, Pieter Abbeel, and Mariano Phielipp. Goal-Conditioned Imitation Learning. Neural Information Processing Systems , volume 32, 2019. [45] Ilya Kostrikov, Ashvin Nair, and Sergey Levine. Offline Reinforcement Learning With Implicit Q-Learning. arXiv:2110.06169, 2021. [46] Yim-Ming Wong and Kung-Fu Ng. On a Theorem of Dini. Journal of the London Mathematical Society , s2-11(1):46–48, 1975. [47] James Bradbury, Roy Frostig, Peter Hawkins, Matthew James Johnson, Chris Leary, Dougal Maclaurin, George Necula, Adam Paszke, Jake VanderPlas, Skye Wanderman-Milne, and Qiao Zhang. JAX: Composable Transformations of Python+NumPy Programs. 2018. [48] Arindam Banerjee, Srujana Merugu, Inderjit Dhillon, and Joydeep Ghosh. Clustering With Bregman Divergences. SIAM International Conference on Data Mining , pp. 234–245, 2004. 
+
+## A Code 
+
+Code and videos can be found at https://tmd-website.github.io/ . The evaluation and base agent structure follows the OGBench codebase [ 43 ]. The TMD agent is implemented in https: //github.com/vivekmyers/tmd-release/blob/master/impls/agents/tmd.py .
+
+## B Analysis of TMD 
+
+This section provides the proofs of the results in Section 3.5. The main result is Theorem 3, which shows that enforcing the TMD constraints on a learned quasimetric distance recovers the optimal distance d∗ 
+
+> SD
+
+.
+
+Theorem 1. Take d ∈ D and consider the sequence 
+
+dn = Pn(d).
+
+Then, dn converges uniformly to a fixed point d∞ ∈ Q .Proof. From Lemma 7, we have that dn+1 (s, g ) ≤ dn(s, g ) for all s, g ∈ S . Thus, the sequence {dn}
+
+is monotonically decreasing (and positive). By the monotone convergence theorem, the sequence converges pointwise to a limit d∞. Since S is compact, by Dini’s theorem [ 46 ], the convergence is uniform, i.e., dn → d∞ under the L∞ topology over D.To see that d∞ is a fixed point of P, we note that if Pd∞ = d′̸ = d∞, we can construct disjoint neighborhoods N of d∞ and N ′ of d′ (since L∞(D) is normed vector space and thus Hausdorff). By construction, the preimage P−1(N ′) contains d∞ and is open by Lemma 6. Thus, we can define another, smaller open neighborhood N ′′ = N ∩ P −1(N ′) of d∞. Now, since dn → d∞, there exists some k so dk, d k+1 ∈ N ′′ ⊂ N . But then since dk ∈ P −1(N ′), we have that dk+1 ∈ N ′. This is a contradiction as N and N ′ were disjoint by construction. Thus, we have that d∞ is a fixed point of P. That d∞ ∈ Q follows from Lemma 5. 13 Theorem 3. The TMD algorithm converges pointwise to the optimal successor distance d∗ 
+
+> SD
+
+for any policy π with full state and action coverage, i.e., 
+
+lim 
+
+> n→∞
+
+(P∗ ◦ T ◦ I )n C(π) = d∗ 
+
+> SD
+
+. (17) 
+
+Proof of Theorem 3. The initial distance C(π) = dSD  
+
+> π
+
+≥ d∗ 
+
+> SD
+
+for any policy π. So, C(π) ∈ D ∗
+
+> +
+
+.Define the sequence of distances dn = ( P∗ ◦ T ◦ I )nC(π) in D∗
+
+> +
+
+. Note that P∗ and I are monotone decreasing. So, the restriction (dn)|X is monotonically decreasing on the domain X = S × (S ∪S ×A ),and thus converges pointwise on X as n → ∞ .Since T and P∗ are continuous operators (Lemma 6 and Eq. (5)), and T is fully-determined by the restriction to X , the sequence (P ◦ T )dn = dn+1 converges pointwise on its full domain. The pointwise limit of dn is a fixed point of (P∗ ◦ T ◦ I ), which must be the unique fixed point d∗ 
+
+> SD
+
+on 
+
+D∗ 
+
+> +
+
+by Lemma 4. 
+
+Lemma 4. The optimal successor distance d∗ 
+
+> SD
+
+is the unique fixed point of P∗ ◦ T ◦ I on D∗
+
+> +
+
+.Proof of Lemma 4. For existence, we note 
+
+(P∗ ◦ T ◦ I )d∗ 
+
+> SD
+
+= ( P∗ ◦ T )( Id∗ 
+
+> SD
+
+) (Remark 2) 
+
+= ( P∗ ◦ T )d∗ 
+
+> SD
+
+(Bellman optimality of Q∗ 
+
+> g
+
+)
+
+= P∗d∗ 
+
+> SD
+
+. (Lemma 5) 
+
+= d∗ 
+
+> SD
+
+. (31) For uniqueness, we need to show that (P∗ ◦ T ◦ I ) has no fixed points besides d∗ 
+
+> SD
+
+in D∗
+
+> +
+
+. Suppose there exists some d ∈ D ∗ 
+
+> +
+
+such that (P∗ ◦ T ◦ I )d = d. Then, we have for x ∈ S ∪ S × A , s, g ∈ S ,and a ∈ A :
+
+(P∗ ◦ T ◦ I )d x, (g, a ) = d x, (g, a ) = d(x, g ). (32) Denote by Q(s, a ) = e−d(( s,a ),g ), and let B be the goal-conditioned Bellman operator defined as 
+
+BQ(s, a ) ≜ EP( s′|s,a )
+
+1{s′ = g} + γQ (s′, g ) (33) At any fixed point d ∈ D ∗
+
+> +
+
+, we have 
+
+(P∗ ◦ T ◦ I )d (s, a ), g  = d (s, a ), g  (34) This last expression implies that 
+
+Q(s, a ) = exp −d (s, a ), g  
+
+= exp −(P∗ ◦ T ◦ I )d (s, a ), g  
+
+≤ EP( s′|s,a )
+
+ min  
+
+> a′∈A
+
+exp d (s′, a ′), g  − log γ
+
+= BQ(s, a ). (35) Since B is a contraction on the exponentiated distance space, and d (s, a ), g  ≥ d∗
+
+> SD
+
+ (s, a ), g ,Eq. (35) is only consistent with Q(s, a ) = Q∗ 
+
+> g
+
+(s, a ). This implies that 
+
+d (s, a ), g  = d∗
+
+> SD
+
+ (s, a ), g . (36) We also know that at this fixed point, d(s, (s, a )) = 0 , and thus from Eq. (36) we have 
+
+d(s, g ) = d∗ 
+
+> SD
+
+(s, g ). (37) So, d = d∗ 
+
+> SD
+
+must be the unique fixed point of (P∗ ◦ T ◦ I ).14 C Path Relaxation and Quasimetric Distances 
+
+We provide short proofs of the claims in Section 3.2 
+
+Lemma 5. We have P(d) = d if and only if d ∈ Q .Proof. P(d)( s, g ) = min 
+
+> w∈S
+
+d(s, w ) + d(w, g )
+
+≤ d(s, s ) + d(s, g )= d(s, g ).
+
+Lemma 6. The path relaxation operator P is continuous with respect to the L∞ topology over D.Proof. Let d, d ′ ∈ D and ϵ > 0. We have 
+
+P(d)( s, g ) − P (d′)( s, g ) = min 
+
+> w∈S
+
+d(s, w ) + d(w, g ) − min 
+
+> w∈S
+
+d′(s, w ) + d′(w, g )
+
+≤ min  
+
+> w∈S
+
+d(s, w ) + d(w, g ) − d′(s, w ) − d′(w, g )
+
+≤ min  
+
+> w∈S
+
+d(s, w ) − d′(s, w ) + min  
+
+> w∈S
+
+d(w, g ) − d′(w, g )
+
+≤ ∥ d − d′∥∞ + ∥d − d′∥∞
+
+= 2 ∥d − d′∥∞.
+
+Thus, if ∥d − d′∥∞ < ϵ/ 2, we have P(d) − P (d′) ∞ < ϵ .
+
+Lemma 7. For any s, g ∈ S and d ∈ D we have that P(d)( s, g ) ≤ d(s, g ).Proof. Let d, d ′ ∈ D and ϵ > 0. We have 
+
+P(d)( s, g ) − P (d′)( s, g ) = min 
+
+> w∈S
+
+d(s, w ) + d(w, g ) − min 
+
+> w∈S
+
+d′(s, w ) + d′(w, g )
+
+≤ min  
+
+> w∈S
+
+d(s, w ) + d(w, g ) − d′(s, w ) − d′(w, g )
+
+≤ min  
+
+> w∈S
+
+d(s, w ) − d′(s, w ) + min  
+
+> w∈S
+
+d(w, g ) − d′(w, g )
+
+≤ ∥ d − d′∥∞ + ∥d − d′∥∞
+
+= 2 ∥d − d′∥∞.
+
+Thus, if ∥d − d′∥∞ < ϵ/ 2, we have P(d) − P (d′) ∞ < ϵ .
+
+Lemma 5. We have P(d) = d if and only if d ∈ Q .Proof. (⇒) Suppose P(d) = d. Then, for all s, g, w ∈ S we have 
+
+d(s, g ) = P(d)( s, g ) = min 
+
+> w∈S
+
+d(s, w ) + d(w, g ) ≤ d(s, w ) + d(w, g ).
+
+Thus, d ∈ Q .(⇐) Suppose d ∈ Q . Then, for all s, g ∈ S we have 
+
+d(s, g ) ≤ min 
+
+> w∈S
+
+d(s, w ) + d(w, g ) = P(d)( s, g ).
+
+We also have P(d)( s, g ) ≤ d(s, g ) by Lemma 7. Thus, P(d) = d.15 Table 2: Hyperparameters for TMD 
+
+Hyperparameter Value 
+
+batch size 256 learning rate 3 · 10 −4
+
+discount factor 0.995 invariance weight ζ 0.01 in medium locomotion environments, 0.1 otherwise Table 3: Network configuration for TMD. 
+
+Configuration Value 
+
+latent dimension size 512 
+
+encoder MLP dimensions (512 , 512 , 512) 
+
+policy MLP dimensions (512 , 512 , 512) 
+
+layer norm in encoder MLPs True 
+
+visual encoder ( visual- envs) impala-small 
+
+MRN components 8
+
+T weighting on diagonal elements 1 (navigation, play) 
+
+0.5 (stitch, explore, noisy) 
+
+## D Experimental Details 
+
+General hyperparameters are provided in Table 2. We implemented TMD using JAX [ 47 ] within the OGBench [ 43 ] framework. OGBench requires a per-environment hyperparameter α controlling the behavioral cloning weight to be tuned for each method based on the scale of its losses. We generally found TMD to work well with similar α values to those used by CRL. We used the same values of α as CMD’s implementation. For a complete list of alpha values, please refer to the code release of the paper. To prevent gradients from overflowing, we clip the T invariance loss per component to be no more than 5. We also found using a slightly smaller batch size of 256 compared to 512 to be helpful for reducing memory usage. 
+
+D.1 Implementation Details 
+
+The network architecture for TMD is described in Table 3. The “MRN components” refers to the number of ensemble terms K in Eq. (21). We found K = 8 components enabled stable learning and expressive distances. We weigh the off-diagonal element, corresponding to the product of the marginals p(s)p(g), on a 0-1 scale compared to the diagonal elements, corresponding to the joint distribution p(s, g ). A scale of 0 corresponds to the off-diagonal elements weighing the same as the diagonal elements, and a scale of 1 means that only diagonal elements will matter for T -operator. 
+
+D.2 Ablations 
+
+The full ablation results for TMD in the pointmaze-teleport-stitch are presented in Table 4 with success rates and standard errors. Table 4: Ablation Success rate. 
+
+Ablation Success Rate 
+
+None 29.3 (±2.2 )
+
+No gradient stopping in LT 18.7 (±1.8 )
+
+No contrastive loss 9.8 (±1.7 )
+
+No I loss 13.3 (±2.9 )
+
+No T loss 18.5 (±2.1 )
+
+16 D.3 Computational Resources 
+
+Experiments were run using NVIDIA A6000 GPUs with 48GB of memory, and 4 CPU cores and 1 GPU per experiment. Each state-based experiment took around 2 hours to run with these resources, and each pixel-based experiment took around 4 hours. 
+
+0 1 2 3 4 5 6
+
+0
+
+2
+
+d′
+
+d
+
+> Loss
+
+Comparison of Bregman divergences for fitting distances 
+
+Dℓ2 (d, d ′) = ( e−d − e−d′
+
+)2
+
+DBCE (d, d ′) = (1 − e−d′
+
+) log(1 − e−d) − de −d′
+
+DT (d, d ′) = exp( d − d′) − d
+
+Figure 5: Comparison of Bregman divergences for e−d onto e−d′
+
+in expectation. All losses are minimized at d = d′, and share the property that they will be minimized in expectation when 
+
+e−d = E[e−d′
+
+]. But only the DT (d, d ′) loss has non-vanishing gradients d ≫ d′ for large d′.
+
+## E Bregman Divergence in T -invariance 
+
+Recall the divergence used in Eq. (25): 
+
+DT (d, d ′) ≜ exp( d − d′) − d. (25) This divergence is proportional to the Bregman divergence [ 36 ] for the function F (x) = − log( x),similar to the Itakura-Saito divergence [37]. 
+
+DF (e−d′
+
+, e −d) = F (e−d′
+
+) − F (e−d) − F ′(e−d)( e−d′
+
+− e−d)= d′ − d + 1
+
+e−d (e−d′
+
+− e−d)= d′ − d + exp( d − d′) − 1= DT (d, d ′) + d′ − 1. (38) The minimizer of Eq. (25) satisfies 
+
+arg min 
+
+> d≥0
+
+Ed′ [DT (d, d ′)] = − log Ed′ [e−d′
+
+] (39) when d′ is a random “target” distance [ 48 ]. In other words, using Eq. (25) as a loss function regresses 
+
+e−d onto the expected value of e−d′
+
+(or onto the expected value of elog γ−d′
+
+as used in Eq. (26)). The key advantage of this divergence when backing up temporal distances is that the gradients do not vanish when either d, d′, or the difference between them is small or large. This property is not shared by more standard loss functions like the squared loss or binary cross-entropy loss when applied to the probability space and the models (distances) are in log-probability space. 17 Algorithm 1: Temporal Metric Distillation (TMD) 
+
+1: input: dataset D, learning rate η
+
+2: initialize representations ϕ, ψ , policy π
+
+3: while training do 
+
+4: sample B = {si, a i, s ′
+
+> i
+
+, g i}Ni=1 ∼ D 
+
+5: ψ ← ψ
+
+6: (ϕ, ψ ) ← (ϕ, ψ ) − η∇ϕ,ψ LTMD (ϕ, ψ ; ψ, B) ▷ Eq. (27) 
+
+7: π ← π − η∇π Lπ (ϕ, ψ, π ; B) ▷ Eq. (28) 
+
+8: return π
+
+Table 5: Ablation of T -invariance loss in antmaze-teleport-stitch 
+
+Loss Success Rate 
+
+DT (Ours) 29.3 (±2.2 )
+
+Dℓ2 16.1 (±1.9 )
+
+DBCE 15.1 (±1.9 )
+
+E.1 Empirical Comparison 
+
+In practice, we found it was important to use this divergence in TMD for stable learning (Table 5). Ths loss could also be applied to other GCRL algorithms where learned value functions are probabilities but are predicted in log-space to improve gradients. Future work should explore this divergence in other GCRL algorithms to improve training compared to the more commonly used squared loss or binary cross-entropy loss [35]. 
+
+## F Algorithm Pseudocode 
+
+Full pseudocode for TMD is provided in Algorithm 1. We provide the full TMD loss function in Eq. (27) and the policy extraction loss in Eq. (28) below for reference: 
+
+LTMD 
+
+ ϕ, ψ ; ψ, B = LNCE (ϕ, ψ ; B) + ζ
+
+
+
+LI (ϕ, ψ ; B) + LT
+
+ ϕ, ψ ; B
+
+(27) 
+
+Lπ
+
+ π; ϕ, ψ, {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i,j =1
+
+(1 − λ)dMRN 
+
+ ϕ(si, ˆaij ), ψ (gj )) , g j
+
+
+
++ λd MRN 
+
+ ϕ(si, ˆaii ), ψ (gi) + α ˆaii − ai 
+
+> 22
+
+(28) where ˆaij = π(si, g j ), batch B ∼ pπβ = {si, a i, s ′
+
+> i
+
+, g i}Ni=1 .
+
+The components of Eq. (27) are (see Section 4): 
+
+LNCE 
+
+ ϕ, ψ ; {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i=1
+
+log 
+
+ ef (si,a i,g i )
+
+PNj=1 ef (sj ,a j ,g i)
+
+
+
+(19) 
+
+LI
+
+ ϕ, ψ ; {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i,j =1
+
+dMRN 
+
+ ψ(si), ϕ (si, a j ) (23) 
+
+LT
+
+ ϕ, ψ ; {si, a i, s ′
+
+> i
+
+, g i}Ni=1 
+
+ =
+
+> N
+
+X
+
+> i,j =1
+
+DT
+
+ dMRN (ϕ(si, a i), ψ (gj )) , d MRN (ψ(s′
+
+> i
+
+), ψ (gj )) − log γ.
+
+(26) 
+
+## Glossary 
+
+Qβ The behavioral Q-function under policy πβ . 4 18 Q∗ 
+
+> g
+
+(s, a ) the optimal goal-conditioned Q-function for reaching goal g. 4, 5 
+
+V ∗ 
+
+> g
+
+(s) the optimal goal-conditioned value function for reaching goal g. 5 
+
+Π All policies π(a | s) mapping states to distributions over actions. 4 
+
+C(π) the outcome of running CRL with policy π, equivalent to dSD under suitable assumptions. 6 
+
+D∗ 
+
+> +
+
+the set of all distances that upper bound the optimal successor distance d∗ 
+
+> SD
+
+. 6, 14 
+
+D the set of all distances over states S. 4, 5, 13 
+
+Q the set of all quasimetrics over states S. 4, 5 
+
+A the action space. 4–8, 14, 19 
+
+I the action invariance operator defined in Eq. (7). 5–8, 14 
+
+P the path relaxation operator defined in Eq. (6). 5, 15 
+
+S the state space. 4–8, 13–15, 19 
+
+T the backup operator defined in Eq. (5). 5–8, 14 
+
+P∗ the projection operator onto the set of quasimetrics Q, defined as the fixed point of path . 5, 6, 14 
+
+πβ the behavior policy used to collect the offline dataset. 6–8, 18 
+
+at the action at time step t (random variable). 4 
+
+st the state at time step t (random variable). 4 
+
+s+ 
+
+> t
+
+the state at a random future time step t + K where K ∼ Geom(1 − γ). 4 
+
+eD the set of all realized successor distances dπ 
+
+> SD
+
+under policies π ∈ Π. 6 
+
+DT The Bregman divergence defined in Eq. (25), analogous to the Linex loss [38, 39]. 8, 17, 18 
+
+LI The action invariance loss defined in Eq. (23). 7, 8, 18 
+
+LT The T -invariance loss defined in Eq. (26). 8, 18 
+
+LNCE The backward NCE loss defined in Eq. (19). 7, 8, 18 
+
+M a controlled Markov process with state space S, action space A, and dynamics P( s′ | s, a ). 4 
+
+ϕ learned state-action representation network. 7, 8, 18 
+
+ψ learned state representation network. 7, 8, 18 
+
+ζ weight of the invariance losses in the overall distance learning objective defined in Eq. (27). 8, 16, 18 
+
+dMRN an ensemble version of the MRN [ 17 ] quasimetric parameterization defined in Eq. (21). 7, 8, 18 
+
+d∗ 
+
+> SD
+
+the optimal successor distance, defined in Eq. (9). 5–7, 13, 14, 19 
+
+dπ 
+
+> SD
+
+the modified successor distance under policy π, defined in Eq. (8). 5, 6, 19 
+
+dSD the successor distance [16]. 6, 7, 14, 19 
+
+action invariance the property that the distance between a state and a state-action pair with that state is zero, d(s, (s, a )) = 0 for all s ∈ S , a ∈ A . 4, 5 
+
+OGBench A benchmark for offline goal-conditioned reinforcement learning [43]. 9, 13, 16 
+
+quasimetric a distance satisfying the triangle inequality (see Eq. (2)). 1–4, 6, 7, 9, 10, 13, 19 19 Acronyms 
+
+CMD Contrastive Metric Distillation. 9, 16 
+
+CRL Contrastive Reinforcement Learning. 9, 10, 16, 19 
+
+GCBC Goal-Conditioned Behavioral Cloning. 9 
+
+GCIQL Goal-Conditioned Implicit Q-Learning. 9, 10 
+
+GCIVL Goal-Conditioned Implicit Value Learning. 9, 10 
+
+GCRL Goal-Conditioned Reinforcement Learning. 2, 3, 10, 18 
+
+IQE Interval Quasimetric Embedding. 10 
+
+MLP Multi-Layer perceptron. 16 
+
+MRN Metric Residual Network. 6, 10, 16 
+
+QRL Quasimetric Reinforcement Learning. 9, 10 
+
+RL Reinforcement Learning. 1, 2, 4, 8, 9 
+
+TD Temporal Difference. 1, 3, 4 
+
+TMD Temporal Metric Distillation. 2, 4–6, 9, 10, 13, 14, 16, 18 
+
+## NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: Yes, we show with theoretical justification (Section 3.4) and experiments (Section 5) that our method outperforms the baselines and enables the capabilities discussed in the introduction. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: Yes, limitations are discussed in Section 6.1. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. 20 • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory assumptions and proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] Justification: Yes, full proofs are in Appendices B and C. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental result reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: Yes, we provide an implementation of our method and experimental details in the code Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. 21 • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [Yes] Justification: Yes, code is referenced in Appendix A and datasets used from Park et al. [43] are openly available. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental setting/details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? 22 Answer: [Yes] Justification: Yes, experimental details are discussed in Appendix D. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment statistical significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [Yes] Justification: Yes, we report error bars across seeds in our results. Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments compute resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [Yes] Justification: Yes, we provide compute resources in Appendix D.3. Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code of ethics 
+
+23 Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: All components of the NeurIPS Code of Ethics are respected. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [Yes] Justification: Yes, we discuss both positive and negative societal impacts in Section 6.1. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: The models and datasets used in this paper do not pose a high risk for misuse. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. 24 • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [Yes] Justification: Yes, we credit the source of the datasets and baseline implementations used in our experiments [43]. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [Yes] • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and research with human subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: No crowdsourcing or human subjects were used in this research. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. 25 • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional review board (IRB) approvals or equivalent for research with human subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: No crowdsourcing or human subjects were used in this research. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 16. Declaration of LLM usage 
+
+Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does not impact the core methodology, scientific rigorousness, or originality of the research, declaration is not required. Answer: [NA] Justification: No LLMs were used in this research. Guidelines: • The answer NA means that the core method development in this research does not involve LLMs as any important, original, or non-standard components. • Please refer to our LLM policy ( https://neurips.cc/Conferences/2025/LLM )for what should or should not be described. 26

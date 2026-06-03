@@ -1,0 +1,1390 @@
+Title: 23324_SpEx_A_Spectral_Approach.pdf
+
+URL Source: https://openreview.net/pdf?id=heoHY4vcRl
+
+Number of Pages: 28
+
+Markdown Content:
+# SPEX: A Spectral Approach to Explainable Clustering 
+
+Tal Argov 
+
+Tel Aviv University 
+
+talargov1@mail.tau.ac.il 
+
+Tal Wagner 
+
+Tel Aviv University 
+
+talwag@tauex.tau.ac.il 
+
+## Abstract 
+
+Explainable clustering by axis-aligned decision trees was introduced by [ 33 ] and has gained considerable interest. Prior work has focused on minimizing the price of explainability for specific clustering objectives, lacking a general method to fit an explanation tree to any given clustering, without restrictions. In this work, we propose a new and generic approach to explainable clustering, based on spectral graph partitioning. With it, we design an explainable clustering algorithm that can fit an explanation tree to any given non-explainable clustering, or directly to the dataset itself. Moreover, we show that prior algorithms can also be interpreted as graph partitioning, through a generalized framework due to [ 45 ] wherein cuts are optimized in two graphs simultaneously. Our experiments show the favorable performance of our method compared to baselines on a range of datasets. 
+
+## 1 Introduction 
+
+Figure 1: Illustration of explainable clustering. Clusters are generated from three gaussians. The dashed lines on the left and the decision tree on the right define the explainable clustering regions, with some points attributed to the wrong cluster. As machine learning increasingly permeates daily life and forms the basis for consequential decision making in the real world, explaining its outputs in a manner that is interpretable to humans often becomes imperative. In a recent influential work, Moshkovitz et al. [ 33 ] pro-posed a model of explainability in clustering. In their model, a clustering of points in a fea-ture space Rd is explainable if it is described by a binary decision tree, where each internal node corresponds to thresholding the points along a single coordinate. Thus, the assign-ment of points to clusters can be described by a sequence of individual feature thresholds, ar-guably making it easy to explain and interpret. See Figure 1 for illustration. Moshkovitz et al. [ 33 ] presented the Iterative Mistake Minimization (IMM) algorithm, which takes as input an already computed k-medians or k-means clustering of the data, called the reference clustering , and “rounds” into an explainable clustering. It works by fitting the reference clustering with a decision tree that greedily minimizes wrong point-to-cluster assignments. They proved that the loss in clustering cost, called the price of explainability , can be bounded as a function of k. This has led to surge of theoretical work on bounding the price of explainability, culminating in tight bounds for k-medians and nearly tight bounds for k-means [26, 28, 30, 31, 32, 12, 7, 19, 20, 4, 27]. This voluminous body of work has so far mostly focused on k-medians and k-means. These methods require the reference clustering to be endowed with centroids in order to work. This fails to capture widely used notions of clustering that do not produce centroids, like kernel k-means or spectral clustering [ 40 , 10 , 47 ], which one might wish to use as the reference clustering. [ 15 ] recently took 
+
+> 39th Conference on Neural Information Processing Systems (NeurIPS 2025).
+
+Figure 2: Left: The two-moons dataset admits an explainable clustering with small error. k-Means clustering will fail to capture the moons if used as reference clustering. Kernel k-means and spectral clustering capture the moons correctly, and can be rounded to the optimal explainable clustering. 
+
+Right: A 3-way clustering example from [33]. The horizontal cut leads to an error-free explainable clustering if chosen at the first step, but CART will select the error-heavy vertical cut first. a first step in this direction, introducing the Kernel IMM algorithm, which extends IMM to handle kernel k-means as the reference clustering, for certain types of kernels. Ideally, one would want a generic explainable clustering method that can be composed over any given reference clustering, irrespective of how it was computed, whether it has centroids, or any other constraint. The only such approach at present is through repurposing classical methods for supervised classification with decision trees, which predate the definition of explainable clustering by decades. CART [ 6, 37 ] is a method for decision tree learning over a labeled dataset, 1 which outputs a tree with nodes corresponding to feature thresholds and leaves corresponding to class labels, with the aim of minimizing classification errors with respect to supervised labels. Thus, given any reference clustering, its cluster assignments can be viewed as supervised labels, and CART can be used to round it into an explainable clustering. 
+
+Limitations of current methods. As discussed above, explainable clustering methods that require a centroid-based reference clustering, like k-means, are unable to handle cluster structures not captured by centroids. This was the motivation in [ 15 ], who gave the example of the classical “two moons” dataset, depicted in Figure 2 (left). Since k-means fails to capture the moon structure, any explainable clustering method built on it as the reference will fail as well. On the other hand, kernel k-means and spectral clustering capture the moons correctly, and can be rounded to the explainable rounding depicted in the figure, with a small number of errors. While the Kernel IMM algorithm does not require centroids, it is limited to kernel k-means with specific kernels, and varies by the specific kernel. Hence, it cannot be used as a generic method. Furthermore, the method is rather complex, and is evaluated in [ 15 ] on datasets of size only up to hundreds of points, leaving its scalability unclear. Our larger scale experiments indeed show that Kernel IMM becomes infeasible on bigger data. The CART algorithm, as mentioned above, can be repurposed for explainable clustering even though it is not designed for this task. To demonstrate its drawbacks, [ 33 ] gave a toy example where CART fails to find a simple error-free explainable clustering. It is shown in Figure 2 (right), and we revisit this example in more detail in Section 3.3. There have been some questions whether this failure mode is representative of behavior on real data, or merely a pathological case not encountered in practice. 2
+
+Preliminary small scale results in [ 15 ] implied that CART performs well empirically. However, our larger scale experiments will show that CART indeed suffers low performance on real data. The upshot is that despite a large body of work, there is no generic method for explainable clustering, which is oblivious to the type of reference clustering and robust across datasets. This is the gap that we address in this work. 
+
+Our results. We introduce a new approach to explainable clustering, based on spectral graph techniques. Cheeger’s inequality relates the eigenvalues of a graph to its optimal cut conductance, a fundamental graph partitioning objective that yields high-quality cuts. This useful fact is widely used  
+
+> 1CART is in fact a family of algorithms for Classification And Regression Trees (hence its name). The specific form of CART used in explainable clustering is detailed later, in Section 3.3. See also Section B.1.
+> 2See the peer review discussion for [15] at https://openreview.net/forum?id=FAGtjl7HOw .
+
+2in algorithms. A geometric consequence of it, stated in Theorem 2.2, relates coordinate cuts in Rd to cut conductances in the graph, provided that the graph usefully captures geometric relations between the data points in Rd. This hints at a relevance to explainable clustering. We use this connection in two ways:  
+
+> •
+
+SPEX-Clique: We may describe any given reference clustering with a graph that contains a clique over each cluster. Applying the spectral result iteratively to this graph leads to an algorithm that can round any given reference clustering, without limitations, into an explainable clustering.  
+
+> •
+
+SPEX-kNN: We may also use the spectral result on a graph built directly on the dataset in Rd,like the k-nearest neighbor graph. This leads to a “reference-free” algorithm, which computes an explainable clustering directly from the data, without using a reference clustering at all. To gain more insight into existing methods and their relation to ours, we show they are captured by a generalized graph partitioning framework of non-uniform sparse cuts [ 45 ], allowing us to view them through a unified analytic lens. Namely, prior methods can be seen as different choices of graphs to describe the reference clustering. Our experiments on a range of datasets and baseline shed light on the empirical performance of explainable clustering methods and showcases the advantage of our approach. 
+
+1.1 Related Work 
+
+Much work has focused on proving multiplicative bounds on the price of explainability for k-medians and k-means. In deterministic algorithms, IMM [ 33 ] achieved O(k) for k-medians and O(k2) for 
+
+k-means. [12] improved the k-means bound to O(k log k), with an algorithm we will call EMN. Randomized methods have enabled better bounds. For k-medians, a sequence of works analyzed a natural randomized procedure and ultimately obtained a tight bound of (1 + o(1)) ln k [ 30 , 32 ,12 , 19 , 20 ]. For k-means, [ 20 ] achieved O(k ln ln k), which is tight up to the ln ln k term. Some works have also shown better bounds in the low-dimensional data regime [ 26 , 12 , 7 ], and studied the computational complexity of approximating the optimal explainable clustering [4, 20, 27]. Some works have used modified or extended definitions of tree-based explainable clustering [ 16 , 18 ,25 , 41 , 9 , 46 , 35 ]. In particular, [ 18 ] generalized the definition far beyond [ 33 ], allowing oblique (hyperplane) cuts that involve multiple coordinates rather than just single coordinate cuts. This greatly increases the expressive capacity of the resulting clustering—in fact, [ 18 ] show it can exactly capture any reference k-means clustering, without any “price of explainability”—though arguably at the price of rendering the clustering less explainable. While defining explainability in clustering remains an open-ended question, in this work we focus on the original explainability model of [33]. In the broader context of explainable machine learning, the model of [ 33 ] is an example of an 
+
+intrinsically explainability method, where the given model (in this case, the reference clustering) is approximated by a different model (in this case, the explainable clustering tree) on which structural explainability constraints are imposed. This is in contrast with post-hoc explainability methods, which aim to endow the given reference model with explanations without modifying it. 
+
+## 2 Spectral Explainable Clustering 
+
+We begin with some necessary background and notation on graph partitioning. Let G(X, E, w ) be an undirected graph. Given a strict non-empty subset S ⊂ X, let eG(S, X \ S) denote the sum of edge weights crossing between S and X \ S, and let vol G(S) denote the sum of weighted degrees of nodes in S (called the volume of S). There are two standard notions for quantifying the outer connectivity of S within G (see [47]): 
+
+ϕG(S) = eG(S, X \ S)
+
+|S| ; ψG(S) = eG(S, X \ S)vol G(S) (1) 
+
+ϕG(S) is called the sparsity of S, while ψG(S) is called the conductance of S. Both notions have analogues for considering S and its complement X \ S as a two-way cut: 
+
+ΦG(S) = eG(S, X \ S) 
+
+> 1
+> |X|
+
+· | S| · | X \ S| ; ΨG(S) = eG(S, X \ S) 
+
+> 1vol G(X)
+
+· vol G(S) · vol G(X \ S) . (2) 3ΦG(S) is sometimes called the ratio cut objective [ 48 ], while ΨG(S) is called the normalized cut objective [ 42 ]. These objectives sometimes appear in the literature slightly differently, with 
+
+min {| S|, |X \ S|} and min {vol G(S), vol G(X \ S)} as their respective denominators. These are the same as Equation (2) up to a factor of 2, since 12 min {s, n − s} ≤ 1 
+
+> n
+
+· s · (n − s) ≤ min {s, n − s}
+
+for all 0 < s < n , which applies here with n = |X|, s = |S| in ΦG(S), and with n = vol G(X),
+
+s = vol G(S) in ΨG(S).
+
+2.1 The Spectral Approach 
+
+Our approach is grounded in the following theorem, which is a generalization of a theorem given in [ 11 ], based on a framework developed by [ 2 , 3], in the context of nearest neighbor search. It relates coordinate cuts in Rd to the Cheeger inequality [ 1, 8], a fundamental result in spectral graph theory with a myriad of algorithmic implications. While they stated the theorem specifically for the nearest neighbor graph of a point set in Rd, it holds for general weighted graphs over points in Rd, as we now state. We provide a proof in Section A. 
+
+Definition 2.1. Let X ⊂ Rd. The coordinate cut given by coordinate j ∈ { 1, . . . , d } and threshold 
+
+τ ∈ R is Sj,τ (X) := {x ∈ X : xj ≤ τ }. The cut is valid if Sj,τ (X)̸ = ∅ and Sj,τ (X)̸ = X.
+
+Theorem 2.2. Let X ⊂ Rd be a set of points, where x ∈ X has coordinates x = ( x1, . . . , x d). Let 
+
+G(X, E, w ) be a graph with vertex set X. Consider two distributions over pairs of points in X: 
+
+> •
+
+Dadj is the distribution over adjacent pairs in G, where a pair x, y ∈ E is sampled with probability proportional to the edge weight between them.  
+
+> •
+
+Dall is the distribution over all pairs x, y ∈ X, where x and y are sampled independently, each with probability proportional to its weighted degree in G.Then, there is a valid coordinate cut j, τ such that 
+
+ΨG(Sj,τ (X)) ≤
+
+s
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+.
+
+Intuitively, the theorem draws a connection between combinatorial graph cuts and geometric proper-ties of the set of points: if the graph nodes graph are associated with embeddings in Rd, then there is a “good quality” graph cut, whose conductance is upper-bounded in terms of the squared Euclidean distances between the node embeddings. Furthermore, that cut is a coordinate cut. The conductance bound is governed by the ratio of expected squared distances in X according to two distributions over pairs of points: the numerator samples pairs of points adjacent in G, while the denominator samples any pair of points. Thus, the ratio (and hence the cut conductance) is smaller when G captures a geometrically meaningful structure in the dataset, wherein adjacent pairs of points are expected to be nearer to each other than general pairs of points. This implies an approach to explainable clustering. Given a reference clustering, we can describe it with a suitable graph G, and iteratively look for the coordinate cut with minimum conductance in each node of the decision tree. If the reference clustering is of good quality, in the sense that a pair of points are expected to be nearer to each other if they are clustered together, then Theorem 2.2 guarantees the existence of a low-conductance cut. At the same time, since the nearness of points in the same cluster is a “soft” requirement (it only needs to hold in expectation), it renders the theorem robust to various types of clustering, allowing for unconstrained cluster shapes, outliers, etc. Another possibility that arises is to dispense with the reference clustering, and construct a graph that captures nearness/farness directly from the dataset. In Section 2.2 we describe the explainable tree construction with a general graph, and in Section 2.3 we discuss graph selection. 
+
+2.2 Iterative Tree Construction 
+
+Given a graph G(X, E, w ) over the dataset X ⊂ Rd, our task is to construct an explainable clustering decision tree T . Let ℓ > 0 be the desired number of leaves. An explainable clustering tree is a decision tree in which every internal node v is associated with a coordinate jv ∈ { 1, . . . , d } and a threshold τv ∈ R, inducing the condition xjv ≤ τv given a point 
+
+x ∈ R. The coordinate thresholds associate a subset Xv ⊂ X with each node v: the root is associated 4with X, and every non-root v with parent u is associated with Xv = Sju,τ u (Xu) if v is the left child of u, or Xv = Xu \ Sju,τ u (Xu) if it v the right child of u.
+
+Algorithm 1 SPEX
+
+input: Dataset X ⊂ Rd, graph G(X, E, w ), target number of clusters ℓ
+
+output: Decision tree T where every internal node is associated with a coordinate j and threshold τ
+
+BUILD TREE (X, G, ℓ ):
+
+T ← initialize a tree with a single node vj, τ ← argmin j,τ CUT SCORE (X, j, τ )
+
+Q ← initialize a maximum priority for the tree leaves, with priorities given by L EAF SCORE 
+
+Q.push (v, X, j, τ )
+
+while T has less than ℓ leaves do 
+
+v, X v , j v , τ v ← Q.pop () 
+
+Associate v with the cut j, τ 
+
+Split v into two new leaves vL, v R
+
+XvL ← Sjv ,τ v (Xv )
+
+XvL ← Xv \ XvL
+
+jL, τ L ← argmin j,τ CUT SCORE (XvL , j, τ )
+
+jR, τ R ← argmin j,τ CUT SCORE (XvR , j, τ )
+
+Q.push (vL, X vL , j L, τ L)
+
+Q.push (vR, X vR , j R, τ R)
+
+return T
+
+CUT SCORE (X′, j, τ ) : 
+
+if Sj,τ (X) = ∅ or Sj,τ (X) = X then return ∞
+
+return ψG(Sj,τ (X′)) + ψG(Xv \ Sj,τ (X′)) 
+
+LEAF SCORE (v, X ′, j, τ ) : 
+
+return ψG(X′) − CUT SCORE (X′, j, τ )
+
+Let L(T ) denote the set of leaves in T . They induce partition of X into clusters, X =
+
+∪v∈L (T )Xv . We measure the quality of T by a generalization of the normalized cut objective to multi-way partitions [47]: 
+
+¯ΨG(T ) = X 
+
+> v∈L (T)
+
+ψG(Xv ). (3) The smaller ¯ΨG(T ), the better the partition induced by its leaves. Note this generalizes the two-way cut objective ΨG(S) (Equation (2)), since ΨG(S) = ψG(S) + ψG(X \ S).To build the tree, we start with T containing only a root. As long as T does not yet have the requisite number of leaves ℓ, we choose the leaf v to split next to greedily minimize 
+
+¯ΨG(T ). Splitting a leaf v with a cut S ⊂ Xv
+
+replaces the summand ψG(Xv ) in Equation (3) with ψG(S)+ ψG(Xv \S), and thus v is chosen to maximize the reduction in ¯ΨT (G) its split would yield, which is 
+
+ψG(Xv )−min  
+
+> S
+
+(ψG(S) + ψG(Xv \ S)) , (4) where S ranges over all valid coordinate cuts. We associate v with the jv , τ v corresponding to the minimizer S, split v into two new leaves along this cut, and repeat. See Algorithm 1. Note that Algorithm 1 has the flexibility to produce a tree T with any desired number of leaves, regardless of the number of clusters in the reference clustering. In contrast, centroid-based methods like IMM, EMN and Kernel IMM are bound to produce the same number of leaves in 
+
+T as the number of centroids in the reference k-median or (kernel) k-means clustering, and increasing the number of leaves requires separate techniques [ 17 , 31 , 15 ]. Increasing the number of leaves is helpful for attaining a smaller price of explainability due to the increased expressivity of T , albeit at the expense of being less explainable due to its bigger size. We discuss this further in Appendix B. Our main evaluation will focus on producing trees with the same number of leaves as clusters in the reference clustering. 
+
+2.3 SPEX-Clique and S PEX-kNN 
+
+To capture a given reference clustering with a graph, there are several natural choices:  
+
+> •
+
+Clique graph: points are adjacent if and only if they are in the same cluster (thus, every cluster becomes a clique).  
+
+> •
+
+Star graph: if the reference clustering is endowed with centroids, each point can be made adjacent to its cluster centroid (thus, every cluster becomes a star).  
+
+> •
+
+Independent set (IS) graph: points are adjacent if and only if they are not in the same cluster (thus, every cluster becomes an independent set). This is the complement of the clique graph. Here, of course, one would wish to maximize rather than minimize the cut objective. The clique graph may seem like the most natural choice, and this is indeed the one we make. Perhaps surprisingly, as we will show in Section 3, when previous methods (IMM, EMN, CART) are interpreted through this graphical lens, they turn out to correspond to either the star graph or the IS graph. This directly relates to their limitations, like requiring centroids (in the case of the star graph) or failing the toy example from Figure 2 (in the case of the IS graph). 5Given any reference clustering, using the clique graph as G in Algorithm 1 yields the algorithm we call S PEX-Clique. We also consider an variant that uses no reference clustering, by constructing the nearest neighbor graph directly on the points in X. This yields the algorithm we call S PEX-kNN. 
+
+2.4 Computational Efficiency 
+
+SPEX as well as the baselines we consider share the following high-level structure. In each tree node 
+
+u with nu points, for each coordinate, they sort the points by that coordinate (time O(nu log nu)) and perform a sweep-line procedure that iterates over the nu − 1 prefix/suffix cuts by moving nodes from the suffix to the prefix one at a time. As each node is moved, the cut score is updated accordingly (let 
+
+S denote the time it takes to update), and eventually the cut with the overall optimal score is selected. Repeating this for all coordinates takes time O(dn u(log nu + S)) . In each tree level, the sum P 
+
+> u
+
+nu
+
+is n for S PEX and CART and n + k ≤ 2n for IMM and EMN, therefore the time per level is 
+
+O(dn (log n + S)) . Summing over up to k − 1 levels in the tree, the total time is O(kdn (log n + S)) .The algorithms may differ on the time S it takes update cut scores during sweep-line. In S PEX-Clique, we need not store the entire clique graph; rather, we only store point-cluster assignments ( O(n)
+
+memory). During sweep-line, we maintain two cluster histograms for the prefix and the suffix ( O(k)
+
+memory), from which the cut score can be updated in S = O(1) time. In S PEX-kNN, letting κ
+
+denote the number of neighbors per node (note that this is a different parameter than the number of clusters k), we can store the kNN graph in O(nκ ) memory and update cut scores in S = O(κ) time. 
+
+## 3 Lens: Non-Uniform Sparse Cuts 
+
+While our spectral approach to explainable clustering may seem rather different from previous methods, in this section we show a generalized graph partitioning framework that captures them in a unified way. It is based on non-uniform sparse cuts as defined by Trevisan [ 45 ], where cuts are optimized simultaneously in two graphs that share the same set of nodes. Trevisan [ 45 ] defined the Non-Uniform Sparsest Cut problem as follows. Let G(X, E G, w G) and 
+
+H(X, E H , w H ) be two graphs on the same set of nodes X. The (G, H )-sparsity of a cut (S, X \ S)
+
+is defined as the (normalized) ratio of edges cut in G to edges cut in H:
+
+ΨG,H (S) =  
+
+> 1vol G(X)
+
+· eG(S, X \ S)  
+
+> 1vol H(X)
+
+· eH (S, X \ S) .
+
+The goal in the Non-Uniform Sparsest Cut problem is to find the cut with the smallest ΨG,H (S).In [ 45 ] it is observed that this generalized graph partitioning problem captures several classical problems defined on a single graph G as special cases:  
+
+> •
+
+The classical (“uniform”) Sparsest Cut problem, of minimizing ΦG(S) from Equation (2), is the case of ΨG,H (S) where H is an unweighted clique over X. 
+
+> •
+
+The Normalized Cut problem, of minimizing ΨG(S) from Equation (2), is the case of ΨG,H (S)
+
+where H is the G-degree weighted clique over X, in which the edge weight in H between every pair x, y ∈ X is the product of their weighted degrees in G. 
+
+> •
+
+The Minimum st -Cut problem is the case of ΨG,H (S) where H contains a single edge between a “distinguished” pair s, t ∈ X.Here, we further observe that this framework is useful in capturing prior methods for explainable clustering (or close variants of those methods), as they in fact produce coordinate cuts that minimize 
+
+ΨG,H (S) with particular choices of graphs G and H, even though neither method is originally given in terms of graphical sparse cut terms.  
+
+> •
+
+IMM [ 33 ] corresponds to G being the star graph over a given reference clustering endowed with centroids, and H containing a single edge that connects a pair of diametrical (furthest) centroids.  
+
+> •
+
+EMN [ 12 ] also corresponds to G being the star graph, but with H being an unweighted clique over the k cluster centroids.  
+
+> •
+
+CART closely corresponds to H being the independent set (IS) graph over the reference clustering (see Section 2.3), and G being the H-degree weighted clique. We now discuss each algorithm in turn, and highlight useful implications of this graph-theortic lens. 63.1 IMM as Non-Uniform Sparse Cut 
+
+Given a reference clustering C = (C1, . . . , C k) endowed with cluster centroids M =
+
+{μ(1) , . . . , μ (k)}, the IMM algorithm builds a decision tree in which every node u is associated with a subset Xu ⊂ X ∪ M of points and centroids. In each node, it chooses the coordinate cut that minimizes the number of “mistakes”, i.e., of points placed at a different side of the cut than their centroid, while separating at least one pair of centroids. Formally, for x ∈ X, let μ(x) denote the centroid of the cluster containing x. The cut S ⊂ Xu in a node u is chosen by IMM to minimize, 
+
+mis u(S) = |{ x ∈ S : μ(x) ∈ Xu \ S} ∪ { x ∈ Xu \ S : μ(x) ∈ S}| ,
+
+among all coordinate cuts S that satisfy μ(i) ∈ S and μ(j) ∈ X \ S for at least one pair μ(i), μ (j) ∈
+
+M ∩ Xu. The construction terminates when each leaf in the tree contains exactly one centroid. To cast this as non-uniform sparse cut, consider a slightly modified variant of IMM. For each node u,Let μ′, μ ′′ ∈ Xu be a pair of centroids at maximal distance among the centroids in M ∩ Xu. Choose the coordinate cut S ⊂ Xu that minimizes mis u(S) among those that separate μ′, μ ′′ . This is a subset of the cuts in the original IMM. For this variant, let G be the star graph over the reference clustering, and Gu = G[Xu] be its restriction to the subset Xu ⊂ X ∪ M associated with each tree node u.Then mis u(S) = eGu (S, X u \ S), since each cut edge marks a point separated from its centroid. Let 
+
+Hu be the single edge graph over Xu that contains only an edge connecting μ′ and μ′′ . Then we have, eHu (S, X u \ S) = 1 if the cut (S, X u \ S) separates μ′, μ ′′ , and eHu (S, X u \ S) = 0 otherwise. Thus, minimizing mis u(S) subject to a cut separating μ′, μ ′′ is equivalent to minimizing the ratio 
+
+eGu (S, X u \ S)/e Hu (S, X u \ S). This is equal (up to normalization) to the non-uniform cut sparsity, 
+
+ΨGu,H u (S). Even though this modified IMM considers less cuts than the original IMM, it attains the same price of explainability for k-medians, by a different proof based on graph partitioning, that avoids the intricate potential function analysis in [33]. We show this in Section A.3. 
+
+3.2 EMN as Non-Uniform Sparse Cut 
+
+The EMN algorithm [ 12 ] is an improvement of IMM by the following modification: in every tree node u, instead of minimizing mis u(S), it chooses the threshold coordinate cut S ⊂ Xu that minimizes the ratio mis u(S)/f u(S), where [ 12 ] define fu(S) = min {| S ∩ M |, |(Xu \ S) ∩ M |} .As with IMM, letting Gu be the star graph over the reference clustering when restricted to Xu, we have mis u(S) = eGu (S, X u \ S). Let Hu be the graph with vertex set Xu whose edges form an 
+
+unweighted clique over M ∩ Xu (the rest of the vertices in Xu are isolated in Hu). Then, 
+
+eHu (S, X u \ S) = |S ∩ M | · | (Xu \ S) ∩ M |.
+
+Recall from Section 2 that 12 fu(S) ≤ 1  
+
+> |M∩Xu|
+
+· eHu (S, X u \ S) ≤ fu(S). Thus, minimizing the ratio mis u(S)/f u(S) is equivalent, up to a factor of 2, to minimizing the ratio eGu (S, X u \
+
+S)/e Hu (S, X u \ S). This is equivalent to minimizing the non-uniform cut sparsity ΨGu,H u (S).
+
+3.3 CART as Non-Uniform Sparse Cut 
+
+We first review the CART algorithm in the form used in explainable clustering. The Gini impurity 
+
+of a distribution (p1, . . . , p k) over k elements is defined as υ(p) = Pki=1 pi(1 − pi). Given a point set X ⊂ Rd, a reference clustering C = {C1, . . . , C k), and a subset S ⊂ X, we may define a distribution pC (S) over the clusters as pC (S) = 
+
+ |S∩C1||S| , |S∩C2||S| , . . . , |S∩Ck ||S|
+
+
+
+, which corresponds to sampling a uniformly random point from S and returning its cluster ID. The impurity of S is defined as υC (S) = υ(pC (S)) , and the impurity of (S, X \ S) as a two-way cut as, 
+
+ΥC (S, X \ S) = |S||X| · υC (S) + |X \ S||X| · υC (X \ S).
+
+The CART algorithm builds a decision tree starting with a root node associated with all of X. It then iteratively chooses a leaf node whose associated subset X′ maximizes score( X′) = υC (X′) −
+
+min S⊂X′ ΥC (S, X ′ \ S), where S ranges over all coordinates threshold cuts, and splits that leaf across that cut. The score captures the impurity reduction gained by splitting X′ along its best cut. Note how this is analogous to Equation (4) in S PEX.7Table 1: Datasets. ∗Training set only. †Embedded with CLIP [38]. ‡Embedded with SBERT [39].                                       
+
+> CIFAR-10 ∗20Newsgroups ∗MNIST ∗Caltech 101 Beans Breast Cancer Ecoli Iris # Points 50,000 11,314 60,000 8677 13,611 569 336 150 # Dimensions 512 †768 ‡512 †512 †16 30 74# Classes 10 20 10 101 7283Reference [24] [5] [29] [13] [23] [44] [21] [14]
+
+Now, we show that a small modification to CART is equivalent to a case of non-uniform sparsest cut. Let H be the independent set graph over the reference clustering C (see Section 2.3). For a subset 
+
+S ⊂ X, Let αH (S) denote the sum of edge weights with both endpoints in S. We can now interpret the impurity υC (S) of a subset S ⊂ X as, 
+
+υC (S) = 
+
+> k
+
+X
+
+> i=1
+
+|S ∩ Ci||S|
+
+
+
+1 − |S ∩ Ci||S|
+
+
+
+= 1
+
+|S|2
+
+> k
+
+X
+
+> i=1
+
+|S ∩ Ci| (|S| − | S ∩ Ci|) = 2 · αH (S)
+
+|S|2 .
+
+Thus, the two-way cut impurity becomes 
+
+ΥC (S, X \ S) = 2
+
+|X|
+
+ αH (S)
+
+|S| + αH (X \ S)
+
+|X \ S|
+
+
+
+. (5) To proceed, we make the modification of replacing set cardinalities with their volumes in H, as in the transition from sparsity to conductance in Equations (1) and (2). We get the modified two-way cut impurity, instead of Equation (5): 
+
+eΥC (S, X \ S) = 2vol H (X)
+
+ αH (S)vol H (S) + αH (X \ S)vol H (X \ S)
+
+
+
+.
+
+This is precisely (up to normalization terms) the N assoc graph cut objective defined in [ 42 , eq. (3)]. 3
+
+As they observed, it is directly related to the normalized cut objective, i.e., to the cut conductance: 
+
+ΨH (S) = 2 − vol H (X)2 · eΥC (S, X \ S).
+
+Thus, finding a coordinate cut S that minimizes our modified impurity eΥ is equivalent to maximizing 
+
+the usual cut conductance ΨH (S) in H. This, in turn, is equivalent to maximizing the non-uniform cut sparsity ΨH,G (S), where H is the independent set graph and G is the H-degree weighted clique 
+
+over X, since (as observed in [ 45 ] and mentioned in the beginning of this section), for this choice of graphs it holds that ΨH,G (S) = Ψ H (S), up to normalization. Finally, since ΨG,H (S) = 1 /ΨH,G (S)
+
+by definition, this is equivalent minimizing the non-uniform cut sparsity ΨH,G (S).This point of view clarifies the failure of CART in Figure 2. The IS graph over a reference clustering incentivizes cuts that separate pairs of points residing in different clusters, but has no incentive to not 
+
+separate points residing in the same cluster, since they are not connected with any edges and hence have no effect on the cut value. Since CART maximizes cut conductance, it opts to cut the larger number of edges between the bottom clusters (vertical cut) over the smaller number of edges between the top cluster and each of the bottom clusters (horizontal cut), which is incompatible with clustering. 
+
+## 4 Experimental Evaluation 
+
+We evaluate our methods compared to baselines, on eight public real-world datasets of various sizes and dimensions, detailed in Table 1. Our code is available online. 4
+
+Our algorithms. We focus on two instantiations of our method: S PEX-Clique with spectral clustering as the reference, and S PEX-kNNwhere the k-NN graph is constructed with k = 20 . Section B includes additional results for S PEX-Clique with k-means and kernel k-means as the reference clustering, and for S PEX-kNN with other values of k.
+
+Baselines. We evaluate the following baselines:        
+
+> 3In the notation of [42], αH(S) = assoc (S, S )and vol H(S) = assoc (S, X ).
+> 4https://github.com/talargv/SpEx
+
+8Figure 3: Adjusted Rand Index (ARI) and Adjusted Mutual Information (AMI), higher is better.  
+
+> •
+
+EMN [ 12 ], the state of the art for explainable clustering with k-means as the reference clustering. Note that EMN cannot work with a spectral or a kernel k-means reference clustering, as its operation requires the reference clustering to have centroids.  
+
+> •
+
+CART, with both k-means and spectral clustering as the reference clustering.  
+
+> •
+
+Kernel IMM [15], which uses kernel k-means as the reference clustering. Our experiments indicated that Kernel IMM does not scale well, failing to run on the larger scale datasets. We therefore report its results only for the three smaller scale datasets (Breast Cancer, Ecoli, Iris), which are the ones used in [15]. See more in Section B. 
+
+Evaluation measures. The classes of each dataset are used as groundtruth clusters. To evaluate each method, we report two standard (and incomparable) measures of clustering agreement between two clusterings of the same data: Adjusted Rand Index (ARI) [ 22 ] and Adjusted Mutual Information (AMI) [ 34 ]. Each is explainable clustering is evaluated for its agreement with the groundtruth clustering through these measures. 
+
+4.1 Results 
+
+Main results are reported in Figure 3. Tables 2 and 3 augment them with additional choices of reference clustering for S PEX-Clique and CART and list ARIs with respect to the reference clustering. They also contain two synthetic small-scale datasets, R15 and Pathbased, used in [ 15 ]. Appendix B includes additional results. The results show that S PEX-Clique is the most consistently high-performing algorithm. It outperforms each baseline in most cases in both evaluation measures, and is never exceeded by more than one baseline at the same time. S PEX-kNN is highly effective particularly on the low dimensional datasets 9Table 2: Results on smaller datasets. Rows are grouped by reference clustering, shown as the first row in each group. The REF column lists the ARI with respect to the reference clustering (rather than the ground truth as in ARI column). Best scores per reference clustering are in bold. R15 Pathbased Ecoli Iris Cancer Algorithm ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF                                                                                                                                                                                         
+
+> REF: Spectral .993 .994 1. .526 .570 1. .711 .653 1. .630 .661 1. .743 .626 1. SPEX-kNN .982 .987 .989 .332 .410 .551 .679 .642 .863 .450 .647 .450 .507 .490 .562 SPEX-Clique .986 .989 .993 .441 .517 .824 .662 .621 .847 .576 .629 .787 .694 .588 .785 CART .986 .989 .993 .441 .517 .824 .672 .618 .886 .576 .629 .787 683 .560 .811
+> REF: k-means .993 .994 1. .461 .543 1. .489 .609 1. .641 .669 1. .491 .464 1. EMN .986 .989 .993 .461 .543 1. .456 .559 .873 .576 .629 .772 .491 .464 1.
+> SPEX-Clique .986 .989 .993 .461 .543 1. .456 .559 .873 .576 .629 .772 .491 .464 1.
+> CART .986 .989 .993 .421 .507 .897 .454 .543 .840 .576 .629 .772 .491 .464 1.
+> REF: Kernel k-means .908 .967 1. .919 .888 1. .538 .612 1. .731 .767 1. .116 .228 1. Kernel IMM .904 .962 .986 .614 .614 .583 .522 .560 .848 .732 .788 .924 .127 .241 .93
+> SPEX-Clique .869 .941 .951 .479 .553 .450 .529 .573 .851 .732 .788 .924 .406 .414 .511 CART .682 .876 .759 .479 .553 .450 .500 .558 .824 .732 .788 .924 .406 .414 .511
+
+Table 3: Results on larger datasets. MNIST Caltech 101 Newsgroups Beans Cifar Algorithm ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF                                                                                                                           
+
+> REF: Spectral .745 .820 1. .563 .859 1. .431 .671 1. .586 .677 1. .712 .801 1. SPEX-kNN .092 .338 .150 .121 .497 .168 .042 .170 .09 .574 .690 .649 .342 .434 .373 SPEX-Clique .217 .384 .282 .247 .521 .303 .078 .223 .189 .564 .671 .743 .320 .438 .394
+> CART .027 .148 .030 -.010 .166 .005 .008 .078 -.013 .542 .658 .705 .036 .169 .035
+> REF: k-means .364 .481 1. .405 .822 1. .502 .660 1. .572 .689 1. .636 .738 1. EMN .25 .342 .42 .249 .548 .416 .115 .219 .163 .563 .688 .780 .314 .402 .387
+> SPEX-Clique .209 .336 .403 .122 .495 .195 .098 .249 .128 .562 .687 .773 .288 .410 .370 CART .124 .299 .229 -.017 .082 .003 .005 .092 .006 .536 .669 .757 .045 .180 .037
+
+(Beans, Ecoli and Iris). 5 On these datasets, it outperforms all baselines as well as S PEX-Clique, with the exception of Kernel IMM on Iris. 6
+
+CART performs well on the smaller datasets (confirming similar results reported in [ 15 ]), however, it performs poorly on the larger datasets. Recall that CART is not originally intended for explainable clustering, but can be repurposed for it since it produces a structurally compatible output (a binary decision tree with coordinate cuts). In Sections 1 and 3.3, we discussed a toy example from [ 33 ] that demonstrates a failure mode of CART for explainable clustering due to its incompatible objective. Our experimental results indicate this incompatibility may also impede its performance on real data. 
+
+Conclusion and limitations. Prior work on explainable clustering has focused on a few specific reference objectives, allowing it to prove worst-case approximation bounds tailored to them (cf. Sec-tion 1.1). S PEX, on the other hand, fills the gap of a generic, reference-oblivious method, currently lacking in the literature. Thus, while theoretically well-grounded (Theorem 2.2, Section 3), it cannot offer such bounds. Other methods may be better choices for some specific reference objectives – e.g., EMN is known to be near-optimal for k-means, and Tables 2 and 3 indeed show that it is generally better than S PEX for that reference objective. S PEX is better for data where objectives already well-studied in explainable clustering (like k-means) fall short, and more versatile objectives (like spectral clustering) are needed. As future work, it would be interesting to explore if the theoretical framework we develop can yet lead to formal approximation bounds for some of these objectives. 
+
+> 5
+
+These datasets are of dimension up to 16. The other datasets have dimension at least 30. 
+
+> 6
+
+On Iris, kernel k-means significantly outperforms spectral and k-means as the reference clustering. In Figure 3, only Kernel IMM uses it a reference. When S PEX-Clique or CART are run on the same kernel k-means reference, the results they yield are identical to Kernel IMM. These results are included in Section B. 
+
+10 Acknowledgements 
+
+This work was supported by Len Blavatnik and the Blavatnik Family foundation and by an Alon Scholarship of the Israeli Council for Higher Education. TW is also with Amazon; this work is not associated with Amazon. 
+
+## References 
+
+[1] Noga Alon and Vitali D Milman. λ1, isoperimetric inequalities for graphs, and superconcentra-tors. Journal of Combinatorial Theory, Series B , 38(1):73–88, 1985. [2] Alexandr Andoni, Assaf Naor, Aleksandar Nikolov, Ilya Razenshteyn, and Erik Waingarten. Data-dependent hashing via nonlinear spectral gaps. In Proceedings of the 50th annual ACM SIGACT symposium on theory of computing , pages 787–800, 2018. [3] Alexandr Andoni, Assaf Naor, Aleksandar Nikolov, Ilya Razenshteyn, and Erik Waingarten. Hölder homeomorphisms and approximate nearest neighbors. In 2018 IEEE 59th Annual Symposium on Foundations of Computer Science (FOCS) , pages 159–169. IEEE, 2018. [4] Sayan Bandyapadhyay, Fedor V Fomin, Petr A Golovach, William Lochet, Nidhi Purohit, and Kirill Simonov. How to find a good explanation for clustering? Artificial Intelligence ,322:103948, 2023. [5] Stephen D Bay, Dennis Kibler, Michael J Pazzani, and Padhraic Smyth. The uci kdd archive of large data sets for data mining research and experimentation. ACM SIGKDD explorations newsletter , 2(2):81–85, 2000. [6] L Breiman, JH Friedman, R Olshen, and CJ Stone. Classification and regression trees. 1984. [7] Moses Charikar and Lunjia Hu. Near-optimal explainable k-means for all dimensions. In 
+
+Proceedings of the 2022 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA) , pages 2580–2606. SIAM, 2022. [8] Fan RK Chung. Spectral graph theory , volume 92. American Mathematical Soc., 1997. [9] Eldan Cohen. Interpretable clustering via soft clustering trees. In International Conference on Integration of Constraint Programming, Artificial Intelligence, and Operations Research , pages 281–298. Springer, 2023. [10] Inderjit S Dhillon, Yuqiang Guan, and Brian Kulis. Kernel k-means: spectral clustering and normalized cuts. In Proceedings of the tenth ACM SIGKDD international conference on Knowledge discovery and data mining , pages 551–556, 2004. [11] Yihe Dong, Piotr Indyk, Ilya Razenshteyn, and Tal Wagner. Learning space partitions for nearest neighbor search. In International Conference on Learning Representations , 2020. [12] Hossein Esfandiari, Vahab Mirrokni, and Shyam Narayanan. Almost tight approximation algorithms for explainable clustering. In Proceedings of the 2022 Annual ACM-SIAM Symposium on Discrete Algorithms (SODA) , pages 2641–2663. SIAM, 2022. [13] Li Fei-Fei, Rob Fergus, and Pietro Perona. One-shot learning of object categories. IEEE Transactions on Pattern Analysis and Machine Intelligence , 28:594–611, 2006. [14] Rory A. Fisher. The use of multiple measurements in taxonomic problems. Annals of Human Genetics , 7:179–188, 1936. [15] Maximilian Fleissner, Leena Chennuru Vankadara, and Debarghya Ghoshdastidar. Explaining kernel clustering via decision trees. In The Twelfth International Conference on Learning Representations (ICLR) , 2024. [16] Ricardo Fraiman, Badih Ghattas, and Marcela Svarc. Interpretable clustering using unsupervised binary trees. Advances in Data Analysis and Classification , 7(2):125–145, 2013. 11 [17] Nave Frost, Michal Moshkovitz, and Cyrus Rashtchian. Exkmc: Expanding explainable 
+
+k-means clustering. arXiv preprint arXiv:2006.02399 , 2020. [18] Magzhan Gabidolla and Miguel Á Carreira-Perpiñán. Optimal interpretable clustering using oblique decision trees. In Proceedings of the 28th ACM SIGKDD Conference on Knowledge Discovery and Data Mining , pages 400–410, 2022. [19] Buddhima Gamlath, Xinrui Jia, Adam Polak, and Ola Svensson. Nearly-tight and oblivious algorithms for explainable clustering. Advances in Neural Information Processing Systems ,34:28929–28939, 2021. [20] Anupam Gupta, Madhusudhan Reddy Pittu, Ola Svensson, and Rachel Yuan. The price of explainability for clustering. In 2023 IEEE 64th Annual Symposium on Foundations of Computer Science (FOCS) , pages 1131–1148. IEEE, 2023. [21] Paul Horton and Kenta Nakai. A probabilistic classification system for predicting the cellular localization sites of proteins. Proceedings. International Conference on Intelligent Systems for Molecular Biology , 4:109–15, 1996. [22] Lawrence J. Hubert and Phipps Arabie. Comparing partitions. Journal of Classification ,2:193–218, 1985. [23] Murat Koklu and Ilker Ali Özkan. Multiclass classification of dry beans using computer vision and machine learning techniques. Comput. Electron. Agric. , 174:105507, 2020. [24] Alex Krizhevsky. Learning multiple layers of features from tiny images. 2009. [25] Eduardo Laber, Lucas Murtinho, and Felipe Oliveira. Shallow decision trees for explainable k-means clustering. Pattern Recognition , 137:109239, 2023. [26] Eduardo S Laber and Lucas Murtinho. On the price of explainability for some clustering problems. In International Conference on Machine Learning , pages 5915–5925. PMLR, 2021. [27] Eduardo Sany Laber. The computational complexity of some explainable clustering problems. 
+
+Information Processing Letters , 184:106437, 2024. [28] Eduardo Sany Laber and Lucas Saadi Murtinho. Nearly tight bounds on the price of explain-ability for the k-center and the maximum-spacing clustering problems. Theoretical Computer Science , 949:113744, 2023. [29] Yann LeCun, Léon Bottou, Yoshua Bengio, and Patrick Haffner. Gradient-based learning applied to document recognition. Proc. IEEE , 86:2278–2324, 1998. [30] Konstantin Makarychev and Liren Shan. Near-optimal algorithms for explainable k-medians and k-means. In International Conference on Machine Learning , pages 7358–7367. PMLR, 2021. [31] Konstantin Makarychev and Liren Shan. Explainable k-means: don’t be greedy, plant bigger trees! In Proceedings of the 54th Annual ACM SIGACT Symposium on Theory of Computing ,pages 1629–1642, 2022. [32] Konstantin Makarychev and Liren Shan. Random cuts are optimal for explainable k-medians. 
+
+Advances in Neural Information Processing Systems , 36, 2024. [33] Michal Moshkovitz, Sanjoy Dasgupta, Cyrus Rashtchian, and Nave Frost. Explainable k-means and k-medians clustering. In International conference on machine learning , pages 7055–7065. PMLR, 2020. [34] Xuan Vinh Nguyen, Julien Epps, and James Bailey. Information theoretic measures for cluster-ings comparison: Variants, properties, normalization and correction for chance. J. Mach. Learn. Res. , 11:2837–2854, 2010. [35] Louis Ohl, Pierre-Alexandre Mattei, Mickaël Leclercq, Arnaud Droit, and Frédéric Precioso. Kernel kmeans clustering splits for end-to-end unsupervised decision trees. arXiv preprint arXiv:2402.12232 , 2024. 12 [36] Fabian Pedregosa, Gaël Varoquaux, Alexandre Gramfort, Vincent Michel, Bertrand Thirion, Olivier Grisel, Mathieu Blondel, Peter Prettenhofer, Ron Weiss, Vincent Dubourg, et al. Scikit-learn: Machine learning in python. the Journal of machine Learning research , 12:2825–2830, 2011. [37] J. Ross Quinlan. Induction of decision trees. Machine learning , 1:81–106, 1986. [38] Alec Radford, Jong Wook Kim, Chris Hallacy, Aditya Ramesh, Gabriel Goh, Sandhini Agar-wal, Girish Sastry, Amanda Askell, Pamela Mishkin, Jack Clark, Gretchen Krueger, and Ilya Sutskever. Learning transferable visual models from natural language supervision. In Interna-tional Conference on Machine Learning , 2021. [39] Nils Reimers and Iryna Gurevych. Sentence-bert: Sentence embeddings using siamese bert-networks. In Proceedings of the 2019 Conference on Empirical Methods in Natural Language Processing . Association for Computational Linguistics, 11 2019. [40] B Schölkopf, AJ Smola, and KR Müller. Nonlinear component analysis as a kernel eigenvalue problem. 1996. [41] Pouya Shati, Eldan Cohen, and Sheila McIlraith. Optimal decision trees for interpretable clustering with constraints (extended version). arXiv preprint arXiv:2301.12671 , 2023. [42] Jianbo Shi and Jitendra Malik. Normalized cuts and image segmentation. IEEE Transactions on pattern analysis and machine intelligence , 22(8):888–905, 2000. [43] Daniel A. Spielman. Spectral and Algebraic Graph Theory . Textbook draft available online, 2025. [44] William Nick Street, William H. Wolberg, and Olvi L. Mangasarian. Nuclear feature extraction for breast tumor diagnosis. In Electronic imaging , 1993. [45] Luca Trevisan. Is cheeger-type approximation possible for nonuniform sparsest cut? arXiv preprint arXiv:1303.2730 , 2013. [46] Nakul Upadhya and Eldan Cohen. Neurcam: Interpretable neural clustering via additive models. 
+
+arXiv preprint arXiv:2408.13361 , 2024. [47] Ulrike Von Luxburg. A tutorial on spectral clustering. Statistics and computing , 17:395–416, 2007. [48] Yen-Chuen Wei and Chung-Kuan Cheng. Towards efficient hierarchical designs by ratio cut partitioning. In 1989 IEEE International Conference on Computer-Aided Design. Digest of Technical Papers , pages 298–301. IEEE, 1989. 13 Impact Statement 
+
+This paper is concerned with fitting interpretable explanations to decisions made by machine learning algorithms, in this case, grouping of individual points into clusters. While explainability in AI is intended to promote safe and ethical use in machine learning, any deployment of automated systems in settings consequential to human individuals may have unforeseen consequences. While our work is not associated with any particular outstanding or new risks, every real-world use of an explainability mechanism in AI should be used with caution and incorporate human oversight, testing, and other use case specific safeguards to mitigate any associated risks. 
+
+## A Proofs 
+
+In Section A.1, we provide a proof of Theorem 2.2. In Section A.2, as a concrete demonstration, we show an application of it that directly relates the k-means reference clustering cost to the graph conductance in a certain graph that describes the reference clustering. In Section A.3, we provide the modified IMM analysis discussed in Section 3.1. 
+
+A.1 Proof of Theorem 2.2 
+
+We restate the theorem: 
+
+Theorem A.1 (Theorem 2.2, restated) . Let X ⊂ Rd be a set of points, where x ∈ X has coordinates 
+
+x = ( x1, . . . , x d). Let G(X, E, w ) be a graph with vertex set X. Consider the following two distributions over pairs in of points in X: 
+
+> •
+
+Dadj is the distribution over adjacent pairs in G, where a pair x, y ∈ E is sampled with probability proportional to the edge weight between them.  
+
+> •
+
+Dall is the distribution over all pairs x, y ∈ X, where x and y are sampled independently, each with probability proportional to its weighted degree in G.Then, there is a valid coordinate cut j, τ such that 
+
+ΨG(Sj,τ (X)) ≤
+
+s
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+.
+
+The proof uses arguments that are standard in spectral graph theory, and follows [ 11 ] in a generalized form (with an arbitrary graph). We include it here for completeness and clarity. Recall the following standard useful fact, 
+
+Fact A.2. Let a1, . . . , a n ≥ 0 and b1, . . . , b n ≥ 0 such that P 
+
+> i
+
+bi > 0. Then 
+
+min 
+
+> i
+
+ai
+
+bi
+
+≤
+
+P 
+
+> i
+
+ai
+
+P 
+
+> i
+
+bi
+
+≤ max 
+
+> i
+
+ai
+
+bi
+
+.
+
+Using it we have, 
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+= Ex,y ∼D adj 
+
+Pdi=1 |xi − yi|2
+
+Ex,y ∼D all 
+
+Pdi=1 |xi − yi|2
+
+=
+
+Pdi=1 Ex,y ∼D adj |xi − yi|2
+
+Pdi=1 Ex,y ∼D all |xi − yi|2
+
+≥ min 
+
+> i∗∈{ 1,...,d }
+
+Ex,y ∼D adj |xi∗ − yi∗ |2
+
+Ex,y ∼D all |xi∗ − yi∗ |2 . (6) Let n = |X| be the number of nodes in G. For convenience we arbitrarily label them 1, . . . , n so we can index the entries a vector z ∈ Rn by points in X, so the coordinates of z are (z(x)) x∈X . We do so similarly for matrices in Rn×n.Recall that w(x, y ) is the edge weight between x and y in G. Let dG(x) denote the weighted degree of x in G. Let ∆G = P 
+
+> x,y
+
+w(x, y ) be the sum of all edge weights. Let AG ∈ Rn×n be its 14 weighted adjacency matrix, AG(x, y ) = w(x, y ). Let DG ∈ Rn×n be its diagonal matrix of degrees, 
+
+DG(x, x ) = dG(x). Let LG = DG − AG be its Laplacian matrix. A standard fact in spectral graph theory is the identity zT LGz = P 
+
+> x,y
+
+w(x, y )|z(x) − z(y)|2 for every z ∈ Rn.Let z∗ ∈ Rn be the vector with entries defined by z∗(x) = xi∗ , where i∗ ∈ { 1, . . . , d } is the minimizer from Equation (6). Recalling that Dadj is the distribution over pairs x, y with probability mass w(x,y )∆G , we have 
+
+Ex,y ∼D adj |xi∗ − yi∗ |2 = X
+
+> x,y
+
+w(x, y )∆G
+
+|xi∗ − yi∗ |2
+
+= X
+
+> x,y
+
+w(x, y )∆G
+
+|z∗(x) − z∗(y)|2
+
+= zT 
+
+> ∗
+
+LGz∗
+
+∆G
+
+. (7) Let H be a weighted clique over X in which the edge weight between every pair x, y ∈ X is 
+
+wH (x, y ) = dG(x) · dG(y)2∆ G
+
+. (8) This is the G-degree weighted clique over X mentioned in Section 3, except we scale all weights down by 2∆ G. The weighted degree of x in H is 
+
+dH (x) = X 
+
+> y̸=x
+
+wH (x, y )= dG(x)∆G
+
+X 
+
+> y̸=x
+
+dG(y)= dG(x)2∆ G
+
+(2∆ G − dG(x)) since ∆G = X
+
+> x,y
+
+w(x, y ) = 12
+
+X
+
+> y∈X
+
+dG(y)= dG(x) − (dG(x)) 2
+
+2∆ G
+
+. (9) Let AH , DH and LH = DH − AH be the weighted adjacency matrix of H, its diagonal degree matrix, and its Laplacian matrix, respectively. Let vG ∈ Rn be the vector of weighted degrees in G,scaled down by √2∆ G:
+
+vG(x) = dG(x)
+
+√2∆ G
+
+.
+
+Observe that, by Equations (8) and (9), 
+
+DH (x, y ) = 
+
+(
+
+dG(x) − (dG(x)) 2 
+
+> 2∆ G
+
+if x = y
+
+0 if x̸ = y and AH (x, y ) = 
+
+(0 if x = y  
+
+> dG(x)·dH(y)2∆ G
+
+if x̸ = y
+
+Therefore, 
+
+LH = DH − AH = DG − vGvTG. (10) Now, recall that Dall is the distribution over pairs x, y , where x and y are i.i.d., each with probability proportional to its degree in G. Hence, 
+
+Ex,y ∼D all |xi∗ − yi∗ |2 = X
+
+> x,y
+
+dG(x)2∆ G
+
+· dG(y)2∆ G
+
+· | xi∗ − yi∗ |2
+
+= 12∆ G
+
+X
+
+> x,y
+
+wH (x, y )|z∗(x) − z∗(y)|2 by Equation (8) 
+
+= zT 
+
+> ∗
+
+LH z∗
+
+2∆ G
+
+. (11) 15 Plugging Equations (7) and (11) into Equation (6), we have obtained, 
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+≥ 2 · zT 
+
+> ∗
+
+LGz∗
+
+zT 
+
+> ∗
+
+LH z∗
+
+. (12) Finally, let 0 and 1 denote the all-0 and all-1 vectors in Rn. Let γG be the constant γG = vTGz∗/v TG1.Letting 
+
+˜z = z∗ − γG1,
+
+we have 
+
+vTG ˜z = vTG(z∗ − γG1) = vTGz∗ − vTGz∗
+
+vTG1 · vTG1 = 0 . (13) It is a standard fact that every graph Laplacian L satisfies L1 = 0. Therefore, 
+
+LGz∗ = LG(˜ z + γG1) = LG ˜z, 
+
+and, using Equations (10) and (13), 
+
+LH z∗ = LH (˜ z + γG1) = LH ˜z = ( DG − vGvTG)˜ z = DG ˜z. 
+
+Plugging these into Equation (12), we obtain 
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+≥ 2 · ˜zT LG ˜z
+
+˜zT DG ˜z . (14) Now we can state the Cheeger inequality for graphs, or rather, a somewhat more general and useful form of it (see, e.g., [43, Theorem 21.1.3]): 
+
+Theorem A.3. Let G(X, E, w ) be an undirected weighted graph with n nodes. Let AG be its weighted adjacency matrix, vG the vector weighted degrees, DG the diagonal matrix of weighted degrees, and LG = DG − AG the Laplacian. Suppose we have a vector ˜z ∈ Rn that satisfies ˜zT vG = 0 . Then, there is a threshold ˜τ ∈ R such that if we consider the cut S = {x ∈ X : ˜ z(x) ≤ ˜τ }, it satisfies S̸ = ∅, S̸ = X, and 
+
+ΨG(S) ≤
+
+s
+
+2 · ˜zT LG ˜z
+
+˜zT DG ˜z . (15) Theorem A.3 together with Equation (14) imply a cut with conductance 
+
+ΨG(S) ≤
+
+s
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+,
+
+given by thresholding the coordinates of ˜z at ˜τ . Recalling that for every x ∈ X it holds that 
+
+˜z(x) = z∗(x) − γG = xi∗ − γG,
+
+the cut S can be equivalently described as S = {x ∈ X : xi∗ ≤ ˜τ + γG}. Therefore, it is a coordinate cut with coordinate i∗ and threshold τ = ˜ τ + γG, and Theorem 2.2 is proven. 
+
+Remark A.4. For context, we relate Theorem A.3 to the more familiar form of Cheeger’s inequality. Let ˆLG = D−1/2LGD−1/2 be the normalized Laplacian matrix of G. It is positive semi-definite and its smallest eigenvalue is 0. Let λG be its second smallest eigenvalue, and zG a corresponding eigenvector. It can be shown that the quotient at right-hand side of Equation (15) is minimized by choosing ˜z = D1/2zG, and that the minimal value it takes is λG. Hence the more standard form of Cheeger’s inequality, ΨG(S) ≤ √2λG.
+
+A.2 k-Means Example of Theorem 2.2 
+
+As a demonstrative example, let us show a special cases of Theorem 2.2, in which a reference 
+
+k-means clustering is described by a suitable graph, and observe the conductance bounds it yields. Let C = {C1, . . . , C k} be a partition of X into k clusters with corresponding centroids μ(1) , . . . , μ (k).16 In k-means, the centroids are given by cluster means, μ(i) = 1
+
+> |Ci|
+
+P 
+
+> x∈Ci
+
+x. Denote the cost of cluster 
+
+Ci by cost( Ci) = P 
+
+> x∈Ci
+
+∥x − μ(i)∥22, and the total reference clustering cost by 
+
+cost( C) = 
+
+> k
+
+X
+
+> i=1
+
+cost( Ci) = 
+
+> k
+
+X
+
+> i=1
+
+X
+
+> x∈Ci
+
+∥x − μ(i)∥22,
+
+We instantiate Theorem 2.2 with a clique graph with edge weights inversely proportional to their cluster sizes. 
+
+Corollary A.5. In the weighted clique graph where every edge connecting x, y ∈ Ci has weight 
+
+1/(|Ci| − 1) , there is a coordinate cut with conductance at most 
+
+s
+
+2 · cost( C)
+
+> 1
+> |X|
+
+P 
+
+> x,y ∈X
+
+∥x − y∥22
+
+.
+
+The proof uses the following fact which can be verified by direct substitution. 
+
+Fact A.6. For every set of points C with mean μ = 1
+
+> |C|
+
+P 
+
+> x∈C
+
+x,
+
+X
+
+> x∈C
+
+∥x − μ∥22 = 1
+
+|C|
+
+X
+
+> x̸=y∈C
+
+∥x − y∥22.
+
+Proof. Denote the weighted clique graph by G(X, X 2, w ). For this graph: 
+
+w(x, y ) = 
+
+( 1 
+
+> |Ci|− 1
+
+∃ i x, y ∈ Ci
+
+0 else 
+
+(Note that if |Ci| = 1 then the only node in Ci has no incident edges, thus the above setting of edge weights is well-defined.) Thus, it holds that: 
+
+∀i, x ∈ Ci ; dG(x) = X 
+
+> y∈Ci
+> y̸=x
+
+1
+
+|Ci| − 1 = 1 .
+
+Hence, Theorem 2.2 implies the existence of a coordinate cut for which the conductance is at most 
+
+s
+
+Ex,y ∼D adj ∥x − y∥22
+
+Ex,y ∼D all ∥x − y∥22
+
+=
+
+vuuutP  
+
+> x,y ∈Xw(x,y )P
+> x′,y ′∈Xw(x′,y ′)
+
+∥x − y∥22
+
+P  
+
+> x,y ∈XdG(x)dG(y)P
+> x′,y ′∈XdG(x)dG(y)
+
+∥x − y∥22
+
+=
+
+vuuut
+
+> 1
+> |X|
+
+Pki=1 1
+
+> |Ci|− 1
+
+P x̸=yx,y ∈Ci
+
+∥x − y∥221
+
+> |X|2
+
+P 
+
+> x,y ∈X
+
+∥x − y∥22
+
+=
+
+> T heorem A. 6
+
+vuutPki=1 1 
+
+> |Ci|− 1
+
+|Ci| P 
+
+> x∈Ci
+
+∥x − μ(i)∥221
+
+> |X|
+
+P 
+
+> x,y ∈X
+
+∥x − y∥22
+
+≤
+
+vuut 2 · Pki=1 
+
+P 
+
+> x∈Ci
+
+∥x − μ(i)∥221
+
+> |X|
+
+P 
+
+> x,y ∈X
+
+∥x − y∥22
+
+=
+
+s
+
+2 · cost (C)
+
+> 1
+> |X|
+
+P 
+
+> x,y ∈X
+
+∥x − y∥22
+
+.
+
+Note that the denominator term 1
+
+> |X|
+
+P 
+
+> x,y ∈X
+
+∥x−y∥22 is a fixed size for the dataset and is independent of the reference clustering C. Thus, with an appropriate choice of graph to describe the reference clustering, Theorem 2.2 yields coordinate cuts with conductance directly related to the reference clustering cost. 17 A.3 IMM Alternative Analysis 
+
+In this section we focus on k-medians clustering in the ℓ1 norm. For every subset C ⊂ Rd, denote its median by 
+
+med( C) = min 
+
+> z∈Rd
+
+X
+
+> x∈C
+
+∥x − y∥1.
+
+Let C = C1, . . . , C k be a reference k-medians clustering of X with respective cluster centroids 
+
+μ(i) = med( Ci). The k-medians clustering cost of C is defined as 
+
+cost 1(C) = 
+
+> k
+
+X
+
+> i=1
+
+X
+
+> x∈Ci
+
+∥x − μ(i)∥1.
+
+Let TIMM (C) be the explainable clustering tree returned by IMM algorithm. [ 33 ] proved the following theorem: 
+
+Theorem A.7. For every reference clustering C with centroids, cost 1(TIMM (C)) ≤ O(k) · cost 1(C).
+
+In the terminology from Section 1, the “price of explainability” of k-medians clustering is O(k). This remains the best bound to date for a deterministic algorithm. 7
+
+In this section we prove the same theorem for our slightly modified variant from Section 3.1, where it was cast in terms of minimizing the non-uniform cut sparsity. The goal is demonstrate how the graph partitioning framework can be used analytically, and present an alternative and arguably simpler proof for the same price of explainability upper bound. Let ˜TIMM (C) denote the tree returned by our modified IMM. 
+
+Theorem A.8. For every reference clustering C with centroids, cost 1( ˜TIMM (C)) ≤ O(k) · cost 1(C).
+
+For the proof, we introduce some notation aligned with [ 33 ] for better comparison and readability. Recall that the IMM algorithm builds an explainable decision tree on both the points X and the centroids M = {μ(1) , . . . , μ (k)}, such that each tree leaf contains exactly one centroid, and partition of X into the k leaves forms the explainable clustering. For every x ∈ X, denote by μ(x) ∈ M
+
+its centroid in the reference clustering C. For every tree node u, let Xu ⊂ X and M u ⊂ M be the subsets of points and centroids, respectively, contained in u, and let Y u = Xu ∪ M u. A mistake in u
+
+is a pair x ∈ Xu, c(x) ∈ M u that are separated by the threshold coordinate cut in u. Let tu denote the number of mistakes in u. Also, recall the in our modified IMM, in each node u we fix a pair of centroids μ′
+
+> u
+
+, μ ′′  
+
+> u
+
+at maximal distance among the centroids in u:
+
+∥μ′ 
+
+> u
+
+− μ′′ 
+
+> u
+
+∥1 = min  
+
+> i,j :˜ μ′,˜μ′′ ∈Mu
+
+∥˜μ′ − ˜μ′′ ∥1.
+
+The proof of Theorem A.8 has two steps, analogous to the proof of Theorem A.7. The first step is a straightforward consequence of the triangle inequality. The detailed proof appears in [ 33 ] and is omitted here. 
+
+Lemma A.9 (Lemma 5.5 in [33]) .
+
+cost 1( ˜TIMM (C)) ≤ cost 1(C) + X 
+
+> u∈T′
+> IMM (C)
+
+tu · ∥ μ′ 
+
+> u
+
+− μ′′ 
+
+> u
+
+∥1.
+
+The second step is the more involved part of the proof, and the part where the graph-based analysis presented here departs from [33]. 
+
+Lemma A.10 (Lemma 5.6 in [33]) . Let H be the height of ˜TIMM (C). Then, 
+
+X 
+
+> u∈T′
+> IMM (C)
+
+tu · ∥ μ′ 
+
+> u
+
+− μ′′ 
+
+> u
+
+∥1 ≤ H · cost 1( ˜TIMM (C)) .
+
+Since ˜TIMM (C) has k leaves, its height is at most k, thus Theorems A.9 and A.10 together immediately imply Theorem A.8.     
+
+> 7As mentioned in Section 1.1, for randomized algorithms, a tight bound of (1 + o(1)) log kis known.
+
+18 Proof of Theorem A.10. Fix a node u in ˜TIMM (C). Let ×dj=1 [auj , b uj ] be a bounding box containing all of Y u. Define the following distribution D over coordinate cuts j, τ : first, pick j ∈ { 1, . . . , d }
+
+with probability proportional to |buj − auj |; then, pick τ uniformly at random in [auj , b uj ].Let ˜G(Y u, ˜E) be any undirected graph over Y u. The probability that an edge xy ∈ ˜E is cut by 
+
+(j, τ ) ∼ D is dX
+
+> j=1
+
+|buj − auj |∥bu − au∥1
+
+· |xj − yj ||buj − auj | = ∥x − y∥1
+
+∥bu − au∥1
+
+,
+
+and therefore, 
+
+E(j,τ )∼D [e ˜G(Sj,τ , Y u \ Sj,τ )] = 1
+
+∥bu − au∥1
+
+X 
+
+> xy ∈˜E
+
+∥x − y∥1. (16) Let Su be the set of coordinate cuts (j, τ ) that satisfy τ ∈ [aj , b j ]. Let mu(j, τ ) denote the number of mistakes that a cut j, τ makes (i.e., the number of points in x ∈ Xu such that c(x) ∈ M u, but the cut separates x and c(x)). Recall that our modified IMM chooses the cut ju, τ u in the node among the cuts in Su that separate the pair μ′
+
+> u
+
+, μ ′′ 
+
+> u
+
+, and tu = mu(ju, τ u).Let G(Y u, E G) be the star graph on Y u, where each x ∈ Xu is adjacent to c(x) if c(x) ∈ M u,and is an isolated node otherwise. Observe that mu(j, τ ) = eG(Sj,τ , Y u \ Sj,τ ). Let H(Y u, E H )
+
+be the graph that contains an single edge between μ′
+
+> u
+
+, μ ′′ 
+
+> u
+
+. Observe that eH (Sj,τ , Y u \ Sj,τ ) equals 
+
+1 if the cut j, τ separates μ′
+
+> u
+
+, μ ′′ 
+
+> u
+
+, and 0 otherwise. We denote this as eH (Sj,τ , Y u \ Sj,τ ) = 
+
+1{(j, τ ) separates μ′
+
+> u
+
+, μ ′′ 
+
+> u
+
+}. Therefore, 
+
+tu = mu(ju, τ u) = min     
+
+> j,τ ∈S u:(j, τ )separates μ′
+> u, μ ′′
+> u
+
+mu(j, τ )= min  
+
+> j,τ ∈S u
+
+mu(j, τ )
+
+1{(j, τ ) separates μ′
+
+> u
+
+, μ ′′ 
+
+> u
+
+}
+
+= min  
+
+> j,τ ∈S u
+
+eG(Sj,τ , Y u \ Sj,τ )
+
+eH (Sj,τ , Y u \ Sj,τ )
+
+≤ E(j,τ )∼D [eG(Sj,τ , Y u \ Sj,τ )] 
+
+E(j,τ )∼D [eH (Sj,τ , Y u \ Sj,τ )] Theorem A.2 
+
+=
+
+P 
+
+> xy ∈EG
+
+∥x − y∥1
+
+P 
+
+> xy ∈EH
+
+∥x − y∥1
+
+Equation (16) 
+
+=
+
+P 
+
+> x∈Xu
+
+∥x − c(x)∥1
+
+∥μ′ 
+
+> u
+
+− μ′′ 
+
+> u
+
+∥1
+
+definition of G and H.Rearranging, tu · ∥ μ′ 
+
+> u
+
+− μ′′ 
+
+> u
+
+∥1 ≤ P 
+
+> x∈Xu
+
+∥x − c(x)∥1. Since in each level L in the tree the clusters 
+
+{Xu : u ∈ L} form a partition of X, we get 
+
+X
+
+> u∈L
+
+tu · ∥ μ′ 
+
+> u
+
+− μ′′ 
+
+> u
+
+∥1 ≤ X
+
+> u∈L
+
+X
+
+> x∈Xu
+
+∥x − c(x)∥1 = X
+
+> x∈X
+
+∥x − c(x)∥1 = cost 1(C).
+
+Summing again over the H levels in the tree yields the lemma. Note that the ratio eG(Sj,τ ,Y u\Sj,τ )    
+
+> eH(Sj,τ ,Y u\Sj,τ )
+
+that arises in the proof is the non-uniform cut sparsity ΨG,H (Sj,τ )
+
+from Section 3. 
+
+## B Additional Experimental Results 
+
+Running times. Table 4 contains running time measurements. For reference-based methods (EMN, CART and S PEX-Clique) we measure the reference clustering step and tree construction step separately. For S PEX-kNN, we measure the k-NN graph construction step and the tree construction step separately. In our experiments, Kernel IMM proved feasible to run only on the smaller datasets (R15, Pathbased, Iris, Ecoli, Breast Cancer). Each algorithm was allotted three hours to run on each dataset. On the 19 Table 4: Runtime comparison of the non kernel k-means based algorithms. Presented times are the median runtime across five runs. For the Clique and CART algorithms, performance was measured based on a spectral reference. Algorithm Beans Iris CIFAR Caltech 101 R15 Pathbased Ecoli Cancer Newsgroups MNIST Spectral reference 1.8s 22.1ms 1m12s 7.6s 91.6ms 29ms 34.2ms 34.1ms 8.54s 1min53s k-means reference 86.4ms 4.21ms 2.69s 2.1s 10.4ms 4.16ms 5.39ms 7.01ms 1.04s 5.16s                                 
+
+> k-NN graph build 1.87s 7.01ms 1m55s 2.23s 19ms 3.57ms 9.31ms 8.03ms 5.79s 2min59s SPEX-kNN 3.69s 27ms 5m53s 1m48s 93.4ms 22.8ms 85.3ms 90.8ms 2min27s 2min52s SPEX-Clique 203ms 8.36ms 28.2s 1m12s 17ms 9.65ms 13.3ms 16.3ms 13.2s 39.4s EMN 13.5s 6.51ms 5m13s 15m40s 101ms 13.3ms 20.9ms 184ms 7min56s 5min20s CART 349ms 14.8ms 32.2s 8min51s 72.7ms 9.4ms 33.9ms 31.9ms 39.2s 30s
+
+Table 5: Performance of S PEX-kNN for different k values. The reference compared in the REF column is the reference with the same k applied. 
+
+Ecoli Iris Cancer 
+
+k ARI AMI REF RS AMI REF ARI AMI REF 2 .594 .571 .006 .287 .370 .020 .681 .603 -.019 5 .594 .589 .640 .450 .647 .895 .594 .546 .688 10 .682 .648 .828 .450 .647 .514 .507 .490 .547 15 .682 .648 .854 .450 .647 .445 .507 .490 .567 20 .679 .642 .863 .450 .647 .450 .507 .490 .562 50 .679 .638 .593 .600 .642 .756 .507 .490 .532 
+
+larger datasets, Kernel IMM either ran out of memory, or failed to complete running within the allotted time. All other methods finished running within up to 16 minutes (see Table 4). Therefore, we report results for Kernel IMM only for the smaller datasets. 
+
+kNN graph parameters. Table 5 includes additional results for S PEX-kNN, showing how its performance changes as k (the parameter of the k-NN graph) varies on the Ecoli, Iris and Breast Cancer datasets. 
+
+Number of leaves. As mentioned in Section 2, S PEX can produce a tree with any desired number of leaves ℓ. Our evaluation so far has focused on the setting ℓ = k, i.e., the number of leaves in the output tree is equal to the number of clusters in the reference clustering. To clarify the relation between k and ℓ, viewing the reference clustering as a trained model, k is its number of outcomes and ℓ is the number of explanations our explainability method can yield. Since each outcome must have its own separate explanation, we must have ℓ ≥ k, thus ℓ = k is the “most explainable” setting. As ℓ increases, the expressiveness of the explainable clustering tree grows and it is better able to approximate the reference clustering, albeit at the cost of explainability, since now some model outcomes would have multiple different explanations. Table 6 includes result with ℓ = 2 k for S PEX-Clique, CART-Spectral, CART-k-means, and ExKMC [ 17 ], which is an extension of IMM to support more leaves (which IMM does not naturally support, due to its reliance on reference clustering centroids; the same goes for EMN). The results do not point to a clearly superior method. 
+
+B.1 Weighted CART 
+
+The implementation of CART in Scikit-Learn [ 36 ] contains a weighted variant different from the standard one described in Section 3.3. It has a modified selection rule for the next leaf to split. When the stopping condition is a pre-specified number of leaves it is the default mode. It performs significantly better than usual CART on some datasets. As we find this noteworthy, the results are reported here. A similar modification can be applied to S PEX-Clique, and it is reported too. The results are in Tables 7 and 8. 20 Table 6: Results with ℓ = 2 k leaves. Ecoli Iris Cancer MNIST Caltech 101 Newsgroups Beans Cifar Algorithm ARI AMI ARI AMI ARI AMI ARI AMI ARI AMI ARI AMI ARI AMI ARI AMI SPEX-Clique .469 .589 .716 .739 .491 .464 .197 .317 .203 .565 .088 .281 .370 .512 .309 .484 ExKMC .458 .582 .730 .755 .491 .464 .224 .328 .249 .546 .096 .263 .370 .512 .323 .467 CART-k-means .447 .573 .716 .739 .491 .464 .031 .177 0 .208 .026 .148 .370 .512 .144 .371 CART-Spectral .434 .493 .610 .648 .749 .631 .080 .210 0 .214 .006 .104 .608 .695 135 .381 Table 7: Results on smaller datasets. R15 Pathbased Ecoli Iris Cancer Algorithm ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF 
+
+REF: Spectral .993 .994 1. .526 .570 1. .711 .653 1. .630 .661 1. .743 .626 1. SPEX-kNN .982 .987 .989 .332 .410 .551 .679 .642 .863 .450 .647 .450 .507 .490 .562 SPEX-Clique .986 .989 .993 .441 .517 .824 .662 .621 .847 .576 .629 .787 .694 .588 .785 SpEx-Clique-modified .986 .989 .993 .441 .517 .824 .672 .618 .886 .576 .629 .787 .683 .560 .811 
+
+CART .986 .989 .993 .441 .517 .824 .672 .618 .886 .576 .629 .787 .683 .560 .811 
+
+CART-modified .986 .989 .993 .441 .517 .824 .672 .618 .886 .576 .629 .787 .683 .560 .811 
+
+REF: k-means .993 .994 1. .461 .543 1. .489 .609 1. .641 .669 1. .491 .464 1. EMN .986 .989 .993 .461 .543 1. .456 .559 .873 .576 .629 .772 .491 .464 1. 
+
+SPEX-Clique .986 .989 .993 .461 .543 1. .456 .559 .873 .576 .629 .772 .491 .464 1. 
+
+SpEx-Clique-modified .986 .989 .993 .461 .543 1. .456 .559 .873 .576 .629 .772 .491 .464 1. 
+
+CART .986 .989 .993 .421 .507 .897 .454 .543 .840 .576 .629 .772 .491 .464 1. 
+
+CART-modified .986 .989 .993 .461 .543 1. .456 .559 .873 .576 .629 .772 .491 .464 1. 
+
+REF: Kernel k-means .908 .967 1. .919 .888 1. .538 .612 1. .731 .767 1. .119 .230 1. Kernel IMM .904 .962 .986 .614 .614 .583 .522 .560 .848 .732 .788 .924 .127 .241 .930 
+
+SPEX-Clique .869 .941 .951 .479 .553 .450 .529 .573 .851 .732 .788 .924 .406 .414 .516 SpEx-Clique-modified .872 .944 .954 .479 .553 .450 .529 .573 .851 .732 .788 .924 .406 .414 .516 CART .682 .876 .759 .479 .553 .450 .500 .558 .824 .732 .788 .924 .406 .414 .516 CART-modified .880 .944 .955 .479 .553 .450 .500 .558 .824 .732 .788 .924 .406 .414 .516 
+
+## NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: Can be verified by reading the manuscript Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: The main limitation of our work compared to prior works is the lack of worst-case approximation bounds, due to targeting a reference-oblivious approach unlike prior work which was tailored a handful of specific references. It is discussed in the “conclusions and limitations” section in the main text. Guidelines: 21 Table 8: Results on larger datasets. MNIST Caltech 101 Newsgroups Beans Cifar Algorithm ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF ARI AMI REF                                                                                                                                                                                       
+
+> REF: Spectral .745 .820 1. .563 .859 1. .431 .671 1. .586 .677 1. .712 .801 1. SPEX-kNN .092 .338 .150 .121 .497 .168 .042 .170 .090 .574 .690 .649 .342 .434 .373 SPEX-Clique .217 .384 .282 .247 .521 .303 .078 .223 .189 .564 .671 .743 .320 .438 .394
+> SpEx-Clique-modified .018 .155 .040 .006 .330 .032 .021 .173 .021 .152 .374 .200 .152 .374 .200 CART .027 .148 .030 -.010 .166 .005 .008 .078 -.013 .036 .169 .035 .036 .169 .035 CART-modified .279 .379 .321 .219 .514 .302 .106 .244 .223 .380 .448 .418 .380 .448 .418
+> REF: k-means .364 .481 1. .405 .822 1. .502 .660 1. .572 .689 1. .636 .738 1. EMN .250 .342 .420 .249 .548 .416 .115 .219 .163 .563 .688 .780 .314 .402 .387
+> SPEX-Clique .209 .336 .403 .122 .495 .195 .098 .249 .128 .562 .687 .773 .288 .410 .370 SpEx-Clique-modified .151 .339 .284 .039 .373 .053 .005 .092 .006 .170 .341 .200 .170 .341 .200 CART .124 .299 .229 -.017 .082 .003 .005 .092 .006 .045 .180 .037 .045 .180 .037 CART-modified .232 .315 .418 .136 .507 .219 .106 .244 .128 .330 .433 .372 .330 .433 .372
+
+• The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory assumptions and proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] Justification: Full rigorous proofs are provided in the appendix Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. 22 • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental result reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: All information needed for reproducibility is included in the paper; experimen-tal code is also enclosed in supplementary material Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [Yes] Justification: All datasets used are publicly available and clearly referenced. Our code is included in the supplementary and will be made available online with the paper. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. 23 • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental setting/details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [Yes] Justification: All parameter settings are described in the text. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment statistical significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [NA] Justification: All methods evaluated in this paper (both our methods and the baseline) are deterministic algorithms. Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). 24 • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments compute resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [Yes] Justification: Our experiments are run on a standard regular free-tier cloud CPU machine (Google Colab) and can be reproduced on any similar machine; our methods and experiments do not require special computational resources. No additional compute beyond what is described in the paper was used in the course of preparing this paper. Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code of ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: Code of Ethics was fully observed. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [Yes] Justification: An impact statement is included as part of the manuscript with an appropriate discussion of potential broader impact. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. 25 • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: No new data or models are released with the paper; the paper poses no such risks. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [Yes] Justification: All uses of existing assets (datasets, as well as images reproduced based on prior works) are fully and properly credited. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? 26 Answer: [NA] Justification: No new assets released. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and research with human subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: The paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional review board (IRB) approvals or equivalent for research with human subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 16. Declaration of LLM usage 
+
+Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does not impact the core methodology, scientific rigorousness, or originality of the research, declaration is not required. Answer: [NA] 27 Justification: the core method development in this research does not involve LLMs as any important, original, or non-standard components. Guidelines: • The answer NA means that the core method development in this research does not involve LLMs as any important, original, or non-standard components. • Please refer to our LLM policy ( https://neurips.cc/Conferences/2025/LLM )for what should or should not be described. 28

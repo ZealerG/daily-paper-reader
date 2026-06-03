@@ -1,0 +1,1634 @@
+Title: 17379_Multi_Actor_Multi_Critic.pdf
+
+URL Source: https://openreview.net/pdf?id=k5ekIwvmYA
+
+Number of Pages: 19
+
+Markdown Content:
+# Multi-Actor Multi-Critic Deep Deterministic Reinforcement Learning with a Novel Q-Ensemble Method 
+
+Anonymous Author(s) 
+
+Affiliation Address 
+
+email 
+
+## Abstract 
+
+Reinforcement learning has gathered much attention in recent years due to its rapid 1
+
+development and rich applications, especially on control systems and robotics. 2
+
+When tackling real-world applications with reinforcement learning method, the 3
+
+corresponded Markov decision process may have huge discrete or even continuous 4
+
+state/action space. Deep reinforcement learning has been studied for handling these 5
+
+issues through deep learning for years, and one promising branch is the actor-critic 6
+
+architecture. Many past studies leveraged multiple critics to enhance the accuracy 7
+
+of evaluation of a policy for addressing the overestimation and underestimation 8
+
+issues. However, few studies have considered the architecture with multiple actors 9
+
+together with multiple critics. This study proposes a novel multi-actor multi-critic 10 
+
+(MAMC) deep deterministic reinforcement learning method. The proposed method 11 
+
+has three main features, including selection of actors based on non-dominated 12 
+
+sorting for exploration with respect to skill and creativity factors, evaluation for 13 
+
+actors and critics using a quantile-based ensemble strategy, and exploiting actors 14 
+
+with best skill factor. Theoretical analysis proves the learning stability and bounded 15 
+
+estimation bias for the MAMC. The present study examines the performance on 16 
+
+a well-known reinforcement learning benchmark MuJoCo. Experimental results 17 
+
+show that the proposed framework outperforms state-of-the-art deep deterministic 18 
+
+based reinforcement learning methods. Experimental analysis also indicates the 19 
+
+proposed components are effective. Empirical analysis further investigates the 20 
+
+validity of the proposed method, and shows its benefit on complicated problems. 21 
+
+## 1 Introduction 22 
+
+Reinforcement learning (RL) has been studied for decades that is proved powerful when dealing 23 
+
+with problems and applications which is assumed or is able to be formulated as a Markov decision 24 
+
+process [ 25 ]. Numerous applications have been successfully solved by RL methods such as playing 25 
+
+board games [ 26 ], training large-language model [ 24 ], and controlling humanoid [ 29 ]. RL methods 26 
+
+are of several types, including value-based approach, policy gradient approach, policy optimization 27 
+
+approach, and actor-critic approach [ 28 ]. This study focus on actor-critic based RL methods due to 28 
+
+its nice performance on continuous control problems. 29 
+
+A common issue in RL is the huge or infinite space of states/actions, making conventional tabular 30 
+
+methods inapplicable, and a straight forward solution is to construct approximation function for 31 
+
+space transformation. As the rapid growth in high performance computing and deep learning [ 3], 32 
+
+leveraging deep learning for building mapping function in RL methods, forming deep reinforcement 33 
+
+learning (DRL), becomes possible. One representative method of DRL is the deep Q-learning (DQN) 34 
+
+Submitted to 39th Conference on Neural Information Processing Systems (NeurIPS 2025). Do not distribute. Table 1: A compilation of some recent proposed actor-critic architectures according to the number of actors and critics #Critics Method Single Double Multiple #Actors Single DQN[23], TD3[9], SAC[10], REDQ[6], MD3[34], DDPG[19]. OAC[7]. QWPVOP[17]. Double - DARC[21]. MA-TD3[18]. Multiple - - SUNRISE[16], MA-DDPG[18]. [23], which adopted deep convolution neural network to estimate the state-action function (a.k.a. Q35 
+
+function). 36 
+
+Advanced issues in deep reinforcement learning have been studied and investigated in past years 37 
+
+[11 ]. Essential issues covers learning stability [ 2, 19 , 9 ], estimation accuracy for handling issues of 38 
+
+overestimation [ 4, 20 ], underestimation [ 7 , 35 ] or both [ 32 , 1, 15 ], sampling efficiency [ 10 , 36 , 22 ? ], 39 
+
+ensemble learning [ 21 , 6, 16 , 14 , 34 ] and so forth, and hybridization of components for addressing 40 
+
+these issues is proved to gain effectiveness and learning efficiency [ 12 ]. It is worth noting that 41 
+
+these issues are highly correlated so that ensemble learning could handle estimation accuracy, which 42 
+
+may bring learning stability and sampling efficiency, and thus results in better performance and 43 
+
+convergence. 44 
+
+This study proposes a novel method: multiple-actors-multiple-critics (MAMC) deep deterministic 45 
+
+reinforcement learning to address the above issues. The main features of the MAMC are threefold: 46 
+
+1) The MAMC manipulates multiple actors and critics in a current manner without predetermined 47 
+
+relations, 2) The MAMC evaluates actors and critics as per a quantile-based ensemble strategy, and 48 
+
+3) The MAMC selects actors for exploration in learning on the basis of non-dominated sorting with 49 
+
+respect to skill and creativity factors. The emerging MAMC is capable of facilitating nice exploration 50 
+
+among multiple actors in the meantime improving and smoothing the learning of critics, which is key 51 
+
+to stabilize the guiding force to actors. 52 
+
+The main contributions are listed as follows: 53 
+
+• Devise a parametric quantile-based ensemble estimator considering multiple actors and 54 
+
+multiple critics for the target values of critics learning 55 
+
+• Design an actor evaluation and selection approach based on skill and creativity factors for 56 
+
+exploration and exploitation 57 
+
+• Theoretically prove the MAMC has stable learning and bounded estimation bias 58 
+
+• Empirically examine the quality and validity of the MAMC, and investigate the run-time 59 
+
+behavior of MAMC by inspecting into the proposed components 60 
+
+The rests of this study are organized as follows. Section 2 reviews recent RL methods under actor-61 
+
+critic architectures, and Section 3 introduces preliminaries of this study. Sections 4 and 5 in turn 62 
+
+gives details and theoretical analysis for the proposed method. Section 6 examines the effectiveness 63 
+
+for the proposed method. Section 7 draws conclusions. 64 
+
+## 2 Related Work 65 
+
+The actor-critic architecture is proposed by Konda and Tsitsiklis [ 13 ]. Table 1 compiles six out nine 66 
+
+categories of actor-critic architectures in terms of the number of actors and critics for some recent 67 
+
+proposed actor-critic-based RL methods. To the best of our knowledge, it is merely no study for 68 
+
+actor-critic architectures with fewer number of actors than of critics. 69 
+
+SASC. For single-actor single-critic (SASC) architecture, a representative study is the deep Q-70 
+
+network (DQN) [ 23 ], which introduced deep convolution neural network into RL and brought nice 71 
+
+performance on Atari. Another famous SASC-based method is the deep deterministic policy gradient 72 
+
+(DDPG) [ 19 ]. DDPG ameliorated the learning stability and efficiency of DQN by combining deep 73 
+
+learning with policy gradient for solving control problems with continuous action space. 74 
+
+2SADC. Beyond SASC, lots of methods are proposed with a single actor and double critics, noted 75 
+
+as SADC, for solving the issues of overestimation and exploration. In [ 9], a twin delayed deep 76 
+
+deterministic policy gradient (TD3) was proposed. TD3 improved DDPG by adopting two critic 77 
+
+networks, where a minimum of the corresponded two target networks are served as the computa-78 
+
+tional basis of target value. TD3 also proposed the delayed update of actor, i.e., a lower update 79 
+
+frequency than critics, for stabilizing the learning of the actor. Soft Actor-Critic (SAC) considered 80 
+
+stochastic policy and introduced soft value function for training the two critics of soft Q-function 81 
+
+[10 ]. Specifically, SAC trained a stochastic policy network to transform noise to an action for a given 82 
+
+state as condition, and the training depends on a policy gradient for maximizing the randomness of 83 
+
+the resulting actions, and the approximated Q values obtained from the minimum of the two critics 84 
+
+as TD3. Different from TD3, SAC trained the two critics independently according to the target soft 85 
+
+value function network, which is soft-updated by the soft value function network, while the soft 86 
+
+value function network is trained by minimizing the different to the target value, which is calculated 87 
+
+as the expectation of state-action value of the minimum of the two critics over action given by the 88 
+
+actor. Optimistic Actor-Critic (OAC) further pointed out the issues of inefficient exploration owing 89 
+
+to insufficient pessimistic in TD3 and SAC, and proposed an amelioration to guide the exploration 90 
+
+according to the approximated lower and upper bounds of the state-action value function [7]. 91 
+
+SAMC. From the observation of improvement from SASC to SADC, many methods considered 92 
+
+increasing the number of critics for improving the estimation accuracy, forming the single-actor 93 
+
+multi-critic architecture (SAMC). Randomized ensembled double Q-learning (REDQ) [ 6 ] estimated 94 
+
+the state-action value using the same strategy of minimum the same as TD3, yet the two critics 95 
+
+were randomly selected from a pool of critics. REDQ also introduced a high update-to-date (UTD) 96 
+
+ratio of 20 to address the issue of sample efficiency. For addressing the estimation accuracy issue, 97 
+
+quasi-median Q-learning (QMQ) used the quasi-median among multiple state-action values, each 98 
+
+of which from a critic, to estimate the state-action value, and applied on TD3, forming the QMD3. 99 
+
+The QMD3 trained actor with delay the same as TD3, but each update is guided by all critics rather 100 
+
+than a single one for exploration improvement. Weakly pessimistic value estimation and optimistic 101 
+
+policy optimization (WPVOP) [ 17 ] proposed weakly pessimistic value estimation and optimistic 102 
+
+policy optimization; the former increased and smoothed the lower confidence bound, whilst the latter 103 
+
+encourages and increases the state-action value, as the maximum action of minimum state-action 104 
+
+values, if the distribution of state-action values with different actions on a given state is centralized, 105 
+
+i.e., the standard deviation less than some threshold. 106 
+
+DADC. From single actor to double actors, double actors and regularized critics (DARC) [ 21 ] adopted 107 
+
+double actors as well as double critics (DADC) and proposed soft target value as a linear combination 108 
+
+of the minimum and maximum state-action values of the two actions given by two target actors, each 109 
+
+of which is a minimum over two target critics. DARC revised the loss function adopted in TD3 by 110 
+
+introducing a weighted regularization term of cross-critic error, i.e., the difference between the two 111 
+
+critics. 112 
+
+DAMC. A multi-actor mechanism (MAM) was proposed in [ 18 ]. The MAM was composed of two 113 
+
+components, i.e., obsolescence technology (OT) and Q-value weighting technology (WT). For each 114 
+
+actor, the OT adaptively adjust the probabilities of interacting with environment according to the 115 
+
+accumulated reward in an episode. For each critic, the WT estimated the target of state-action value 116 
+
+by a linear combination of state-action values achieved by the corresponding actor, and by the other 117 
+
+actors. The MAM was integrated into TD3 (MA-TD3) with double actors and four critics, forming 118 
+
+the double-actor multi-critic architecture (DAMC). 119 
+
+MAMC. For multi-actor multi-critic (MAMC) architecture, the MAM was also integrated into 120 
+
+DDPG (MA-DDPG) with three actors and three critics, which became another MAMC-based method 121 
+
+[ 18 ]. An early MAMC method is the Simple UNified framework for ReInforcement learning using 122 
+
+enSEmbles (SUNRISE) [ 16 ]. SUNRISE manipulated multiple SAC agents, each contained a pair of 123 
+
+soft Q-function and an actor. SUNRISE integrated weighted Bellman backup, which decreases the 124 
+
+influence from high variance transitions, and upper confidence bound (UCB) exploration [5]. 125 
+
+## 3 Preliminaries 126 
+
+Given a Markov decision process (S, A,P, R, γ ) with state space S, action space A, a state transition 127 
+
+probability Pas,s ′ , a reward function Rs,a = E[Rt+1 |St = s, A t = a], and a discount factor γ,128 
+
+3Table 2: Notation system Symbol Meaning 
+
+NA, NC , NB Number of actors, critics, and mini-batch size 
+
+πϕ Actor network with parameter ϕA, ˜A Actors and selected actors 
+
+C, C′ Critics and target critics 
+
+Qθ (Qθ′ ) Critic (target) network with parameter θ (θ′)
+
+R, B Replay buffer and mini-batch 
+
+M Sample multiple reuse 
+
+(s, a, r, s ′) Transition from state s to next state s′by action a with reward rγ Discount factor ⃗Js(A),⃗ Jc(A) Skill and creativity factors of actors A
+
+≺ Crowded-comparison operator 
+
+N (μ, σ ) Gaussian distribution with mean μ and variance σ2
+
+τ Soft update ratio reinforcement learning aims at learning policy π to achieve optimal return from rewards. A famous 129 
+
+method is the Q-learning [ 33 ], which learns a state-action value function for estimating the reward 130 
+
+function Rs,a 131 
+
+Qπ (s, a ) = E[Rt+1 |St = s, A t = a]= E[rt+1 + γQ π (St+1 = s′, A t+1 = π(st+1 )) |St = s, A t = a] . (1) The estimation forms a Bellman equation, which can be solved by temporal difference (TD) [ 27 , 30 ]132 
+
+methods. TD methods approximate the expected return by gradually lowering down the TD error, i.e., 133 
+
+the difference of returns between the state-action value Q(s, a ) and the TD-target rt+1 + γV (st+1 ),134 
+
+where V (st+1 ) is the state-value function satisfying V (st+1 ) = Q(st+1 , π (st+1 )) .135 
+
+Establishing approximation function to form a mapping from state space to action space πϕ : S → A 136 
+
+and a mapping from state space and action space to a real-value Qθ : S × A → R by deep neural 137 
+
+network forms deep reinforcement learning. According to [ 9], the update of critic then can be made 138 
+
+by minimizing the critic loss function: 139 
+
+JQ(θ) = E(s,a,r,s ′)∼B [( Qθ (s, a ) − r + γV ϕ(s′; θ′)) 2] , (2) subject to 140 
+
+Vϕ(s′; θ′) = Qθ′ (s′, π ϕ(s′) + ϵ) , (3) where θ′ is the parameters of critic target with soft update, satisfying θ′ ← τ θ + (1 − τ )θ′, and ϵ141 
+
+is the policy noise similar to the technique adopted in SARSA learning [ 28 ]. The soft update is for 142 
+
+stabilizing the learning of critic network using a fixed target. Then, the update of actor is to minimize 143 
+
+the actor loss function: 144 
+
+Jπ (ϕ; θ) = E(s,a,r,s ′)∼B [−Qθ (s, ϕ (s))] . (4) 
+
+## 4 MAMC 145 
+
+This study proposes a multi-actor-multi-critic architecture-based RL method: the Multi-Actor Multi-146 
+
+Critic deep deterministic reinforcement learning (MAMC). There are three main features in the 147 
+
+proposed MAMC, including the adoption of multiple actors and critics without predefined interaction, 148 
+
+the quantile-based ensemble estimation, and the selection of actors as per proposed skill and creativity 149 
+
+factors for exploration and exploitation. Table 2 provides the notation system used in this study. 150 
+
+4.1 The Overall Procedure 151 
+
+Algorithm 1 gives the main procedure of the proposed MAMC. At initialization, the MAMC generates 152 
+
+a set of NA actor networks A and a set of NC critic networks C with random parameters, and set the 153 
+
+parameters of each target network according to the parameters of its corresponded critic network. 154 
+
+The replay buffer R is also initialized by random actions of a predefined size. During each iteration, 155 
+
+there are three main stages: critics learning stage, actors learning state, and exploration stage. 156 
+
+4Algorithm 1 Main procedure of MAMC 
+
+1: Initialize a set of NA actor networks A with random parameters {ϕi}1≤i≤NA
+
+2: Initialize a set of NC critic networks C with random parameters {θj }1≤j≤NC
+
+3: Initialize a set of NC target networks C′ with critics θ′ 
+
+> j
+
+← θj for 1 ≤ j ≤ NC
+
+4: Initialize replay buffer R
+
+5: while Not Terminated do 
+
+6: ▷ Critics Learning 
+
+7: {B j }1≤j≤NC ∼ R ▷ Sample a mini-batch from replay buffer R for each critic 
+
+8: for m ← 1 to M do ▷ Sample multiple reuse 
+
+9: Update θj on Bj according to Eqs. (6) and (7) for 1 ≤ j ≤ NC
+
+10: Update θ′ 
+
+> j
+
+by soft update for 1 ≤ j ≤ NC
+
+11: end for 
+
+12: ▷ Actors Learning 
+
+13: {B i}1≤i≤NA ∼ R ▷ Sample a mini-batch from replay buffer R for each actor 
+
+14: for m ← 1 to M do ▷ Sample multiple reuse 
+
+15: j ← m mod NC ▷ Guided by each critic in turn 
+
+16: Update ϕi by θj on Bi according to Eq. (4) for all 1 ≤ i ≤ NA
+
+17: end for 
+
+18: ▷ Exploration 
+
+19: ˜A ←Selection (⃗ Js(A; C),⃗ J c(A; C), ≺) ▷ Crowded-comparison operator 
+
+20: (r, s ′) ← Env 
+
+
+
+s, a = πϕ∼ ˜A(s) + ϵ
+
+
+
+, ϵ ∼ N (0 , σ ) ▷ Interact with environment 
+
+21: R ← R ∪ (s, a, r, s ′)
+
+22: π∗ ← arg min ϕ Js(ϕ; C)
+
+23: end while 
+
+24: return π∗
+
+4.2 Quantile-based Ensemble Estimation 157 
+
+In critics learning stage, NC sets of mini-batch {B j }1≤j≤NC are sampled from the replay buffer R,158 
+
+and each critic is trained on a specific mini-batch for M times for improving the stability. 159 
+
+Definition 1. For each transitions (s, a, r, s ′) ∈ B j , the TD-target for jth critic Qθj is defined as the 160 
+
+median action of the qth-quantile among the critic targets: 161 
+
+y(s, a ) = r + γ ˆVA(s′) , (5) subject to 162 
+
+ˆVA(s′; C′) = Med( { ˆVϕi (s′; C′)}1≤i≤NA )ˆVϕi (s′; C′) = Quantile q ({Qθ′ 
+
+> j
+
+(s′, π ϕi (s′) + ϵ)}1≤j≤NC ) . (6) The critic loss function is therefore defined as 163 
+
+JQ(θj ; C′) = E(s,a,r,s ′)∼B [( Qθj (s, a ) − r + γV A(s′; C′)) 2] . (7) All the target critics are soft-updated with parameter τ after one out of M iterations of training, which 164 
+
+is capable of sharing information to each target critic from all the other critic targets and bring to the 165 
+
+next iteration. 166 
+
+For the learning of actors, the MAMC also sampled NA sets of mini-batch {B i}1≤i≤NA from the 167 
+
+replay buffer R as it does in critics learning stage. The training of each actor πϕi is in turn guided 168 
+
+by each critic Qθj with objective Jπ (ϕi; θj ) (cf. Eq. (4)) on its mini-batch Bi. The idea of updating 169 
+
+M times within a mini-batch for each actor and critics is similar to sample multiple reuse (SMR) 170 
+
+proposed in [22], which is able to stabilize the learning sequence. 171 
+
+4.3 Actor Evaluation, Exploration, and Exploitation 172 
+
+After training of actors and critics, the exploration stage is to select appropriate actors for interacting 173 
+
+with the environment. The evaluation of an actor πϕi is based on two factors, i.e., skill and creativity, 174 
+
+both are determined by the ensemble estimation of state value function. 175 
+
+5Definition 2. Ensemble estimation of state value function is defined as the qth-quantile of state-action 176 
+
+value function over critics C:177 
+
+ˆVϕi (s(k); C) = Quantile q ({Qθj (s(k), π ϕi (s(k))) }1≤j≤NC ) , (8) where s(k) is the kth transition in a mini-batch. The consideration of skill factor guarantees the quality 178 
+
+of interaction, whilst the consideration of creativity factor preserves the diversity of interaction. 179 
+
+The skill factor evaluates the optimality of an actor through the scoring ability on the ensemble 180 
+
+estimation 181 
+
+Js(ϕi; C) = N −1
+
+> B
+> NB
+
+X
+
+> k=1
+
+ˆVϕi (s(k)) , (9) while the creativity factor examines the diversity of an actor on the critics through the closeness of 182 
+
+each critic to the ensemble estimation with respect to mean absolute error 183 
+
+Jc(ϕi; C) = N −1 
+
+> B
+
+N −1
+
+> CNB
+
+X
+
+> k=1
+> NC
+
+X
+
+> j=1
+
+|Qθj (s(k), π ϕi (s(k))) − ˆVϕi (s(k))| . (10) Both factors are expectation over a mini-batch. Note that the two factors depends on all the critics as 184 
+
+rather than critic targets since the actors are guided by critics. The selection of actors on the two factor 185 
+
+hinges upon the crowed-comparison operator [ 8 ] by considering the two factors as two objective 186 
+
+values. The top-√NA actors ˜A are selected, which serves as the candidate actors for interaction 187 
+
+with the environment. Specifically, an actor is randomly picked from the candidate actors ˜A for 188 
+
+determining a single step of interaction with the environment. The MAMC also records an optimal 189 
+
+policy with highest skill factor for exploitation at each iteration; that is, the MAMC only returns a 190 
+
+single actor for inference due to the efficiency in terms of time and space complexity. 191 
+
+## 5 Theoretical Analysis 192 
+
+This section gives some nice properties for the MAMC. First, the target values obtained by multiple 193 
+
+actors are more stable in terms of variance than using a single actor. 194 
+
+Theorem 1. The variance of target values obtained by multiple actors are less than that using a 195 
+
+single actor. 196 
+
+V[ ˆVA(s′; C′)] ≤ V[ ˆVϕ(s′; C′)] (11) Similarly, the target values obtained by multiple critics are more stable than using a single critic. 197 
+
+Theorem 2. The variance of target values obtained by multiple critics are less than using a single 198 
+
+critic. 199 
+
+V[ ˆVϕ(s′; C′)] ≤ V[ ˆVϕ(s′; θ′)] (12) Thus, the learning stability of the MAMC, with lowest variance, is greater than SAMC and SASC. 200 
+
+Further, this study investigate the property of estimation error, which is a good metric for indicating 201 
+
+the estimation accuracy [21]. 202 
+
+Definition 3. The estimation error of MAMC is defined as the difference between expectation of 203 
+
+estimate values and the expectation of optimal policy π.204 
+
+EA,C = E[ ˆVA(s′; C)] − E[ ˆVϕ(s′; C)] (13) Then the MAMC holds the following properties. 205 
+
+Theorem 3. The estimation error of MAMC is between the estimation error of multiple actors with 206 
+
+minimum and maximum critics. 207 
+
+EA,Q θmin ≤ E A,C ≤ E A,Q θmax (14) 
+
+Theorem 4. The estimation error of MAMC is between the estimation error of multiple critics with 208 
+
+minimum and maximum actors. 209 
+
+Eπϕmin ,C ≤ E A,C ≤ E πϕmax ,C (15) Hence, the estimation error of MAMC is in between the maximum and minimum of SAMC and 210 
+
+MASC. The proofs of above theorems will be given in supplementary material Section B due to space 211 
+
+limitation. 212 
+
+6Table 3: Wilcoxon signed rank test for TD3 and DARC compared with the MAMC at early (100k), middle (200k), and late stage (300k). The win/tie/lose denotes the number of environments that the MAMC is significantly superior, equal, and inferior to the corresponding test method. Stage (win/tie/lose) TD3-SMR DARC-SMR SAC-SMR REDQ-SMR 100k 3/2/0 2/2/1 3/2/0 0/4/1 200k 2/3/0 1/4/0 2/2/1 0/4/1 300k 2/3/0 1/3/1 1/4/0 0/3/2 
+
+Figure 1: Average return against environment steps for TD3-based and SAC-based methods by comparison with the MAMC on the five environments 
+
+## 6 Experimental Results 213 
+
+This section examines the performance of the proposed MAMC method in terms of effectiveness 214 
+
+and efficiency through experiments. Further analysis is made for showing the effectiveness of the 215 
+
+proposed components, the sensitivity of introduced hyperparameters, and the validity of the MAMC. 216 
+
+6.1 Experimental Settings 217 
+
+The experiments are conducted on a set of five test environments chose from the well-known MuJuCo 218 
+
+benchmark [ 31 ], including Hopper-v5, HalfCheetah-v5, Walker2d-v5, Ant-v5, and Humanoid-v5. 219 
+
+These environments are all have continuous state and action spaces with different dimensions. Re-220 
+
+garding the dimensionality, the difficulty of each environment can be regarded as either simple 221 
+
+(Hopper-v5), medium (HalfCheetah-v5, Walker2d-v5), or hard (Ant-v5, Humanoid-v5). The proper-222 
+
+ties of these environment can be found in the supplementary material Section A.3. 223 
+
+This study selects four state-of-the-art RL methods for performance comparison, including two with 224 
+
+deterministic policy: TD3[ 9] and DARC[ 21 ], and two with stochastic policy: SAC[ 10 ], REDQ[ 6 ]. 225 
+
+Both TD3 and SAC used a single actor with two critics. REDQ also adopts a single actor but with ten 226 
+
+critics, while DARC exploits two actors and two critics. The proposed MAMC utilizes ten actors 227 
+
+and ten critics. An analysis on the number of actors and critics can be found in the supplementary 228 
+
+material Section C.3. In addition, as the MAMC considers sample multiple reuse (SMR) [ 22 ], all the 229 
+
+four test methods are implemented as SMR versions, which are reported with better performance 230 
+
+than the original versions, for a fair comparison. 231 
+
+The hyperparameter settings for the four baseline methods follow their original suggestions. The 232 
+
+termination criterion is set to 300k environmental steps. All experiments conducted 10 trials, and 233 
+
+each trial is an average over twenty seeds for return if not stated. All figures are uniformly smoothed. 234 
+
+For significance analysis, this study adopts the Wilcoxon ranksum test with .05 significant level. The 235 
+
+error bars are within the range [μ − σ, μ + σ], which are generated by standard deviations with the 236 
+
+assumption of normally distributed errors. For more details about the experimental settings, please 237 
+
+refer to the supplementary material Section A. 238 
+
+7Table 4: Average and standard deviation of return for the MAMC with single-objective and multi-objective actor selection strategies on Ant-v5 over eight trials at early (100k), middle (200k), and late stage (300k). The bold symbol implies the highest value. Stage 100k 200k 300k Ant-v5 SO MO SO MO SO MO Mean 1980 2701 2805 3611 3395 4276 
+
+Std. 800 1235 1014 1631 1278 1260 
+
+Figure 2: Average return for the best, worst, and skilled (selected) actors in the MAMC in a specific trial on the five test environments 
+
+6.2 Effectiveness 239 
+
+Table 3 compares the Wilcoxon signed rank test for TD3 and DARC compared with the MAMC at 240 
+
+early (100k), middle (200k), and late stage (300k). The details are provided in supplementary material 241 
+
+Section C.1. At early stage, the MAMC achieves better quality than the two deterministic methods 242 
+
+TD3-SMR and DARC-SMR. Comparing to the two SAC-based methods, the MAMC outperforms 243 
+
+SAC-SMR but performs slightly worse than REDQ-SMR on the Hopper-v5 environment. At middle 244 
+
+stage, the MAMC still betters TD3-SMR and DARC-SMR, yet the improvement becomes smaller 245 
+
+than that at early stage. As for the two SAC-based methods, the trend on REDQ-SMR keeps, while 246 
+
+the improvement on SAC-SMR also decreases. At late stage, the lead to TD3-SMR, DARC-SMR, 247 
+
+and SAC-SMR further shrinks that the MAMC is slightly superior to TD3-SMR and SAC-SMR, 248 
+
+but is comparable to DARC-SMR. The REDQ-SMR further surpasses the MAMC on Humanoid-v5 249 
+
+environment. These results reflect the merits of MAMC at early and middle stage, and the demerit at 250 
+
+late stage. 251 
+
+6.3 Efficiency 252 
+
+Figure 1 draws the average return against environment steps for TD3-based and SAC-based methods 253 
+
+by comparison with the MAMC on the five environments. Compared with TD3-based methods, the 254 
+
+MAMC gains faster convergence on the three more complicated environments, i.e., Walker2d-v5, 255 
+
+Ant-v5, and Humanoid-v5. Similarly, the MAMC converges faster than SAC-SMR on these three 256 
+
+environments, yet the REDQ-SMR converges nicer than the MAMC on all except Walker2d-v5. 257 
+
+These results validate the efficiency of the MAMC against the two deterministic method TD3-SMR 258 
+
+and DARC-SMR, and the simpler stochastic method SAC-SMR. 259 
+
+6.4 Components Analysis 260 
+
+Table 4 lists the average and standard deviation of return for the MAMC with single-objective 261 
+
+(MAMC-SO) and multi-objective actor selection strategies on Ant-v5 over eight trials. The MAMC-262 
+
+SO averages the skill and creativity factors and selects the top actors by sorting for exploration. 263 
+
+The exploitation selection mechanism for MAMC-SO and MAMC is the same. From the table, the 264 
+
+MAMC performs better than MAMC-SO at all the three stages, which verifies the effectiveness of 265 
+
+the proposed multi-objective actor selection mechanism. 266 
+
+Figure 2 plots the average return for the best (upper bound), worst (lower bound), and skilled 267 
+
+(selected) actors in the MAMC in a specific trial on the five test environments. On HalfCheetah-v5 268 
+
+and Humanoid-v5, the MAMC is capable of selecting good actor approaching the upper bound, to 269 
+
+wit, the best actor. For Hopper-v5, Walker2d-v5, and Ant-v5, the MAMC tracks the moving upper 270 
+
+bound, and in most of the time the selected actor having quality beyond the average of upper and 271 
+
+8Table 5: Average and standard deviation of return for the MAMC with different quantile parameter qq = 0 .1 = 0 .2 = 0 .3 = 0 .4 = 0 .5
+
+HalfCheetah-v5 9119 ±1077 8153 ±1115 9117 ±1070 9191 ±1043 9466 ±1256 Walker2d-v5 3188 ±1516 4324 ±1038 4083 ±927 3385 ±1039 1406 ±561 
+
+Figure 3: Estimated and ground-truth average discounted return against environment steps for the MAMC with different quantile parameters q on HalfCheetah-v5 and Walker2d-v5 lower bounds. These results validate the effectiveness of the proposed skill factor for actor selection 272 
+
+for exploitation. 273 
+
+6.5 Sensitivity Analysis 274 
+
+Figure 3 plots the estimated and ground-truth average discounted return against environment steps 275 
+
+for MAMC with different quantile parameters q on HalfCheetah-v5 and Walker2d-v5. It is obvious 276 
+
+that the estimated value increases as q increases; the best q in terms of the smallest distance to 277 
+
+ground-truth value is 0.4 for HalfCheetah-v5 and 0.3 for Walker2d-v5. However, the values are 278 
+
+inconsistent to the best q in terms of the average return, which is 0.5 for HalfCheetah-v5 and 0.2 for 279 
+
+Walker2d-v5 (cf. Table 5). That is, the setting of quantile parameters q should also considers the 280 
+
+environmental preferences of optimism and pessimism. In general, a range between 0.2 and 0.3 is a 281 
+
+good setting for environments which favor pessimism, and a value between 0.3 and 0.4 is nice for 282 
+
+optimism cases; thus, a robust q value may near 0.3, but the best one for a specific environment still 283 
+
+needs to be investigated. 284 
+
+6.6 Validity Analysis 285 
+
+The proposed MAMC is based on deterministic policy, and the results have shown that the MAMC 286 
+
+can ameliorate the performance of TD3-SMR and REDQ-SMR. The MAMC is also beneficial in 287 
+
+comparison to SAC-SMR, a simple but powerful method with stochastic policy. Past studies have 288 
+
+discovered the potential of stochastic policy over deterministic policy, and this may be the weakness 289 
+
+of the MAMC, which is considered as the main reason to be surpassed by REDQ-SMR. 290 
+
+## 7 Conclusions 291 
+
+This study proposes a multi-actor multi-critic deep deterministic reinforcement learning method. The 292 
+
+MAMC includes a selection of actors for exploration using skill and creativity factors, an ensemble 293 
+
+target value based on a predefined quantile parameter, and a selection of best actor regarding skill 294 
+
+factor for exploitation. Theoretical analysis proves the MAMC having bounded estimation error, and 295 
+
+learning stability over SAMC and MASC. From experimental results, the MAMC excels TD3-SMR, 296 
+
+DARC-SMR, and SAC-SMR with better quality and faster convergence on the selected environments 297 
+
+in MuJoCo. The validity analysis shows a weakness of deterministic based method and is also a 298 
+
+possible future extension. Another promising orientation for future research is to adapt the quantile 299 
+
+parameter to address the issue of estimation accuracy by balancing optimism and pessimism. 300 
+
+9References 301 
+
+[1] Patigül Abliz. A controlling estimation bias method: Max-Mix-Min estimator for Q-learning. 302 
+
+The Journal of Supercomputing , 80(13):19248–19273, 2024. 1 303 
+
+[2] Oron Anschel, Nir Baram, and Nahum Shimkin. Averaged-DQN: Variance reduction and stabi-304 
+
+lization for deep reinforcement learning. In Proceedings of the 34th International Conference 305 
+
+on Machine Learning , pages 176–185, 2017. 1 306 
+
+[3] Yoshua Bengio, Ian Goodfellow, and Aaron Courville. Deep learning , volume 1. MIT press, 307 
+
+2016. 1 308 
+
+[4] Edoardo Cetin and Oya Celiktutan. Learning pessimism for reinforcement learning. In Pro-309 
+
+ceedings of the AAAI Conference on Artificial Intelligence , pages 6971–6979, 2023. 1 310 
+
+[5] Richard Y. Chen, Szymon Sidor, Pieter Abbeel, and John Schulman. UCB exploration via 311 
+
+q-ensembles. CoRR , abs/1706.01502, 2017. 2 312 
+
+[6] Xinyue Chen, Che Wang, Zijian Zhou, and Keith Ross. Randomized ensembled double 313 
+
+q-learning: Learning fast without a model. In 9th International Conference on Learning 314 
+
+Representations (ICLR) , 2021. 1, 1, 2, 6.1 315 
+
+[7] Kamil Ciosek, Quan Vuong, Robert Loftin, and Katja Hofmann. Better exploration with 316 
+
+optimistic actor critic. In Advances in Neural Information Processing Systems , 2019. 1, 1, 2 317 
+
+[8] K. Deb, A. Pratap, S. Agarwal, and T. Meyarivan. A fast and elitist multiobjective genetic 318 
+
+algorithm: Nsga-ii. IEEE Transactions on Evolutionary Computation , 6(2):182–197, 2002. 4.3 319 
+
+[9] Scott Fujimoto, Herke van Hoof, and David Meger. Addressing function approximation error in 320 
+
+actor-critic methods. In Proceedings of the 35th International Conference on Machine Learning ,321 
+
+pages 1587–1596, 2018. 1, 1, 2, 3, 6.1 322 
+
+[10] Tuomas Haarnoja, Aurick Zhou, Pieter Abbeel, and Sergey Levine. Soft actor-critic: Off-policy 323 
+
+maximum entropy deep reinforcement learning with a stochastic actor. In Proceedings of the 324 
+
+35th International Conference on Machine Learning , pages 1861–1870, 2018. 1, 1, 2, 6.1 325 
+
+[11] Peter Henderson, Riashat Islam, Philip Bachman, Joelle Pineau, Doina Precup, and David 326 
+
+Meger. Deep reinforcement learning that matters. Proceedings of the AAAI Conference on 327 
+
+Artificial Intelligence , 32(1), 2018. 1 328 
+
+[12] Matteo Hessel, Joseph Modayil, Hado Van Hasselt, Tom Schaul, Georg Ostrovski, Will Dabney, 329 
+
+Dan Horgan, Bilal Piot, Mohammad Azar, and David Silver. Rainbow: Combining improve-330 
+
+ments in deep reinforcement learning. In Proceedings of the 32th AAAI conference on artificial 331 
+
+intelligence , 2018. 1 332 
+
+[13] Vijay Konda and John Tsitsiklis. Actor-critic algorithms. In Advances in Neural Information 333 
+
+Processing Systems , pages 1008–1014, 1999. 2 334 
+
+[14] Arsenii Kuznetsov, Pavel Shvechikov, Alexander Grishin, and Dmitry Vetrov. Controlling 335 
+
+overestimation bias with truncated mixture of continuous distributional quantile critics. In 336 
+
+Proceedings of the 37th International Conference on Machine Learning , pages 5556–5566, 337 
+
+2020. 1 338 
+
+[15] Qingfeng Lan, Yangchen Pan, Alona Fyshe, and Martha White. Maxmin q-learning: Controlling 339 
+
+the estimation bias of q-learning. In 8th International Conference on Learning Representations 340 
+
+(ICLR) , 2020. 1 341 
+
+[16] Kimin Lee, Michael Laskin, Aravind Srinivas, and Pieter Abbeel. SUNRISE: A simple unified 342 
+
+framework for ensemble learning in deep reinforcement learning. In Proceedings of the 38th 343 
+
+International Conference on Machine Learning , pages 6131–6141, 2021. 1, 1, 2 344 
+
+[17] Fan Li, Mingsheng Fu, Wenyu Chen, Fan Zhang, Haixian Zhang, Hong Qu, and Zhang Yi. 345 
+
+Improving exploration in actor–critic with weakly pessimistic value estimation and optimistic 346 
+
+policy optimization. IEEE Transactions on Neural Networks and Learning Systems , 35(7):8783– 347 
+
+8796, 2024. 1, 2 348 
+
+10 [18] Lin Li, Yuze Li, Wei Wei, Yujia Zhang, and Jiye Liang. Multi-actor mechanism for actor-critic 349 
+
+reinforcement learning. Information Sciences , 647:119494, 2023. 1, 2 350 
+
+[19] Timothy P. Lillicrap, Jonathan J. Hunt, Alexander Pritzel, Nicolas Heess, Tom Erez, Yuval 351 
+
+Tassa, David Silver, and Daan Wierstra. Continuous control with deep reinforcement learning. 352 
+
+In 4th International Conference on Learning Representations, ICLR 2016 , 2016. 1, 1, 2 353 
+
+[20] Jinyi Liu, Zhi Wang, Yan Zheng, Jianye Hao, Chenjia Bai, Junjie Ye, Zhen Wang, Haiyin 354 
+
+Piao, and Yang Sun. OVD-explorer: Optimism should not be the sole pursuit of exploration in 355 
+
+noisy environments. In Proceedings of the AAAI Conference on Artificial Intelligence , pages 356 
+
+13954–13962, 2024. 1 357 
+
+[21] Jiafei Lyu, Xiaoteng Ma, Jiangpeng Yan, and Xiu Li. Efficient continuous control with double 358 
+
+actors and regularized critics. In Proceedings of the AAAI Conference on Artificial Intelligence ,359 
+
+pages 7655–663, 2022. 1, 1, 2, 5, 6.1 360 
+
+[22] Jiafei Lyu, Le Wan, Xiu Li, and Zongqing Lu. Off-policy rl algorithms can be sample-efficient 361 
+
+for continuous control via sample multiple reuse. Information Sciences , 666:120371, 2024. 1, 362 
+
+4.2, 6.1 363 
+
+[23] V. Mnih, K. Kavukcuoglu, D. Silver, A. A. Rusu, J. Veness, Bellemare M. G., A. Graves, 364 
+
+M. Riedmiller, A. K. Fidjeland, G. Ostrovski, S. Petersen, C. Beattie, A. Sadik, I. Antonoglou, 365 
+
+H. King, D. Kumaran, D. Wierstra, S. Legg, and D. Hassabis. Human-level control through 366 
+
+deep reinforcement learning. Nature , 518(7540):529–533, 2015. 1, 1, 2 367 
+
+[24] Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, 368 
+
+Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, et al. Training language models to 369 
+
+follow instructions with human feedback. Advances in neural information processing systems ,370 
+
+35:27730–27744, 2022. 1 371 
+
+[25] Martin L Puterman. Markov decision processes. Handbooks in operations research and 372 
+
+management science , 2:331–434, 1990. 1 373 
+
+[26] David Silver, Julian Schrittwieser, Karen Simonyan, Ioannis Antonoglou, Aja Huang, Arthur 374 
+
+Guez, Thomas Hubert, Lucas Baker, Matthew Lai, Adrian Bolton, et al. Mastering the game of 375 
+
+go without human knowledge. nature , 550(7676):354–359, 2017. 1 376 
+
+[27] Richard S. Sutton. Learning to predict by the method of temporal differences. Machine Learning ,377 
+
+3:9–44, 08 1988. 3 378 
+
+[28] Richard S. Sutton and Andrew G. Barto. Reinforcement learning: An introduction . MIT Press, 379 
+
+2018. 1, 3 380 
+
+[29] Chen Tang, Ben Abbatematteo, Jiaheng Hu, Rohan Chandra, Roberto Martín-Martín, and 381 
+
+Peter Stone. Deep reinforcement learning for robotics: A survey of real-world successes. In 382 
+
+Proceedings of the 39th AAAI Conference on Artificial Intelligence , pages 28694–28698, 2025. 383 
+
+1384 
+
+[30] Gerald Tesauro. Temporal difference learning and td-gammon. Commun. ACM , 38(3):58–68, 385 
+
+Mar 1995. 3 386 
+
+[31] Emanuel Todorov, Tom Erez, and Yuval Tassa. MuJoCo: A physics engine for model-based 387 
+
+control. In 2012 IEEE/RSJ International Conference on Intelligent Robots and Systems , pages 388 
+
+5026–5033, 2012. 6.1, A.3 389 
+
+[32] Hang Wang, Sen Lin, and Junshan Zhang. Adaptive ensemble Q-learning: Minimizing esti-390 
+
+mation bias via error feedback. In Advances in Neural Information Processing Systems , pages 391 
+
+24778–24790, 2021. 1 392 
+
+[33] C. J. Watkins and P. Dayan. Q-learning. Machine learning , 8(3):279–292, 1992. 3 393 
+
+[34] Wei Wei, Yujia Zhang, Jiye Liang, Lin Li, and Yyuze Li. Controlling underestimation bias in 394 
+
+reinforcement learning via quasi-median operation. In Proceedings of the AAAI Conference on 395 
+
+Artificial Intelligence , pages 8621–8628, 2022. 1, 1 396 
+
+11 [35] Chenyang Wu, Tianci Li, Zongzhang Zhang, and Yang Yu. Bayesian optimistic optimiza-397 
+
+tion: Optimistic exploration for model-based reinforcement learning. In Advances in neural 398 
+
+information processing systems , pages 14210–14223, 2022. 1 399 
+
+[36] Yao Yao, Li Xiao, Zhicheng An, Wanpeng Zhang, and Dijun Luo. Sample efficient reinforce-400 
+
+ment learning via model-ensemble exploration and exploitation. In 2021 IEEE International 401 
+
+Conference on Robotics and Automation (ICRA) , pages 4202–4208, 2021. 1 402 
+
+12 NeurIPS Paper Checklist 403 
+
+1. Claims 404 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the 405 
+
+paper’s contributions and scope? 406 
+
+Answer: [Yes] 407 
+
+Justification: The abstract and introduction clearly state the claims made, including the 408 
+
+contributions made in the paper and important assumptions and limitations. 409 
+
+Guidelines: 410 
+
+• The answer NA means that the abstract and introduction do not include the claims 411 
+
+made in the paper. 412 
+
+• The abstract and/or introduction should clearly state the claims made, including the 413 
+
+contributions made in the paper and important assumptions and limitations. A No or 414 
+
+NA answer to this question will not be perceived well by the reviewers. 415 
+
+• The claims made should match theoretical and experimental results, and reflect how 416 
+
+much the results can be expected to generalize to other settings. 417 
+
+• It is fine to include aspirational goals as motivation as long as it is clear that these goals 418 
+
+are not attained by the paper. 419 
+
+2. Limitations 420 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? 421 
+
+Answer: [Yes] 422 
+
+Justification: The limitations of the proposed work have been discussed in Section 6.6. 423 
+
+Guidelines: 424 
+
+• The answer NA means that the paper has no limitation while the answer No means that 425 
+
+the paper has limitations, but those are not discussed in the paper. 426 
+
+• The authors are encouraged to create a separate "Limitations" section in their paper. 427 
+
+• The paper should point out any strong assumptions and how robust the results are to 428 
+
+violations of these assumptions (e.g., independence assumptions, noiseless settings, 429 
+
+model well-specification, asymptotic approximations only holding locally). The authors 430 
+
+should reflect on how these assumptions might be violated in practice and what the 431 
+
+implications would be. 432 
+
+• The authors should reflect on the scope of the claims made, e.g., if the approach was 433 
+
+only tested on a few datasets or with a few runs. In general, empirical results often 434 
+
+depend on implicit assumptions, which should be articulated. 435 
+
+• The authors should reflect on the factors that influence the performance of the approach. 436 
+
+For example, a facial recognition algorithm may perform poorly when image resolution 437 
+
+is low or images are taken in low lighting. Or a speech-to-text system might not be 438 
+
+used reliably to provide closed captions for online lectures because it fails to handle 439 
+
+technical jargon. 440 
+
+• The authors should discuss the computational efficiency of the proposed algorithms 441 
+
+and how they scale with dataset size. 442 
+
+• If applicable, the authors should discuss possible limitations of their approach to 443 
+
+address problems of privacy and fairness. 444 
+
+• While the authors might fear that complete honesty about limitations might be used by 445 
+
+reviewers as grounds for rejection, a worse outcome might be that reviewers discover 446 
+
+limitations that aren’t acknowledged in the paper. The authors should use their best 447 
+
+judgment and recognize that individual actions in favor of transparency play an impor-448 
+
+tant role in developing norms that preserve the integrity of the community. Reviewers 449 
+
+will be specifically instructed to not penalize honesty concerning limitations. 450 
+
+3. Theory assumptions and proofs 451 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and 452 
+
+a complete (and correct) proof? 453 
+
+Answer: [Yes] 454 
+
+13 Justification: The assumptions and proofs are given in supplementary material Section B. 455 
+
+Guidelines: 456 
+
+• The answer NA means that the paper does not include theoretical results. 457 
+
+• All the theorems, formulas, and proofs in the paper should be numbered and cross-458 
+
+referenced. 459 
+
+• All assumptions should be clearly stated or referenced in the statement of any theorems. 460 
+
+• The proofs can either appear in the main paper or the supplemental material, but if 461 
+
+they appear in the supplemental material, the authors are encouraged to provide a short 462 
+
+proof sketch to provide intuition. 463 
+
+• Inversely, any informal proof provided in the core of the paper should be complemented 464 
+
+by formal proofs provided in appendix or supplemental material. 465 
+
+• Theorems and Lemmas that the proof relies upon should be properly referenced. 466 
+
+4. Experimental result reproducibility 467 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-468 
+
+perimental results of the paper to the extent that it affects the main claims and/or conclusions 469 
+
+of the paper (regardless of whether the code and data are provided or not)? 470 
+
+Answer: [Yes] 471 
+
+Justification: All the information needed to reproduce the main experimental results of the 472 
+
+paper is given in Section 6.1 and supplementary material Section A. The code used in this 473 
+
+paper along with instructions containing the exact command and environment needed to run 474 
+
+to reproduce the results are also provided in anonymized github page at 475 
+
+https://github.com/NobodyAcademic/MAMC 476 
+
+Guidelines: 477 
+
+• The answer NA means that the paper does not include experiments. 478 
+
+• If the paper includes experiments, a No answer to this question will not be perceived 479 
+
+well by the reviewers: Making the paper reproducible is important, regardless of 480 
+
+whether the code and data are provided or not. 481 
+
+• If the contribution is a dataset and/or model, the authors should describe the steps taken 482 
+
+to make their results reproducible or verifiable. 483 
+
+• Depending on the contribution, reproducibility can be accomplished in various ways. 484 
+
+For example, if the contribution is a novel architecture, describing the architecture fully 485 
+
+might suffice, or if the contribution is a specific model and empirical evaluation, it may 486 
+
+be necessary to either make it possible for others to replicate the model with the same 487 
+
+dataset, or provide access to the model. In general. releasing code and data is often 488 
+
+one good way to accomplish this, but reproducibility can also be provided via detailed 489 
+
+instructions for how to replicate the results, access to a hosted model (e.g., in the case 490 
+
+of a large language model), releasing of a model checkpoint, or other means that are 491 
+
+appropriate to the research performed. 492 
+
+• While NeurIPS does not require releasing code, the conference does require all submis-493 
+
+sions to provide some reasonable avenue for reproducibility, which may depend on the 494 
+
+nature of the contribution. For example 495 
+
+(a) If the contribution is primarily a new algorithm, the paper should make it clear how 496 
+
+to reproduce that algorithm. 497 
+
+(b) If the contribution is primarily a new model architecture, the paper should describe 498 
+
+the architecture clearly and fully. 499 
+
+(c) If the contribution is a new model (e.g., a large language model), then there should 500 
+
+either be a way to access this model for reproducing the results or a way to reproduce 501 
+
+the model (e.g., with an open-source dataset or instructions for how to construct 502 
+
+the dataset). 503 
+
+(d) We recognize that reproducibility may be tricky in some cases, in which case 504 
+
+authors are welcome to describe the particular way they provide for reproducibility. 505 
+
+In the case of closed-source models, it may be that access to the model is limited in 506 
+
+some way (e.g., to registered users), but it should be possible for other researchers 507 
+
+to have some path to reproducing or verifying the results. 508 
+
+14 5. Open access to data and code 509 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-510 
+
+tions to faithfully reproduce the main experimental results, as described in supplemental 511 
+
+material? 512 
+
+Answer: [Yes] 513 
+
+Justification: The code used in this paper along with instructions containing the exact 514 
+
+command and environment needed to run to reproduce the results are also provided in 515 
+
+anonymized github page at 516 
+
+https://github.com/NobodyAcademic/MAMC 517 
+
+Guidelines: 518 
+
+• The answer NA means that paper does not include experiments requiring code. 519 
+
+• Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ 520 
+
+public/guides/CodeSubmissionPolicy ) for more details. 521 
+
+• While we encourage the release of code and data, we understand that this might not be 522 
+
+possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not 523 
+
+including code, unless this is central to the contribution (e.g., for a new open-source 524 
+
+benchmark). 525 
+
+• The instructions should contain the exact command and environment needed to run to 526 
+
+reproduce the results. See the NeurIPS code and data submission guidelines ( https: 527 
+
+//nips.cc/public/guides/CodeSubmissionPolicy ) for more details. 528 
+
+• The authors should provide instructions on data access and preparation, including how 529 
+
+to access the raw data, preprocessed data, intermediate data, and generated data, etc. 530 
+
+• The authors should provide scripts to reproduce all experimental results for the new 531 
+
+proposed method and baselines. If only a subset of experiments are reproducible, they 532 
+
+should state which ones are omitted from the script and why. 533 
+
+• At submission time, to preserve anonymity, the authors should release anonymized 534 
+
+versions (if applicable). 535 
+
+• Providing as much information as possible in supplemental material (appended to the 536 
+
+paper) is recommended, but including URLs to data and code is permitted. 537 
+
+6. Experimental setting/details 538 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-539 
+
+parameters, how they were chosen, type of optimizer, etc.) necessary to understand the 540 
+
+results? 541 
+
+Answer: [Yes] 542 
+
+Justification: The experimental setting are presented in Section 6.1. The full details are 543 
+
+provided in the supplementary material Section A. 544 
+
+Guidelines: 545 
+
+• The answer NA means that the paper does not include experiments. 546 
+
+• The experimental setting should be presented in the core of the paper to a level of detail 547 
+
+that is necessary to appreciate the results and make sense of them. 548 
+
+• The full details can be provided either with the code, in appendix, or as supplemental 549 
+
+material. 550 
+
+7. Experiment statistical significance 551 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate 552 
+
+information about the statistical significance of the experiments? 553 
+
+Answer: [Yes] 554 
+
+Justification: The error bars are within the range [μ − σ, μ + σ], which are generated by 555 
+
+standard deviations with the assumption of normally distributed errors. The statistical signif-556 
+
+icance of the experiments is examined by the Wilcoxon ranksum test with .05 significance 557 
+
+level. These are mentioned in Section 6.1. 558 
+
+Guidelines: 559 
+
+15 • The answer NA means that the paper does not include experiments. 560 
+
+• The authors should answer "Yes" if the results are accompanied by error bars, confi-561 
+
+dence intervals, or statistical significance tests, at least for the experiments that support 562 
+
+the main claims of the paper. 563 
+
+• The factors of variability that the error bars are capturing should be clearly stated (for 564 
+
+example, train/test split, initialization, random drawing of some parameter, or overall 565 
+
+run with given experimental conditions). 566 
+
+• The method for calculating the error bars should be explained (closed form formula, 567 
+
+call to a library function, bootstrap, etc.) 568 
+
+• The assumptions made should be given (e.g., Normally distributed errors). 569 
+
+• It should be clear whether the error bar is the standard deviation or the standard error 570 
+
+of the mean. 571 
+
+• It is OK to report 1-sigma error bars, but one should state it. The authors should 572 
+
+preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis 573 
+
+of Normality of errors is not verified. 574 
+
+• For asymmetric distributions, the authors should be careful not to show in tables or 575 
+
+figures symmetric error bars that would yield results that are out of range (e.g. negative 576 
+
+error rates). 577 
+
+• If error bars are reported in tables or plots, The authors should explain in the text how 578 
+
+they were calculated and reference the corresponding figures or tables in the text. 579 
+
+8. Experiments compute resources 580 
+
+Question: For each experiment, does the paper provide sufficient information on the com-581 
+
+puter resources (type of compute workers, memory, time of execution) needed to reproduce 582 
+
+the experiments? 583 
+
+Answer: [Yes] 584 
+
+Justification: All the experiments are conducted on a server with Intel Xeon W7-2475X 585 
+
+CPU (with 2.6 GHz clock rate, 20 cores and 40 hyperthreads), two NVIDIA RTX 4090 GPU 586 
+
+cards (each with 24GB memory), and 128 GB main memory. The description is revealed in 587 
+
+the supplementary material Section A.2. 588 
+
+Guidelines: 589 
+
+• The answer NA means that the paper does not include experiments. 590 
+
+• The paper should indicate the type of compute workers CPU or GPU, internal cluster, 591 
+
+or cloud provider, including relevant memory and storage. 592 
+
+• The paper should provide the amount of compute required for each of the individual 593 
+
+experimental runs as well as estimate the total compute. 594 
+
+• The paper should disclose whether the full research project required more compute 595 
+
+than the experiments reported in the paper (e.g., preliminary or failed experiments that 596 
+
+didn’t make it into the paper). 597 
+
+9. Code of ethics 598 
+
+Question: Does the research conducted in the paper conform, in every respect, with the 599 
+
+NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?600 
+
+Answer: [Yes] 601 
+
+Justification: The authors have checked the NeurIPS Code of Ethics and make sure the 602 
+
+conducted research in this paper conform it in every respect. 603 
+
+Guidelines: 604 
+
+• The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. 605 
+
+• If the authors answer No, they should explain the special circumstances that require a 606 
+
+deviation from the Code of Ethics. 607 
+
+• The authors should make sure to preserve anonymity (e.g., if there is a special consid-608 
+
+eration due to laws or regulations in their jurisdiction). 609 
+
+10. Broader impacts 610 
+
+16 Question: Does the paper discuss both potential positive societal impacts and negative 611 
+
+societal impacts of the work performed? 612 
+
+Answer: [No] 613 
+
+Justification: This paper is a foundational research and not tied to particular applications. 614 
+
+Guidelines: 615 
+
+• The answer NA means that there is no societal impact of the work performed. 616 
+
+• If the authors answer NA or No, they should explain why their work has no societal 617 
+
+impact or why the paper does not address societal impact. 618 
+
+• Examples of negative societal impacts include potential malicious or unintended uses 619 
+
+(e.g., disinformation, generating fake profiles, surveillance), fairness considerations 620 
+
+(e.g., deployment of technologies that could make decisions that unfairly impact specific 621 
+
+groups), privacy considerations, and security considerations. 622 
+
+• The conference expects that many papers will be foundational research and not tied 623 
+
+to particular applications, let alone deployments. However, if there is a direct path to 624 
+
+any negative applications, the authors should point it out. For example, it is legitimate 625 
+
+to point out that an improvement in the quality of generative models could be used to 626 
+
+generate deepfakes for disinformation. On the other hand, it is not needed to point out 627 
+
+that a generic algorithm for optimizing neural networks could enable people to train 628 
+
+models that generate Deepfakes faster. 629 
+
+• The authors should consider possible harms that could arise when the technology is 630 
+
+being used as intended and functioning correctly, harms that could arise when the 631 
+
+technology is being used as intended but gives incorrect results, and harms following 632 
+
+from (intentional or unintentional) misuse of the technology. 633 
+
+• If there are negative societal impacts, the authors could also discuss possible mitigation 634 
+
+strategies (e.g., gated release of models, providing defenses in addition to attacks, 635 
+
+mechanisms for monitoring misuse, mechanisms to monitor how a system learns from 636 
+
+feedback over time, improving the efficiency and accessibility of ML). 637 
+
+11. Safeguards 638 
+
+Question: Does the paper describe safeguards that have been put in place for responsible 639 
+
+release of data or models that have a high risk for misuse (e.g., pretrained language models, 640 
+
+image generators, or scraped datasets)? 641 
+
+Answer: [No] 642 
+
+Justification: This paper provides open access to the source code under pyTorch and NumPy 643 
+
+Licenses without warranty of any kind. 644 
+
+Guidelines: 645 
+
+• The answer NA means that the paper poses no such risks. 646 
+
+• Released models that have a high risk for misuse or dual-use should be released with 647 
+
+necessary safeguards to allow for controlled use of the model, for example by requiring 648 
+
+that users adhere to usage guidelines or restrictions to access the model or implementing 649 
+
+safety filters. 650 
+
+• Datasets that have been scraped from the Internet could pose safety risks. The authors 651 
+
+should describe how they avoided releasing unsafe images. 652 
+
+• We recognize that providing effective safeguards is challenging, and many papers do 653 
+
+not require this, but we encourage authors to take this into account and make a best 654 
+
+faith effort. 655 
+
+12. Licenses for existing assets 656 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in 657 
+
+the paper, properly credited and are the license and terms of use explicitly mentioned and 658 
+
+properly respected? 659 
+
+Answer: [Yes] 660 
+
+Justification: All the code packages and datasets used in this paper are cited and/or credited 661 
+
+properly. 662 
+
+Guidelines: 663 
+
+17 • The answer NA means that the paper does not use existing assets. 664 
+
+• The authors should cite the original paper that produced the code package or dataset. 665 
+
+• The authors should state which version of the asset is used and, if possible, include a 666 
+
+URL. 667 
+
+• The name of the license (e.g., CC-BY 4.0) should be included for each asset. 668 
+
+• For scraped data from a particular source (e.g., website), the copyright and terms of 669 
+
+service of that source should be provided. 670 
+
+• If assets are released, the license, copyright information, and terms of use in the 671 
+
+package should be provided. For popular datasets, paperswithcode.com/datasets 672 
+
+has curated licenses for some datasets. Their licensing guide can help determine the 673 
+
+license of a dataset. 674 
+
+• For existing datasets that are re-packaged, both the original license and the license of 675 
+
+the derived asset (if it has changed) should be provided. 676 
+
+• If this information is not available online, the authors are encouraged to reach out to 677 
+
+the asset’s creators. 678 
+
+13. New assets 679 
+
+Question: Are new assets introduced in the paper well documented and is the documentation 680 
+
+provided alongside the assets? 681 
+
+Answer: [Yes] 682 
+
+Justification: This paper provides open access to the source code under pyTorch and NumPy 683 
+
+Licenses, which is mentioned in an anonymized github page at 684 
+
+https://github.com/... 685 
+
+Guidelines: 686 
+
+• The answer NA means that the paper does not release new assets. 687 
+
+• Researchers should communicate the details of the dataset/code/model as part of their 688 
+
+submissions via structured templates. This includes details about training, license, 689 
+
+limitations, etc. 690 
+
+• The paper should discuss whether and how consent was obtained from people whose 691 
+
+asset is used. 692 
+
+• At submission time, remember to anonymize your assets (if applicable). You can either 693 
+
+create an anonymized URL or include an anonymized zip file. 694 
+
+14. Crowdsourcing and research with human subjects 695 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper 696 
+
+include the full text of instructions given to participants and screenshots, if applicable, as 697 
+
+well as details about compensation (if any)? 698 
+
+Answer: [NA] 699 
+
+Justification: The paper does not involve crowdsourcing nor research with human subjects. 700 
+
+Guidelines: 701 
+
+• The answer NA means that the paper does not involve crowdsourcing nor research with 702 
+
+human subjects. 703 
+
+• Including this information in the supplemental material is fine, but if the main contribu-704 
+
+tion of the paper involves human subjects, then as much detail as possible should be 705 
+
+included in the main paper. 706 
+
+• According to the NeurIPS Code of Ethics, workers involved in data collection, curation, 707 
+
+or other labor should be paid at least the minimum wage in the country of the data 708 
+
+collector. 709 
+
+15. Institutional review board (IRB) approvals or equivalent for research with human 710 
+
+subjects 711 
+
+Question: Does the paper describe potential risks incurred by study participants, whether 712 
+
+such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) 713 
+
+approvals (or an equivalent approval/review based on the requirements of your country or 714 
+
+institution) were obtained? 715 
+
+18 Answer: [NA] 716 
+
+Justification: The paper does not involve crowdsourcing nor research with human subjects. 717 
+
+Guidelines: 718 
+
+• The answer NA means that the paper does not involve crowdsourcing nor research with 719 
+
+human subjects. 720 
+
+• Depending on the country in which research is conducted, IRB approval (or equivalent) 721 
+
+may be required for any human subjects research. If you obtained IRB approval, you 722 
+
+should clearly state this in the paper. 723 
+
+• We recognize that the procedures for this may vary significantly between institutions 724 
+
+and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the 725 
+
+guidelines for their institution. 726 
+
+• For initial submissions, do not include any information that would break anonymity (if 727 
+
+applicable), such as the institution conducting the review. 728 
+
+16. Declaration of LLM usage 729 
+
+Question: Does the paper describe the usage of LLMs if it is an important, original, or 730 
+
+non-standard component of the core methods in this research? Note that if the LLM is used 731 
+
+only for writing, editing, or formatting purposes and does not impact the core methodology, 732 
+
+scientific rigorousness, or originality of the research, declaration is not required. 733 
+
+Answer: [NA] 734 
+
+Justification: The core method development in this research does not involve LLMs as any 735 
+
+important, original, or non-standard components. 736 
+
+Guidelines: 737 
+
+• The answer NA means that the core method development in this research does not 738 
+
+involve LLMs as any important, original, or non-standard components. 739 
+
+• Please refer to our LLM policy ( https://neurips.cc/Conferences/2025/LLM )740 
+
+for what should or should not be described. 741 
+
+19

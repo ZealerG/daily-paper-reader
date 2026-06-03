@@ -1,0 +1,1877 @@
+Title: 13476_HypRL_Reinforcement_Lear.pdf
+
+URL Source: https://openreview.net/pdf?id=lJSAtyx9Uc
+
+Number of Pages: 32
+
+Markdown Content:
+# HYP RL: Reinforcement Learning of Control Policies for Hyperproperties 
+
+Tzu-Han Hsu ∗ Arshia Rafieioskouei ∗ Borzoo Bonakdarpour 
+
+Michigan State University 
+
+{tzuhan, rafieios, borzoo}@msu.edu 
+
+## Abstract 
+
+Reward shaping in multi-agent reinforcement learning (MARL) for complex tasks remains a significant challenge. Existing approaches often fail to find optimal solu-tions or cannot efficiently handle such tasks. We propose H YP RL, a specification-guided reinforcement learning framework that learns control policies w.r.t. hyper-properties expressed in HyperLTL. Hyperproperties constitute a powerful formal-ism for specifying objectives and constraints over sets of execution traces across agents. To learn policies that maximize the satisfaction of a HyperLTL formula φ,we apply Skolemization to manage quantifier alternations and define quantitative robustness functions to shape rewards over execution traces of a Markov decision process with unknown transitions. A suitable RL algorithm is then used to learn policies that collectively maximize the expected reward and, consequently, increase the probability of satisfying φ. We evaluate H YP RL on a diverse set of benchmarks, including safety-aware planning, Deep Sea Treasure, and the Post Correspondence Problem. We also compare with specification-driven baselines to demonstrate the effectiveness and efficiency of H YP RL. 
+
+## 1 Introduction 
+
+Designing reward functions that accurately capture desirable behaviors in multi-agent reinforcement learning (MARL) remains a notorious stumbling block. Consider a wildfire scenario in a 3 × 3 grid-world with cells labeled {a, b, . . . , i} (see Figure 1). Locations {i, f , c} are on fire, and two victims are located at {f , g}. Now, two autonomous agents are deployed from {a} with two objectives; O1:the firefighter agent ( FF ) must extinguish all fire zones, and O2: the medical agent ( Med ) aims to rescue all victims. The agents also have to satisfy two constraints; C1: they must always remain within a 2-cell communication range, and C2: Med cannot pass any fire zone before FF extinguished the fire in that zone. The goal is to learn optimal policies for FF and Med that maximize the probability of satisfying all above requirements, as shown by the agent paths in Figure 1a. Now, suppose we use an existing RL approach by assigning the following rewards; extinguish fire: 
+
++50 , rescue a victim: +10 , agent out of range: −100 , and Med in fire zone: −100 . These approaches would guide FF to complete O1 optimally by path a R
+
+−→ b R
+
+−→ c U
+
+−→ f U
+
+−→ i, but due to C1, it forces Med to delay the rescue of the victim in {g} with redundant moves: a U
+
+−→ d D
+
+−→ a U
+
+−→ d U
+
+−→ g· · · (see Figure 1b). Furthermore, the victim in {f } is trapped in fire, so satisfying O2 depends on the progress of O1,while respecting C1 (safety) and C2 (dependency). Such complex requirements make reward design in MARL particularly challenging, as policies must account for both individual objectives and relational constraints between agents with dependencies. In fact, existing RL approaches often fail to find optimal policies because agent paths are implicitly universally quantified, which is overly restrictive and limits the ability of RL to explore more optimal solutions. That is, the set of requirements is of the form ∀τ. ∀τ ′.ψ , where τ and τ ′ are agents’ paths and ψ specifies constrains and objectives. 
+
+> ∗Equal contribution. 39th Conference on Neural Information Processing Systems (NeurIPS 2025).
+
+⋄ (O1): FF extinguishes all fires. 
+
+⋄ (O2): Med rescues all victims. 
+
+⋄ (C1): FF and Med always stay within 2-cells of each other. 
+
+⋄ (C2): Med must not passing any fire zone at all time. (a) Optimal policies. (b) Med paces in a − d. (c) Med pauses in e.
+
+Figure 1: A wildfire scenario with two objectives ( O1, O2) and two relational constraints ( C1, C2). Temporal logics [ 37 ] have shown to be both expressive and effective to address objectives and constraints in single-agent settings [ 32 , 24 , 2, 10 , 14 , 21 , 22 , 28 , 45 , 47 ]. However, these methods cannot handle our motivating example as it involves multiple agents. Recent works have been extended to MARL [ 33 , 31 , 20 , 16 ], but these approaches either fail to capture relational dependencies between agents or can handle only a subset of temporal properties, such as co-safty [ 29 , 41 ]. Moreover, specifications in temporal logics that formalize the behavior of individual traces (e.g., LTL) are again inherently universally quantified and, hence, too restrictive. In this paper, we propose a specification-guided RL framework that leverages the powerful framework of hyperproperties [12 ] and, in particular, the temporal logic HyperLTL [ 13 ], as its formal foundation. Hyperproperties characterize requirements over sets of execution traces, allowing the specification of relational and dependent behaviors that involve multiple agents or joint system executions, rather than individual behaviors of agents. This expressiveness is particularly well-suited for capturing relational, quantified, and multi-agent objectives. Building on this foundation, we propose Hyp erproperties for 
+
+Reinforcement Learning (H YP RL), a framework that learns a collection of control policies which maximizes the probability of satisfying a hyperproperty expressed as a HyperLTL formula. In our motivating example, HyperLTL allows a specification of the form ∀τ. ∃τ ′.ψ , which enables H YP RL to search for more optimal policies and identify the one in Figure 1a. The main challenge here is to deal with HyperLTL formulas with quantifier alternation, which has not been studied prior to H YP RL. Our work represents a novel step towards the automated synthesis of reward mechanisms that capture complex objectives and constraints in multi-agent setting. 
+
+Contributions: 
+
+1. We formulate the control policies synthesis problem for a multi-agent system as a learning problem, where the goal is to maximize the probability of satisfying a HyperLTL formula that expresses a set of objectives and constraints (Section 4). 2. We address the challenge of reasoning about quantifier alternation in a HyperLTL formula due to expressing dependencies among agents by Skolemization (Section 5.1). 3. We introduce quantitative semantics for HyperLTL that compute robustness values as rewards, providing a solution of reward shaping for optimizing hyperproperty satisfaction (Section 5.2). Finally, we use off-the-shelf RL algorithms to learn an optimal collection of policies (Section 5.3). 4. We evaluate H YP RL on a diverse set of learning tasks, including safety-aware multi-objective planning, the Post Correspondence Problem, the famous Deep Sea Treasure benchmark, and the wildfire scenario. Our results show that H YP RL is more efficient and effective in handling complex requirements compared to selected baselines (Section 6). 
+
+## 2 Related Work 
+
+Logic-based Single-agent RL. DIRL [ 24 ] is a framework that synthesizes an optimal policy which the specification is expressed in the language SPECTRL [23 ]. However, SPECTRL does not capture the full expressiveness of temporal logics as it only supports a fragment of LTL. In [ 32 ], the authors introduce truncated LTL for quantitative reasoning over LTL formulas, but it is limited to single-agent task specifications (similar reasonings are also presented in [ 44 , 2, 10 ]). In [ 28 ], LTL formulas are encoded by replacing operators and predicates with recurrent neural networks connected according to the parse tree, forming a structure that captures the formula’s semantics. In [ 14 , 21 , 45 , 47 , 30 ], the authors compose an MDP with a Limit Deterministic Büchi Automaton (LDBA), which represents the LTL specification, and solve the compositional model as a control problem. 2Logic-based Multi-Agent Reinforcement Learning. In [ 25 ], the authors extend the SPECTRL language [ 23 ] to non-cooperative multi-agent systems and train joint policies that form a Nash Equilibrium, which requires relational reasoning. However, their algorithm follows an “enumerate-and-verify” approach by exhaustively searching RL policies to identify one that has higher probability to form such equilibrium, which leads to substantial learning overhead as the number of agents increases. Moreover, the extended language in [ 25 ] cannot handle arbitrary HyperLTL formulas. In [ 16 ], the authors propose a reward shaping method by composing an MDP with a single centralized LDBA derived from a global LTL specification. However, this approach cannot capture inter-agent dependencies, and the product construction of LDBA may suffer from state-space explosion. More recent efforts in [ 33 , 31 , 20 ] extend quantitative reasoning to formulas with LTL operators in a multi-agent setting. However, in contrast to H YP RL, they only cover co-safety specifications and do not support the full logic. 
+
+Shield Synthesis. Shield synthesis for RL is a technique that asks an agent to propose an action in each learning step, and a shield (i.e., a safety guard) evaluates whether such action is safe [ 3, 26 , 27 ]. In [ 34 ], the authors apply shield synthesis in a decentralized multi-agent setting, where the learning targets are specified by deterministic finite automata. However, the specifications are limited to universal (i.e., a ∀∗.ψ formula) and cannot handle properties such as planning tasks that involve dependencies (which is a ∀∃ hyperproperty). Furthermore, the authors in [ 17 ] proposed factored 
+
+shielding, which can learn multiple policies by a factorization of joint state space (i.e., decomposing one shield into multiple sub-shields). However, the main contribution is the improvement on RL scalability, but the limitation on universal-only properties remains. 
+
+## 3 Preliminaries                              
+
+> ⟨2,0⟩
+> ⟨2,1⟩⟨1,0⟩
+> ⟨1,1⟩⟨2,2⟩⟨0,0⟩
+> ⟨0,1⟩⟨1,2⟩
+> ⟨0,2⟩
+> RU
+> 10.5 0.5
+> LRRU
+> 10.5 0.5
+> LRU
+> 111
+> UL
+> 1
+> 1
+> 1
+> 1
+> R
+> 1
+> a
+> bd
+> ceg
+> hf
+> i
+
+Figure 2: The MDP of The grid-world in Figure 1. 
+
+Markov Decision Processes (MDP). We model our RL problem for hyperproperties using MDP M = ⟨S , s0, A, P, AP , L⟩, where 
+
+S is a finite set of states , s0 ∈ S is the initial state , and A is a finite set of actions . The transition probability function P : S × A × S →
+
+[0 , 1] assigns a probability to each transition, ensuring that for any state s and action a, the sum of outgoing probabilities satisfies P 
+
+> s′∈S
+
+P(s, a, s′) = 1 . Additionally, AP denotes a finite set of 
+
+atomic propositions , and L : S → 2AP is the labeling function. For example, Figure 2 represents the MDP of Figure 1, where each state can be represented by ⟨x, y ⟩ with x, y ∈ { 0, 1, 2}, labeled by {a, b, ..., i }, and actions A = {U, D, L, R } (i.e., four moving directions). A path in M is a sequence ζ = s0
+
+> a0
+
+−→ s1
+
+> a1
+
+−→ s2
+
+> a2
+
+−→· · · , where si ∈ S and ai ∈ A for all i ≥ 0. A sub-path ζ[ℓ:k] is a segment sℓ
+
+> aℓ
+
+−→ · · · ak−1
+
+−−−→ sk, for 0 ≤ ℓ < k < |ζ|. We write 
+
+Z∗ and Zω to denote the sets of all finite and infinite paths, respectively. A (deterministic) policy 
+
+π : Z∗ → A maps each finite path to a (fixed) action a ∈ A. The trace t of a path ζ is the sequence of labels Tr (ζ) = t(0) t(1) t(2) · · · , where t(i) = L(si) for all i ≥ 0. Slightly abusing notation, we use Traces (Z∗) and Traces (Zω ) to denote the sets of all finite and infinite traces, respectively. 
+
+Finite Semantics for HyperLTL. The syntax of HyperLTL [ 13 ] is given by the following grammar: 
+
+φ ::= ∃τ.φ | ∀ τ.φ | ψ ψ ::= pτ | ¬ ψ | ψ ∨ ψ | ψ | ψ U ψ, 
+
+where p ∈ AP is an atomic proposition, τ is a trace variable , and the second rule (for unquantified formulas) produces LTL formulas. The Boolean connectives ¬ and ∨ have their standard meanings, while and U denote the “next” and “until” temporal operators, respectively. Other Boolean and temporal operators are derived as syntactic sugar: true ≜ pτ ∨ ¬ pτ , false ≜ ¬true , ψ1 → ψ2 ≜
+
+¬ψ1 ∨ ψ2, ψ ≜ true U ψ, and ψ ≜ ¬ ¬ψ, where ‘ ’ and ‘ ’ are the eventually and always 
+
+temporal operators. In a quantified formula, ∃τ means “along some trace τ ”, and ∀τ means “along all traces τ ”. We write Vars (φ) for the set of trace variables in a formula φ. A formula is closed if all 
+
+τ ∈ Vars (φ) are quantified, with no variable quantified twice. Since RL algorithms operate on finite samples, we adopt the finite semantics of HyperLTL [ 11 ] over finite trace assignments, where a partial mapping Π : Vars (φ) ⇀ (2 AP )∗ assigns each τ ∈ Vars (φ) to a finite trace. Given Π, a trace variable 
+
+τ , and a finite trace t ∈ (2 AP )∗, we write Π[ τ → t] for the assignment identical to Π, except that τ is mapped to t. We denote by Π∅ the empty trace assignment. For t ∈ Π, we refer to traces in the image of Π. Throughout this paper, we abbreviate tuples ⟨x1, . . . , x n⟩ as ⟨xi⟩i∈1,...,n . An interpretation of 3a HyperLTL formula φ = Q1τ1. . . . Qnτn. ψ , denoted by T = ⟨Tτi ⟩i∈{ 1,..., |Vars (φ)|} , is a tuple of sets of traces, where we have one set Tτi per trace variable τi, denoting the set of traces that can be assigned to τi. Let Dπi be the distribution over a set of paths induced by a policy πi, and we write 
+
+Zτi ∼ D πi to denote a set of paths Zτi sampled from Dπi , such that πi is the policy associated with the trace variable τi, for each i ∈ { 1, . . . , |Vars (φ)|} (each trace variable ranges over the possible behaviors of an agent). We also define a family of sampled sets S = ⟨Z τi ∼ D πi ⟩i∈{ 1,..., |Vars (φ)|} .That is, for each τi in Vars (φ), Tτi = Traces (Zτi ∼ D πi ) is the set of traces that τi can range over, which comes from the sampled paths from the associated policy πi. Abusing notation, we write 
+
+T = Traces (S) as the tuple of sets of sampled traces. The satisfaction relation |= maps a formula φ
+
+to a model (T , Π, i ), where i ∈ Z≥0 indicates the current evaluation position. Formally: 
+
+(T , Π, 0) |= ∃τ. ψ iff there is a t ∈ Tτ , such that (T , Π[ τ → t], 0) |= ψ
+
+(T , Π, 0) |= ∀τ. ψ iff for all t ∈ Tτ , such that (T , Π[ τ → t], 0) |= ψ
+
+(T , Π, i ) |= pτ iff p ∈ Π( τ )( i)(T , Π, i ) |= ¬ψ iff (T , Π, i )̸ |= ψ
+
+(T , Π, i ) |= ψ1 ∨ ψ2 iff (T , Π, i ) |= ψ1 or (T , Π, i ) |= ψ2
+
+(T , Π, i ) |= ψ iff (T , Π, i + 1) |= ψ and for all t ∈ Π.|t| ≥ i + 1 (T , Π, i ) |= ψ1 U ψ2 iff there exists j ≥ i with j < min t∈Π |t|, such that (T , Π, j ) |= ψ2
+
+and for all k ∈ [i, j ), (T , Π, k ) |= ψ1.
+
+We say that an interpretation T satisfies a HyperLTL formula φ, written as T | = φ, if (T , Π∅, 0) |= φ.Likewise, a family of samples S (induced by each πτi associated with each τi ∈ Vars (φ)), satisfies a sentence φ if ⟨Traces (Zτi ∼ D πi )⟩i∈{ 1,..., |Vars (φ)|} |= φ.
+
+Example. The following HyperLTL formula captures the objectives and constraints of our mo-tivating example described in Figure 1, where τ1 is the path for FF and τ2 is the path for Med :
+
+Specification : φRescue ≜ ∀τ1.∃τ2.(ψfire ∧ ψsave ∧ ψdist ∧ ψsafe )
+
+O1 : ψfire ≜ (iτ1 ) ∧ (f τ1 ) ∧ (cτ1 ) C1 : ψdist ≜ (|Location τ1 − Location τ2 | < 3) 
+
+O2 : ψsave ≜ (gτ2 ) ∧ (f τ2 ) C2 : ψsafe ≜ (¬iτ2 U iτ1 ) ∧ (¬f τ2 U f τ1 ) ∧ (¬cτ2 U cτ1 )
+
+For instance, the dependency constraint C2 for “ Med cannot enter any fire zone until FF extinguished the fire in that zone” is expressed using the conjunction of temporal until operators. Notice that 
+
+φRescue features ∀∃ quantifier alternation, which increases the complexity of reasoning about hy-perproperties [ 8]. We emphasize that most RL approaches assume purely universal forms (i.e., ∀∗), which cannot capture agent dependencies and often yield sub-optimal solutions. For instance, if FF 
+
+ignores that Med must wait until the fire is extinguished to rescue a victim, FF may follow its own optimal path that causes unnecessary delay for Med (see Figure 1c). 
+
+## 4 Problem Statement 
+
+Let us use ⋆ to denote optimality (e.g., π⋆ denotes an optimal policy). The following optimization problem formulates policy synthesis as a learning problem. Given an MDP M with unknown transitions and a HyperLTL formula φ of the form 
+
+Q1τ1. . . . Qnτn. ψ , our goal is to identify a tuple of n policies ⟨π⋆ 
+
+> 1
+
+, . . . , π ⋆n⟩, such that: 
+
+⟨π⋆i ⟩i∈{ 1,...,n } ∈
+
+
+
+arg max 
+
+> ⟨πi⟩
+
+P
+
+h
+
+⟨Traces (Zτi ∼ D πi )⟩ | = φ
+
+i
+
+> i∈{ 1,...,n }
+
+where Dπ1 , . . . , Dπn are the distributions over set of paths generated by policy spaces 
+
+π1, . . . , π n. That is, ⟨π⋆ 
+
+> 1
+
+, . . . , π ⋆n⟩ maximizes the probability P such that the generated tuple of sets of traces ⟨Traces (Zτ1 ∼ D π1 ), . . . , Traces (Zτn ∼ D πn )⟩ from M satisfies φ.
+
+Example. Consider the MDP in Figure 2 and the following HyperLTL formula: 
+
+φexp ≜ ∀τ1.∃τ2.
+
+
+
+iτ1 ∧ dist (⟨x, y ⟩τ1 , ⟨x, y ⟩τ2 ) < 3
+
+
+
+Suppose agent FF with π1 draws samples Zτ1 = {ζ1
+
+FF , ζ 2
+
+FF } from the MDP: 
+
+ζ1
+
+FF : ⟨2, 0⟩
+
+| {z } 
+
+> a
+> R
+
+→ ⟨ 2, 1⟩
+
+| {z } 
+
+> b
+> R
+
+→ ⟨ 2, 2⟩
+
+| {z } 
+
+> c
+> U
+
+→ ⟨ 1, 2⟩
+
+| {z } 
+
+> f
+> L
+
+→ ⟨ 0, 2⟩
+
+| {z } 
+
+> i
+
+ζ2
+
+FF : ⟨2, 0⟩
+
+| {z } 
+
+> a
+> R
+
+→ ⟨ 2, 1⟩
+
+| {z } 
+
+> b
+> R
+
+→ ⟨ 1, 1⟩
+
+| {z } 
+
+> e
+> L
+
+→ ⟨ 0, 1⟩
+
+| {z } 
+
+> h
+> U
+
+→ ⟨ 0, 2⟩
+
+| {z } 
+
+> i
+
+4Agent Med with policy π2 draws Zτ2 = {ζ1
+
+Med , ζ 2
+
+Med }:
+
+ζ1
+
+Med : ⟨2, 0⟩
+
+| {z } 
+
+> a
+> U
+
+→ ⟨ 1, 0⟩
+
+| {z } 
+
+> d
+> U
+
+→ ⟨ 0, 0⟩
+
+| {z } 
+
+> g
+> R
+
+→ ⟨ 1, 0⟩
+
+| {z } 
+
+> d
+> R
+
+→ ⟨ 1, 0⟩
+
+| {z } 
+
+> d
+
+ζ2
+
+Med : ⟨2, 0⟩
+
+| {z } 
+
+> a
+> U
+
+→ ⟨ 2, 1⟩
+
+| {z } 
+
+> b
+> L
+
+→ ⟨ 1, 1⟩
+
+| {z } 
+
+> e
+> R
+
+→ ⟨ 1, 2⟩
+
+| {z } 
+
+> f
+> L
+
+→ ⟨ 0, 2⟩
+
+| {z } 
+
+> i
+
+Notice that, the number of samples can be more than two. We now calculate the probability of satisfying φ using Zτ1 and Zτ2 (obtained by π1 and π2) as follows: 
+
+Traces (⟨{ ζ1
+
+FF }, Zτ2 ⟩) |= φexp Traces (⟨{ ζ2
+
+FF }, Zτ2 ⟩) |= φexp ,
+
+where ζ2
+
+Med is the witness to τ2 (existentially quantified) for both satisfaction relations. Hence, given 
+
+Z1 and Z2, the probability of satisfying φexp is evaluated as: 
+
+P⟨π1,π 2⟩
+
+h
+
+Traces (⟨Z τ1 , Zτ2 ⟩) |= φexp 
+
+i
+
+= 1 
+
+Now, if φexp had the form ∀∀ , the evaluation has to go over all combinations between Zτ1 and Zτ2 :
+
+Traces (⟨{ ζ1
+
+FF }, {ζ1
+
+Med }⟩ )̸ |= φexp Traces (⟨{ ζ1
+
+FF }, {ζ2
+
+Med }⟩ ) |= φexp 
+
+Traces (⟨{ ζ2
+
+FF }, {ζ1
+
+Med }⟩ )̸ |= φexp Traces (⟨{ ζ2
+
+FF }, {ζ2
+
+Med }⟩ ) |= φexp 
+
+Thus, the satisfaction probability of ∀∀ ψ would be 0.5. This example demonstrates that the probability of satisfying a HyperLTL formula crucially depends on its quantifier structure. 
+
+## 5 Algorithmic Details of H YP RL 
+
+To solve the problem formally stated in Section 3, our algorithm proceeds in the following three steps. We first Skolemize φ [ 40 ] to eliminate quantifier alternations and simplify the learning task. We then define quantitative semantics for HyperLTL, converting satisfaction checking into robustness value optimization. Finally, we train a neural network using these robustness signals to learn optimal policies that solve the original learning problem. 
+
+5.1 Step 1: HyperLTL Skolemization 
+
+Let a HyperLTL formula be of the form φ = Q1τ1.Q2τ2. . . . Qn.τ n. ψ (τ1, τ 2, . . . , τ n), where for 1 ≤ ℓ ≤ n, each Qℓ ∈ {∀ , ∃} quantifies a trace variable τℓ, and ψ is a quantifier-free LTL formula. We first Skolemize φ, producing Skolem (φ), to eliminate quantifier alternations. We define Q∃ = {i | Qi = ∃} and Q∀ = {j | Qj = ∀} as the sets of existential and universal quantifier indices, respectively. For each i ∈ Q∃, we denote Q∀ 
+
+> i
+
+= {j < i | Qj = ∀} as the index set of all universal quantifiers preceding Qi. A Skolem function for each i ∈ Q∃ is defined as fi : T |Q∀  
+
+> i|
+
+→ T ,
+
+and reduces to a constant function when Q∀ 
+
+> i
+
+= ∅. A trace assignment Π is consistent with fi, if 
+
+Π( τij ) ∈ T for all j ∈ Q∀ 
+
+> i
+
+, and Π( τi) = fi
+
+ Π( τi1 ), Π( τi2 ), . . . , Π( τi|Q∀ 
+
+> i|
+
+) for all i ∈ Q∃, where 
+
+Q∀ 
+
+> i
+
+= {i1 < i 2 < · · · < i |Q∀ 
+
+> i|
+
+}. If (T , Π, 0) |= φ for every trace assignment Π consistent with all fi, then each fi is said to witness the satisfaction of φ [43 ]. For the inner LTL formula ψ (i.e., obtaining Skolem (ψ)), we replace each proposition pτi with pfi for all p ∈ AP and i ∈ Q∃, thereby instantiating variables of the existentially quantified paths via their Skolem witnesses. In general, a Skolemized φ is of the following form: 
+
+Skolem (φ) = ∃fi(τi1 , . . . , τ i|Q∀  
+
+> i|
+
+)
+
+| {z } 
+
+> for each i∈Q∃
+
+. ∀τj .
+
+|{z}  
+
+> for each j∈Q∀
+
+Skolem (ψ) (1) Based on this transformation, we re-write the problem statement from Section 3 as follows. We first define the image of fi:
+
+Img (fi) ≜ {fi(ti1 , . . . , ti|Q∀  
+
+> i|
+
+) | tij ∈ Traces (Zτij ∼ D πij ), j ∈ Q∀ 
+
+> i
+
+}
+
+That is, Img (fi) is the set of mapped traces (which τij for each i ∈ Q∃ ranges over) from all possible preceding ∀-quantified τij , where each tij is from its own sampled trace set Zτij . Now, let us use 
+
+▷◁ as a notation to ensure the collection of trace sets are ordered w.r.t. their path indices. Given two tuples of sets of traces T1 and T2, we define T1 ▷◁ T2 ≜ ⟨Traces (Zτx )⟩x∈{ 1··· n}, where each 5ρ Tr (ζ[ℓ:k]), ψ  = ρmin if Tr (ζ[ℓ:.. ]) = ϵ and ρ Tr (ζ[ℓ:k]), ψ  otherwise. 
+
+ρ Tr (ζ[ℓ:k]), true  = ρmax 
+
+ρ Tr (ζ[ℓ:k]), f  L(sℓ) < c = c − f  L(sℓ)
+
+ρ Tr (ζ[ℓ:k]), ¬ψ = −ρ Tr (ζ[ℓ:k]), ψ 
+
+ρ Tr (ζ[ℓ:k]), ψ = ρ Tr (ζ[ℓ+1: k]), ψ  if (k > ℓ ).ρ Tr (ζ[ℓ:k]), ψ = min 
+
+> i∈[ℓ,k )
+
+ρ Tr (ζ[i:k]), ψ 
+
+ρ Tr (ζ[ℓ:k]), ψ = max 
+
+> i∈[ℓ,k )
+
+ρ Tr (ζ[i:k])ψ
+
+ρ Tr (ζ[ℓ:k]), ψ 1 ∧ ψ2
+
+ = min  ρ Tr (ζ[ℓ:k]), ψ 1
+
+ρ Tr (ζ[ℓ:k]), ψ 2
+
+ 
+
+ρ Tr (ζ[ℓ:k]), ψ 1 ∨ ψ2
+
+ = max  ρ Tr (ζ[ℓ:k]), ψ 1
+
+ρ Tr (ζ[ℓ:k]), ψ 2
+
+ 
+
+ρ Tr (ζ[ℓ:k]), ψ 1 U ψ2
+
+ = max 
+
+> i∈[ℓ,k )
+
+
+
+min 
+
+
+
+ρ Tr (ζ[i:k]), ψ 2
+
+, min 
+
+> j∈[ℓ,i )
+
+ρ Tr (ζ[j:i]), ψ 1
+
+ 
+
+Figure 3: Quantitative semantics for LTL. 
+
+Traces (Zτx ) is either in T1 or T2 (and not both). Given an MDP M and a HyperLTL specification φ
+
+of the form Q1τ1.Q2τ2. . . . Qnτn. ψ , our goal is to compute (1) a tuple of Skolem witnesses ⟨fi⟩i∈Q∃ ,and (2) a tuple of policies ⟨π⋆j ⟩j∈Q∀ , such that: 
+
+⟨π⋆j ⟩j∈Q∀ ∈
+
+
+
+arg max  
+
+> ⟨πj⟩
+
+P
+
+h
+
+⟨Img (fi)⟩ ▷◁ ⟨Traces (Zτj ∼ D πj )⟩ | = Skolem (φ)
+
+i
+
+> i∈Q∃,j ∈Q∀
+
+That is, the tuple of policies ⟨π⋆j ⟩ maximizes the probability that the ordered collection of (1) the generated traces of all universal quantifiers ⟨Traces (Zτj ∼ D πj )⟩j∈Q∀ and (2) the sets of mapped traces (i.e., the image) of each Skolem witness for all existential quantifiers ⟨Img (fi)⟩i∈Q∃ together satisfies Skolem (φ). Notice that in the updated problem statement, we compute policies only for universally quantified traces, while Skolem functions are learned for existentially quantified traces to witness the optimality. 
+
+5.2 Step 2: Policy Learning with Quantitative Semantics 
+
+To transform the satisfaction checking problem (i.e., determining |=) into an optimization task, we define quantitative semantics for HyperLTL, extended from [ 32 ]. In particular, we evaluate the Skolemized HyperLTL formula Skolem (φ) over tuples of sampled paths ⟨ζ1, ζ 2, . . . , ζ n⟩ from M.
+
+Robustness for a Single Trace. Let R be the set of real numbers and Ψ the set of all LTL formulas. We define a valuation function f : 2 AP → R that assigns a real value to a set of atomic propositions, provided as part of the input. Given a state s ∈ S of an MDP M, the quantitative semantics are defined over predicates in the form of f  L(s) < c, where c is a user-specified threshold. Next, we define a robustness function ρ : Traces (Z∗) × Ψ → R that assigns a robustness value to a finite trace for an LTL formula. Intuitively, the robustness value evaluates “how far” the given finite trace is from satisfying ψ. The complete quantitative semantics is shown in Figure 3. We use constants ρmax and 
+
+ρmin for the maximum and minimum robustness values, respectively. Given a trace, a higher ρ value implies the trace has higher robustness to satisfy ψ, and a lower ρ value means the trace is less likely to satisfy ψ (e.g., a potential violation). Formally, given an LTL formula ψ and an MDP M, a path ζ with a higher robustness value indicates that it has higher probability to satisfy ψ. The optimization task of seeking a single policy π⋆ is: 
+
+π⋆ ∈ arg max 
+
+> π
+
+P
+
+> ζ∼D π
+
+h
+
+ρ Tr (ζ[0: k]), ψ  ⋆
+
+→ ρmax 
+
+i
+
+Here, for simplicity, we use the notation ⋆
+
+→ to represent convergence. That is, π⋆ maximizes the probability of satisfying ψ over the distribution of paths generated by policy π.
+
+Robustness for a Tuple of Traces. To evaluate the robustness value over multiple traces, we first define a zip function that pointwise bundles a tuple of traces. Given a tuple of finite traces ⟨t1, . . . , tn⟩,we derive a zipped trace zip (⟨t1, . . . , tn⟩) and for all i ≥ 0, zip (⟨t1, . . . , tn⟩)( i) ≜ ⟨t1(i), . . . , tn(i)⟩.Given an LTL formula, a tuple of paths ⟨ζ1, ζ 2, . . . , ζ n⟩ has higher probability of satisfying ψ if the 6robustness value of zip  ⟨Tr (ζ1[0: k1]), Tr (ζ2[0: k2]), . . . , Tr (ζn[0: kn])⟩ converges to ρmax w.r.t. ψ for some k1, . . . , k n, where 0 ≤ kℓ ≤ | ζℓ| for each 1 ≤ ℓ ≤ n. Thus, the optimization task of computing a tuple of policies ⟨π⋆ 
+
+> 1
+
+, π ⋆ 
+
+> 2
+
+, . . . , π ⋆n⟩ that maximizes the robustness becomes: 
+
+⟨π⋆ℓ ⟩ℓ∈{ 1,...n } ∈
+
+
+
+arg max 
+
+> ⟨πℓ⟩
+
+P
+
+h
+
+ρ zip  ⟨Tr (ζℓ[0: kℓ] ∼ D πℓ )⟩, ψ  ⋆
+
+→ ρmax 
+
+i
+
+> ℓ∈{ 1,...,n }
+
+This formulation reflects that LTL formulas are implicitly universally quantified as we emphasized in Section 1. For instance, model checking ∀∗.ψ reduces to checking ∀.ψ via self-composition [ 5, 8]. 
+
+Robustness for Skolemized HyperLTL. Optimizing an alternating HyperLTL formula requires that policies for universally quantified paths simultaneously optimize the existentially quantified paths. In order to preserve ordering, we use ∪≤ to make sure the union of trace tuples are in order w.r.t. their path indices. That is, given two tuple of traces ⟨·⟩ 1 and ⟨·⟩ 2, we define ⟨·⟩ 1∪≤⟨·⟩ 1 ≜ ⟨Tr (ζx)⟩x∈{ 1··· n},where each Tr (ζx) is either from ⟨·⟩ 1 or ⟨·⟩ 2. Given a Skolemized HyperLTL formula, the inner LTL formula is denoted as Skolem (ψ), as defined in (1) . For each i ∈ Q∃ and j ∈ Q∀, we say a tuple of paths ⟨ζ1, ζ 2, . . . , ζ n⟩ satisfies ψ if and only if: 
+
+h
+
+ρ
+
+
+
+zip  ⟨Tr (ζi[0: ki])⟩ ∪ ≤⟨Tr (ζj [0: kj ])⟩, Skolem (ψ)
+
+i 
+
+> i∈Q∃,j ∈Q∀
+> ⋆
+
+→ ρmax 
+
+Essentially, the set ⟨Tr (ζi[0: ki])⟩i∈Q∃ captures the tuple of traces produced by each Skolem function for each existential quantifiers (i.e., a trace from Img (fi)) for each i ∈ Q∃), while ⟨Tr (ζj [0: kj ])⟩j∈Q∀
+
+corresponds to the tuple of traces for each j ∈ Q∀. That is, we can formalize the optimization task for a Skolemized HyperLTL as follows: 
+
+
+
+⟨π⋆i ⟩∪ ≤⟨π⋆j ⟩ ∈ arg max  
+
+> ⟨πi⟩∪ ≤⟨πj⟩
+
+P
+
+h
+
+ρ
+
+
+
+zip  ⟨Tr (ζi[0: ki] ∼ D πi ) ∪≤⟨Tr (ζj [0: kj ] ∼ D πj ) ,
+
+Skolem (ψ)
+
+ ⋆
+
+→ ρmax 
+
+i
+
+> i∈Q∃,j ∈Q∀
+
+(2) Notice that, for each i ∈ Q∃ (i.e., a Skolem function), the evaluation of ρ dependes on whether the sampled trace ζi ∼ D πi serves as a witness for its preceding ⟨ζij ⟩ij ∈Q∀
+
+> i
+
+. That is, ρ fi, ψ  ≜
+
+ρ fi(Tr (ζi1 ), . . . , Tr (ζi|Q∀  
+
+> i|
+
+)) , ψ . Hence, the optimization of ⟨π⋆i ⟩ depends on ⟨π⋆j ⟩, which is nec-essary to capture the semantics of a HyperLTL formula with quantifier alternation (we provide a comprehensive example in Appendix C). Finally, we show that the set of optimal policies obtained by (2) also solves the original optimization problem in Section 3 (detailed proof in Appendix A). 
+
+Theorem 1 Given an MDP M and a HyperLTL formula φ, an optimal tuple of policies 
+
+⟨π⋆i ⟩i∈Q∃ ∪≤⟨π⋆j ⟩j∈Q∀ for Skolem (φ) is also an optimal tuple of policies for φ, that optimizes the probability of satisfying φ in M (the problem statement in Section 3). 
+
+5.3 Step 3: Reinforcement Learning for HyperLTL 
+
+Now, we solve the optimization task in (2) using RL, where the reward signal is defined by the robustness values from Section 5.2. As our MDP model lacks a built-in reward function, we use robustness values to guide learning. To avoid confusion with standard RL terminology, we refer to expected robustness value when mentioning expected rewards. For simplicity, we assume all sampled paths have equal length. 
+
+Optimizing Expected Reward. The goal of this step is to learn an optimal neural network N N ⋆,a parameterized compositional function that synthesizes the policies solving (2) . The construction of learning constraints is inspired by the well-known Bellman Equation [ 4 ], which characterizes the optimal expected reward of a decision process as a recursive function of immediate reward and the value of future states. Let us use sk to denoted the state of a zipped path at position k (i.e., 
+
+sk ≜ zip (⟨t1, . . . , tn⟩)( k)). We define the immediate reward for a state-action pair (sk, ak) based on the robustness value of the zipped trace from (2): 
+
+R(sk, ak) ≜
+
+h
+
+ρ
+
+
+
+zip  ⟨Tr (ζi[0: k])⟩∪ ≤⟨Tr (ζj [0: k])⟩, Skolem (ψ)i
+
+> i∈Q∃,j ∈Q∀
+
+7Formula instrumentation 
+
+> Agents
+
+⟨π⋆ 
+
+> 1
+
+· · · π⋆n⟩
+
+⟨ζ1 · · · ζn⟩
+
+> Environment
+
+Skolemization HyperLTL φ
+
+MDP 
+
+M
+
+Robustness function 
+
+ρ ⟨ζ1 · · · ζn⟩, φ 
+
+> Robustness values
+> Next episode
+> Samples
+
+Skolem (φ)
+
+Figure 4: Overview of H YP RL. 
+
+Table 1: HyperLTL specifications of case studies. 
+
+(SRL) ∀τ1.∃τ2. ⟨xτ1 , y τ1 ⟩̸ = ⟨xτ2 , y τ2 ⟩ ∧ ⟨xτ1 , y τ1 ⟩ = ⟨xG1, y G1⟩∧ ⟨xτ2 , y τ2 ⟩ = ⟨xG2, y G2⟩
+
+(DST) ∀τ1.∃τ2. (T1 τ1 ∧ (T2 τ1 ∧ (T3 τ1 ) . . . )) ∧        
+
+> (step τ2< δ )∧(|pos τ1−pos τ2|<1)
+
+(PCP)                                
+
+> ∀τ1.∃τ2. ψ SemiMatch τ1U ψExtend τ1,τ 2∧V
+> p∈AP
+> (ptop τ2↔pbot τ2)
+> ψSemiMatch τ1≜
+> h V
+> p∈AP
+> (ptop τ1↔pbot τ1)
+> i
+> U(# top τ1⊕#bot τ1)
+> φExtend τ1,τ 2≜
+> h V
+> p∈AP
+>  (ptop τ1↔ptop τ2)∧(pbot τ1↔pbot τ2)i
+> U
+>  (# top τ1∨#bot τ1)∧(¬#top τ2∧ ¬ #bot τ2)
+
+The expected reward E(sk, ak) follows the classic Bellman formulation, combining immediate reward and future reward based on some discount factor γ (see Appendix B for details). Intuitively, E(sk, ak)
+
+quantifies the long-term utility of taking action ak at state sk. Finally, for any arbitrary state s and action a, the Bellman Equation then defines the Q-value recursively for each (s, a) ∈ S × A, denoted as QN N (s, a):
+
+QN N (s, a) ≜ X
+
+> s′∈S
+
+P(s, a, s′)
+
+
+
+R(s, a) + γ X
+
+> a′∈A
+
+N N (a′ | s′) E(s′, a′)
+
+
+
+,
+
+where N N (a′ | s′) indicates that N N takes action a′ on state s′. Consequently, the optimal action-value function for each (s, a) is: 
+
+QN N ⋆
+
+(s, a) ≜ max  
+
+> N N
+
+QN N (s, a) (3) Intuitively, QN N ⋆
+
+(s, a) captures the maximum expected reward achievable from a state s by taking action a. We remark that, our framework samples all paths for each quantifier simultaneously. That is, the learned neural network N N ⋆ induces a set of n functions {N N ⋆
+
+> 1
+
+, . . . , N N ⋆n}, where 
+
+n = |Vars (φ)|, and for all 1 ≤ ℓ ≤ n, N N ⋆ℓ maps a state to an optimal actions for a path ζℓ.
+
+Constructing Policies. Based on the learned N N ⋆, we now construct the tuple of policies ⟨π⋆i ⟩i∈Q∃
+
+and ⟨π⋆j ⟩j∈Q∀ that solves (2) for each k-step ranging over the sample size as follows. • For each j ∈ Q∀, we inductively construct the policies: 
+
+π⋆j (ζj [0: k]) ≜ N N ⋆j (sk)
+
+• For each i ∈ Q∃, we construct a Skolem witness as follows: 
+
+π⋆i (ζi[0: k]) ≜ N N ⋆i
+
+
+
+fi
+
+ Tr (ζi1 [0: k]), . . . , Tr (ζi|Q∀ 
+
+> i|[0: k]
+
+)
+
+That is, the optimal policy for a finite prefix ζi with i ∈ Q∃ depends on the optimal actions taken along the preceding universal paths ζi1 , . . . , ζ i|Q∀  
+
+> i|
+
+, illustrating how our framework captures the dependency of an existential path on the universally quantified ones. To this end, from the learned neural network 
+
+N N ⋆, we succesfully derive two tuples ⟨π⋆i ⟩i∈Q∃ and ⟨π⋆j ⟩j∈Q∀ for Equation (2). 
+
+Theorem 2 Given an MDP M and a HyperLTL formula φ, the optimal neural network function N N ⋆ derives a tuple of Skolem function witnesses ⟨fi⟩i∈Q∃ and a tuple of optimal policies ⟨π⋆j ⟩j∈Q∀ that optimize the satisfaction of Skolem (φ).
+
+Theorem 2 gives the premise of Theorem 1, which, in turn, solves the original problem stated in Section 3 (detailed proof in Appendix A). 
+
+## 6 Implementation and Experiments 
+
+HYP RL is fully implemented (see Figure 4). Given a HyperLTL formula φ with n quantifiers, H YP RL first constructs its Skolemized form Skolem (φ), as prescribed in Section 5.1. Next, at each step 8Table 2: Descriptions of the case studies. Safe RL in Grid Worlds (SRL) Two agents collaboratively learn policies ⟨π⋆             
+
+> 1, π ⋆
+> 2⟩to reach their respective goals while avoiding collisions in a grid world. Deep Sea Treasure (DST) Two agents (a driver and a treasure collector) navigate among treasures. Learn policies ⟨π⋆
+> 1, π ⋆
+> 2⟩such that, for all ways the collector maximizes treasures, a safe route exists for the driver to exit within the time limit δ.Post Correspondence Problem (PCP) Learn policies ⟨π⋆
+> 1, π ⋆
+> 2⟩for PCP: for any semi-matching sequence of dominos, there exists an extension into full matches.
+
+t, for each i ∈ { 1, . . . , n }, a policy πi observes a finite path ζi[0: t], and selects an action πi(ζi[0: t]),yielding an updated path ζi[0: t+1] . The environment computes feedback using robustness function 
+
+ρ to guide learning (Section 5.2). The optimal tuple of policies ⟨π⋆ 
+
+> 1
+
+, . . . , π ⋆n⟩ are learned iteratively using a selected RL algorithm such as DQN [ 36 ], PPO [ 39 ], or CQ-Learning [ 15 ] (Section 5.3). We summarize all our case studies and their corresponding HyperLTL specifications in Table 2 and Table 1, respectively. We also investigate the wildfire scenario introduced in Section 1 with larger grid-worlds. All experiments are ran on an Apple M1 Max (10-core CPU, 24-core GPU). Additional details of experimental setups are provided in Appendix D. 
+
+Baseline. We experiment all cases using the setup from [ 32 ] by comparing against manually designed reward functions. To ensure a fair comparison, for DST, we use the reward function from [ 42 ]; for the rest of the cases, we construct several reward functions and report the best-performing one (details are provided in Appendix D). For SRL, we also compare with the method called “shield synthesis” [ 17 ], where a pre-synthesized shield enforces a safety property during learning and, in this specific case, can reason about inter-agent dependencies. 
+
+Results and Analysis. First, for SRL, we use the maps from [ 35 ] and compare CQ-learning+H YP RL against shield synthesis [ 17 ] (detailed map descriptions are inAppendix D). It is worth noting that for [ 17 ], a shield has to be explicitly designed to avoid unsafe states, whereas HYP RL achieves better safe and goal-directed behavior purely through the robustness values derived from a HyperLTL formula. Our analysis for SRL is presented in Table 3. In a two-agent setting, the result shows that the policies learned by H YP RL outperform the shielded agent in all of the environments by requiring fewer steps to reach the goal, except in SUNY, where their performance is quite similar. Furthermore, in both SUNY and MIT maps, H YP RL successfully avoids collisions as what we replicated from [ 17 ]. In a three-agent setting (where the HyperLTL formula is expanded to 
+
+∀∀∃ ), the shielding method successfully avoids all collisions; however, it failed to reach the goals within the bound of 100 steps in ISR, Pentagon, and MIT. In contrast, H YP RL was able to guide the agents to reach their goals significantly faster than both baselines and achieved fewer collisions compared to CQ-learning. We emphasize that although shield synthesis can avoid collision in all cases, it comes with the cost of spending a significant number of steps to reach the goal. In contrast, HYP RL maintains low collision rates in ISR and Pentagon, and learns policies that reach the goal with substantially fewer steps in ISR, Pentagon, and MIT maps. Second, for SRL, we compare DQN+H YP RL with DQN and present the results in Figure 6. The top four figures demonstrate that H YP RL always achieves a higher number of successful goal completions under the same number of learning episodes. The bottom four figures show that H YP RL requires fewer episodes to learn collision avoidance. For DST, we compare PPO+H YP RL with PPO, and DQN+H YP RL with DQN, using the reward functions from [ 42 ] in both cases. We evaluate using two metrics: (1) the total amount of collected treasures ( P ), and (2) the average amount of collected treasures per step ( P /steps ). As shown 
+
+Table 3: SRL, avg. and std. error of 10 evaluations after 1k training episodes, 10 runs, where S/B stands for step-bound which is 100 steps for all cases. CQ CQ + Shield [17] CQ + H YP RL Maps No. Agents Steps Collisions Steps Collisions Steps Collisions ISR 227.95 ±7.4 0.19 ±0.1 17.40 ±2.2 0.00 ±0.0 7.58 ±0.3 0.25 ±0.2                                         
+
+> Pentagon 36.46 ±7.70.28 ±0.175.20 ±12 .60.00 ±0.011.90 ±4.60.53 ±0.5
+> SUNY 11.99 ±0.50.01 ±0.011.50 ±0.30.00 ±0.012.48 ±0.60.00 ±0.0
+> MIT 41.28 ±8.50.20 ±0.133.46 ±3.40.00 ±0.023.20 ±0.50.00 ±0.0
+> ISR 398.79 ±0.8 12.68 ±3.8 S/B 0.00 ±0.0 74.18 ±5.1 7.78 ±1.0 Pentagon 97.15 ±2.4 16.46 ±7.2 S/B 0.00 ±0.0 78.82 ±1.7 10.92 ±1.4 SUNY 84.89 ±7.9 0.63 ±0.2 82.35 ±4.1 0.00 ±0.0 44.95 ±8.3 0.71 ±0.4 MIT 96.96 ±1.8 2.83 ±1.3 S/B 0.00 ±0.0 71.53 ±7.7 1.58 ±0.7
+
+9100 200        
+
+> 50
+> 100
+> 150
+> Episodes (ISR)
+> Total Reach
+> 100 200
+> 50
+> 100
+> 150
+> Episodes (PENTAGON)
+> 100 200
+> 50
+> 100
+> 150
+> Episodes (SUNY)
+> 150 300
+> 50
+> 100
+> 150
+> 200
+> Episodes (MIT)
+> 100 200
+> 0
+> 5
+> 10
+> Episodes (ISR)
+> Collisions
+> 100 200
+> 0
+> 5
+> 10
+> Episodes (PENTAGON)
+> 100 200
+> 0
+> 5
+> 10
+> Episodes (SUNY)
+> 150 300
+> 0
+> 5
+> 10
+> Episodes (MIT)
+
+Figure 6: SRL results, avg. and std. error of total number of goal completions by 2 agents (top) and collisions (bottom). DQN+H YP RL (line ) and DQN (line ), over 10 runs. 
+
+Table 4: DST results, avg. and std. error over 10 evalua-tions across, 10 runs, and Epi. stands for “Episodes”. Method Epi. P P /steps Method Epi. P P /steps                             
+
+> PPO 500 4.31 ±1.20.17 ±0.04 DQN 500 1.08 ±0.20.05 ±0.00
+> PPO + H YP RL 500 22.93 ±2.20.91 ±0.08 DQN + H YP RL 500 4.12 ±1.40.14 ±0.05
+> PPO 1000 3.22 ±0.80.12 ±0.03 DQN 1000 1.45 ±0.20.02 ±0.00
+> PPO + H YP RL 1000 23.97 ±2.21.12 ±0.08 DQN + H YP RL 1000 4.43 ±0.80.21 ±0.03
+
+Table 5: Wildfire results, avg. and std. error of 10 trials after 5k episodes, 10 runs. Size Method Dist Steps O1 Steps O2                            
+
+> 32PPO 2.5 ±0.01 33.43 ±4.1787.03 ±31 .8
+> PPO + H YP RL 2.30 ±0.03 18.940 ±1.1143.550 ±1.152PPO 4.2 ±0.01 62.7 ±9.7S/B PPO + H YP RL 2.1 ±0.05 59.50 ±14 .38057.5 ±121 .482PPO 11.2 ±0.03 16801.8 ±2144.0 S/B PPO + H YP RL 6.94 ±0.07 4149.6 ±1743.1 386.2 ±80.5
+> 10 2PPO 10.9 ±0.01 S/B 29023.6 ±976.4 PPO + H YP RL 5.3 ±0.10 21272.8 ±3579.0 570.3 ±52.2
+
+in Table 4, policies learned by H YP RL outperform those learned by the baseline, regardless of the number of training episodes or the choice of the RL algorithm.             
+
+> 200 400 600 800 1,000
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> 350
+> Episodes
+> # of successful match  DQN+H YP RL (k= 5)
+> DQN+H YP RL (k= 6)
+> DQN (k= 5)
+> DQN (k= 6)
+
+Figure 5: PCP results, avg. and std. error of total matches, 10 runs. Finding policies to solve the PCP problem is inherently chal-lenging due to its undecidability. H YP RL is able to learn op-timal policies that solve PCP more efficient, compare to the baseline. Figure 5 presents the performance comparison of DQN+H YP RL with DQN, showing that H YP RL achieves more successful matches in both 5- and 6-domino settings. Lastly, we evaluate H YP RL on the wildfire scenario and com-pare PPO+H YP RL with PPO. As shown in Table 5, even when scaling up the grid-world environment from 32 to 52, 82, and 
+
+10 2, H YP RL consistently outperforms the baseline by requiring fewer steps to rescue victims, extin-guish all fires, and maintain a safe distance between the two agents. The step-bounds are set to 10k steps for the 32 and 52 environments, 20k steps for 82, and 30k steps for 10 2. In fact, PPO fails to learn policies capable of rescuing victims ( O2) within the step-bounds for 52 and 82, and is unable to extinguish all fires ( O1) within the step-bound in the 10 2 setting. 
+
+## 7 Conclusion 
+
+We introduced H YP RL, a reinforcement learning framework that synthesizes control policies for tasks specified as HyperLTL formulas over MDPs with unknown transitions. By leveraging the expressiveness of hyperproperties, H YP RL can handle complex multi-agent objectives and relational constraints, including safe planning and undecidable problems like PCP. Our quantitative semantics automatically derives robustness values from the specification and learns control policies that maxi-mize the probability of satisfying the given HyperLTL property. Implemented with off-the-shelf RL algorithms, H YP RL demonstrates superior performance over comparable baselines across a set of diverse case studies, especially in scenarios where reward shaping is non-trivial. 
+
+Limitations. HYP RL currently does not support fully decentralized control policies, where each agent learns its local policy without access to global observations and rewards. Second, it is possible that environment states are not fully observable. That is, instead of an MDP, the environment is a partially observable MDP (POMDP). We believe these limitations open up exciting future work and can be addressed by extending H YP RL. 
+
+Societal impacts. This work marks a significant step towards extending MARL to complex tasks with relational requirements. By enabling the learning of policies under interdependent objectives, our approach broadens the applicability of MARL to critical domains such as disaster response, swarm drones, smart home automation, and industrial resource management, where coordination among agents is essential for success. 10 References 
+
+[1] Alekh Agarwal, Nan Jiang, Sham M Kakade, and Wen Sun. Reinforcement learning: Theory and algorithms. CS Dept., UW Seattle, Seattle, WA, USA, Tech. Rep , 32:96, 2019. [2] Derya Aksaray, Austin Jones, Zhaodan Kong, Mac Schwager, and Calin Belta. Q-learning for robust satisfaction of signal temporal logic specifications. In 2016 IEEE 55th Conference on Decision and Control (CDC) , pages 6565–6570. IEEE, 2016. [3] Mohammed Alshiekh, Roderick Bloem, Rüdiger Ehlers, Bettina Könighofer, Scott Niekum, and Ufuk Topcu. Safe reinforcement learning via shielding. In Proceedings of the AAAI conference on artificial intelligence , volume 32, 2018. [4] EN Barron and H Ishii. The bellman equation for minimizing the maximum cost. NONLINEAR ANAL. THEORY METHODS APPLIC. , 13(9):1067–1090, 1989. [5] Gilles Barthe, Pedro R D’argenio, and Tamara Rezk. Secure information flow by self-composition. Mathematical Structures in Computer Science , 21(6):1207–1252, 2011. [6] Richard Bellman. On the theory of dynamic programming. Proceedings of the national Academy of Sciences , 38(8):716–719, 1952. [7] Raven Beutner and Bernd Finkbeiner. Hyperatl*: A logic for hyperproperties in multi-agent systems. Logical Methods in Computer Science , Volume 19, Issue 2:13, May 2023. ISSN 1860-5974. [8] B. Bonakdarpour and B. Finkbeiner. The complexity of monitoring hyperproperties. In 
+
+Proceedings of the 31st IEEE Computer Security Foundations Symposium CSF , pages 162–174, 2018. [9] B. Bonakdarpour and S. Sheinvald. Finite-word hyperlanguages. Information and Computation ,295:104944, 2023. [10] Ronen Brafman, Giuseppe De Giacomo, and Fabio Patrizi. Ltlf/ldlf non-markovian rewards. In 
+
+Proceedings of the AAAI conference on artificial intelligence , volume 32, 2018. [11] N. Brett, U. Siddique, and B. Bonakdarpour. Rewriting-based runtime verification for alternation-free HyperLTL. In Proceedings of the 23rd International Conference on Tools and Algorithms for the Construction and Analysis of Systems (TACAS) , pages 77–93, 2017. [12] M. R. Clarkson and F. B. Schneider. Hyperproperties. Journal of Computer Security , 18(6): 1157–1210, 2010. [13] M. R. Clarkson, B. Finkbeiner, M. Koleini, K. K. Micinski, M. N. Rabe, and C. Sánchez. Temporal logics for hyperproperties. In Proceedings of the 3rd Conference on Principles of Security and Trust POST , pages 265–284, 2014. [14] Giuseppe De Giacomo, Luca Iocchi, Marco Favorito, and Fabio Patrizi. Foundations for restraining bolts: Reinforcement learning with ltlf/ldlf restraining specifications. In Proceedings of the international conference on automated planning and scheduling , volume 29, pages 128–136, 2019. [15] Yann-Michaël De Hauwere, Peter Vrancx, and Ann Nowé. Learning multi-agent state space representations. In Proceedings of the 9th International Conference on Autonomous Agents and Multiagent Systems: Volume 1 - Volume 1 , AAMAS ’10, page 715–722, Richland, SC, 2010. In-ternational Foundation for Autonomous Agents and Multiagent Systems. ISBN 9780982657119. [16] Ingy ElSayed-Aly and Lu Feng. Logic-based reward shaping for multi-agent reinforcement learning, 2022. [17] Ingy ElSayed-Aly, Suda Bharadwaj, Christopher Amato, Rüdiger Ehlers, Ufuk Topcu, and Lu Feng. Safe multi-agent reinforcement learning via shielding. In Proceedings of the 20th International Conference on Autonomous Agents and MultiAgent Systems , AAMAS ’21, page 483–491, Richland, SC, 2021. International Foundation for Autonomous Agents and Multiagent Systems. ISBN 9781450383073. 11 [18] Ky Fan. Minimax theorems. Proceedings of the National Academy of Sciences , 39(1):42–47, 1953. [19] B. Finkbeiner and C. Hahn. Deciding hyperproperties. In Proceedings of the 27th International Conference on Concurrency Theory (CONCUR) , pages 13:1–13:14, 2016. [20] Lewis Hammond, Alessandro Abate, Julian Gutierrez, and Michael Wooldridge. Multi-agent reinforcement learning with temporal logic specifications, 2021. [21] Mohammadhosein Hasanbeig, Alessandro Abate, and Daniel Kroening. Logically-constrained reinforcement learning. arXiv preprint arXiv:1801.08099 , 2018. [22] Mohammadhosein Hasanbeig, Yiannis Kantaros, Alessandro Abate, Daniel Kroening, George J Pappas, and Insup Lee. Reinforcement learning for temporal logic control synthesis with probabilistic satisfaction guarantees. In 2019 IEEE 58th conference on decision and control (CDC) , pages 5338–5343. IEEE, 2019. [23] Kishor Jothimurugan, Rajeev Alur, and Osbert Bastani. A composable specification language for reinforcement learning tasks. Advances in Neural Information Processing Systems , 32, 2019. [24] Kishor Jothimurugan, Suguman Bansal, Osbert Bastani, and Rajeev Alur. Compositional reinforcement learning from logical specifications. Advances in Neural Information Processing Systems , 34:10026–10039, 2021. [25] Kishor Jothimurugan, Suguman Bansal, Osbert Bastani, and Rajeev Alur. Specification-guided learning of nash equilibria with high social welfare. In International Conference on Computer Aided Verification , pages 343–363. Springer, 2022. [26] Bettina Könighofer, Florian Lorber, Nils Jansen, and Roderick Bloem. Shield synthesis for reinforcement learning. In Leveraging Applications of Formal Methods, Verification and Validation: Verification Principles: 9th International Symposium on Leveraging Applications of Formal Methods, ISoLA 2020, Rhodes, Greece, October 20–30, 2020, Proceedings, Part I 9 ,pages 290–306. Springer, 2020. [27] Bettina Könighofer, Julian Rudolf, Alexander Palmisano, Martin Tappler, and Roderick Bloem. Online shielding for reinforcement learning. Innovations in Systems and Software Engineering ,19(4):379–394, 2023. [28] Yen-Ling Kuo, Boris Katz, and Andrei Barbu. Encoding formulas as deep networks: Rein-forcement learning for zero-shot execution of ltl formulas. In 2020 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 5604–5610. IEEE, 2020. [29] Orna Kupferman and Moshe Y. Vardi. Model checking of safety properties. In International Conference on Computer Aided Verification, CAV 1999 , 1999. [30] Xuan-Bach Le, Dominik Wagner, Leon Witzman, Alexander Rabinovich, and Luke Ong. Reinforcement learning with LTL and $\omega$-regular objectives via optimality-preserving translation to average rewards. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. [31] Borja G. León and Francesco Belardinelli. Extended markov games to learn multiple tasks in multi-agent reinforcement learning, 2020. [32] Xiao Li, Cristian-Ioan Vasile, and Calin Belta. Reinforcement learning with temporal logic rewards. In 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) ,pages 3834–3839. IEEE, 2017. [33] Chanjuan Liu, Jinmiao Cong, Bingcai Chen, Yaochu Jin, and Enqiang Zhu. Guiding multi-agent multi-task reinforcement learning by a hierarchical framework with logical reward shaping, 2024. [34] Daniel Melcer, Christopher Amato, and Stavros Tripakis. Shield decentralization for safe multi-agent reinforcement learning. Advances in Neural Information Processing Systems , 35: 13367–13379, 2022. 12 [35] Francisco S. Melo and Manuela Veloso. Learning of coordination: exploiting sparse interactions in multiagent systems. In Proceedings of The 8th International Conference on Autonomous Agents and Multiagent Systems - Volume 2 , AAMAS ’09, page 773–780, Richland, SC, 2009. In-ternational Foundation for Autonomous Agents and Multiagent Systems. ISBN 9780981738178. [36] Volodymyr Mnih, Koray Kavukcuoglu, David Silver, Andrei A. Rusu, Joel Veness, Marc G. Bellemare, Alex Graves, Martin Riedmiller, Andreas K. Fidjeland, Georg Ostrovski, Stig Pe-tersen, Charles Beattie, Amir Sadik, Ioannis Antonoglou, Helen King, Dharshan Kumaran, Daan Wierstra, Shane Legg, and Demis Hassabis. Human-level control through deep reinforcement learning. Nature , 518(7540):529–533, February 2015. ISSN 1476-4687. [37] A. Pnueli. The temporal logic of programs. In Symposium on Foundations of Computer Science (FOCS) , pages 46–57, 1977. [38] Antonin Raffin, Ashley Hill, Adam Gleave, Anssi Kanervisto, Maximilian Ernestus, and Noah Dormann. Stable-baselines3: Reliable reinforcement learning implementations. Journal of Machine Learning Research , 22(268):1–8, 2021. [39] John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms, 2017. [40] Thoralf Skolem. Logisch-kombinatorische untersuchungen über die erfüllbarkeit oder beweis-barkeit mathematischer sätze nebst einem theoreme über dichte mengen. Videnskapsselskapets Skrifter, I. Matematisk-naturvidenskabelig Klasse , 1920. [41] Wolfgang Thomas. Safety-and liveness-properties in propositional temporal logic: characteriza-tions and decidability. Banach Center Publications , 21(1):403–417, 1988. [42] Peter Vamplew, Richard Dazeley, Adam Berry, Rustam Issabekov, and Evan Dekker. Empirical evaluation methods for multiobjective reinforcement learning algorithms. Machine Learning ,84(1):51–80, 2011. [43] S. Winter and M. Zimmermann. Tracy, traces, and transducers: Computable counterexamples and explanations for hyperltl model-checking, 2024. [44] Z. Xu, Y. Rawat, Y. Wong, M. S. Kankanhalli, and M. Shah. Don't pour cereal into coffee: Dif-ferentiable temporal logic for temporal action segmentation. In Advances in Neural Information Processing Systems , volume 35, pages 14890–14903, 2022. [45] Zhe Xu and Ufuk Topcu. Transfer of temporal logic formulas in reinforcement learning. In 
+
+IJCAI: proceedings of the conference , volume 28, page 4010. NIH Public Access, 2019. [46] Runzhe Yang, Xingyuan Sun, and Karthik Narasimhan. A generalized algorithm for multi-objective reinforcement learning and policy adaptation. In H. Wallach, H. Larochelle, A. Beygelzimer, F. d'Alché-Buc, E. Fox, and R. Garnett, editors, Advances in Neural In-formation Processing Systems , volume 32. Curran Associates, Inc., 2019. [47] Lim Zun Yuan, Mohammadhosein Hasanbeig, Alessandro Abate, and Daniel Kroening. Modular deep reinforcement learning with temporal logic specifications. arXiv e-prints , pages arXiv– 1909, 2019. 13 NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: The paper successfully makes the four contributions as we stated explicitly in the abstract and the introduction. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: Yes, we elaborate the limitation in Section 7. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory assumptions and proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] 14 Justification: We provide complete proofs in the supplementary material for the both theo-rem 1 and theorem 2 stated in the main paper. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental result reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: We detail the steps for reproducing our main experimental results in Sec-tion 5.1,Section 5.2, and Section 5.3, and describe the implementation of our framework in Section 6. Additional implementation and experimental details are provided in the supplementary material. Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 15 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [No] Justification: Our implementation can be reproduced by following the detailed algorithmic steps in Section 5 and the elaborations of experimental setups for each case in the Appendix. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines (https://nips.cc/public/ guides/CodeSubmissionPolicy) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines (https: //nips.cc/public/guides/CodeSubmissionPolicy) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental setting/details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [Yes] Justification: We provide all details about hyperparameters and environment setup in supple-mentary material. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment statistical significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [Yes] Justification: Standard error is reported in all figures and tables throughout the paper (represented by the color-shaded areas). Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. 16 • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments compute resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [Yes] Justification: All experiments are conducted on an Apple M1 Max (10-core CPU, 24-core GPU). Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code of ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines? Answer: [Yes] Justification: We believe we fulfill all specifications in the ethics guidelines. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [Yes] Justification: Yes, we discussed the societal impacts in Section 7. Guidelines: • The answer NA means that there is no societal impact of the work performed. 17 • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: This paper poses no such risk. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [Yes] Justification: We did use existing assets, and we properly cited them in the paper. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. 18 • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [NA] . Justification: This paper did not release any new assets, as the main contribution is a new framework that leverage on existing learning techniques to solve our target objective. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and research with human subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: This paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional review board (IRB) approvals or equivalent for research with human subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: This paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. 19 • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 16. Declaration of LLM usage 
+
+Question: Does the paper describe the usage of LLMs if it is an important, original, or non-standard component of the core methods in this research? Note that if the LLM is used only for writing, editing, or formatting purposes and does not impact the core methodology, scientific rigorousness, or originality of the research, declaration is not required. Answer:[NA] Justification: The core method development (i.e., technical content) in this paper does not involve LLMs. Guidelines: • The answer NA means that the core method development in this research does not involve LLMs as any important, original, or non-standard components. • Please refer to our LLM policy (https://neurips.cc/Conferences/2025/LLM) for what should or should not be described. 20 A Proofs of Theorems 
+
+A.1 Proof of Theorem 1 
+
+Recall that given a HyperLTL formula φ, Skolem (φ) is in the form of: 
+
+Skolem (φ) = ∃fi(τi1 , . . . , τ i|Q∀  
+
+> i|
+
+)
+
+| {z } 
+
+> for each i∈Q∃
+
+. ∀τj .
+
+|{z}  
+
+> for each j∈Q∀
+
+Skolem (ψ)
+
+Assuming that ⟨π⋆i ⟩i∈Q∃ ∪≤⟨π⋆j ⟩j∈Q∀ is the optimal set of policies for the Skolemized φ, then for every k ≥ 0, it maximizes the probability of converging to ρmax for the inner LTL sub-formula 
+
+Skolem (ψ):
+
+P
+
+h
+
+ρ
+
+
+
+zip  ⟨Tr (ζi[0: ki])⟩ ∪ ≤⟨Tr (ζj [0: kj ])⟩, Skolem (ψ)
+
+i 
+
+> i∈Q∃,j ∈Q∀
+> ⋆
+
+→ ρmax 
+
+That is, on any step k, the zipped path derives a set of paths that instantiate each path variables in the original φ as follows: • For all universal quantified paths τj , where j ∈ Q∀:
+
+[τj 7 → Tr (ζj [0: k])] 
+
+• For all existential quantified paths τi, where i ∈ Q∃:
+
+[τi 7 → fi
+
+ Tr (ζi1 [0: k]), . . . , Tr (ζi|Q∀ 
+
+> i|[0: k]
+
+)], and for each ℓ ∈ { 1, . . . , |Q∀ 
+
+> i
+
+|} , if iℓ = j then Tr (ζiℓ [0: k]) = Tr (ζj [0: k])
+
+This instaintiation guarantees that the probability of satisfying φ is maximized up to step k. Next, the zipped path proceeds to step k + 1 with an optimal action given by its corresponding optimal policy ⟨π⋆i ⟩i∈Q∃ ∪≤⟨π⋆j ⟩j∈Q∀ . That is, the same path mappings of each universally quantified path variable ζj and existentially quantified Skolem function witnesses fi holds for all k ≥ 0. Finally, for the original HyperLTL formula φ = Q1τ1.Q2τ2. . . . Qn.τ n. ψ, by instantiating the trace variables in the same fashion for all τi of i ∈ Q∃ and all τj of j ∈ Q∀, the same optimality immediately follows, because the optimal convergence to ρmax means maximizing the probability of satisfying the inner LTL sub-formula. That is, the optimal set of paths (derived from the zipped path) also optimizes the satisfaction of original φ for all steps k ≥ 0. To this end, we proved that, an optimal tuple of policies ⟨π⋆i ⟩i∈Q∃ ∪≤⟨π⋆j ⟩j∈Q∀ for Skolem (φ) is also an optimal set of policies for φ, that optimizes the probability of satisfying φ in M.
+
+A.2 Proof of Theorem 2 
+
+Bellman’s Principle of Optimality [ 6] states that “ for an optimal policy, no matter what the initial decision is, the remaining decisions must constitute an optimal policy with regard to the state resulting from the initial decision ”. An extended lemma (proved in [ 1 ]) states that for a discounted MDP, there exists an optimal policy, denoted as N N ⋆, such that for all (s, a) ∈ S × A, there exists a maximum Q-value achieved by N N ⋆ (denoted as QN N ⋆
+
+) as introduced in Equation (3): 
+
+QN N ⋆
+
+(s, a) ≜ max  
+
+> N N
+
+QN N (s, a)
+
+Let us denote N N (a | s) as N N ’s decision to take action a on state s. Our goal is to find an optimized N N , such that: 
+
+max 
+
+> N N
+
+X
+
+> s′∈S
+
+P(s, a, s′)
+
+
+
+R(s, a) + γ X
+
+> a∈A
+
+N N (a | s)E(s′, a′)
+
+
+
+where P(s, a, s′) is the one-step transition probability, R(s, a) is the reward of taking action a on state s, γ is a discount selected factor, and E is the expected reward of keep taking an action a′ on a state s′. (as defined in Section 5.3). Recall that in Section 5.2, our immediate reward R(s, a) is associated with a robustness value of a finite prefix by evaluation only up to the current seen state 21 s (i.e., independent from the unseen s′ after taking action a). As a result, maximizing N N do not depend on R(s, a), so the previous optimization problem is equivalent to: 
+
+R(s, a) + max 
+
+> N N
+
+h X 
+
+> s′∈S
+
+P(s, a, s′) γ X
+
+> a∈A
+
+N N (a | s)E(s′, a′)
+
+i
+
+Let us now only focus on the optimization part (i.e., the right side of the plus operator in the above formula). Based on the definition of expected reward defined in Section 5.3, the above formula shows that an optimal N N ⋆ is more likely to the take action a (by the learned N N (a | s)) that has higher probability (decided by P(s, a, s′)) to transit to an unseen state s′ that lead to higher expected value (estimated by E(s′, a′)). That is, given a state s, N N ⋆ outputs an optimal action a, such that: 
+
+γEs′∼P(s,a,·)) 
+
+R(s′, a′)N N ⋆
+
+,
+
+which, intuitively, represents an optimal one-step look-ahead. Now, to connect the above formula with the reward function defined in Section 5.3, we have: 
+
+γEs′∼P(s,a,·)) 
+
+
+
+ρ
+
+
+
+zip  ⟨Tr (ζi[0: k])⟩∪ ≤⟨Tr (ζj [0: k])⟩, Skolem (ψ)
+
+N N ⋆i∈Q∃,j ∈Q∀
+
+,
+
+where s is the state on the k-th step of the zipped path. Recall that ρ is constructed using min-max approach as presented in Figure 3, so the optimal outcome of ρ can be derived from the Minimax Lemma [ 18 ]. That is, if each path always considers the “worst-possible” scenario that other paths will act during learning, it leads to a set of optimal policy among all paths. Hence, ρ is guaranteed optimal for all steps k ≥ 0, which implies the maximum probability of the following: 
+
+P
+
+h
+
+ρ
+
+
+
+zip  ⟨Tr (ζi[0: ki] ∼ D πi ) ∪≤⟨Tr (ζj [0: kj ] ∼ D πj ) , Skolem (ψ)
+
+ ⋆
+
+→ ρmax 
+
+i
+
+> i∈Q∃,j ∈Q∀
+
+To this end, we prove that the action chose by N N ⋆ achieves the maximum expected value E for all 
+
+(s, a) ∈ S × A. Finally, ⟨fi⟩i∈Q∃ and ⟨π⋆j ⟩j∈Q∀ can be inductively constructed from N N ⋆ (as we elaborated in Section 5.3), which is a policies set that optimizes the satisfaction of Skolem (φ).
+
+## B Additional Algorithmic Details of HypRL 
+
+Expected Reward of a Zipped Trace. The expected reward of a state sk after taking an action ak
+
+with discount factor γ ∈ [0 , 1] is: 
+
+E(sk, ak) ≜
+
+> ∞
+
+X
+
+> t=0
+
+γt × R(sk+t+1 , ak+t+1 )
+
+Intuitively, E(sk, ak) evaluates “how good” of choosing ak on sk in infinite time steps, where each step is discounted by γ. We address that, γ is often chosen based on the optimization goal. For example, for short-term tasks, a lower γ is preferred because the expected robustness value focuses more on immediate ρ value. We report the setup of these hyperparameters in Appendix D. 
+
+## C A Comprehensive Example of HypRL Algorithm 
+
+In this section, we present a comprehensive head-to-toe example that aligns with the algorithmic details presented in Section 5. 
+
+Formula Skolemization. In Section 3, we presented the HyperLTL formula for our wildfire example as follows: 
+
+Requirements : φRescue ≜ ∀τ1.∃τ2.(ψfire ∧ ψsave ∧ ψdist ∧ ψsafe )
+
+O1 : ψfire ≜ (iτ1 ) ∧ (f τ1 ) ∧ (cτ1 ) C1 : ψdist ≜ (|Location τ1 − Location τ2 | < 3) 
+
+O2 : ψsave ≜ (gτ2 ) ∧ (f τ2 ) C2 : ψsafe ≜ (¬iτ2 U iτ1 ) ∧ (¬f τ2 U f τ1 ) ∧ (¬cτ2 U cτ1 )
+
+22 Following the illustration in Section 5.1, the Skolemized form of the formula φRescue is as follows: 
+
+Skolem (φRescue ) ≜ ∃f2(τ1).∀τ1.
+
+Skolem (ψfire ) ∧ Skolem (ψsave ) ∧ Skolem (ψdist ) ∧ Skolem (ψsafe )
+
+Skolem (ψfire ) ≜ (iτ1 ) ∧ (f τ1 ) ∧ (cτ1 )
+
+Skolem (ψsave ) ≜ (gf2 ) ∧ (f f2 )
+
+Skolem (ψdist ) ≜ (|Location τ1 − Location f2 | < 3) 
+
+Skolem (ψsafe ) ≜ (¬if2 U iτ1 ) ∧ (¬f f2 U f τ1 )( ¬cf2 U cτ1 )
+
+In this context, there are two quantifiers, Q2 = ∃ so Q∃ = {2}, and Q1 = ∀ so Q∀ = {1}. Besides, all propositions of the existential quantified path variable (originally subscripted by τ2) average now subscripted by f2 in the Skolemized form. Furthermore, for each inner LTL sub-formula, the propositions subscripted with τ2 is substituted with propositions subscripted with f2.
+
+Robustness Optimization. Continuing with the Skolemized formula: 
+
+∃f2(τ1).∀τ1. Skolem (ψfire ) ∧ Skolem (ψsave ) ∧ Skolem (ψdist ) ∧ Skolem (ψsafe )
+
+Our goal is to optimize the following: 
+
+⟨π⋆ 
+
+> 1
+
+, π ⋆ 
+
+> 2
+
+⟩ ∈ arg max 
+
+> ⟨π1,π 2⟩
+
+P
+
+h
+
+ρ zip (⟨Tr (ζ1[0: k1] ∼ D π1 ), Tr (ζ2[0: k2] ∼ D π2 )⟩),
+
+Skolem (ψfire ∧ ψsave ∧ ψdist ∧ ψsafe ) ⋆
+
+→ ρmax 
+
+i
+
+Notice that, by applying ∪≤, the order of the quantified traces are in the right order with respect to the original HyperLTL formula φ.
+
+## D Implementation and Experimental Details 
+
+D.1 From HyperLTL Formulas to Robustness Functions 
+
+In our implementation, we use the theory developed in Section 5.1 to obtain the Skolemized form of the formula, denoted Skolem (φ). We then generate the corresponding robustness function using the approach presented in Section 5.2 (see [ 32 ] for details on translating temporal properties into robustness functions). We now elaborate the following term from the quantitative semantics introduced in Figure 3: 
+
+ρ Tr (ζ[ℓ:k]), f  L(sℓ) < c = c − f  L(sℓ)
+
+This equation lies at the core of transitioning from logical properties (which yield Boolean outputs) to robustness functions (which produce real-valued outputs). To apply this transformation, we must define the function f and the constant c for each property considered in this paper. We now provide details explanations on how we define such functions and constants for each formula introduced in this paper. • The HyperLTL formula defined for safe reinforcement learning (SRL), denoted as φSRL :
+
+– For the property ⟨xτ1 , y τ1 ⟩ = ⟨xG1, y G1⟩, we define f as a distance function and set 
+
+c = 1 . The distance function we have in this case study follows the well-known Manhattan distance definition. That is: 
+
+Dist (⟨xτ1 , y τ1 ⟩, ⟨xG1, y G1⟩) ≜ (|xτ1 − xG1| + |yτ1 − yG1|)
+
+The, by setting c = 1 , this yields the following expression: 
+
+Dist (⟨xτ1 , y τ1 ⟩, ⟨xG1, y G1⟩) < 1,
+
+which expresses that the distance from the first agent (i.e., τ1) to its goal (i.e., G1) is less than one, which implies that the first agent has indeed reached the specified goal location. The corresponding equation is: 
+
+1 − Dist (⟨xτ1 , y τ1 ⟩, ⟨xG1, y G1⟩)
+
+The optimal value is achieved when the agent is exactly at the location of the goal position, giving 1 − 0 = 1 .23 – For the property ⟨xτ2 , y τ2 ⟩ = ⟨xG2, y G2⟩, the same definition for the distance function is similarly defined. That is: 
+
+Dist (⟨xτ2 , y τ2 ⟩, ⟨xG2, y G2⟩) < 1,
+
+which expresses that the distance from the second agent to its goal is less than one, so the corresponding equation is: 
+
+1 − Dist (⟨xτ2 , y τ2 ⟩, ⟨xG2, y G2⟩)
+
+The optimal value is achieved when the second agent is exactly at the goal position, giving 1 − 0 = 1 .
+
+– For the property ⟨xτ1 , y τ1 ⟩̸ = ⟨xτ2 , y τ2 ⟩, we define f as a distance function and set 
+
+c = −1. This yields the condition: 
+
+−Dist (⟨xτ1 , y τ1 ⟩, ⟨xτ2 , y τ2 ⟩) < −1,
+
+which expresses that the distance between the first and second agent (i.e., τ1 and τ2)is greater than one; i.e., the agents are not in the same location. The corresponding equation is: 
+
+−1 + Dist (⟨xτ1 , y τ1 ⟩, ⟨xτ2 , y τ2 ⟩).
+
+This equation is maximized when the two agents are far apart, and it evaluates to −1
+
+when they are in same location. • The HyperLTL formula defined for deep sea treasure (DST), denoted as φDST :
+
+– For the properties T1 , T2 , · · · , we define f for each treasure Ti a distance function between the position of the submarine driver ( τi) and the treasure location ( Ti ), and set 
+
+c = 1 . This yields the condition: 
+
+Dist (⟨xτ1 , y τ1 ⟩, ⟨xT 1, y T 1⟩) < 1
+
+which expresses that the distance from the first agent to T1 is less than one. The corresponding equation is: 
+
+1 − Dist (⟨xτ1 , y τ1 ⟩, ⟨xT 1, y T 1⟩)
+
+The same approach is applied to T2 , T3 ,. . . and the remaining properties. 
+
+– For the property step τ2 < δ , we use the same approach and obtain the following equation: 
+
+δ − step τ2
+
+– For the property |pos τ1 − pos τ2 | < 1, we define f as a distance function and set c = 1 .This yields the condition: 
+
+Dist (⟨xτ1 , y τ1 ⟩, ⟨xτ2 , y τ2 ⟩) < 1,
+
+which expresses that the distance between the first and second agent is less than one. That is, the agents are in the same location. The corresponding equation is: 
+
+1 − Dist (⟨xτ1 , y τ1 ⟩, ⟨xτ2 , y τ2 ⟩)
+
+This equation is maximized when the agents are in the same location. • The formula defined for the Post Correspondence Problem (PCP), denoted as φPCP :
+
+– To address the properties such as (p1 ↔ p2), where p means a sequence of alphabets (that forms a string), we define f as a function of evaluating whether two strings are matching and set c = 1 . The matching function we have in this case study is as follows: 
+
+Match (p1, p 2)= 
+
+0 if p1 and p2 are equal, 
+
+1 otherwise .
+
+This yields the condition: 
+
+Match (p1, p 2) < 1,
+
+which expresses whether the two compared alphabets p1 and p2 are equal or not. The corresponding equation is: 
+
+1 − Match (p1, p 2)
+
+24 (a) ISR (b) MIT 
+
+(c) Pentagon (d) SUNY 
+
+Figure 7: Maps of Grid World [35] benchmarks. 
+
+– For the symbol #, we are checking whether the alphabet under consideration is equal to #. This is expressed as the logical condition p ↔ #.• The HyperLTL formula defined for the wildfire scenario, denoted as φRescue :
+
+– For the properties V1 , V2 , · · · and F1 , F2 , · · · , we use the same distance function Dist 
+
+(as in SRL and DST) to calculate the distance from agents to victims and fire zones, with c = 1 . That is, the reachability of the two objectives. 
+
+– For the property |Location τ1 − Location τ2 | < 3, we use the distance function Dist 
+
+with c = 3 . This constraints make sure that for the optimized strategy, the two agents are always staying within the safe communication range. 
+
+D.2 Safe RL (SRL) Case Study Setup. In the Safe RL case study (see Figure 7), the blue circle (denoted A1 ) and the orange circle (denoted A2 ) are agents that aim to learn optimal policies to navigate from their initial positions to their respective targets: the blue square ( G1 ) and the orange square ( G2 ), while avoiding collisions. The state space is represented as a tuple ⟨x, y ⟩, and the action space is defined as a = {stay , up , down , left , right }. The following HyperLTL formula φSRL specifies the required objectives: 
+
+φSRL ≜ ∀τ1.∃τ2.
+
+
+
+ψG1 τ1 ∧ ψG2 τ2 ∧ ψCA τ1,τ 2
+
+
+
+where the subformulas are defined as: 
+
+ψG1 τ1 ≜ ⟨xτ1 , y τ1 ⟩ = ⟨xG1, y G1⟩, ψG2 τ2 ≜ ⟨xτ2 , y τ2 ⟩ = ⟨xG2, y G2⟩,ψCA τ1,τ 2 ≜ ⟨xτ1 , y τ1 ⟩̸ = ⟨xτ2 , y τ2 ⟩.
+
+Here, ψG1 τ1 and ψG2 τ2 express that A1 and A2 eventually reach G1 and G2 , respectively. The subformula ψCA τ1,τ 2 ensures that the agents avoid collisions while navigating toward their goals. 
+
+First Experminemt Setup. In the first experiment, to ensure a fair comparison, we evaluate HYP RL combined with CQ-Learning against the shielding method [ 17 ] also using CQ-Learning. The implementation and hyperparameters of CQ-Learning are taken from [ 17 ]. Since CQ-Learning initially employs a decentralized phase (i.e., a single-agent state space), we modify the formula φSRL 
+
+to remove inter-agent dependencies: 
+
+∀τ1.∀τ2.
+
+
+
+ψG1 τ1 ∧ ψG2 τ2 ∧ ψCA τ1,τ 2
+
+
+
+25 In this setting, Skolemization is unnecessary, and the agents act independently. When the algorithm transitions into a joint phase, expanding the state space to include inter-agent interactions, we use the original specification φSRL . At this stage, H YP RL guides the learning process effectively to achieve both goal completion and collision avoidance. 
+
+Second Experminemt Setup. We employ DQN as our learning algorithm, utilizing a neural network with three hidden layers of 512 nodes and ReLU activation functions. We set the discount factor to γ = 1 .0, the learning rate to 0.001, the initial ϵ to 1.0 with a decay rate of 0.995 down to a minimum of 0.01, and use the Adam optimizer. We set the number of training episodes to 200 for the SUNY, ISR, and Pentagon maps, and to 300 for the MIT map due to its increased complexity. Each episode consists of 300 steps (see Figure 7 for the map setups). 
+
+Baselines Reward Functions. The manually designed reward functions have the following form: 
+
+RSRL =
+
+
+
+a if both agents reach their respective goals, 
+
+b if one agent reaches its goal, 
+
+c if the agents collide. The function RSRL addresses all objectives and safety constraints of the problem. The manually designed reward function is tested with the following values: • a = 10 , b = 5 , c = −5 (RSRL  
+
+> 1
+
+)• a = 2 , b = 1 , c = −1 (RSRL  
+
+> 2
+
+)• a = 20 , b = 10 , c = −10 (RSRL  
+
+> 3
+
+)• a = 100 , b = 50 , c = −10 (RSRL  
+
+> 4
+
+)• a = 10 , b = 5 , c = −10 (RSRL  
+
+> 5
+
+)In the main paper, we report the results obtained using values a = 10 , b = 5 , c = −5 (RSRL  
+
+> 1
+
+) for the baseline reward function. Figure 8 presents the results corresponding to all different reward functions 
+
+R1, R2, R3, R4, and R5 we introduced above. 
+
+D.3 Deep Sea Treasure (DST) Case Study Setup. This case study (see Figure 9) was originally proposed by [ 42 ]. We adopt the implementation provided in [ 46 ]. The state space is represented as a tuple ⟨x, y, step ⟩, and the action space is defined as a = {up , down , left , right }. The following HyperLTL formula φDST specifies the required objectives: 
+
+φDST ≜ ∀τ1.∃τ2. (T1 τ1 ∧ (T2 τ1 ∧ (T3 τ1 ) . . . )) ∧ (step τ2 < δ ) ∧ (|pos τ1 − pos τ2 | < 1) 
+
+The original case study is in a single-agent environment with two objectives. We modified it into a multi-agent problem by assigning one agent with the objective of maximizing collected treasure, and another agent with the task of keeping the number of steps below a certain threshold. 
+
+Experminemt Setup. For our experiments, we used PPO and DQN implementations from [ 38 ]. For DQN, we set the hyperparameters as follows: discount factor γ = 0 .99 , ϵ decaying from 1.0 to 0.07 over a fraction of 0.2, and a learning rate of 0.0004 . Since the DQN implementation from [ 38 ]does not directly support multi-discrete actions, we expanded the action spaces of both agents and defined a unified action space compatible with this implementation. For PPO, we set hyperparameters as following, γ = 0 .99 , clipping factor to 0.2, learning rate to 0.0003, and GAE lambda to 0.98. Additionally, to ensure a fair comparison, we added a reward penalty of −10 to the baseline reward function whenever the two agents became separated. 
+
+D.4 Additional Experiment on DST 
+
+We conduct an additional experiment on DST, where the focus is on minimizing the step constraint in the problem. In Table 6, we report the number of steps required for the cumulative treasure achieved by the treasure collector to exceed values of 1, 5, 10, 15, 20, and 30. The results show that H YP RL consistently and significantly outperforms the baselines in all settings, except when using PPO trained for 1000 episodes. 26 100 200            
+
+> 50
+> 100
+> Episodes (ISR)
+> Total Reach
+> 100 200
+> 20
+> 40
+> 60
+> Episodes (PENTAGON)
+> 100 200
+> 50
+> 100
+> Episodes (SUNY)
+> 150 300
+> 5
+> 10
+> 15
+> Episodes (MIT)
+> 100 200
+> 0
+> 5
+> Episodes (ISR)
+> Collisions
+> 100 200
+> 0
+> 5
+> Episodes (PENTAGON)
+> 100 200
+> 0
+> 5
+> Episodes (SUNY)
+> 150 300
+> 0
+> 5
+> 10
+> Episodes (MIT)
+> 100 200
+> 0
+> 5
+> Episodes (ISR)
+> Collisions
+> 100 200
+> 0
+> 5
+> Episodes (PENTAGON)
+> 100 200
+> 0
+> 5
+> Episodes (SUNY)
+> 150 300
+> 0
+> 5
+> 10
+> Episodes (MIT)
+
+Figure 8: Total number of successful goal completions by both agents (top) and number of collisions (bottom). Lines , , , , and correspond to reward functions R1, R2, R3, R4, and 
+
+R5, respectively. Results are averaged over 10 runs. 
+
+D.4.1 The Post Correspondence Problem (PCP) Case Study Setup. PCP (see Figure 11) consists of a set of k dominos, denoted as D =
+
+{dom 0, dom 1, . . . , dom k}. Each domino dom i (0 ≤ i ≤ k) is represented by a pair of nonempty finite words (top i, bot i) from a given alphabet Σ. The objective is to find a finite sequence of dominos such that the concatenated words on the top match those on the bottom. In our case study, the state space is defined as a tuple ⟨top , bot ⟩ for each domino. The action space consists of selecting a domino from D, resulting in k possible actions A = {dom 0, dom 1, . . . , dom k}. Notably, traces (i.e., agents) are unaware of the context of the dominos and can only identify them by their labels (i.e., 
+
+dom i). The initial state of the MDP encodes empty words on both the top and bottom: s0 = ⟨ε, ε ⟩.
+
+Table 6: DST results on steps required to achieve the desired treasures, showing average and standard error over 10 evaluations. Treasures Achieved Method Episodes 1 5 10 15 20 30 PPO 500 199.01 ±6.65 218.66 ±6.67 244.87 ±6.68 247.89 ±6.67 253.16 ±6.66 268.01 ±6.70 
+
+PPO +H YP RL 500 13.30 ±1.01 29.72 ±1.57 39.10 ±1.81 49.22 ±1.96 56.59 ±2.03 71.55 ±2.26 
+
+PPO 1000 5.75 ±0.30 6.75 ±0.30 29.68 ±0.76 32.29 ±0.75 36.09 ±0.74 39.82 ±0.72 
+
+PPO +H YP RL 1000 55.37 ±3.66 106.89 ±4.96 126.25 ±5.10 141.06 ±5.27 153.49 ±5.35 183.51 ±5.70 
+
+DQN 500 832.10 ±9.93 897.54 ±6.95 916.40 ±5.63 917.64 ±5.55 917.89 ±5.54 926.33 ±5.25 
+
+DQN +H YP RL 500 114.60 ±2.67 115.61 ±2.56 116.61 ±2.52 117.61 ±2.50 148.66 ±4.34 155.39 ±4.58 
+
+DQN 1000 893.37 ±9.67 953.25 ±6.55 992.10 ±2.50 992.12 ±2.55 996.05 ±1.52 997.19 ±1.14 
+
+DQN +H YP RL 1000 303.63 ±6.64 319.09 ±6.38 335.20 ±6.21 335.20 ±6.21 337.21 ±6.18 339.90 ±6.22 
+
+27 T1    
+
+> T2
+> T3
+> T4 T5 T6
+> T7 T8
+> T9
+> T10
+
+Figure 9: DST Grid Map. Figure 10: Job Scheduling bench-mark. Subsequently, they choose actions from the action space (choosing a domino) to construct traces that aims to satisfy the PCP objective. Before encoding PCP in HyperLTL, we note that in [ 19 , 9 ], the authors reduce PCP to the satisfiability problem for the ∀∃ fragment of HyperLTL and the emptiness problem of nondeterministic finite-state hyper automata. Part of the encoding is to ensure that only valid dominos are chosen. We do not need those constraints in our encoding, as the action space of the MDP enforces choosing valid dominos only. This is the reason our that encoding is less complex than that of [19, 9]. We formalize a valid solution to PCP in HyperLTL as follows. The set AP of atomic propositions is defined such that as Σ = 2 AP ∪ { #}, where # encodes termination. Essentially, the HyperLTL formula requires that for all traces τ1, where top and bottom words match up to the end of the shorter trace, there exists a trace τ2 such that τ1 is a SemiMatch and τ2 extends τ1 to complete equal top and bottom words: 
+
+φPCP ≜ ∀τ1.∃τ2. ψ SemiMatch τ1 U  ψExtend τ1,τ 2 ∧ ψMatch τ2
+
+
+
+where φSemiMatch means the top and bottom words match up to the length of the shorter word: 
+
+ψSemiMatch τ1 ≜
+
+h ^ 
+
+> p∈AP
+
+(ptop τ1 ↔ pbot τ1 )
+
+i
+
+U (# top τ1 ⊕ #bot τ1 )
+
+where ‘ ⊕’ is the xor operator. The formula φMatch indicates that the word constructed on the top and bottom are equal: 
+
+ψMatch τ2 ≜ ^
+
+> p∈AP
+
+(ptop τ2 ↔ pbot τ2 )
+
+Finally, formula φExtend τ1,τ 2 encodes that trace τ2 is a successor trace τ1 as follows: 
+
+φExtend τ1,τ 2 ≜
+
+h ^ 
+
+> p∈AP
+
+ (ptop τ1 ↔ ptop τ2 ) ∧ (pbot τ1 ↔ pbot τ2 )i
+
+U
+
+ (# top τ1 ∨ #bot τ1 ) ∧ (¬#top τ2 ∧ ¬ #bot τ2 )
+
+Experminemt Setup. We employ DQN as our learning algorithm, utilizing a neural network with three layers of 512 nodes and ReLU activation functions. We set the discount factor γ to 0.99, the learning rate to 0.001, and the initial ϵ to 1.0 with a decay rate of 0.995 down to a minimum of 0.001. We use the Adam optimizer and train for 1000 episodes. This experiment is conducted for domino collections containing 5 and 6 dominos. 
+
+Baselines Reward Functions. The manually designed reward functions have the following form: 
+
+RPCP =
+
+a if the same indexed letters on the top and bottom are equal, 
+
+b otherwise. 28 Collection of k dominos 
+
+> Match
+> Not Match
+> Semi Match
+
+Figure 11: PCP overview                                   
+
+> 200 400 600 800 1,000
+> 10 −1
+> 10 0
+> 10 1
+> 10 2
+> 0
+> ...
+> Episodes
+> # of successful match
+> RPCP
+> 2,k= 5 RPCP
+> 1,k= 5 RPCP
+> 3,k= 5 RPCP
+> 4,k= 5
+> RPCP
+> 1,k= 6 RPCP
+> 2,k= 6 RPCP
+> 3,k= 6 RPCP
+> 4,k= 6
+
+Figure 12: PCP baseline results showing average total matches over 10 runs. The function RPCP addresses all objectives and safety constraints of the problem. The manually designed reward function is tested with the following values: • a = 1 , b = −1 (RPCP  
+
+> 1
+
+)• a = 5 , b = −2 (RPCP  
+
+> 2
+
+)• a = 10 , b = −10 (RPCP  
+
+> 3
+
+)• a = 1 , b = −5 (RPCP  
+
+> 4
+
+)In the paper, we report results using the baseline reward function with values a = 5 , b = −2 (RPCP  
+
+> 2
+
+)for k = 5 , and a = 1 , b = −1 (RPCP  
+
+> 1
+
+) for k = 6 . Figure 12 presents the results corresponding to the different reward functions. The baselines RPCP  
+
+> 2
+
+, RPCP  
+
+> 3
+
+, and RPCP  
+
+> 4
+
+for k = 6 did not successfully produce any matches. We visualize this using a value of zero in the log-scale plot shown in Figure 12. 
+
+Table 7: Wildfire results, avg. and std. error of 10 trials after 5k episodes. Size Method Dist Steps O1 Steps O2
+
+32 PPO + RFAIR  
+
+> 1
+
+2.8 ±0.01 77.13 ±5.7 T/O PPO + RFAIR  
+
+> 2
+
+2.5 ±0.01 33.43 ±4.1 787.03 ±31 .852 PPO + RFAIR  
+
+> 1
+
+5.6 ±0.02 31.2 ±4.5 7057.8 ±1047 .9
+
+PPO + RFAIR  
+
+> 2
+
+4.2 ±0.01 62.7 ±9.7 T/O 29 D.4.2 Wild Fire Scenario Case Study Setup. Consider a wildfire scenario in a grid-world environment as we introduced in Section 1. Three locations are on fire, and two victims need to be rescued. Two autonomous agents are deployed from the same position with distinct objectives: the firefighter agent ( FF ) must extinguish all fire zones, and the medical agent ( Med ) must rescue all victims. The agents must also satisfy two constraints: which requires them to always remain within a 2-cell communication range; and which prohibits Med from entering any fire zone before FF has extinguished the fire in that zone. The state space is represented as a tuple ⟨x, y ⟩, and the action space is defined as 
+
+a = {stay , up , down , left , right }. The goal is to learn optimal policies for FF and Med that maximize the probability of satisfying all these requirements. The following HyperLTL formula captures the objectives of this case study:                                                            
+
+> φRescue ≜∀τ1.∃τ2.(ψfire ∧ψsave ∧ψdist ∧ψsafe )
+> O1:ψfire ≜(iτ1)∧(fτ1)∧(cτ1)C1:ψdist ≜(|Location τ1−Location τ2|<3)
+> O2:ψsave ≜(gτ2)∧(fτ2)C2:ψsafe ≜(¬iτ2Uiτ1)∧(¬fτ2Ufτ1)∧(¬cτ2Ucτ1)
+
+Experiment Setup. We use the PPO implementation from [ 38 ], with the following hyperparameters: a learning rate of 0.0003, a clipping parameter of 0.2, a discount factor γ = 0 .995 , and a GAE lambda of 0.95. We conduct our experiments on 3 × 3 and 5 × 5 grid-world environments. The timeout is set to 1000 steps for the 3 × 3 grid and 10,000 steps for the 5 × 5 grid. 
+
+Baselines. We evaluated (see Table 7) two baseline reward functions in this experiment: • RFAIR  
+
+> 1
+
+: extinguishing fire: +50 , rescuing a victim: +10 , agent out of range: −100 , and Med 
+
+in a fire zone: −100 .• RFAIR  
+
+> 2
+
+: Extinguishing fire: +10 , rescuing a victim: +50 , agent out of range: −100 , and Med 
+
+in a fire zone: −100 .We used RFAIR  
+
+> 2
+
+in the paper, although in 5×5 RFAIR  
+
+> 1
+
+performs better than RFAIR  
+
+> 2
+
+(in terms of only Steps 
+
+O1 and Steps O2). However, we chose to include RFAIR  
+
+> 2
+
+in the main paper because its performance in the 3 × 3 grid is consistently better than RFAIR  
+
+> 1
+
+across all metrics. This trend does not hold in the 
+
+5 × 5 grid, where RFAIR  
+
+> 1
+
+outperforms RFAIR  
+
+> 2
+
+only in Steps O1 and Steps O2.
+
+D.5 Additional Experiment Case Study Setup. In this case study (see Figure 10), a single permanent resource is placed on a grid with multiple agents, which must learn to share resources. The objective here is to maximize the overall utility of all agents while ensuring fair allocation of the resource. In other words, the goal is not merely to maximize utility by allocating the resource to a single agent but to distribute it equitably among all agents. The action space is defined as a = {stay , up , down , left , right }. The state space is extended by ⟨x, y, Energy ⟩. We expresses our allocation and fairness objectives by the following HyperLTL formula: 
+
+φFAIR ≜ ∀τ1.∀τ2.
+
+
+
+Resource τ1 ∧ Resource τ2
+
+
+
+∧ □ |Energy τ1 − Energy τ2 | < δ 
+
+That is, all agents should eventually gain access to the resource at every step, while ensuring that the difference in their Energy levels (i.e., allocated resources) remains less than a threshold δ, which can be set as a hyperparameter 2. In our setup, agents start with Energy = 0 , and each time an agent reaches the resource position, its energy level increments by one while maintaining the same action space. 
+
+Experiment Setup. We employ PPO as our learning algorithm, using two neural networks: a policy network and a value network. Both networks consist of three hidden layers with 512 nodes and ReLU activation functions. The policy network uses a softmax activation in the output layer, while the value network uses a linear output. We set the learning rate to 0.001, the discount factor γ = 0 .95 , and the clipping factor to 0.2. Optimization is performed using the Adam optimizer. We also set δ = 10 .   
+
+> 2We acknowledge that is a Büchi condition and is strange to be use in finite semantics. Nevertheless, when it is interpreted in the context of robustness values, function ρattempts to maximize the occurrence of
+> Resource , which is the intended objective.
+
+30 Baselines Reward Functions. The manually designed reward functions have the following form: 
+
+RFAIR =
+
+a if resource allocated to either of agents, 
+
+b if |Energy Agent 1 − Energy Agent 2 | > δ 
+
+The function RFAIR addresses all objectives and safety constraints of the problem. The manually designed reward function is tested with the following values: • a = 2 , b = −1 (RFAIR  
+
+> 1
+
+)• a = 20 , b = −5 (RFAIR  
+
+> 2
+
+)• a = 10 , b = −5 (RFAIR  
+
+> 3
+
+)• a = 5 , b = −5 (RFAIR  
+
+> 4
+
+)
+
+Analysis and Results. The evaluation (see Figure 13) demonstrates how the learning process maximizes utility for both agents while minimizing the difference in their utilities. In Figure 13a, using H YP RL, we observe that the two agents initially start with low resource utilization. Although this issue is addressed over time, there is a noticeable gap in resource allocation between episodes 150 and 270. H YP RL gradually reduces this disparity, and after episode 400, it achieves high resource utilization while maintaining fairness. This is evident from the fact that the gap between the maximum and minimum utilization becomes nearly invisible between episodes 400 and 500. By the end of training, each agent receives approximately 40 to 45 resources per episode (with 100 steps), while the optimal allocation is 50 resources per agent. These results highlight the effectiveness of H YP RL in achieving fairness in MARL. On the other hand, using PPO with the baseline reward functions does not successfully yield a policy that both maximizes the average utility of the agents and minimizes the gap between the minimum and maximum allocated resources. For example, RFAIR  
+
+> 1
+
+(see Figure 13b) succeeds in maximizing the average resource allocation to the optimal level but fails to minimize the disparity between agents in terms of resource allocation. The other baseline reward functions RFAIR  
+
+> 2
+
+, RFAIR  
+
+> 3
+
+, and RFAIR  
+
+> 4
+
+exhibit similar behavior (see Figures 13c to 13e, respectively). While they perform better than RFAIR  
+
+> 1
+
+in minimizing the min-max range of resource allocation, they still fall short compared to H YP RL in achieving both fairness and optimal utility. 
+
+## E Why H YP RL is Important? 
+
+In this work, we propose a method named H YP RL, which introduces a novel fusion between reinforce-ment learning and a recently developed class of logics known as hyperproperties. Hyperproperties have gained increasing attention in the formal methods community due to their expressive power in capturing system-level behaviors that span across multiple execution traces. We observe that many objectives and constraints in MARL naturally align with the expressive capabilities of hyperproperties. Motivated by this insight, we present a framework that first formally specifies the objectives and constraints of a given RL problem using hyperproperties and then learns policies that aim to maximize the probability of satisfying these specifications. We believe that our approach provides a solid theoretical foundation for a new direction in reinforce-ment learning, where users can formally express their high-level requirements using hyperproperties and then synthesize policies that satisfy them. Importantly, hyperproperties are not limited to specify-ing objectives of individual agents or pairwise dependencies. Recent extensions such as HyperATL [ 7]allow reasoning about team-level objectives and inter-team relational dependencies, further expanding the scope of formal specification in MARL. 31 100 200 300 400 500 
+
+20 
+
+30 
+
+40 
+
+50 
+
+Episodes  
+
+> # of allocations
+> (a) HYP RL
+
+100 200 300 400 
+
+20 
+
+40 
+
+60 
+
+80 
+
+Episodes   
+
+> # of allocations
+> (b) RFAIR
+> 1baseline reward function.
+
+100 200 300 400 
+
+10 
+
+30 
+
+50 
+
+Episodes   
+
+> # of allocations
+> (c) RFAIR
+> 2baseline reward function.
+
+100 200 300 400 
+
+10 
+
+30 
+
+50 
+
+Episodes   
+
+> # of allocations
+> (d) RFAIR
+> 3baseline reward function.
+
+100 200 300 400 
+
+10 
+
+30 
+
+50 
+
+Episodes   
+
+> # of allocations
+> (e) RFAIR
+> 4baseline reward function.
+
+Figure 13: Fair resource allocation results under various baseline reward functions. Boundaries represent the minimum and maximum allocated resources per episode. Dashed lines indicate average usage, dashed-dotted lines show optimal allocations, and solid lines represent polynomial trend fits. Results are based on 10 independent runs in a 4 × 4 grid with two agents, each run consisting of 500 episodes with 100 steps per episode. 32

@@ -1,0 +1,7003 @@
+Title: 14130_A_Nearly_Optimal_and_Low.pdf
+
+URL Source: https://openreview.net/pdf?id=s3icZC2NLq
+
+Number of Pages: 52
+
+Markdown Content:
+# A Nearly Optimal and Low-Switching Algorithm for Reinforcement Learning with General Function Approximation 
+
+Heyang Zhao 
+
+Department of Computer Science University of California, Los Angeles Los Angeles, CA 90095 
+
+hyzhao@cs.ucla.edu 
+
+Jiafan He 
+
+Department of Computer Science University of California, Los Angeles Los Angeles, CA 90095 
+
+jiafanhe19@ucla.edu 
+
+Quanquan Gu 
+
+Department of Computer Science University of California, Los Angeles Los Angeles, CA 90095 
+
+qgu@cs.ucla.edu 
+
+## Abstract 
+
+The exploration-exploitation dilemma has been a central challenge in reinforcement learning (RL) with complex model classes. In this paper, we propose a new algorithm, Monotonic Q-Learning with Upper Confidence Bound (MQL-UCB) for RL with general function approximation. Our key algorithmic design includes (1) a general deterministic policy-switching strategy that achieves low switching cost, (2) a monotonic value function structure with carefully controlled function class complexity, and (3) a variance-weighted regression scheme that exploits historical trajectories with high data efficiency. MQL-UCB achieves minimax optimal regret of eO(d√HK ) when K is sufficiently large and near-optimal policy switching cost of eO(dH ), with d being the eluder dimension of the function class, H being the planning horizon, and K being the number of episodes. Our work sheds light on designing provably sample-efficient and deployment-efficient Q-learning with nonlinear function approximation. 
+
+## 1 Introduction 
+
+In reinforcement learning (RL), a learner interacts with an unknown environment and aims to maximize the cumulative reward. As one of the most mainstream paradigms for sequential decision-making, RL has extensive applications in many real-world problems (Kober et al., 2013; Mnih et al., 2015; Lillicrap et al., 2015; Zoph and Le, 2016; Zheng et al., 2018). Theoretically, the RL problem is often formulated as a Markov Decision Process (MDP) (Puterman, 2014). Achieving the optimal regret bound for various MDP settings has been a long-standing fundamental problem in RL research. In tabular MDPs where the state space S and the action space A are finite, the optimal regret bound has been well-established, ranging from the episodic setting (Azar et al., 2017; Zanette and Brunskill, 2019; Simchowitz and Jamieson, 2019; Zhang et al., 2020), average-reward setting (Zhang and Ji, 2019) to the discounted setting (He et al., 2021b). Nevertheless, these regret guarantees are intolerably large in many real-world applications, where the state space S and the action space A are often large or even infinite. 
+
+38th Conference on Neural Information Processing Systems (NeurIPS 2024). As is commonly applied in applications, function approximation has been widely studied by theorists to demonstrate the generalization across large state-action spaces, proving the performance guarantees of various RL algorithms for specific function classes. There are recent works on RL with linear function approximation under different assumptions such as linear MDPs (Yang and Wang, 2019; Jin et al., 2020), linear mixture MDPs (Modi et al., 2020; Ayoub et al., 2020; Zhou et al., 2021a). Among them, Zhou et al. (2021a) achieved nearly optimal regret bounds for linear mixture MDPs through a model-based approach adopting variance-weighted linear regression. Later, Hu et al. (2022) proposed LSVI-UCB+ algorithm, making an attempt to improve the regret for linear MDP through an over-optimistic value function approach. However, their analysis was later discovered to suffer from a technical issue (Agarwal et al., 2022; He et al., 2022). To fix this issue, Agarwal et al. (2022) introduced similar over-optimistic value functions to construct a monotonic variance estimator and a non-Markov policy, achieving the first statistically optimal regret for linear MDPs. They also proposed a novel algorithm dubbed VO QL for RL with general function approximation. Concurrently, He et al. (2022) proposed LSVI-UCB++, which takes a different approach and employs a rare-switching technique to obtain the optimal regret. In a parallel line of research, there has been a growing body of literature proposing more general frameworks to unify sample efficient RL algorithms, e.g., Bellman rank (Jiang et al., 2017), Witness rank (Sun et al., 2019), eluder dimension (Russo and Van Roy, 2013), Bellman eluder dimension (Jin et al., 2021), Bilinear Classes (Du et al., 2021), Decision-Estimation Coefficient (Foster et al., 2021), Admissible Bellman Characterization (Chen et al., 2022) and Decoupling Coefficient (Agarwal and Zhang, 2022a,b). However, when applying these frameworks to linear MDPs, none of them can achieve the minimax optimal regret. To our knowledge, Agarwal et al. (2022) is the only algorithmic framework achieving optimal regret for RL beyond linear function approximation. Since VO QL requires a non-Markov planning procedure, where the resulting policy does not act greedily with respect to a single optimistic value function, it is natural to ask 
+
+Can we develop a RL algorithm with Markov policy 1 to solve MDPs with general function approximation and achieve the optimal regret? 
+
+While the sample efficiency of RL algorithms for MDPs with nonlinear function classes has been comprehensively researched, deployment efficiency (Matsushima et al., 2020) is also a major concern in many real-world application scenarios. For example, in recommendation systems (Afsar et al., 2022), it may take several weeks to deploy a new recommendation policy. On the other hand, the system is capable of collecting an enormous amount of data every minute implementing a fixed policy. As a result, it is computationally inefficient to change the executed policy after each data point is collected as is demanded by most of the online RL algorithms in theoretical studies. To resolve this issue, Bai et al. (2019) first introduced the concept of switching cost, defined as the number of policy updates. Following this concept, a series of RL algorithms have been proposed on the theoretical side with low switching cost guarantees (e.g., Zhang et al., 2020; Wang et al., 2021; Qiao et al., 2022; Kong et al., 2021; Velegkas et al., 2022; Li et al., 2023). Xiong et al. (2023) considered low-switching RL with general function approximation, which achieves eO(dH ) switching cost. However, their algorithm has an intractable planning phase and is not statistically optimal. Kong et al. (2021), Velegkas et al. (2022), and Li et al. (2023) considered RL with general function approximation, all of which achieved the switching cost of O(d2Hpolylog (K)) , where d is the eluder dimension of the underlying function class, H is the planning horizon, and K is the number of episodes. In contrast, Gao et al. (2021) proved an Ω( dH/ log d) lower bound of switching cost for any deterministic algorithms in learning linear MDPs. Therefore, the following question remains open: 
+
+Can we design an efficient algorithm with eO(dH ) switching cost for MDPs with bounded eluder dimension? 
+
+In this paper, we answer the above two questions simultaneously by proposing a novel algorithm 
+
+Monotonic Q-Learning with UCB (MQL-UCB) with all the aforementioned appealing properties. At the core of our algorithmic design are the following innovative techniques: 
+
+> 1A Markov policy means that the action chosen by the policy only depends on the current state instead of the prefix trajectory. It is more aligned with the empirical RL approaches, since the estimated value function is not well-defined under non-Markov policy.
+
+2Table 1: A comparison of existing algorithms in terms of regret and switching cost for linear MDP and general function class with bounded eluder dimension and Bellman completeness. The results hold for in-homogeneous episodic RL with horizon length H, number of episodes K where the total reward obtained in an episode is not larger than 1. For regret, we only present the leading term when 
+
+K is large enough compared to other variables and hide poly-logarithmic factors in K, d or dim , H
+
+and the constant. For linear MDPs, d is the dimension of the feature vectors. For general function class, dim is a shorthand of the eluder dimension of the underlying function class, N is the covering number of the value function class, and NS,A is the covering number of the state-action space. Algorithm Regret # of Switches Model Class LSVI-UCB (Jin et al., 2020) d3/2H√K K                         
+
+> LSVI-UCB-RareSwitch (Wang et al., 2021) d3/2H√KeO(dH )
+> LSVI-UCB++ (He et al., 2022) d√HK eO(dH )
+> Linear MDPs
+> F-LSVI (Wang et al., 2020a) dim( F)plog Nlog NS,A·H√KK
+> GOLF (Jin et al., 2021)
+> pdim( F) log N·H√KKBounded eluder dimension VOQL + Completeness (Agarwal et al., 2022)
+> pdim( F) log N·HK eO(dim( F)2H)
+> MQL-UCB
+> (Theorem 4.1)
+> pdim( F) log N·HK eO(dim( F)H)
+
+• We propose a novel policy-switching strategy based on the cumulative sensitivity of historical data. To the best of our knowledge, this is the first computationally-tractable deterministic rare-switching algorithm for RL with general function approximation which achieves eO(dH ) switching cost. We also prove a nearly matching lower bound for any algorithm with arbitrary policies including both deterministic and stochastic policies (See Theorem B.1). Previous approaches for low switching cost in RL with general function approximation are sampling-based (Kong et al., 2021; Velegkas et al., 2022; Li et al., 2023) and highly coupled with a sub-sampling technique used for regression, making it less efficient. When restricted to the linear case, sampling-based rare-switching has a worse switching cost of eO(d2H) (Section 3.3 in Kong et al. 2021; Theorem 3.3 in Velegkas et al. 2022; Section C in Li et al. 2023) than that in Wang et al. (2021). • With the novel policy-switching scheme, we illustrate how to reduce the complexity of value function classes while maintaining a series of monotonic value functions, strictly generalizing the LSVI-UCB++ algorithm (He et al., 2022) to general function class with bounded eluder dimension. Based on the structure of the value functions, we further demonstrate how MQL-UCB achieves a variance-dependent regret bound that can gracefully reduce to a nearly constant regret for deterministic MDPs. While in the worst case, our algorithm still attains a nearly minimax optimal regret guarantee. Our work is the first work for RL with general function approximation that achieves the nearly minimax optimal regret when specialized to linear MDPs, while still enjoys simple Markov planning phase. It is worth noting that recently, Qiao et al. (2023) also considered RL with low-switching cost beyond linear function approximation, i.e., MDPs with low inherent Bellman error (Zanette et al., 2020b) and generalized linear MDPs (Wang et al., 2020b). Their approach can be seen as a slight extension of RL with low-switching cost for linear MDPs, since in both settings, the covariance matrix still exists and they can still use the determinant of the covariance as a criterion for policy switching. 
+
+Notation. We use lower case letters to denote scalars and use lower and upper case bold face letters to denote vectors and matrices respectively. We denote by [n] the set {1, . . . , n }. For two positive sequences {an} and {bn} with n = 1 , 2, . . . , we write an = O(bn) if there exists an absolute constant C > 0 such that an ≤ Cb n holds for all n ≥ 1 and write an = Ω( bn) if there exists an absolute constant C > 0 such that an ≥ Cb n holds for all n ≥ 1. We use eO(·) to further hide the polylogarithmic factors except log-covering numbers. We use 1{·} to denote the indicator function. 32 Preliminaries 
+
+2.1 Time-Inhomogeneous Episodic MDP 
+
+We consider a time-inhomogeneous episodic Markov Decision Process (MDP), denoted by a tuple 
+
+M = M (S, A, H, {Ph}Hh=1 , {rh}Hh=1 ). Here, S and A are the spaces of state and action, respectively, 
+
+H is the length of each episode, Ph : S × A × S → [0 , 1] is the transition probability function at stage h which denotes the probability for state s to transfer to the next state s′ with current action a,and rh : S × A → [0 , 1] is the deterministic reward function at stage h. A policy π := {πh}Hh=1 is a collection of mappings πh from an observed state s ∈ S to the simplex of action space A. For any policy π = {πh}Hh=1 and stage h ∈ [H], we define the value function V πh (s) and the action-value function Qπh (s, a ) as follows: 
+
+Qπh (s, a ) = rh(s, a ) + E
+
+ HX
+
+> h′=h+1
+
+rh′
+
+ sh′ , π h′ (sh′ ) sh = s, a h = a
+
+
+
+, V πh (s) = Qπh (s, π h(s)) ,
+
+where sh′+1 ∼ Ph′ (·| sh′ , a h′ ). Then, we further define the optimal value function V ∗ 
+
+> h
+
+and the optimal action-value function Q∗ 
+
+> h
+
+as V ∗ 
+
+> h
+
+(s) = max π V πh (s) and Q∗
+
+> h
+
+(s, a ) = max π Qπh (s, a ). For simplicity, we assume the total reward for each possible trajectory (s1, a 1, ..., s H , a H ) satisfies 
+
+PHh=1 rh(sh, a h) ≤ 1. Under this assumption, the value function V πh (·) and Qπh (·, ·) are bounded in 
+
+[0 , 1] . For any function V : S → R and stage h ∈ [H], we define the following first-order Bellman operator Th and second-order Bellman operator T 2 
+
+> h
+
+on function V :
+
+ThV (sh, a h) = Esh+1 
+
+rh + V (sh+1 )|sh, a h
+
+, T 2 
+
+> h
+
+V (sh, a h) = Esh+1 
+
+h rh + V (sh+1 )2|sh, a h
+
+i
+
+,
+
+where sh+1 ∼ Ph(·| sh, a h) and rh = rh(sh, a h). For simplicity, we further define [PhV ]( s, a ) = 
+
+Es′∼Ph(·| s,a )V (s′) and [VhV ]( s, a ) = T 2 
+
+> h
+
+V (sh, a h) −  ThV (sh, a h)2. Using this notation, for each stage h ∈ [H], the Bellman equation and Bellman optimality equation take the following forms: 
+
+Qπh (s, a ) = ThV πh+1 (s, a ), Q∗(s, a ) = ThV ∗
+
+> h+1
+
+(s, a ),
+
+where V πH+1 (·) = V ∗
+
+> H+1
+
+(·) = 0 . At the beginning of each episode k ∈ [K], the agent selects a policy πk to be executed throughout the episode, and an initial state sk 
+
+> 1
+
+is arbitrarily selected by the environment. For each stage h ∈ [H], the agent first observes the current state skh, chooses an action following the policy πkh, then transits to the next state with skh+1 ∼ Ph(·| skh, a kh) and reward 
+
+rh(sh, a h). Based on the protocol, we defined the suboptimality gap in episode k as the difference between the value function for selected policy πk and the optimal value function V ∗ 
+
+> 1
+
+(sk 
+
+> 1
+
+) − V πk 
+
+> 1
+
+(sk 
+
+> 1
+
+).
+
+Based on these definitions, we can define the regret in the first K episodes as follows: 
+
+Definition 2.1. For any RL algorithm Alg , the regret in the first K episodes is denoted by the sum of the suboptimality for episode k = 1 , . . . , K ,Regret (K) = 
+
+> K
+
+X
+
+> k=1
+
+V ∗ 
+
+> 1
+
+(sk 
+
+> 1
+
+) − V πk 
+
+> 1
+
+(sk 
+
+> 1
+
+),
+
+where πk is the agent’s policy at episode k.
+
+2.2 Function Classes and Covering Numbers Assumption 2.2 (Completeness) . Given F := {F h}Hh=1 which is composed of bounded functions 
+
+fh : S × A → [0 , L ]. We assume that for any function V : S → [0 , 1] there exists f1, f 2 ∈ F h such that for any (s, a ) ∈ S × A ,
+
+Es′∼Ph(·| s,a )
+
+rh(s, a ) + V (s′) = f1(s, a ), and Es′∼Ph(·| s,a )
+
+h rh(s, a ) + V (s′)2i
+
+= f2(s, a ).
+
+We assume that L = O(1) throughout the paper. 
+
+Remark 2.3. Completeness is a fundamental assumption in RL with general function approximation, as recognized in Wang et al. (2020b); Jin et al. (2021); Agarwal et al. (2022). Our assumption is the same as that in Agarwal et al. (2022) and is slightly stronger than that in Wang et al. (2020a) and 4Jin et al. (2021). More specifically, in Wang et al. (2020a), completeness is only required for the first-order Bellman operator. In contrast, we necessitate completeness with respect to the second-order Bellman operator, which becomes imperative during the construction of variance-based weights. Jin et al. (2021) only requires the completeness for the function class Fh+1 (ThFh+1 ⊆ F h). However, the GOLF algorithm (Jin et al., 2021) requires solving an intricate optimization problem across the entire episode. In contrast, we employ pointwise exploration bonuses as an alternative strategy, which requires the completeness for function class V = {V : S → [0 , 1] } , i.e., ThV ⊆ F h. The completeness assumption on the second moment is first introduced by Agarwal et al. (2022), and is crucial for obtaining a tighter regret bound. More specifically, making use of the variance of the value function at the next state is known to be crucial to achieve minimax-optimal regret bound in RL ranging from tabular MDPs (Azar et al., 2017) to linear mixture MDPs (Zhou et al., 2021a) and linear MDPs (He et al., 2022). In RL with general function approximation, the second-moment compleness assumption makes the variance of value functions computationally tractable. 
+
+Definition 2.4 (Generalized Eluder dimension, Agarwal et al. 2022) . Let λ ≥ 0, a sequence of state-action pairs Z = {zi}i∈[T ] and a sequence of positive numbers σ = {σi}i∈[T ]. The gener-alized Eluder dimension of a function class F : S × A → [0 , L ] with respect to λ is defined by 
+
+dim α,T (F) := sup Z,σ:|Z|=T, σ≥α dim( F, Z, σ),
+
+dim( F, Z, σ) := 
+
+> T
+
+X
+
+> i=1
+
+min 
+
+
+
+1, 1
+
+σ2
+
+> i
+
+D2 
+
+> F
+
+(zi; z[i−1] , σ [i−1] )
+
+
+
+,D2 
+
+> F
+
+(z; z[t−1] , σ [t−1] ) := sup 
+
+> f1,f 2∈F
+
+(f1(z) − f2(z)) 2
+
+P
+
+> s∈[t−1] 1
+> σ2
+> s
+
+(f1(zs) − f2(zs)) 2 + λ .
+
+We write dim α,T (F) := H−1 · P 
+
+> h∈[H]
+
+dim α,T (Fh) for short when F is a collection of function classes F = {F h}Hh=1 in the context. 
+
+Remark 2.5. The D2 
+
+> F
+
+quantity has been introduced in Agarwal et al. (2022) and Ye et al. (2023) to quantify the uncertainty of a state-action pair given a collected dataset with corresponding weights. It was inspired by Gentile et al. (2022) where an unweighted version of uncertainty has been defined for active learning. Prior to that, Wang et al. (2020a) introduced a similar ‘sensitivity’ measure to determine the sampling probability in their sub-sampling framework. As discussed in Agarwal et al. (2022), when specialized to linear function classes, D2 
+
+> F
+
+(zt; z[t−1] , σ [t−1] ) can be written as the elliptical norm ∥zt∥2
+
+> Σ−1
+> t−1
+
+, where Σt−1 is the weighted covariance matrix of the feature vectors z[t−1] .
+
+Definition 2.6 (Bonus oracle ¯D2 
+
+> F
+
+). In this paper, the bonus oracle is denoted by ¯D2 
+
+> F
+
+, which computes the estimated uncertainty of a state-action pair z = ( s, a ) ∈ S × A with respect to historical data z[t−1] and corresponding weights σ[t−1] . In detail, we assume that a computable function 
+
+¯D2 
+
+> F
+
+(z; z[t−1] , σ [t−1] ) satisfies ¯DF (z;z[t−1] ,σ [t−1] )  
+
+> DF(z;z[t−1] ,σ [t−1] )
+
+∈ [1 , C ] , where C is a fixed constant. 
+
+Remark 2.7. Agarwal et al. (2022) also assumed access to such a bonus oracle defined in Defini-tion 2.6, where they assume that the bonus oracle finds a proper bonus from a finite bonus class (Definition 3, Agarwal et al. 2022). Our definition is slightly different in the sense that the bonus class is not assumed to be finite but with a finite covering number. Previous works by Kong et al. (2021) and Wang et al. (2020a) proposed a sub-sampling idea to compute such a bonus function efficiently in general cases, which is also applicable in our framework. In a similar nonlinear RL setting, Ye et al. (2023) assumed that the uncertainly D2 
+
+> F
+
+can be directly computed, which is a slightly stronger assumption. But essentially, these differences in bonus assumption only lightly affect the algorithm structure. 
+
+Definition 2.8 (Covering numbers of function classes) . For any ϵ > 0, we define the following covering numbers of the involved function classes: 1. For each h ∈ [H], there exists an ϵ-cover C(Fh, ϵ ) ⊆ F h with size |C (Fh, ϵ )| ≤ N (Fh, ϵ ), such that for any f ∈ F , there exists f ′ ∈ C (Fh, ϵ ), such that ∥f − f ′∥∞ ≤ ϵ. For any ϵ > 0, we define the uniform covering number of F with respect to ϵ as NF (ϵ) := max h∈[H] N (Fh, ϵ ).2. There exists a bonus class B : S × A → R such that for any t ≥ 0, z[t] ∈ (S × A )t, σ[t] ∈ Rt,the oracle defined in Definition 2.6 ¯DF (·; z[t], σ [t]) is in B.3. For bonus class B, there exists an ϵ-cover C(B, ϵ ) ⊆ B with size |C (B, ϵ )| ≤ N (B, ϵ ), such that for any b ∈ B , there exists b′ ∈ C (B, ϵ ), such that ∥b − b′∥∞ ≤ ϵ.5Remark 2.9. In general function approximation, it is common to introduce the additional assumption on the covering number of bonus function classes. For example, in Ye et al. (2023), Agarwal and Zhang (2022a), and Di et al. (2023), the covering number of the bonus function class is bounded. 
+
+## 3 Algorithm and Key Techniques 
+
+In this section, we will introduce our new algorithm, MQL-UCB. The detailed algorithm is provided in Algorithm 1. Our algorithm’s foundational framework follows the Upper Confidence Bound (UCB) approach. In detail, for each episode k ∈ [K], we construct an optimistic value function 
+
+Qk,h (s, a ) during the planning phase. Subsequently, in the exploration phase, the agent interacts with the environment, employing a greedy policy based on the current optimistic value function Qk,h (s, a ).Once the agent obtains the reward rkh and transitions to the next state skh+1 , these outcomes are incorporated into the dataset, contributing to the subsequent planning phase. We will proceed to elucidate the essential components of our method. 
+
+3.1 Rare Policy Switching 
+
+For MQL-UCB algorithm, the value functions Qk,h , qQk,h , along with their corresponding policy πk,undergo updates when the agent collects a sufficient number of trajectories within the dataset that could significantly diminish the uncertainty associated with the Bellman operator ThV (·, ·) through the weighted regression. In the context of linear bandits (Abbasi-Yadkori et al., 2011) or linear MDPs (He et al., 2022), the uncertainty pertaining to the least-square regression is quantified by the covariance matrix Σk. In this scenario, the agent adjusts its policy once the determinant of the covariance matrix doubles, employing a determinant-based criterion. Nevertheless, in the general function approximation setting, such a method is not applicable in the absence of the covariance matrix which serves as a feature extractor in the linear setting. Circumventing this issue, Kong et al. (2021) proposed a sub-sampling-based method to achieve low-switching properties in nonlinear RL. Their subsampling technique is inspired by Wang et al. (2021), which showed that one only needs to maintain a small subset of historical data to obtain a sufficiently accurate least-square estimator. Such a subset can be generated sequentially according to the sensitivity of a new coming data point. However, their approach leads to a switching cost of eO(d2H), which does not match the lower bound in linear MDPs proposed by Gao et al. (2021). To resolve this issue, we proposed a more general deterministic policy-updating framework for non-linear RL. In detail, we use ¯D2 
+
+> Fh
+
+(zi,h ; z[klast −1] ,h , ¯σ[klast −1] ,h ) to evaluate the information collected at the episode i, given the last updating klast . Once the collected information goes beyond a threshold 
+
+χ from last updating, i.e.,       
+
+> k−1X
+> i=klast
+> 1¯σ2
+> i,h
+> ¯D2
+> Fh(zi,h ;z[klast −1] ,h ,¯σ[klast −1] ,h )≥χ. (3.1)
+
+the agent will perform updates on both the optimistic estimated value function and the pessimistic value function. Utilizing the D2 
+
+> Fh
+
+-based criterion, we will show that the number of policy updates can be bounded by O(H · dim α,K (F)) . This further reduces the complexity of the optimistic value function class and removes additional factors from a uniform convergence argument over the function class. Specifically, we showcase under our rare-switching framework, the ϵ-covering number of the optimistic and the pessimistic value function class at episode k is bounded by 
+
+Nϵ(k) := [ NF (ϵ/ 2) · N (B, ϵ/ 2 pβK )] lk +1 , (3.2) where pβK is the maximum confidence radius as shown in Algorithm 1, which will be specified in Lemmas G.3 and G.4, lk is the number of policy switches before the end of the k-th episode according to Algorithm 1. 
+
+3.2 Weighted Regression 
+
+The estimation of Q function in MQL-UCB extends LSVI-UCB proposed by Jin et al. (2020) to general function classes. While the estimators in LSVI-UCB are computed from the classic least 6squares regression, we construct the estimated value function pfk,h for general function classes by solving the following weighted regression: 
+
+pfk,h = argmin 
+
+> fh∈F h
+
+X
+
+> i∈[k−1]
+
+1¯σ2
+
+> i,h
+
+(fh(sih, a ih) − rih − Vk,h +1 (sih+1 )) 2.
+
+In the weighted regression, we set the weight ¯σk,h as 
+
+¯σk,h = max σk,h , α, γ · ¯D1/2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) ,
+
+where σk,h is the estimated variance for the stochastic transition process, ¯DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+denotes the uncertainty of the estimated function pfk,h conditioned on the historical observations and 
+
+γ2 := log 
+
+ 
+
+2HK 2 2 log( L2k/α 4) + 2  ·   log(4 L/α 2) + 2  · N 4 
+
+> F
+
+(ϵ) · N 2 
+
+> ϵ
+
+(K)
+
+δ
+
+
+
+(3.3) 
+
+is used to properly balance the uncertainty across various state-action pairs. It is worth noting that Ye et al. (2023) also introduced the uncertainty-aware variance in the general function approximation with a distinct intention to deal with the adversarial corruption from the attacker. In addition, according to the weighted regression, with high probability, the Bellman operator ThVk,h satisfies: 
+
+λ + X
+
+> i∈[k−1]
+
+¯σ−2
+
+> i,h
+
+ pfk,h (sih, a ih) − T hVk,h +1 (sih, a ih)
+
+2
+
+≤ pβ2 
+
+> k
+
+,
+
+where pβk is the exploration radius for the Q functions, which will be specified in Theorem 4.1. According to the definition of Generalized Eluder dimension, the estimation error between the estimated function pfk,h and the Bellman operator is upper bounded by: 
+
+pfk,h (s, a ) − T hVk,h +1 (s, a ) ≤ pβk DFh (z; z[k−1] ,h , ¯σ[k−1] ,h ).
+
+Therefore, we introduce the exploration bonus bk,h and construct the optimistic value function Qk,h (s, a ),i.e., Qk,h (s, a ) ≈ pfk,h (s, a ) + bk,h (s, a ), where bk,h (s, a ) = pβk ·
+
+¯DF
+
+ (s, a ); z[k−1] ,h , σ [k−1] ,h 
+
+. Inspired by Hu et al. (2022); He et al. (2022); Agarwal et al. (2022), in order to estimate the gap between the optimistic value function Vk,h (s) and the optimal value function 
+
+V ∗ 
+
+> h
+
+(s), we further construct the pessimistic estimator qfk,h by the following weighted regression 
+
+qfk,h = argmin 
+
+> fh∈F h
+
+X
+
+> i∈[k−1]
+
+1¯σ2
+
+> i,h
+
+(fh(sih, a ih) − rih − qVk,h +1 (sih+1 )) 2,
+
+and introduce a negative exploration bonus when generating the pessimistic estimator. qQk,h (s, a ) ≈
+
+qfk,h (s, a )−qbk,h (s, a ), where qbk,h (s, a ) = qβk · ¯DF (( s, a ); z[k−1] ,h , σ [k−1] ,h . Different from Agarwal et al. (2022), the pessimistic value function qfk,h is computed from a similar weighted-regression scheme as in the case of the optimistic estimator, leading to a tighter confidence set. 
+
+3.3 Variance Estimator 
+
+In this subsection, we provide more details about the variance estimator σk,h , which measures the variance of the value function Vk,h +1 (skh+1 ) caused by the stochastic transition from state-action pair 
+
+(skh, a kh). According to the definition of pfk,h , the difference between the estimator pfk,h and ThVk,h +1 
+
+satisfies 
+
+λ + X
+
+> i∈[k−1]
+
+1¯σ2
+
+> i,h
+
+  pfk,h (sih, a ih) − T hVk,h +1 (sih, a ih)2 ≤ 2 X
+
+> i∈[k−1]
+
+1¯σ2
+
+> i,h
+
+ f (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih) · pηih(Vk,h +1 ),
+
+where the noise pηkh(V ) = rkh + V (skh+1 ) − Es′∼Ph(skh,a kh)[rh(skh, a kh, s ′) + V (s′)] denotes the stochastic transition noise for the value function V . However, the generation of the target function 
+
+Vk,h +1 relies on previously collected data z[klast ], thus violating the conditional independence property. Consequently, the noise term pηkh(Vk,h +1 ) may not be unbiased. To address this challenge, it becomes imperative to establish a uniform convergence property over the potential function class, which is first introduced in linear MDPs by Jin et al. (2020). Following the previous approach introduced by Azar et al. (2017); Hu et al. (2022); Agarwal et al. (2022); He et al. (2022), we decompose the noise of optimistic value function pηkh(Vk,h +1 ) into the 7Algorithm 1 Monotonic Q-Learning with UCB (MQL-UCB) 
+
+Require: Regularization parameter λ, confidence radius { eβk}k∈[K], { pβk}k∈[K] and { qβk}k∈[K].
+
+1: Initialize klast = 0 . For each stage h ∈ [H] and state-action (s, a ) ∈ S × A , set Q0,h (s, a ) ←
+
+H, qQ0,h (s, a ) ← 0.
+
+2: for episodes k = 1 , . . . , K do 
+
+3: Received the initial state sk 
+
+> 1
+
+.
+
+4: for stage h = H, . . . , 1 do 
+
+5: if there exists a stage h′ ∈ [H] such that (3.1) holds then 
+
+6: pfk,h ← argmin fh∈F h
+
+P 
+
+> i∈[k−1] 1¯σ2
+> i,h
+
+(fh(sih, a ih) − rih − Vk,h +1 (sih+1 )) 2.
+
+7: qfk,h ← argmin fh∈F h
+
+P 
+
+> i∈[k−1] 1¯σ2
+> i,h
+
+(fh(sih, a ih) − rih − qVk,h +1 (sih+1 )) 2.
+
+8: efk,h ← argmin fh∈F h
+
+P
+
+> i∈[k−1]
+
+ fh(sih, a ih) −  rih + Vk,h +1 (sih+1 )2 2.
+
+9: Qk,h (s, a ) ← min 
+
+n pfk,h (s, a ) + bk,h (s, a ), Q k−1,h (s, a ), 1
+
+o
+
+.
+
+10: qQk,h (s, a ) ← max 
+
+n qfk,h (s, a ) − qbk,h (s, a ), qQk−1,h (s, a ), 0
+
+o
+
+.
+
+11: Set the last updating episode klast ← k and number of policies as lk ← lk−1 + 1 .
+
+12: else 
+
+13: Qk,h (s, a ) ← Qk−1,h (s, a ), qQk,h (s, a ) ← qQk−1,h (s, a ) and lk ← lk−1.
+
+14: end if 
+
+15: Set the policy πk as πkh(·) ← argmax a∈A Qk,h (·, a ). Vk,h (s) ← max a Qk,h (s, a ),
+
+qVk,h (s) ← max a qQk,h (s, a ).
+
+16: end for 
+
+17: for stage h = 1 , . . . , H do 
+
+18: Take action akh ← πkh(skh) and receive next state skh+1 .
+
+19: Set the estimated variance σk,h as in (3.4) and set ¯σk,h ← max σk,h , α, γ ·
+
+D1/2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) .
+
+20: end for 
+
+21: end for 
+
+noise of optimal value function pηkh(V ∗
+
+> h+1
+
+) and the noise pηkh
+
+ Vk,h +1 − V ∗
+
+> h+1
+
+ to reduce the extra 
+
+log  Nϵ(K) dependency in the confidence radius. With the noise decomposition, we evaluate the variances [VhV ∗
+
+> h+1
+
+]( s, a ) and Vh(Vk,h +1 − V ∗
+
+> h+1
+
+)(s, a ) separately. For the variance of the optimal value function [VhV ∗
+
+> h+1
+
+]( s, a ), since the optimal value function V ∗
+
+> h+1
+
+is independent with the collected data z[klast ], it prevents a uniform convergence-based argument over the function class. However, the optimal value function V ∗ 
+
+> h+1
+
+is unobservable, and it requires several steps to estimate the variance. In summary, we utilize the optimistic function Vk,h +1 to approximate the optimal value function V ∗ 
+
+> h+1
+
+and calculate the estimated variance [ ¯VhVk,h ] as the difference between the second-order moment and the square of the first-order moment of Vk,h 
+
+[ ¯Vk,h Vk,h +1 ] = efk,h − pf 2
+
+> k,h
+
+.
+
+Here, the approximate second-order moment efk,h and the approximate first-order moment pfk,h is generated by the least-square regression (Lines 6 and 8). In addition, we introduce the exploration bonus Ek,h to control the estimation error between the estimated variance and the true variance of 
+
+Vk,h +1 and Fk,h to control the sub-optimality gap between Vk,h +1 and V ∗
+
+> h+1
+
+:
+
+Ek,h = (2 Lβ k + eβk ) min  1, ¯DFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),Fk,h =   log( N (F, ϵ ) · Nϵ(K))  · min  1, 2 pfk,h (skh, a kh) − 2 qfk,h (skh, a kh) + 4 βk ¯DFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where 
+
+eβk =
+
+r
+
+128 log Nϵ(k) · N (F, ϵ ) · Hδ + 64 Lϵ · k, β k =
+
+r
+
+128 · log Nϵ(k) · N (F, ϵ )Hδ + 64 Lϵ · k/α 2.
+
+For the variance of the sub-optimality gap, Vh(Vk,h +1 − V ∗
+
+> h+1
+
+)(s, a ), based on the structure of optimistic and pessimistic value function, it can be approximate and upper bounded by 
+
+[Vh(Vk,h +1 − V ∗
+
+> h+1
+
+)]( skh, a kh) ≤ 2[ Ph(Vk,h +1 − V ∗
+
+> h+1
+
+)]( skh, a kh)
+
+8≤ 2[ Ph(Vk,h +1 − qVk,h +1 )]( skh, a kh) ≈ 2 pfk,h (skh, a kh) − 2 qfk,h (skh, a kh),
+
+where the approximate first-order moments pfk,h , qfk,h are generated by the least-square regression (Lines 6 and 7) and can be dominated by the exploration bonus Fk,h .In summary, we construct the estimated variance σk,h as: 
+
+σk,h =
+
+q
+
+[ ¯Vk,h Vk,h +1 ]( skh, a kh) + Ek,h + Fk,h . (3.4) 
+
+3.4 Monotonic Value Function 
+
+As we discussed in the previous subsection, we decompose the value function Vk,h and evaluate the variance [VhV ∗
+
+> h+1
+
+]( s, a ), Vh(Vk,h +1 − V ∗
+
+> h+1
+
+)(s, a ) separately. However, for each state-action pair (skh, a kh) and any subsequent episode i > k , the value function Vi,h and corresponding vari-ance Vh(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh) may differ from the previous value function Vk,h and variance 
+
+Vh(Vk,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh). Extending the idea proposed by He et al. (2022) for linear MDPs, we ensure that the pessimistic value function qQk,h maintains a monotonically increasing property during updates, while the optimistic value function Qk,h maintains a monotonically decreasing property. Leveraging these monotonic properties, we can establish an upper bound on the variance as follows: 
+
+Vh(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh) ≤ 2[ Ph(Vi,h +1 − qVi,h +1 )]( skh, a kh) ≤ 2[ Ph(Vk,h +1 − qVk,h +1 )]( skh, a kh) ≤ Fk,h .
+
+In this scenario, the previously employed variance estimator σk,h offers a consistent and uniform upper bound for the variance across all subsequent episodes. 
+
+## 4 Main Results 
+
+In this section, we present the main theoretical results. In detail, we provide the regret upper bound of Algorithm MQL-UCB in Theorem 4.1. As a complement, in Section B.1, we provide a lower bound on the communication complexity for cooperative linear MDPs. Finally, in Section B.2, we discussed the connection between the generalized eluder dimension and the standard eluder dimension. The following theorem provides the regret upper bound of Algorithm MQL-UCB. 
+
+Theorem 4.1. Suppose Assumption 2.2 holds for function classes F := {F h}Hh=1 and Defini-tion 2.4 holds with λ = 1 . If we set α = 1 /√KH , ϵ = ( KLH )−1, and set pβ2 
+
+> k
+
+= qβ2 
+
+> k
+
+:= 
+
+O  log 2k2(2 log( L2k/α 4)+2 )·(log(4 L/α 2)+2 )
+
+> δ/H
+
+ · [log( NF (ϵ)) + 1] + O(λ) + O(ϵkL/α 2), then with probability 1 − O(δ), the regret of MQL-UCB is upper bounded as follows: 
+
+Regret( K) = eO p dim( F) log N · HVar K
+
+
+
++ eO H2.5 dim 2(F)plog N log( N · Nb) · pH log N + dim( F) log( N · Nb)
+
+where Var K := PKk=1 
+
+PHh=1 [VhV πk
+
+> h+1
+
+]( skh, a kh) = eO(K), we denote the covering number of bonus function class by Nb, the covering number of function class F by N , and the dimension dim α,K (F)
+
+by dim( F). Meanwhile, the switching cost of Algorithm 1 is O(dim α,K (F) · H).In the worst case, when the number of episodes K is sufficiently large, the leading term in our regret bound is eO p dim( F) log N · HK . Our result matches the optimal regret achieved by Agarwal et al. (2022). While their proposed algorithm involves the execution of a complicated and non-Markovian policy with an action selection phase based on two series of optimistic value functions and the prefix trajectory, MQL-UCB only requires the knowledge of the current state and a single optimistic state-action value function Q to make a decision over the action space. In addition, our theorem also provides a variance-dependent regret bound, which is adaptive to the randomness of the underlying MDP encountered by the agent. Our definition of Var K is inspired by Zhao et al. (2023) and Zhou et al. (2023), which studied variance-adaptive RL under tabular MDP setting and linear mixture MDP setting, respectively. As a direct application, we also present the regret guarantee of MQL-UCB for linear MDPs. 9Corollary 4.2. Under the same conditions of Theorem 4.1, assume that the underlying MDP is a linear MDP such that F := {F h}h∈[H] is composed of linear function classes with a known feature mapping over the state-action space ϕ : S × A → Rd. If we set λ = 1 , α = 1 /√K, then with probability 1 − O(δ), the following cumulative regret guarantee holds for MQL-UCB: 
+
+Regret( K) = eO d√HK + H2.5d5pH + d2.
+
+Remark 4.3. The leading term in our regret bound, as demonstrated in Corollary 4.2, matches the lower bound proved in Zhou et al. (2021a) for linear MDPs. Similar optimal regrets have also been accomplished by He et al. (2022) and Agarwal et al. (2022) for linear MDPs. Since we also apply weighted regression to enhance the precision of our pessimistic value functions, the lower order term (i.e., H2.5d5√H + d2) in our regret has a better dependency on H than VO QL (Agarwal et al., 2022) and LSVI-UCB++ (He et al., 2022), which may be of independent interest when considering long-horizon MDPs. In addition, the switching cost of Algorithm 1 is bounded by eO(dH ), which matches the lower bound in Gao et al. (2021) for deterministic algorithms and our new lower bound in Theorem B.1 for arbitrary algorithms up to logarithmic factors. For more details about our lower bound, please refer to Appendix E. 
+
+## 5 Conclusion and Future Work 
+
+In this paper, we delve into the realm of RL with general function approximation. We proposed the MQL-UCB algorithm with an innovative uncertainty-based rare-switching strategy in general function approximation. Notably, our algorithm only requires eO(dH ) updating times, which matches with the lower bound established by Gao et al. (2021) up to logarithmic factors, and obtains a eO(d√HK )
+
+regret guarantee, which is near-optimal when restricted to the linear cases. 
+
+## Acknowledgments and Disclosure of Funding 
+
+We thank the anonymous reviewers for their helpful comments. HZ is partially supported by the research award from Cisco. JH and QG are partially supported by the research fund from UCLA-Amazon Science Hub. The views and conclusions contained in this paper are those of the authors and should not be interpreted as representing any funding agencies. 
+
+## References 
+
+ABBASI -Y ADKORI , Y., P ÁL , D. and S ZEPESVÁRI , C. (2011). Improved algorithms for linear stochastic bandits. Advances in neural information processing systems 24 2312–2320. AFSAR , M. M., C RUMP , T. and F AR , B. (2022). Reinforcement learning based recommender systems: A survey. ACM Computing Surveys 55 1–38. AGARWAL , A., J IN , Y. and Z HANG , T. (2022). Voql: Towards optimal regret in model-free rl with nonlinear function approximation. arXiv preprint arXiv:2212.06069 .AGARWAL , A. and Z HANG , T. (2022a). Model-based rl with optimistic posterior sampling: Structural conditions and sample complexity. Advances in Neural Information Processing Systems 35 35284– 35297. AGARWAL , A. and Z HANG , T. (2022b). Non-linear reinforcement learning in large action spaces: Structural conditions and sample-efficiency of posterior sampling. In Conference on Learning Theory . PMLR. AYOUB , A., J IA , Z., S ZEPESVARI , C., W ANG , M. and Y ANG , L. (2020). Model-based reinforcement learning with value-targeted regression. In International Conference on Machine Learning . PMLR. AZAR , M. G., O SBAND , I. and M UNOS , R. (2017). Minimax regret bounds for reinforcement learning. In International Conference on Machine Learning . PMLR. BAI , Y., X IE , T., J IANG , N. and W ANG , Y.-X. (2019). Provably efficient q-learning with low switching cost. Advances in Neural Information Processing Systems 32 .10 CHEN , Z., L I, C. J., Y UAN , H., G U, Q. and J ORDAN , M. (2022). A general framework for sample-efficient function approximation in reinforcement learning. In The Eleventh International Conference on Learning Representations .DANN , C., J IANG , N., K RISHNAMURTHY , A., A GARWAL , A., L ANGFORD , J. and S CHAPIRE ,R. E. (2018). On oracle-efficient pac rl with rich observations. Advances in neural information processing systems 31 .DI, Q., Z HAO , H., H E, J. and G U, Q. (2023). Pessimistic nonlinear least-squares value iteration for offline reinforcement learning. arXiv preprint arXiv:2310.01380 .DU, S., K AKADE , S., L EE , J., L OVETT , S., M AHAJAN , G., S UN , W. and W ANG , R. (2021). Bilinear classes: A structural framework for provable generalization in rl. In International Conference on Machine Learning . PMLR. DU, S. S., K AKADE , S. M., W ANG , R. and Y ANG , L. F. (2019). Is a good representation sufficient for sample efficient reinforcement learning? In International Conference on Learning Representations .FOSTER , D. J., K AKADE , S. M., Q IAN , J. and R AKHLIN , A. (2021). The statistical complexity of interactive decision making. arXiv preprint arXiv:2112.13487 .GAO , M., X IE , T., D U, S. S. and Y ANG , L. F. (2021). A provably efficient algorithm for linear markov decision process with low switching cost. arXiv preprint arXiv:2101.00494 .GENTILE , C., W ANG , Z. and Z HANG , T. (2022). Achieving minimax rates in pool-based batch active learning. In International Conference on Machine Learning . PMLR. HAN , Y., Z HOU , Z., Z HOU , Z., B LANCHET , J., G LYNN , P. W. and Y E, Y. (2020). Sequential batch learning in finite-action linear contextual bandits. arXiv preprint arXiv:2004.06321 .HE, J., Z HAO , H., Z HOU , D. and G U, Q. (2022). Nearly minimax optimal reinforcement learning for linear markov decision processes. arXiv preprint arXiv:2212.06132 .HE, J., Z HOU , D. and G U, Q. (2021a). Logarithmic regret for reinforcement learning with linear function approximation. In International Conference on Machine Learning . PMLR. HE, J., Z HOU , D. and G U, Q. (2021b). Nearly minimax optimal reinforcement learning for discounted mdps. Advances in Neural Information Processing Systems 34 22288–22300. HU, P., C HEN , Y. and H UANG , L. (2022). Nearly minimax optimal reinforcement learning with linear function approximation. In International Conference on Machine Learning . PMLR. HUANG , J., C HEN , J., Z HAO , L., Q IN , T., J IANG , N. and L IU , T.-Y. (2022). Towards deployment-efficient reinforcement learning: Lower bound and optimality. arXiv preprint arXiv:2202.06450 
+
+.JIA , Z., Y ANG , L., S ZEPESVARI , C. and W ANG , M. (2020). Model-based reinforcement learning with value-targeted regression. In Learning for Dynamics and Control . PMLR. JIANG , N., K RISHNAMURTHY , A., A GARWAL , A., L ANGFORD , J. and S CHAPIRE , R. E. (2017). Contextual decision processes with low bellman rank are pac-learnable. In International Conference on Machine Learning . PMLR. JIN , C., A LLEN -Z HU , Z., B UBECK , S. and J ORDAN , M. I. (2018). Is q-learning provably efficient? 
+
+Advances in neural information processing systems 31 .JIN , C., L IU , Q. and M IRYOOSEFI , S. (2021). Bellman eluder dimension: New rich classes of rl problems, and sample-efficient algorithms. Advances in neural information processing systems 34 
+
+13406–13418. JIN , C., Y ANG , Z., W ANG , Z. and J ORDAN , M. I. (2020). Provably efficient reinforcement learning with linear function approximation. In Conference on Learning Theory . PMLR. 11 KOBER , J., B AGNELL , J. A. and P ETERS , J. (2013). Reinforcement learning in robotics: A survey. 
+
+The International Journal of Robotics Research 32 1238–1274. KONG , D., S ALAKHUTDINOV , R., W ANG , R. and Y ANG , L. F. (2021). Online sub-sampling for reinforcement learning with general function approximation. arXiv preprint arXiv:2106.07203 .LI, Y., W ANG , Y., C HENG , Y. and Y ANG , L. (2023). Low-switching policy gradient with exploration via online sensitivity sampling. In International Conference on Machine Learning . PMLR. LILLICRAP , T. P., H UNT , J. J., P RITZEL , A., H EESS , N., E REZ , T., T ASSA , Y., S ILVER , D. and WIERSTRA , D. (2015). Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971 .MATSUSHIMA , T., F URUTA , H., M ATSUO , Y., N ACHUM , O. and G U, S. (2020). Deployment-efficient reinforcement learning via model-based offline optimization. In International Conference on Learning Representations .MNIH , V., K AVUKCUOGLU , K., S ILVER , D., R USU , A. A., V ENESS , J., B ELLEMARE , M. G., GRAVES , A., R IEDMILLER , M., F IDJELAND , A. K., O STROVSKI , G. ET AL . (2015). Human-level control through deep reinforcement learning. nature 518 529–533. MODI , A., J IANG , N., T EWARI , A. and S INGH , S. (2020). Sample complexity of reinforcement learning using linearly combined model ensembles. In International Conference on Artificial Intelligence and Statistics .PUTERMAN , M. L. (2014). Markov decision processes: discrete stochastic dynamic programming .John Wiley & Sons. QIAO , D., Y IN , M., M IN , M. and W ANG , Y.-X. (2022). Sample-efficient reinforcement learning with loglog (t) switching cost. In International Conference on Machine Learning . PMLR. QIAO , D., Y IN , M. and W ANG , Y.-X. (2023). Logarithmic switching cost in reinforcement learning beyond linear mdps. arXiv preprint arXiv:2302.12456 .RUAN , Y., Y ANG , J. and Z HOU , Y. (2021). Linear bandits with limited adaptivity and learning distributional optimal design. In Proceedings of the 53rd Annual ACM SIGACT Symposium on Theory of Computing .RUSSO , D. and V AN ROY , B. (2013). Eluder dimension and the sample complexity of optimistic exploration. Advances in Neural Information Processing Systems 26 .RUSSO , D. and V AN ROY , B. (2014). Learning to optimize via posterior sampling. Mathematics of Operations Research 39 1221–1243. SIMCHOWITZ , M. and J AMIESON , K. G. (2019). Non-asymptotic gap-dependent regret bounds for tabular mdps. Advances in Neural Information Processing Systems 32 .SUN , W., J IANG , N., K RISHNAMURTHY , A., A GARWAL , A. and L ANGFORD , J. (2019). Model-based rl in contextual decision processes: Pac bounds and exponential improvements over model-free approaches. In Conference on learning theory . PMLR. VELEGKAS , G., Y ANG , Z. and K ARBASI , A. (2022). Reinforcement learning with logarithmic regret and policy switches. Advances in Neural Information Processing Systems 35 36040–36053. WANG , R., S ALAKHUTDINOV , R. R. and Y ANG , L. (2020a). Reinforcement learning with general value function approximation: Provably efficient approach via bounded eluder dimension. Advances in Neural Information Processing Systems 33 6123–6135. WANG , T., Z HOU , D. and G U, Q. (2021). Provably efficient reinforcement learning with linear function approximation under adaptivity constraints. Advances in Neural Information Processing Systems 34 13524–13536. WANG , Y., W ANG , R., D U, S. S. and K RISHNAMURTHY , A. (2020b). Optimism in reinforcement learning with generalized linear function approximation. In International Conference on Learning Representations .12 XIONG , N., Y ANG , Z. and W ANG , Z. (2023). A general framework for sequential decision-making under adaptivity constraints. arXiv preprint arXiv:2306.14468 .YANG , L. and W ANG , M. (2019). Sample-optimal parametric q-learning using linearly additive features. In International Conference on Machine Learning . PMLR. YANG , L. and W ANG , M. (2020). Reinforcement learning in feature space: Matrix bandit, kernels, and regret bound. In International Conference on Machine Learning . PMLR. YE, C., X IONG , W., G U, Q. and Z HANG , T. (2023). Corruption-robust algorithms with uncertainty weighting for nonlinear contextual bandits and markov decision processes. In International Conference on Machine Learning . PMLR. ZANETTE , A., B RANDFONBRENER , D., B RUNSKILL , E., P IROTTA , M. and L AZARIC , A. (2020a). Frequentist regret bounds for randomized least-squares value iteration. In International Conference on Artificial Intelligence and Statistics .ZANETTE , A. and B RUNSKILL , E. (2019). Tighter problem-dependent regret bounds in reinforce-ment learning without domain knowledge using value function bounds. In International Conference on Machine Learning . PMLR. ZANETTE , A., L AZARIC , A., K OCHENDERFER , M. and B RUNSKILL , E. (2020b). Learning near optimal policies with low inherent bellman error. In International Conference on Machine Learning .PMLR. ZHANG , Z. and J I, X. (2019). Regret minimization for reinforcement learning by evaluating the optimal bias function. Advances in Neural Information Processing Systems 32 .ZHANG , Z., J I, X. and D U, S. (2021). Is reinforcement learning more difficult than bandits? a near-optimal algorithm escaping the curse of horizon. In Conference on Learning Theory . PMLR. ZHANG , Z., J IANG , Y., Z HOU , Y. and J I, X. (2022). Near-optimal regret bounds for multi-batch reinforcement learning. Advances in Neural Information Processing Systems 35 24586–24596. ZHANG , Z., Z HOU , Y. and J I, X. (2020). Almost optimal model-free reinforcement learningvia reference-advantage decomposition. Advances in Neural Information Processing Systems 33 
+
+15198–15207. ZHAO , H., H E, J., Z HOU , D., Z HANG , T. and G U, Q. (2023). Variance-dependent regret bounds for linear bandits and reinforcement learning: Adaptivity and computational efficiency. arXiv preprint arXiv:2302.10371 .ZHENG , G., Z HANG , F., Z HENG , Z., X IANG , Y., Y UAN , N. J., X IE , X. and L I, Z. (2018). Drn: A deep reinforcement learning framework for news recommendation. In Proceedings of the 2018 world wide web conference .ZHOU , D. and G U, Q. (2022). Computationally efficient horizon-free reinforcement learning for linear mixture mdps. arXiv preprint arXiv:2205.11507 .ZHOU , D., G U, Q. and S ZEPESVARI , C. (2021a). Nearly minimax optimal reinforcement learning for linear mixture markov decision processes. In Conference on Learning Theory . PMLR. ZHOU , D., H E, J. and G U, Q. (2021b). Provably efficient reinforcement learning for discounted mdps with feature mapping. In International Conference on Machine Learning . PMLR. ZHOU , R., Z IHAN , Z. and D U, S. S. (2023). Sharp variance-dependent bounds in reinforcement learning: Best of both worlds in stochastic and deterministic environments. In International Conference on Machine Learning . PMLR. ZOPH , B. and L E, Q. V. (2016). Neural architecture search with reinforcement learning. arXiv preprint arXiv:1611.01578 .13 A Additional Related Work 
+
+A.1 RL with Linear Function Approximation 
+
+In recent years, a substantial body of research has emerged to address the challenges of solving Markov Decision Processes (MDP) with linear function approximation, particularly to handle the vast state and action spaces (Jiang et al., 2017; Dann et al., 2018; Yang and Wang, 2019; Du et al., 2019; Sun et al., 2019; Jin et al., 2020; Wang et al., 2020b; Zanette et al., 2020a; Yang and Wang, 2020; Modi et al., 2020; Ayoub et al., 2020; Zhou et al., 2021a; He et al., 2021a; Zhou and Gu, 2022; He et al., 2022; Zhao et al., 2023). These works can be broadly categorized into two groups based on the linear structures applied to the underlying MDP. One commonly employed linear structure is known as the linear MDP (Jin et al., 2020), where the transition probability function Ph and reward function 
+
+rh are represented as linear functions with respect to a given feature mapping ϕ : S × A → Rd.Under this assumption, the LSVI-UCB algorithm (Jin et al., 2020) has been shown to achieve a regret guarantee of eO(√d3H4K). Subsequently, Zanette et al. (2020a) introduced the RLSVI algorithm, utilizing the Thompson sampling method, to attain a regret bound of eO(√d4H5K). More recently, He et al. (2022) improved the regret guarantee to eO(√d2H3K) with the LSVI-UCB++ algorithm, aligning with the theoretical lower bound in Zhou et al. (2021a) up to logarithmic factors. Another line of research has focused on linear mixture MDPs (Modi et al., 2020; Yang and Wang, 2020; Jia et al., 2020; Ayoub et al., 2020; Zhou et al., 2021a), where the transition probability is expressed as a linear combination of basic models P1, P2, .., Pd. For linear mixture MDPs, Jia et al. (2020) introduced the UCRL-VTR algorithm, achieving a regret guarantee of eO(√d2H4K). Subsequently, Zhou et al. (2021a) enhanced this result to eO(√d2H3K), reaching a nearly minimax optimal regret bound. Recently, several works focused on time-homogeneous linear mixture MDPs, and removed the dependency on the episode length (horizon-free) (Zhang and Ji, 2019; Zhou et al., 2021b; Zhao et al., 2023). 
+
+A.2 RL with General Function Approximation 
+
+Recent years have witnessed a flurry of progress on RL with nonlinear function classes. To explore the theoretical limits of RL algorithms, various complexity measures have been developed to characterize the hardness of RL instances such as Bellman rank (Jiang et al., 2017), Witness rank (Sun et al., 2019), eluder dimension (Russo and Van Roy, 2013), Bellman eluder dimension (Jin et al., 2021), Bilinear Classes (Du et al., 2021), Decision-Estimation Coefficient (Foster et al., 2021), Admissible Bellman Characterization (Chen et al., 2022), generalized eluder dimension (Agarwal et al., 2022). Among them, only Agarwal et al. (2022) yields a near-optimal regret guarantee when specialized to linear MDPs. In their paper, they proposed a new framework named generalized eluder dimension to handle the weighted objects in weighted regression, which can be seen as a variant of eluder dimension. In their proposed algorithm VO QL, they adopted over-optimistic and over-pessimistic value functions in order to bound the variance of regression targets, making it possible to apply a weighted regression scheme in the model-free framework. 
+
+A.3 RL with Low Switching Cost 
+
+Most of the aforementioned approaches necessitate updating both the value function and the corre-sponding policy in each episode, a practice that proves to be inefficient when dealing with substantial datasets. To overcome this limitation, a widely adopted technique involves dividing the time sequence into several epochs and updating the policy only between different epochs. In the context of the linear bandit problem, Abbasi-Yadkori et al. (2011) introduced the rarely-switching OFUL algorithm, where the agent updates the policy only when the determinant of the covariance matrix doubles. This method enables the algorithm to achieve near-optimal regret of eO(√K) while maintaining policy updates to 
+
+eO(d log K) times. When the number of arms, denoted as |D| , is finite, Ruan et al. (2021) proposed an algorithm with regret bounded by eO(√dK ) and a mere eO(d log d log K) policy-updating times. In the realm of episodic reinforcement learning, Bai et al. (2019) and Zhang et al. (2021) delved into tabular Markov Decision Processes, introducing algorithms that achieve a regret of eO(√T )
+
+and eO(SA log K) updating times. Wang et al. (2021) later extended these results to linear MDPs, unveiling the LSVI-UCB-RareSwitch algorithm. LSVI-UCB-RareSwitch delivers a regret bound 14 of eO(d3H4K) with a policy switching frequency of eO(d log T ), which matches the lower bound of the switching cost (Gao et al., 2021) up to logarithmic terms. Furthermore, if the policy is updated within fixed-length epochs (Han et al., 2020), the method is termed batch learning model, but this falls beyond the scope of our current work. In addition, with the help of stochastic policies, Zhang et al. (2022) porposed an algorithm with eO(√K) regret guarantee and only eO(H) swithcing cost for learning tabular MDPs. Later, Huang et al. (2022) employed the stochastic policy in learning linear MDPs, which is able to find an ϵ-optimal policy with only eO(H) switching cost. 
+
+## B Additional Results 
+
+B.1 Lower Bound for the Switching Cost 
+
+As a complement, we prove a new lower bound on the switching cost for RL with linear MDPs. Note that linear MDPs lie in the class of MDPs studied in our paper with bounded generalized eluder dimension. In particular, the generalized eluder dimension of linear MDPs is eO(d).
+
+Theorem B.1. For any algorithm Alg with expected switching cost less than dH/ (16 log K), there exists a hard-to-learn linear MDP, such that the expected regret of Alg is at least Ω( K).
+
+Remark B.2. Theorem B.1 suggests that, to achieve a sublinear regret guarantee, an eΩ( dH ) switch-ing cost is inevitable. This lower bound does not violate the minimax upper bound of eO(H) proved in Zhang et al. (2022); Huang et al. (2022), which additionally assume that the initial state sk 
+
+> 1
+
+is either fixed or sampled from a fixed distribution. In contrast, our work and Gao et al. (2021) allow the initial state to be adaptively chosen by an adversarial environment, bringing more challenges to the learning of linear MDPs. When comparing our lower bound with the result in Gao et al. (2021), it is worth noting that their focus is solely on deterministic algorithms, and they suggest that an 
+
+eΩ( dH ) switching cost is necessary. As a comparison, our result holds for any algorithm with arbitrary policies including both deterministic and stochastic policies. 
+
+B.2 Connection Between D2 
+
+> F
+
+-Uncertainty and Eluder Dimension 
+
+Previous work by Agarwal et al. (2022) achieved the optimal regret bound eO(pdim( F) log N · HK ),where dim( F) is defined as the generalized eluder dimension as stated in Definition 2.4. However, the connection between generalized eluder dimension and eluder dimension proposed by Russo and Van Roy (2013) is still under-discussed 2. Consequently, their results could not be directly compared with the results based on the classic eluder dimension measure (Wang et al., 2020a) or the more general Bellman eluder dimension (Jin et al., 2021). In this section, we make a first attempt to establish a connection between generalized eluder dimension and eluder dimension in Theorem B.3. 
+
+Theorem B.3. For a function space G, α > 0, let dim be defined in Definition 2.4. WLOG, we assume that for all g ∈ G and z ∈ Z , |g(z)| ≤ 1. Then the following inequality between 
+
+dim( F, Z, σ) and dim E (G, 1/√T ) holds for all Z := {zi}i∈[T ] with zi ∈ Z and σ := {σi}i∈[T ] s.t. 
+
+α ≤ σi ≤ M ∀i ∈ [T ]:            
+
+> X
+> i∈[T]
+> min
+> 
+> 1,1
+> σ2
+> i
+> D2
+> G
+>  zi;z[i−1] , σ [i−1]
+> 
+> ≤O(dim E(F,1/√T) log Tlog λT log( M/α ) + λ−1).
+
+According to Theorem B.3, the generalized eluder dimension is upper bounded by eluder dimension up to logarithmic terms. When the number of episodes K is sufficiently large, the leading term in our regret bound in Theorem 4.1 is eO p dim E (F) log N · HK , where dim E (F) is the eluder dimension of the function class F.
+
+## C Proof of Theorem B.3 
+
+To start with, we first recall the concept of eluder dimension as follows. 
+
+> 2Agarwal et al. (2022) (Remark 4) also discussed the relationship between the generalized eluder dimension and eluder dimension. However, there exists a technique flaw in the proof and we will discuss it in Appendix D.
+
+15 Definition C.1 (Definition of eluder dimension, Russo and Van Roy 2013) . The eluder dimension of a function class G with domain Z is defined as follows: • A point z ∈ Z is ϵ-dependent on z1, z 2, · · · , z k ∈ Z with respect to G, if for all g1, g 2 ∈ G such that Pki=1 [g1(zi) − g2(zi)] 2 ≤ ϵ, it holds that |g1(z) − g2(z)| ≤ ϵ.• Further z is said to be ϵ-independent of z1, z 2, · · · , z k with respect to G, if z is not dependent on 
+
+z1, z 2, · · · , z k.• The eluder dimension of G, denoted by dim E (G, ϵ ), is the length of the longest sequence of elements in Z such that every element is ϵ′-independent of its predecessors for some ϵ′ ≥ ϵ.With this definition, we can prove Theorem B.3. 
+
+Proof of Theorem B.3. Let Ij (1 ≤ j ≤ ⌈ log 2 M/α ⌉) be the index set such that 
+
+Ij = t ∈ [T ]|σt ∈ [2 j−1 · α, 2j α] .
+
+Then we focus on the summation over Ij for each j. For simplicity, we denote the subsequence 
+
+{zi}i∈I j by {xi}i∈[|I j |]. Then we have 
+
+X
+
+> i∈I j
+
+min 
+
+
+
+1, 1
+
+σ2
+
+> i
+
+D2
+
+> G
+
+ zi; z[i−1] , σ [i−1] 
+
+
+
+≤ X 
+
+> i∈[|I j|]
+
+min  1, 4D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ .
+
+To bound P  
+
+> i∈[|I j|]
+
+min  1, 4D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ,
+
+X 
+
+> i∈[|I j|]
+
+min  1, 4D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ 
+
+≤ 4/λ + X 
+
+> i∈[|I j|]
+
+4
+
+Z 11/λT 
+
+1 D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ≥ ρ dρ
+
+≤ 4/λ + 4 
+
+Z 11/λT 
+
+X 
+
+> i∈[|I j|]
+
+1 D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ≥ ρ dρ. (C.1) Then we proceed by bounding the summation P  
+
+> i∈[|I j|]
+
+1 D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ≥ ρ for each 
+
+ρ ≥ 1/(λT ). For short, let d := dim E (G, 1/√T ). Essentially, it suffices to provide an upper bound of the cardinality of the subset Jj := i ∈ I j |D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ≥ ρ .For each i ∈ J j , since D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ≥ ρ, there exists g1, g 2 in G such that 
+
+(g1(xi) − g2(xi)) 2
+
+P
+
+> t∈[i−1]
+
+(g1(xt) − g2(xt)) 2 + λ ≥ ρ/ 2.
+
+Here (g1(xi) − g2(xi)) 2 ≥ λρ ≥ 1/T . Denote such value of (g1(xi) − g2(xi)) 2 by L(xi). Then we consider split cJ j into ⌈log 2 T ⌉ layers such that in each layer J kj (k ∈ [⌈log 2 T ⌉]) , we have 
+
+1/T ≤ ξ ≤ L(xi) ≤ 2ξ for some ξ.Denote the cardinality of J kj by A and the subsequence {xi}i∈I kj by {yi}i∈[A]. For the elements in 
+
+{y}, we dynamically maintain ⌊A/d ⌋ queues of elements. We enumerate through {y} in its original order and put the current element yi into the queue Q such that yi is ξ-independent of the current elements in Q. By the Pigeonhole principle and the definition of eluder dimension d, we can find an element yi in {y} such that yi is ξ-dependent of all the ⌊A/d ⌋ queues before i.Then by the definition of L(yi) and ξ, we can choose g1, g 2 such that 
+
+(g1(yi) − g2(yi)) 2
+
+P
+
+> t∈[i−1]
+
+(g1(yt) − g2(yt)) 2 + λ ≥ ρ/ 2, 2ξ ≥ (g1(yt) − g2(yt)) 2 ≥ ξ. (C.2) 16 By the ξ-dependencies, we have P
+
+> t∈[i−1]
+
+(g1(yt) − g2(yt)) 2 ≥ ⌊ A/d ⌋ · ξ. At the same time, 
+
+P
+
+> t∈[i−1]
+
+(g1(yt) − g2(yt)) 2 ≤ 4ξ/ρ due to (C.2) . Thus, we deduce that A = |J kj | ≤ O(d/ρ ) for all 
+
+k ∈ [⌈log 2 T ⌉]. Substituting it into (C.1), we have 
+
+X 
+
+> i∈[|I j|]
+
+min  1, 4D2
+
+> G
+
+ xi; x[i−1] , 1[i−1] 
+
+ ≤ 4/λ + 4 
+
+Z 11/λT 
+
+O(d/ρ · log 2 T )dρ
+
+= O(d log 2 T · log λT + λ−1).
+
+Here j is chosen arbitrarily. Hence, the generalized eluder dimension can be further bounded as follows: 
+
+X 
+
+> i∈[T]
+
+min 
+
+
+
+1, 1
+
+σ2
+
+> i
+
+D2
+
+> G
+
+ zi; z[i−1] , σ [i−1] 
+
+
+
+≤ O(dim E (F, 1/√T ) log T log λT log( M/α ) + λ−1).
+
+In the following part, we will also discuss the issue in Agarwal et al. (2022) about the relationship between the standard eluder dimension dim E and the generalized eluder dimension dim . In detail, Agarwal et al. (2022) proposed the concept of Generalized Eluder dimension and made the following claim: 
+
+Lemma C.2 (Remark 4, Agarwal et al. 2022) . If we set the weight σ = 1 , then the Generalized Eluder dimension dim = sup Z,σ:|Z|=T dim( F, Z, 1) satisfied 
+
+dim ≤ dim E (F, pλ/T ) + 1 ,
+
+where dim E denotes the standard Eluder dimension proposed in Russo and Van Roy (2013). In the proof of Remark 4, Agarwal et al. (2022) claims that given the standard Eluder dimen-sion dim E (F, √λ) = n, there are at most n different (sorted) indices {t1, t 2, .. } such that 
+
+D2 
+
+> F
+
+(zti ; zti−1] , 1) ≥ ϵ2/λ . However, according to the definition of D2 
+
+> F
+
+-uncertainty, we only have 
+
+D2 
+
+> F
+
+(z; z[t−1] , 1) := sup 
+
+> f1,f 2∈F
+
+(f1(z) − f2(z)) 2
+
+P
+
+> s∈[t−1]
+
+(f1(zs) − f2(zs)) 2 + λ .
+
+However, zti is ϵ-dependence with z1, .., z ti−1 is only a sufficient condition for the uncertainty 
+
+D2 
+
+> F
+
+(z; z[t−1] , 1) rather than necessary condition. In cases where both (f1(z) − f2(z)) 2 ≥ ϵ2 and 
+
+P
+
+> s∈[t−1]
+
+(f1(zs) − f2(zs)) 2 ≥ ϵ2 hold, the uncertainty D2 
+
+> F
+
+(z; z[t−1] , 1) may exceed ϵ2/λ , yet it will not be counted within the longest ϵ-independent sequence for the standard Eluder dimension. 
+
+## D Proof of Theorem 4.1 
+
+In this section, we provide the proof of Theorem 4.1. 
+
+D.1 High Probability Events 
+
+In this subsection, we define the following high-probability events: 
+
+E efk,h =
+
+λ + X
+
+> i∈[k−1]
+
+ efk,h (sih, a ih) − T 2 
+
+> h
+
+Vk,h +1 (sih, a ih)
+
+2
+
+≤ eβ2
+
+> k
+
+ , (D.1) 
+
+E pfk,h =
+
+λ + X
+
+> i∈[k−1]
+
+1¯σ2
+
+> i,h
+
+ pfk,h (sih, a ih) − T hVk,h +1 (sih, a ih)
+
+2
+
+≤ β2
+
+> k
+
+ , (D.2) 
+
+E qfk,h =
+
+λ + X
+
+> i∈[k−1]
+
+1¯σ2
+
+> i,h
+
+ qfk,h (sih, a ih) − T h qVk,h +1 (sih, a ih)
+
+2
+
+≤ β2
+
+> k
+
+ , (D.3) 17 where 
+
+eβk := 
+
+r
+
+128 log Nϵ(k) · NF (ϵ) · Hδ + 64 Lϵ · k, β k := 
+
+r
+
+128 · log Nϵ(k) · NF (ϵ)Hδ + 64 Lϵ · k/α 2.
+
+E efk,h , E pfk,h and E qfk,h are the hoeffding-type concentration results for efk,h , pfk,h and qfk,h respectively. Then we define the following bellman-type concentration events for pfk,h , qfk,h , which implies a tighter confidence set due to carefully designed variance estimators and an inverse-variance weighted regression scheme for the general function classes. 
+
+E pfh =
+
+(
+
+λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h ′ )2
+
+ pfk,h ′ (sih′ , a ih′ ) − T h′ Vk,h ′+1 (sih′ , a ih′ )
+
+2
+
+≤ pβ2 
+
+> k
+
+, ∀h ≤ h′ ≤ H, k ∈ [K]
+
+)
+
+,
+
+E qfh =
+
+(
+
+λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h ′ )2
+
+ qfk,h ′ (sih′ , a ih′ ) − T h′ Vk,h ′+1 (sih′ , a ih′ )
+
+2
+
+≤ qβ2 
+
+> k
+
+, ∀h ≤ h′ ≤ H, k ∈ [K]
+
+)
+
+,
+
+(D.4) where 
+
+pβ2 
+
+> k
+
+= qβ2 
+
+> k
+
+:= O log 2k2  2 log( L2k/α 4) + 2  ·  log(4 L/α 2) + 2 
+
+δ/H 
+
+!
+
+· [log( NF (ϵ)) + 1] + O(λ) + O(ϵkL/α 2).
+
+We also define the following events which are later applied to prove the concentration of pfk,h and 
+
+qfk,h by induction. 
+
+¯E pfk,h =
+
+
+
+λ + X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ pfk,h (sih, a ih) − T hVk,h +1 (sih, a ih)
+
+2
+
+≤ pβ2
+
+> k
+
+
+
+, (D.5) where p1i,h is the shorthand for the following product of indicator functions 
+
+p1i,h := 1  [VhV ∗
+
+> h+1
+
+]( sih, a ih) ≤ ¯σ2
+
+> i,h
+
+ · 1  [ThVi,h +1 − T V ∗
+
+> h+1
+
+] ≤ (log NF (ϵ) + log Nϵ(K)) −1 ¯σ2
+
+> i,h
+
+
+
+· 1  Vi,h +1 (s) ≥ V ∗
+
+> h+1
+
+(s) ∀s ∈ S  . (D.6) 
+
+¯E qfk,h =
+
+
+
+λ + X
+
+> i∈[k−1]
+
+q1i,h 
+
+(¯ σi,h )2
+
+ qfk,h (sih, a ih) − T h qVk,h +1 (sih, a ih)
+
+2
+
+≤ qβ2
+
+> k
+
+
+
+, (D.7) where q1i,h is the shorthand for the following product of indicator functions 
+
+q1i,h := 1  [VhV ∗
+
+> h+1
+
+]( sih, a ih) ≤ ¯σ2
+
+> i,h
+
+ · 1  [T V ∗ 
+
+> h+1
+
+− T h qVi,h +1 ] ≤ (log NF (ϵ) + log Nϵ(K)) −1 ¯σ2
+
+> i,h
+
+
+
+· 1
+
+ qVi,h +1 (s) ≤ V ∗
+
+> h+1
+
+(s) ∀s ∈ S 
+
+
+
+. (D.8) The following Lemmas suggest that previous events hold with high probability. 
+
+Lemma D.1. Let efk,h be defined as in line 8 of Algorithm 1, we have E ef := T 
+
+> k≥1,h ∈[H]
+
+E efk,h holds with probability at least 1 − δ, where E efk,h is defined in (D.1). 
+
+Lemma D.2. Let pfk,h be defined as in line 6 of Algorithm 1, we have E pf := T 
+
+> k≥1,h ∈[H]
+
+E pfk,h holds with probability at least 1 − δ, where E pfk,h is defined in (D.2). 
+
+Lemma D.3. Let qfk,h be defined as in line 7 of Algorithm 1, we have E qf := T 
+
+> k≥1,h ∈[H]
+
+E qfk,h holds with probability at least 1 − δ, where E qfk,h is defined in (D.3). 
+
+Lemma D.4. Let pfk,h be defined as in line 6 of Algorithm 1, we have ¯E pf := T 
+
+> k≥1,h ∈[H]
+
+¯E pfk,h holds with probability at least 1 − 2δ, where E pfk,h is defined in (D.5). 
+
+Lemma D.5. Let qfk,h be defined as in line · of Algorithm 1, we have ¯E qf holds with probability at least 1 − 2δ.18 D.2 Optimism and Pessimism 
+
+Based on the high probability events, we have the following lemmas for the function pfk,h (s, a ) and 
+
+qfk,h (s, a )
+
+Lemma D.6. On the events E pfh and E qfh , for each episode k ∈ [K], we have 
+
+pfk,h (s, a ) − T hVk,h +1 (s, a ) ≤ pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+qfk,h (s, a ) − T h qVk,h +1 (s, a ) ≤ qβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where z = ( s, a ) and z[k−1] ,h = {z1,h , z 2,h , .., z k−1,h }.
+
+Lemma D.7. On the events E pfh+1 and E qfh+1 , for each stage h ≤ h′ ≤ H and episode k ∈ [K], we have Qk,h (s, a ) ≥ Q∗
+
+> h
+
+(s, a ) ≥ qQk,h (s, a ). Furthermore, for the value functions Vk,h (s) and qVk,h (s),we have Vk,h (s) ≥ V ∗ 
+
+> h
+
+(s) ≥ qVk,h (s).
+
+D.3 Monotonic Variance Estimator 
+
+In this subsection, we introduce the following lemmas to construct the monotonic variance estimator. 
+
+Lemma D.8. On the events E ef , E pf and E qf , for each episode k ∈ [K] and stage h ∈ [H], we have 
+
+pfk,h (s, a ) − T hVk,h +1 (s, a ) ≤ βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+qfk,h (s, a ) − T h qVk,h +1 (s, a ) ≤ βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+efk,h (s, a ) − T 2 
+
+> h
+
+Vk,h +1 (s, a ) ≤ eβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where z = ( s, a ) and z[k−1] ,h = {z1,h , z 2,h , .., z k−1,h }.
+
+Lemma D.9. On the events E ef , E pf , E qf , E pfh+1 , E qfh+1 , for each episode k ∈ [K], the empirical variance [ ¯VhVk,h +1 ]( skh, a kh) satisfies the following inequalities: 
+
+[ ¯VhVk,h +1 ]( skh, a kh) − [VhVk,h +1 ]( skh, a kh) ≤ Ek,h ,
+
+[ ¯VhVk,h +1 ]( skh, a kh) − [VhV ∗
+
+> h+1
+
+]( skh, a kh) ≤ Ek,h + Fk,h .
+
+Lemma D.10. On the events E pf , E qf , E pfh+1 , E qfh+1 , for each episode k ∈ [K] and i > k , we have 
+
+(log NF (ϵ) + log Nϵ(K)) · Vh(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh) ≤ Fi,h ,
+
+(log NF (ϵ) + log Nϵ(K)) · Vh(V ∗ 
+
+> h+1
+
+− qVi,h +1 )(skh, a kh) ≤ Fi,h ,
+
+Based on previous lemmas, we can construct an optimistic estimator σk,h for the transition variance. Under this situation, the weighted regression have the following guarantee. 
+
+Lemma D.11. If the events E ef , E pf , E qf , ¯E pf and ¯E qf hold, then events E pf = E pf 
+
+> 1
+
+and E qf = E qf 
+
+> 1
+
+hold. 
+
+D.4 Proof of Regret Bound 
+
+In the subsection, we first define the following high proSbability events to control the stochastic noise from the transition process: 
+
+E1 =
+
+
+
+∀h′ ∈ [H],
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=h′
+
+[Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) −
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=h′
+
+ Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
+≤ 2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=h′
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+
+
+,
+
+E2 =
+
+
+
+∀h′ ∈ [H],
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=h′
+
+[Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) −
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=h′
+
+ Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 )
+
+19 ≤ 2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=h′
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+
+
+.
+
+According to Freedman inequality (Lemma H.5), we directly have the following results. 
+
+Lemma D.12. Events E1 and E2 hold with probability at least 1 − 2δ.
+
+Proof. Fix an arbitrary h ∈ [H]. Applying Lemma H.5, we have the following inequality: 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) −
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+ Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
+≤ 2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+(D.9) Applying a union bound for (D.9) across all h ∈ [H], k ≥ 0, we have Event E1 holds with probability at least 1 − 2δ.Similarly, we also have the corresponding high-probability bound for E2.Next, we need the following lemma to control the summation of confidence radius. 
+
+Lemma D.13. For any parameters β ≥ 1 and stage h ∈ [H], the summation of confidence radius over episode k ∈ [K] is upper bounded by 
+
+> K
+
+X
+
+> k=1
+
+min 
+
+
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+
+
+≤ (1 + βγ 2) dim α,K (Fh) + 2 β
+
+q
+
+dim α,K (Fh)
+
+vuut KX
+
+> k=1
+
+(σ2 
+
+> k,h
+
++ α2),
+
+where z = ( s, a ) and z[k−1] ,h = {z1,h , z 2,h , .., z k−1,h }.Then, we can decompose the total regret in the first K episode to the summation of variance 
+
+PKk=1 
+
+PHh=1 σ2 
+
+> k,h
+
+as the following lemma. 
+
+Lemma D.14. On the events E pf = E pf 
+
+> 1
+
+, E qf = E qf 
+
+> 1
+
+and E1, for each stage h ∈ [H], the regret in the first K episodes can be decomposed and controlled as: 
+
+> K
+
+X
+
+> k=1
+
+ Vk,h (skh) − V πk 
+
+> h
+
+(skh) ≤ 2CH (1 + χ)(1 + pβkγ2) dim α,K (F)+ 4 C(1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+and for all stage h ∈ [H], we further have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh)
+
+≤ 2CH 2(1 + χ)(1 + pβkγ2) dim α,K (F) + 4 CH (1 + χ) pβk
+
+q
+
+dim α,K (Fh)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+20 + H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+ .
+
+In addition, the gap between the optimistic value function Vk,h (s) and pessimistic value function 
+
+qVk,h (s) can be upper bounded by the following lemma. 
+
+Lemma D.15. On the events E pf = E pf 
+
+> 1
+
+, E qf = E qf 
+
+> 1
+
+and E2, for each stage h ∈ [H], the regret in the first K episodes can be decomposed and controlled as: 
+
+> K
+
+X
+
+> k=1
+
+ Vk,h (skh) − qVk,h (skh)) ≤ 4CH (1 + χ)(1 + pβkγ2) dim α,K (Fh) (D.10) 
+
++ 8 C(1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+and for all stage h ∈ [H], we further have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh)
+
+≤ 4CH 2(1 + χ)(1 + pβkγ2) dim α,K (Fh) + 8 CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+ .
+
+We define the following high probability event E3 to control the summation of variance. 
+
+E3 =
+
+ KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[VhV πk
+
+> h+1
+
+]( skh, a kh) ≤ 3K + 3 H log(1 /δ )
+
+
+
+.
+
+According to Jin et al. (2018) (Lemma C.5) 3, with probability at least 1 − δ. Condition on this event, the summation of variance PKk=1 
+
+PHh=1 σ2 
+
+> k,h
+
+can be upper bounded by the following lemma. 
+
+Lemma D.16. On the events E1, E2, E3, E pf = E pf 
+
+> 1
+
+and E qf = E qf 
+
+> 1
+
+, the total estimated variance is upper bounded by: 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+σ2 
+
+> k,h
+
+≤ (log NF (ϵ) + log Nϵ(K)) × eO (1 + γ2)( βk + H pβk + eβk)H dim α,K (F)
+
++ (log NF (ϵ) + log Nϵ(K)) 2 × eO (βk + H pβk + eβk)2H dim α,K (F)
+
++ eO(Var K + KHα 2).
+
+With all previous lemmas, we can prove Theorem 4.1 
+
+Proof of Theorem 4.1. The low switching cost result is given by Lemma G.1. 
+
+> 3
+
+Jin et al. (2018) showed that PKk=1 
+
+PHh=1 [VhV πk
+
+> h+1
+
+]( skh, a kh) = eO(KH 2 + H3) when 
+
+P h = 1 H rh(sh, a h) ≤ H. In this work, we assume the total reward satisfied PHh=1 rh(sh, a h) ≤ 1, and the summation of variance is upper bounded by eO(K + H)
+
+21 After taking a union bound, the high probability events E1, E2, E3, E ef , E pf , E qf , ¯E pf and ¯E qf hold with probability at least 1 − 10 δ. Conditioned on these events, the regret is upper bounded by 
+
+Regret( K)=
+
+> K
+
+X
+
+> k=1
+
+ V ∗ 
+
+> 1
+
+(sk 
+
+> 1
+
+) − V πk 
+
+> k, 1
+
+(sk 
+
+> 1
+
+)
+
+≤
+
+> K
+
+X
+
+> k=1
+
+ Vk, 1(sk 
+
+> 1
+
+) − V πk 
+
+> k, 1
+
+(sk 
+
+> 1
+
+)
+
+≤ 2CH (1 + χ)(1 + pβK γ2) dim α,K (F) + eO
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh)
+
+
+
++ 4 C(1 + χ) pβK
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+≤ 2CH (1 + χ)(1 + pβK γ2) dim α,K (F) + eO
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Ph(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh)
+
+
+
++ 4 C(1 + χ) pβK
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+≤ 2CH (1 + χ)(1 + pβK γ2) dim α,K (F) + eO
+
+ pβK
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+
+
+≤ eO
+
+
+
+H dim α,K (F) · (1 + pβK γ2)
+
+
+
++ eO
+
+
+
+pβK
+
+q
+
+dim α,K (F) · pHVar K
+
+
+
++ eO
+
+
+
+H dim α,K (F) pβK (βK + H pβK + eβK ) · log[ NF (ϵ) · Nϵ(K)] 
+
+
+
++ eO
+
+
+
+H dim α,K (F) pβK (1 + γ2)
+
+
+
+= eO
+
+
+
+H3 dim 2 
+
+> α,K
+
+(F) · log NF
+
+ 12KHL 
+
+
+
+· log 
+
+
+
+NF
+
+ 12KHL 
+
+
+
+· N
+
+
+
+B, 12KHL pβK
+
+ 
+
++ eO H2.5 dim 2.5 
+
+> α,K
+
+(F) ·
+
+s
+
+log NF
+
+ 12KHL 
+
+
+
+· log 1.5
+
+
+
+NF
+
+ 12KHL 
+
+
+
+· N
+
+
+
+B, 12KHL pβK
+
+ !
+
++ eO
+
+s
+
+dim α,K (F) log NF
+
+ 12KHL 
+
+
+
+· HVar K
+
+!
+
+, (D.11) where the first inequality holds due to Lemma D.7, the second inequality holds due to Lemma D.14, the third inequality follows from Lemma D.7 and Var[ X] ≤ E[X] · M if random variable X is in 
+
+[0 , M ], the fourth inequality holds due to (F.41) and 2ab ≤ a2 + b2, the last inequality holds due to Lemma D.16. Thus, we complete the proof of Theorem 4.1. We can reorganize (D.11) into the following upper bound for regret, 
+
+Regret( K) = eO(pdim( F) log N · HVar K )+ eO
+
+
+
+H2.5 dim 2(F)plog N log( N · Nb) · pH log N + dim( F) log( N · Nb)
+
+
+
+,
+
+where we denote the covering number of bonus function class N
+
+
+
+B, 12KHL pβK
+
+
+
+by Nb, the covering number of function class F by N and the dimension dim α,K (F) by dim( F). Since E3 occurs with high probability according to Jin et al. (2018) (Lemma C.5), we have Var K = eO(K), which matches the worst-case minimax optimal regret bound of MDPs with general function approximation. 22 D.5 Proof Sketch of Regret Bound 
+
+In this subsection, we provide a proof sketch on the regret bound and show how our policy-switching strategy works. First, we introduce the following lemma which illustrates the stability of the bonus function after using the uncertainty-based policy-switching condition. 
+
+Lemma D.17 (Restatement of Lemma G.2) . If the policy is not updated at episode k, the uncertainty of all state-action pair z = ( s, a ) ∈ S × A and stage h ∈ [H] satisfies the following stability property: 
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) ≥ 11 + χ D2 
+
+> Fh
+
+(z; z[klast −1] ,h , ¯σ[klast −1] ,h ).
+
+With Lemma G.2, we can then convert D2 
+
+> Fh
+
+(z; z[klast −1] ,h , ¯σ[klast −1] ,h in the bonus term into 
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) with a cost of an additional 1 + χ constant. As a direct consequence of Lemma G.2, We have the following lemma, which controls the gap between optimistic value functions and real value functions resulting from the exploration bonuses. 
+
+Lemma D.18 (Restatement of Lemma D.14) . On the events E pf = E pf 
+
+> 1
+
+, E qf = E qf 
+
+> 1
+
+and E1, for each stage h ∈ [H], the regret in the first K episodes can be decomposed and controlled as: 
+
+> K
+
+X
+
+> k=1
+
+ Vk,h (skh) − V πk 
+
+> h
+
+(skh) ≤ 2CH (1 + χ)(1 + pβkγ2) dim α,K (F)+ 4 C(1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+and for all stage h ∈ [H], we further have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh)
+
+≤ 2CH 2(1 + χ)(1 + pβkγ2) dim α,K (F) + 4 CH (1 + χ) pβk
+
+q
+
+dim α,K (Fh)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+ .
+
+As a need to bound the sum of bonuses corresponding to a weighted regression target, we derive the following results on the sum of inverse weights. 
+
+Lemma D.19 (Informal version of Lemma D.16) . With high probability, the total estimated variance is upper bounded by: 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+σ2 
+
+> k,h
+
+≤ (log NF (ϵ) + log Nϵ(K)) × eO (1 + γ2)( βk + H pβk + eβk)H dim α,K (F)
+
++ (log NF (ϵ) + log Nϵ(K)) 2 × eO (βk + H pβk + eβk)2H dim α,K (F)
+
++ eO(Var K + KHα 2).
+
+Proof sketch of Theorem 4.1. As the result of optimism, we have shown that with high probability, for all k, h ∈ [K] × [H], Vk,h is an upper bound for V ∗ 
+
+> h
+
+. Hence, we further have, 
+
+Regret( K) = 
+
+> K
+
+X
+
+> k=1
+
+ V ∗ 
+
+> 1
+
+(sk 
+
+> 1
+
+) − V πk 
+
+> k, 1
+
+(sk 
+
+> 1
+
+) ≤
+
+> K
+
+X
+
+> k=1
+
+ Vk, 1(sk 
+
+> 1
+
+) − V πk 
+
+> k, 1
+
+(sk 
+
+> 1
+
+).
+
+23 To further proceed, we apply Lemma D.14 and obtain 
+
+Regret( K) ≤ 2CH (1 + χ)(1 + pβK γ2) dim α,K (F) + eO
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh)
+
+
+
++ 4 C(1 + χ) pβK
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2),
+
+where the second term can be bounded by applying Lemma D.14 repeatedly and the third term can be controlled by Lemma D.16. Then after substituting the value of pbeta K , γ and α, we conclude that with high probability, 
+
+Regret( K) = eO(pdim( F) log N · HVar K )+ eO
+
+
+
+H2.5 dim 2(F)plog N log( N · Nb) · pH log N + dim( F) log( N · Nb)
+
+
+
+.
+
+Please refer to Subsection D.4 for the detailed calculation of this part. 
+
+## E Proof of Theorem B.1 
+
+In this section, we provide the proof of Theorem B.1. To prove the lower bound, we create a series of hard-to-learn MDPs as follows. Each hard-to-learn MDP comprises d/ 4 distinct sub-MDPs denoted as M1, .., Md/ 4. Each sub-MDP Mi is characterized by two distinct states, initial state si, 0
+
+and absorbing state si, 1, and shares the same action set A = {a0, a 1}. Since the state and action spaces are finite, these tabular MDPs can always be represented as linear MDPs with dimension 
+
+|S| × |A| = d.To generate each sub-MDP Mi, for all stage h ∈ [H], a special action ai,h is uniformly randomly selected from the action set {a0, a 1}. Given the current state si, 0, the agent transitions to the state 
+
+si, 0 if it takes the special action ai,h . Otherwise, the agent transitions to the absorbing state si, 1 and remains in that state in subsequent stages. The agent will receive the reward 1 if it takes the special action ai,H at the state si, 0 during the last stage H. Otherwise, the agent always receives reward 0.In this scenario, for sub-MDP Mi, the optimal policy entails following the special action sequence 
+
+(ai, 1, a i, 2, ..., a i,H ) to achieve a total reward of 1. In contrast, any other action sequence fails to yield any reward. Now, we partition the K episodes to d/ 4 different distinct epochs. For each epoch (ranging from episodes 4( i − 1) K/d + 1 to episode 4iK/d ), we initialize the state as si, 0 and exclusively focus on the sub-MDP Mi. The regret in each epoch can be lower bounded separately as follows: 
+
+Lemma E.1. For each epoch i ∈ [d/ 4] and any algorithm Alg capable of deploying arbitrary policies, if the expected switching cost in epoch i is less than H/ (2 log K), the expected regret of Alg in the 
+
+i-th epoch is at least Ω( K/d ).
+
+Proof of Lemma E.1. Given that each sub-MDP is independently generated, policy updates before epoch i only offer information for the sub-MDPs M1, ..., Mi−1 and do not provide any information for the current epoch i. In this scenario, there is no distinction between epochs and for simplicity, we only focus on the first epoch, encompassing episodes 1 to 4K/d .Now, let k0 = 0 and we denote K = {k1, k 2, ... } as the set of episodes where the algorithm Alg 
+
+updates the policy. If Alg does not update the policy i times, we set ki = 4 K/d + 1 . For simplicity, we set C = 2 log K and for each i ≤ H/C , we define the events E as the algorithm Alg has not reached the state s1,0 at the stage iC before the episode ki.Conditioned on the events E1, ..., Ei−1, the algorithm Alg does not gather any information about the special action a1,h for stage h ≥ (i − 1) C + 1 . In this scenario, the special actions can still be considered as uniformly randomly selected from the action set a0, a 1. For each episode between ki−1
+
+and ki, the probability that a policy π arrives at state s1,0 at stage iC is upper-bounded by: 
+
+Ea1,(i−1) C+1 ,...,a 1,iC 
+
+ΠiC h=1 Pr( πh(s1,0) = a1,h ) ≤ Ea1,(i−1) C+1 ,...,a 1,iC 
+
+ΠiC h=( i−1) C+1 Pr( πh(s1,0) = a1,h ) = 12C ,
+
+24 where the first inequality holds due to π(s1,0) = a1,h ) ≤ 1 and the second equation holds due to the random generation process of the special actions. Notice that there are at most K episodes between the ki−1 and ki and after applying an union bound for all episodes, we have 
+
+Pr( Ei|E 1, ..., Ei−1) ≤ 1 − K
+
+2C = 1 − 1
+
+K .
+
+Furthermore, we have 
+
+Pr( EH/C ) ≤ Pr( E1 ∩ E 2 ∩ E 3 ∩ ... ∩ E H/C ) = Π H/C i=1 Pr( Ei|E 1, ..., Ei−1) ≤ (1 − 11K )H/C ≤ 1 − HCK .
+
+(E.1) Notice that the agent cannot receive any reward unless it has reached the state si, 0 at the last stage 
+
+H. Therefore, the expected regret for the algorithm Alg for the sub-MDP M can be bounded by the switching cost δ:
+
+EM[Regret (Alg )] ≥ EM[1(EH/C ) × (kH/C − 1)] 
+
+≥ EM[kH/C − 1] − HC
+
+≥ EM
+
+ 1(δ < H/C ) · K/d  − HC
+
+≥ 4K/d − EM
+
+δ · 4KC dH − HC , (E.2) where the first inequality holds due to the fact that the agent receives no reward before kH/C 
+
+conditioned on the event EH/C , the second inequality holds due to (E.1) with kH/C − 1 ≤ K, the third inequality holds due to the definition of kH/C and the last inequality holds due to E[1(x ≥
+
+a)] ≤ E[x]/a for any non-negative random variable x. According to the result in (E.1) , if the expected switching E[δ] ≤ H/ (2 C), the expected regret is at least Ω( K), when K is large enough compared to H.With Lemma B.1, we can prove Theorem B.1. 
+
+Proof of Theorem B.1. For these constructed hard-to-learn MDPs and any given algorithm Alg , we denote the expected switching cost for sub-MDP Mi as δi.According to Lemma E.1, we have 
+
+EMi [Regret (Alg )] ≥ Pr  δi < H/ (2 log K) · K/d 
+
+≥  1 − EMi [δi] · 2 log K/H  · K/d, (E.3) where the first inequality holds due to lemma B.1 and last inequality holds due to E[1(x ≥ a)] ≤
+
+E[x]/a for any non-negative random variable x. Taking a summation of (E.3) for all sub-Mdps, we have 
+
+EM[Regret (Alg )] = 
+
+> d/ 4
+
+X
+
+> i=1
+
+EMi [Regret (Alg )] 
+
+≥
+
+> d/ 4
+
+X
+
+> i=1
+
+ 1 − EMi [δi] · 2 log K/H  · K/d 
+
+= ( d/ 4 − EM[δ] · 2 log K/H ) · K/d, 
+
+where δ is the total expected switching cost. Therefore, for any algorithm with total expected switching cost less than dH/ (16 log K), the expected is lower bounded by 
+
+EM[Regret (Alg )] ≥ (d/ 4 − EM[δ] · 2 log K/H ) · K/d ≥ K/ 8.
+
+Thus, we finish the proof of Theorem B.1. 25 F Proof of Lemmas in Appendix D 
+
+In this section, we provide the detailed proof of lemmas in Appendix D. 
+
+F.1 Proof of High Probability Events F.1.1 Proof of Lemma D.1 
+
+Proof of Lemma D.1. We first prove that for an arbitrarily chosen h ∈ [H], E efk,h holds with probabil-ity at least 1 − δ/H for all k.For simplicity, in this proof, we denote T 2 
+
+> h
+
+Vk,h +1 (sih, a ih) as ef ∗ 
+
+> k
+
+(sih, a ih) where ef ∗ 
+
+> k
+
+∈ F h exists due to our assumption. For any function V : S → [0 , 1] , let eηkh(V ) =  rkh + V (skh+1 )2 −
+
+Es′∼skh,a kh
+
+h r(skh, a kh, s ′) + V (s′)2i
+
+.By simple calculation, for all f ∈ F h, we have 
+
+X
+
+> i∈[k−1]
+
+
+
+f (sih, a ih) − ef ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 2 X
+
+> i∈[k−1]
+
+
+
+f (sih, a ih) − ef ∗ 
+
+> k
+
+(sih, a ih)
+
+
+
+· eηih(Vk,h +1 )
+
+| {z }   
+
+> I(f, ef∗
+> k,V k,h +1 )
+
+= X
+
+> i∈[k−1]
+
+h rih + Vk,h +1 (sih)2 − f (sih, a ih)
+
+i2
+
+− X
+
+> i∈[k−1]
+
+h rih + Vk,h +1 (sih)2 − ef ∗ 
+
+> k
+
+(sih, a ih)
+
+i2
+
+.
+
+Due to the definition of efk,h , we have 
+
+X
+
+> (i,j )∈[k−1] ×[H]
+
+ efk,h (sij , a ij ) − ef ∗ 
+
+> k
+
+(sij , a ij )
+
+2
+
++ 2 I( efk,h , ef ∗ 
+
+> k
+
+, V k,h +1 ) ≤ 0. (F.1) Then we give a high probability bound for −I(f, ef ∗ 
+
+> k
+
+, V k,h +1 ) through the following calculation. Applying Lemma H.4, for fixed f , ¯f and V , with probability at least 1 − δ,
+
+−I(f, ¯f , V ) := − X
+
+> i∈[k−1]
+
+ f (sih, a ih) − ¯f (sih, a ih) · eηih(V )
+
+≤ 8λ X
+
+> i∈[k−1]
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 1
+
+λ · log 1
+
+δ .
+
+By the definition of V in line · of Algorithm 1, Vk,h +1 lies in the optimistic value function class Vk
+
+defined in (G.4) . Applying a union bound for all the value functions V c in the corresponding ϵ-net 
+
+Vc, we have 
+
+−I(f, ¯f , V c) ≤ 14
+
+X
+
+> i∈[k−1]
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 32 · log Nϵ(k)
+
+δ
+
+holds for all k with probability at least 1 − δ.For all V such that ∥V − V c∥∞ ≤ ϵ, we have |ηih(V ) − ηih(V c)| ≤ 4ϵ. Therefore, with probability 
+
+1 − δ, the following bound holds for I(f, ¯f , V k,h +1 ):
+
+−I(f, ¯f , V k,h +1 ) ≤ 14
+
+X
+
+> i∈[k−1]
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 32 · log Nϵ(k)
+
+δ + 4 ϵ · k. 
+
+To further bound I( efk,h , ef ∗ 
+
+> k
+
+, V k,h +1 ) in (F.1) , we apply an ϵ-covering argument on Fh and show that with probability at least 1 − δ,
+
+−I( efk,h , ef ∗ 
+
+> k
+
+, V k,h +1 ) ≤ 14
+
+X
+
+> i∈[k−1]
+
+ efk,h (sih, a ih) − ef ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 32 · log Nϵ(k) · NF (ϵ)
+
+δ
+
+26 + 16 Lϵ · k (F.2) for probability at least 1 − δ.Substituting (F.2) into (F.1) and rearranging the terms, 
+
+X
+
+> i∈[k−1]
+
+ efk,h (sih, a ih) − ef ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
+≤ 128 log Nϵ(k) · NF (ϵ) · Hδ + 64 Lϵ · k
+
+for all k with probability at least 1 − δ/H .Finally, we apply a union bound over all h ∈ [H] to conclude that E ef holds with probability at least 
+
+1 − δ.
+
+F.1.2 Proof of Lemmas D.2 and D.3 
+
+Proof of Lemma D.2. Similar to the proof of Lemma D.1, we first prove that for an arbitrarily chosen 
+
+h ∈ [H], E pfk,h holds with probability at least 1 − δ/H for all k.In this proof, we denote ThVk,h +1 (sih, a ih) as pf ∗ 
+
+> k
+
+(sih, a ih) where pf ∗ 
+
+> k
+
+∈ F h exists due to our assumption. For any function V : S → [0 , 1] , let pηkh(V ) =  rkh + V (skh+1 )−Es′∼skh,a kh
+
+rh(skh, a kh, s ′) + V (s′).For all f ∈ F h, we have 
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+
+
+f (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 2 X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+
+
+f (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+
+
+· pηih(Vk,h +1 )
+
+| {z }   
+
+> I(f, pf∗
+> k,V k,h +1 )
+
+= X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+rih + Vk,h +1 (sih)2 − f (sih, a ih)2 − X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+h
+
+rih + Vk,h +1 (sih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+i2
+
+.
+
+By the definition of pfk,h , we have 
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 2 I( pfk,h , V k,h +1 ) ≤ 0. (F.3) Then we give a high probability bound for −I( pfk,h , pf ∗ 
+
+> k
+
+, V k,h +1 ) through the following calculation. Applying Lemma H.4, for fixed f , ¯f and V , with probability at least 1 − δ,
+
+−I(f, ¯f , V ) := − X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V )
+
+≤ 8λ 1
+
+α2
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 1
+
+λ · log 1
+
+δ .
+
+By the definition of V in line · of Algorithm 1, Vk,h +1 lies in the optimistic value function class Vk
+
+defined in (G.4) . Applying a union bound for all the value functions V c in the corresponding ϵ-net 
+
+Vc, we have 
+
+−I(f, ¯f , V c) ≤ 14
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 32 
+
+α2 · log Nϵ(k)
+
+δ
+
+holds for all k with probability at least 1 − δ.For all V such that ∥V − V c∥∞ ≤ ϵ, we have |ηih(V ) − ηih(V c)| ≤ 4ϵ. Therefore, with probability 
+
+1 − δ, the following bound holds for I(f, ¯f , V k,h +1 ):
+
+−I(f, ¯f , V k,h +1 ) ≤ 14
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 32 
+
+α2 · log Nϵ(k)
+
+δ + 4 ϵ · k/α 2.
+
+27 To further bound I( pfk,h , pf ∗ 
+
+> k
+
+, V k,h +1 ) in (F.3) , we apply an ϵ-covering argument on Fh and show that with probability at least 1 − δ,
+
+−I( pfk,h , pf ∗ 
+
+> k
+
+, V k,h +1 ) ≤ 14
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 32 · log Nϵ(k) · NF (ϵ)
+
+δ
+
++ 16 Lϵ · k/α 2. (F.4) Substituting (F.4) into (F.3) and rearranging the terms, we have 
+
+X
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
+≤ 128 · log Nϵ(k) · NF (ϵ)Hδ + 64 Lϵ · k/α 2
+
+for all k with probability at least 1 − δ/H . Then we can complete the proof by using a union bound over all h ∈ [H].
+
+Proof of Lemma D.3. The proof is almost identical to the proof of Lemma D.2. 
+
+F.1.3 Proof of Lemmas D.4 and D.5 
+
+Proof of Lemma D.4. Similar to the proof of Lemma D.1, we first prove that for an arbitrary h ∈ [H],
+
+¯E pfk,h holds with probability at least 1 − δ/H for all k.In this proof, we denote ThVk,h +1 (sih, a ih) as pf ∗ 
+
+> k
+
+(sih, a ih) where pf ∗ 
+
+> k
+
+∈ F exists due to our assumption. For any function V : S → [0 , 1] , let pηkh(V ) =  rkh + V (skh+1 )−Es′∼skh,a kh
+
+rh(skh, a kh, s ′) + V (s′).For all f ∈ F h, we have 
+
+X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+
+
+f (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 2 X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+
+
+f (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+
+
+· pηih(Vk,h +1 )
+
+| {z }   
+
+> I(f, pf∗
+> k,V k,h +1 )
+
+= X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+rih + Vk,h +1 (sih)2 − f (sih, a ih)2 − X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+h
+
+rih + Vk,h +1 (sih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+i2
+
+.
+
+Due to the definition of pfk,h , we have 
+
+X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
++ 2 I( pfk,h , V k,h +1 ) ≤ 0. (F.5) Then it suffices to bound the value of I(f, ¯f , V k,h +1 ) for all f, ¯f ∈ F .Unlike the proof for Lemma D.1, we decompose I(f, ¯f , V k,h +1 ) into two parts: 
+
+I(f, ¯f , V k,h +1 ) = X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V ∗
+
+> h+1
+
+)+ X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(Vk,h +1 − V ∗
+
+> h+1
+
+). (F.6) Then we bound the two terms separately. For the first term, we first check the following conditions before applying Lemma H.2, which is a variant of Freedman inequality. For fixed f and ¯f , we have 
+
+E
+
+" p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V ∗
+
+> h+1
+
+)
+
+#
+
+= 0 ,
+
+since sih+1 is sampled from Ph(·| sih, a ih).28 Next, we need to derive a bound for the maximum absolute value of each ‘weighted’ transition noise: 
+
+max 
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V ∗
+
+> h+1
+
+)
+
+≤ 4 max 
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)
+
+≤ 4 max 
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+vuuutD2
+
+> Fh
+
+ zi,h ; z[i−1] ,h , ¯σ[i−1] ,h 
+
+ X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ
+
+
+
+≤ 4 · γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ, (F.7) where the second inequality follows from the definition of DFh in Definition 2.4, the last inequality holds since ¯σi,h ≥ γ · D1/2
+
+> Fh
+
+ zi,h ; z[i−1] ,h , ¯σ[i−1] ,h 
+
+ according to line 19 in Algorithm 1. From the definition of p1i,h in (D.6) we directly obtain the following upper bound of the variance: 
+
+X
+
+> i∈[k−1]
+
+E
+
+" p1i,h 
+
+(¯ σi,h )4
+
+ f (sih, a ih) − ¯f (sih, a ih)2 · pηih(V ∗
+
+> h+1
+
+)2
+
+#
+
+≤ 4 X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)2 ≤ 4L2k/α 2 := V. 
+
+Applying Lemma H.2 with V = 4 L2k/α 2, M = 2 L/α 2 and v = m = 1 , for fixed f , ¯f , k, with probability at least 1 − δ/ (2 k2 · NF (ϵ) · H),
+
+− X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V ∗
+
+> h+1
+
+) (F.8) 
+
+≤ ι
+
+vuuut2
+
+8 X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)2 + 1 
+
+
+
++ 23 ι2
+
+8γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ + 1 
+
+ (F.9) 
+
+≤
+
+
+
+4ι + 16 3 ι2γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ + √2ι + 23 ι2, (F.10) where ι := ι1(k, h, δ ) = 
+
+r
+
+log 2k2  
+
+> 
+> 2 log( 4L2kα2)+2
+> 
+> ·
+
+(log( 4Lα2 )+2 )·NF (ϵ) 
+
+> δ/H
+
+.Using a union bound across all f, ¯f ∈ C (Fh, ϵ ) and k ≥ 1, with probability at least 1 − δ/H ,
+
+− X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V ∗
+
+> h+1
+
+)
+
+≤
+
+
+
+4ι + 16 3 ι2γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ + √2ι + 23 ι2 (F.11) holds for all f, ¯f ∈ C (Fh, ϵ ) and k. Due to the definition of ϵ-net, we deduce that for pfk,h and pf ∗ 
+
+> k
+
+,
+
+− X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+
+
+· pηih(V ∗
+
+> h+1
+
+)
+
+29 ≤
+
+
+
+4ι + 16 3 ι2γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ pfk,h (sτh, a τh) − pf ∗ 
+
+> k
+
+(sτh, a τh)
+
+2
+
++ λ + √2ι + 23 ι2
+
++
+
+
+
+4ι + 16 3 ι2γ−2
+
+p16 kϵL/α 2 + 8 ϵk/α 2. (F.12) For the second term in (F.6), the following inequality holds for all V ∈ V k,h +1 ,
+
+E
+
+ 1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V − V ∗
+
+> h+1
+
+)
+
+
+
+= 0 ,
+
+max 
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(V − V ∗
+
+> h+1
+
+)
+
+≤ 4 max 
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)
+
+≤ 4 max 
+
+> i∈[k−1]
+
+1(¯ σi,h )2
+
+vuutD2
+
+> Fh
+
+ zi,h ; z[i−1] ,h , ¯σ[i−1] ,h 
+
+ X 
+
+> τ∈[k−1]
+
+1(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ
+
+= 4 · γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+1(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ, 
+
+where the calculation is similar to that in (F.7). We denote the sum of variance by Var( V − V ∗
+
+> h+1
+
+) as follows for simplicity: 
+
+Var( V − V ∗
+
+> h+1
+
+) := X
+
+> i∈[k−1]
+
+E
+
+" p1i,h 
+
+(¯ σi,h )4
+
+
+
+f (sih, a ih) − ¯f (sih, a ih)
+
+2
+
+· pηih(V − V ∗
+
+> h+1
+
+)2
+
+#
+
+(F.13) 
+
+≤ k · L2/α 4. (F.14) 
+
+For Vk,h +1 , we have 
+
+Var( Vk,h +1 − V ∗
+
+> h+1
+
+) := X
+
+> i∈[k−1]
+
+E
+
+" p1i,h 
+
+(¯ σi,h )4
+
+ f (sih, a ih) − ¯f (sih, a ih)2 · pηih(Vk,h +1 − V ∗
+
+> h+1
+
+)2
+
+#
+
+≤ 4log NF (ϵ) + log Nϵ(K)
+
+X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih)2 ,
+
+where the second inequality holds due to the definition of p1i,h in (D.6). With a similar argument as shown in (F.8) ∼(F.12) , we have with probability at least 1 − δ/ (2 k2 ·
+
+NF (ϵ) · Nϵ(k − 1) · H), for a fixed f , ¯f , k and V , (applying Lemma H.2, with V = k · L2/α 4 and 
+
+M = 2 L/α 2, v = (log NF (ϵ) + log Nϵ(K)) −1/2, m = v2. ) 
+
+− X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ f (sih, a ih) − ¯f (sih, a ih) · pηih(Vk,h +1 − V ∗
+
+> h+1
+
+)
+
+≤ ι
+
+r
+
+2
+
+
+
+2Var( V − V ∗
+
+> h+1
+
+) + (log NF (ϵ) + log Nϵ(K)) −1
+
++ 23 ι2
+
+8γ−2
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ f (sτh, a τh) − ¯f (sτh, a τh)2 + λ + (log NF (ϵ) + log Nϵ(K)) −1
+
+ .
+
+where 
+
+log 2k2
+
+
+
+2 log L2k(log NF (ϵ)·Nϵ(K)) 1/2 
+
+> α4
+
++ 2 
+
+
+
+·
+
+
+
+log( 4L(log NF (ϵ)·Nϵ(K))  
+
+> α2
+
+) + 2 
+
+
+
+· NF (ϵ) · Nϵ(k)
+
+δ/H 
+
+30 ≤ log 2k2
+
+
+
+2 log L2kα4 + 2 
+
+
+
+·  log( 4Lα2 ) + 2  · N 4 
+
+> F
+
+(ϵ) · N 2 
+
+> ϵ
+
+(K)
+
+δ/H := ι22(k, h, δ ).
+
+Using a union bound over all (f, ¯f , V ) ∈ C (Fh, ϵ ) × C (Fh, ϵ ) × V ck,h +1 and all k ≥ 1, we have the inequality above holds for all such f, ¯f , V, k with probability at least 1 − δ/H .There exists a V ck,h +1 in the ϵ-net such that ∥Vk,h +1 − V ck,h +1 ∥∞ ≤ ϵ. Then we have 
+
+− X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+
+
+· pηih(Vk,h +1 − V ∗
+
+> h+1
+
+)
+
+≤ O ι2(k, h, δ )
+
+plog NF (ϵ) + log Nϵ(K) + ι2(k, h, δ )2
+
+γ−2
+
+!
+
+·
+
+vuut X 
+
+> τ∈[k−1]
+
+p1τ,h 
+
+(¯ στ,h )2
+
+ pfk,h (sτh, a τh) − pf ∗ 
+
+> k
+
+(sτh, a τh)
+
+2
+
++ λ
+
++ O(ϵkL/α )2) + O
+
+ ι22(k, h, δ )log NF (ϵ) + log Nϵ(K)
+
+
+
+, (F.15) for all k with at least probability 1 − δ/H .Substituting (F.15) and (F.12) into (F.5), we can conclude that 
+
+X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
+≤ O
+
+ ι2(k, h, δ )
+
+plog NF (ϵ) + log Nϵ(K) + ι2(k, h, δ )2 · γ−2
+
+!2 + O
+
+ ι1(k, h, δ ) + ι1(k, h, δ )2/γ 22
+
+.
+
+From the definition of γ in (3.3), we can rewrite the upper bound of the squared loss 
+
+P
+
+> i∈[k−1]
+> p1i,h
+> (¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
+as follows: 
+
+λ + X
+
+> i∈[k−1]
+
+p1i,h 
+
+(¯ σi,h )2
+
+ pfk,h (sih, a ih) − pf ∗ 
+
+> k
+
+(sih, a ih)
+
+2
+
+≤ O
+
+log 2k2
+
+
+
+2 log L2kα4 + 2 
+
+
+
+·  log( 4Lα2 ) + 2 
+
+δ/H 
+
+ · [log( NF (ϵ)) + 1] + O(λ) + O(ϵkL/α 2).
+
+Proof of Lemma D.5. The proof is almost identical to the proof of Lemma D.4. 
+
+F.2 Proof of Optimism and Pessimism F.2.1 Proof of Lemma D.6 
+
+Proof of Lemma D.6. According to the definition of D2 
+
+> F
+
+function, we have 
+
+  pfk,h (s, a ) − T hVk,h +1 (s, a )2
+
+≤ D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) × λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h )2
+
+ pfk,h (sih, a ih) − T hVk,h +1 (sih, a ih)
+
+2
+
+!
+
+≤ pβ2 
+
+> k
+
+× D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+31 where the first inequality holds due the definition of D2 
+
+> F
+
+function with the Assumption 2.2 and the second inequality holds due to the events E pfh . Thus, we have 
+
+pfk,h (s, a ) − T hVk,h +1 (s, a ) ≤ pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ).
+
+With a similar argument, for the pessimistic value function qfk,h , we have 
+
+  qfk,h (s, a ) − T h qVk,h (s, a )2
+
+≤ D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) × λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h )2
+
+ qfk,h (sih, a ih) − T h qVk,h +1 (sih, a ih)
+
+2
+
+!
+
+≤ qβ2 
+
+> k
+
+× D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where the first inequality holds due to the definition of D2 
+
+> F
+
+function with the Assumption 2.2 and the second inequality holds due to the events E qfh . In addition, we have, 
+
+qfk,h (s, a ) − T h qVk,h +1 (s, a ) ≤ pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ).
+
+Thus, we complete the proof of Lemma D.6. 
+
+F.2.2 Proof of Lemma D.7 
+
+Proof of Lemma D.7. We use induction to prove the optimistic and pessimistic property. First, we study the basic case with the last stage H + 1 . In this situation, Qk,H +1 (s, a ) = Q∗
+
+> h
+
+(s, a ) = 
+
+qQk,h (s, a ) = 0 and Vk,h (s) = V ∗ 
+
+> h
+
+(s) = qVk,h (s) = 0 hold for all state s ∈ S and action a ∈ A .Therefore, Lemma D.7 holds for the basic case (stage H + 1 ). Second, if Lemma D.7 holds for stage h + 1 , then we focus on the stage h. Notice that the event 
+
+eEh directly implies the event eEh+1 . Therefore, according to the induction assumption, the following inequality holds for all state s ∈ S and episode k ∈ [K].
+
+Vk,h +1 (s) ≥ V ∗
+
+> h+1
+
+(s) ≥ qVk,h (s). (F.16) Thus, for all episode k ∈ [K] and state-action pair (s, a ) ∈ S × A , we have 
+
+pfk,h (s, a ) + bk,h (s, a ) − Q∗
+
+> h
+
+(s, a )
+
+≥ T hVk,h +1 (s, a ) − pβk · DFh (z; z[k−1] ,h , ¯σ[k−1] ,h ) + bk,h (s, a ) − Q∗
+
+> h
+
+(s, a )
+
+≥ T hVk,h +1 (s, a ) − Q∗
+
+> h
+
+(s, a )= PhVk,h +1 (s, a ) − PhV ∗ 
+
+> h
+
+(s, a )
+
+≥ 0, (F.17) where the first inequality holds due to Lemma D.6, the second inequality holds due to the definition of the exploration bonus bk,h and the last inequality holds due to the (F.16) . Therefore, the optimal value function Q∗
+
+> h
+
+(s, a ) is upper bounded by 
+
+Q∗
+
+> h
+
+(s, a ) ≤ min 
+
+n
+
+min 
+
+> 1≤i≤k
+
+pfi,h (s, a ) + bi,h (s, a ), 1
+
+o
+
+≤ Qk,h (s, a ), (F.18) where the first inequality holds due to (F.17) with the fact that Q∗
+
+> h
+
+(s, a ) ≤ 1 and the second inequality holds due to the update rule of value function Qk,h .With a similar argument, for the pessimistic estimator qfk,h , we have 
+
+qfk,h (s, a ) − bk,h (s, a ) − Q∗
+
+> h
+
+(s, a )
+
+≤ T h qVk,h +1 (s, a ) + qβk · DFh (z; z[k−1] ,h , ¯σ[k−1] ,h ) − bk,h (s, a ) − Q∗
+
+> h
+
+(s, a )
+
+≤ T h qVk,h +1 (s, a ) − Q∗
+
+> h
+
+(s, a )= Ph qVk,h +1 (s, a ) − PhV ∗ 
+
+> h
+
+(s, a )
+
+≤ 0, (F.19) 32 where the first inequality holds due to Lemma D.6, the second inequality holds due to the definition of the exploration bonus bk,h and the last inequality holds due to the (F.19) . Therefore, the optimal value function Q∗
+
+> h
+
+(s, a ) is lower bounded by 
+
+Q∗
+
+> h
+
+(s, a ) ≥ max 
+
+n
+
+max 
+
+> 1≤i≤k
+
+qfi,h (s, a ) − bi,h (s, a ), 0
+
+o
+
+≥ qQk,h (s, a ), (F.20) where the first inequality holds due to (F.19) with the fact that Q∗
+
+> h
+
+(s, a ) ≥ 0 and the second inequality holds due to the update rule of value function qQk,h .Furthermore, for the value functions Vk,h and qVk,h , we have 
+
+Vk,h (s) = max  
+
+> a
+
+Qk,h (s, a ) ≥ max  
+
+> a
+
+Q∗
+
+> h
+
+(s, a ) = V ∗ 
+
+> h
+
+(s),
+
+qVk,h (s) = max 
+
+> a
+
+qQk,h (s, a ) ≤ max  
+
+> a
+
+Q∗
+
+> h
+
+(s, a ) = V ∗ 
+
+> h
+
+(s),
+
+where the first inequality holds due to (F.18) and the second inequality holds due to (F.20) . Thus, by induction, we complete the proof of Lemma D.7. 
+
+F.3 Proof of Monotonic Variance Estimator F.3.1 Proof of Lemma D.8 
+
+Proof of Lemma D.8. According to the definition of D2 
+
+> F
+
+function, we have 
+
+  pfk,h (s, a ) − T hVk,h +1 (s, a )2
+
+≤ D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) × λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h )2
+
+ pfk,h (sih, a ih) − T hVk,h +1 (sih, a ih)
+
+2
+
+!
+
+≤ β2 
+
+> k
+
+× D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where the first inequality holds due the definition of D2 
+
+> F
+
+function with the Assumption 2.2 and the second inequality holds due to the events E pf . Thus, we have 
+
+pfk,h (s, a ) − T hVk,h +1 (s, a ) ≤ βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ).
+
+For the pessimistic value function qfk,h , we have 
+
+  qfk,h (s, a ) − T h qVk,h (s, a )2
+
+≤ D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) × λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h )2
+
+ qfk,h (sih, a ih) − T h qVk,h +1 (sih, a ih)
+
+2
+
+!
+
+≤ β2 
+
+> k
+
+× D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where the first inequality holds due the definition of D2 
+
+> F
+
+function with the Assumption 2.2 and the second inequality holds due to the events E qf . In addition, we have 
+
+qfk,h (s, a ) − T h qVk,h +1 (s, a ) ≤ βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ).
+
+With a similar argument, for the second-order estimator efk,h , we have 
+
+  efk,h (s, a ) − T 2 
+
+> h
+
+Vk,h (s, a )2
+
+≤ D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) × λ +
+
+> k−1
+
+X
+
+> i=1
+
+1(¯ σi,h )2
+
+ efk,h (sih, a ih) − T 2 
+
+> h
+
+Vk,h +1 (sih, a ih)
+
+2
+
+!
+
+≤ eβ2 
+
+> k
+
+× D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ),
+
+where the first inequality holds due the definition of D2 
+
+> F
+
+function with the Assumption 2.2 and the second inequality holds due to the events E ef . Therefore, we have 
+
+efk,h (s, a ) − T 2 
+
+> h
+
+Vk,h (s, a ) ≤ eβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ).
+
+Now, we complete the proof of Lemma D.8. 33 F.3.2 Proof of Lemma D.9 
+
+Proof of Lemma D.9. First, according to Lemma D.8, we have 
+
+[ ¯VhVk,h +1 ]( skh, a kh) − [VhVk,h +1 ]( skh, a kh)
+
+= efk,h − pf 2 
+
+> k,h
+
+− [PhV 2
+
+> k,h +1
+
+]( skh, a kh) +  [PhVk,h +1 ]( skh, a kh)2
+
+≤ pf 2 
+
+> k,h
+
+−  [PhVk,h +1 ]( skh, a kh)2 + efk,h − [PhV 2
+
+> k,h +1
+
+]( skh, a kh)
+
+≤ 2L pfk,h −  [PhVk,h +1 ]( skh, a kh) + efk,h − [PhV 2
+
+> k,h +1
+
+]( skh, a kh)
+
+≤ (2 Lβ k + eβk)DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )= Ek,h , (F.21) where the first inequality holds due to |a + b| ≤ | a| + |b|, the second inequality holds due to 
+
+|a2 − b2| = |a − b| · | a + b| ≤ | a − b| · 2 max( |a|, |b|) and the last inequalirtnholds due to Lemma D.8. For the difference between variances [VhVk,h +1 ]( skh, a kh) and [VhV ∗
+
+> h+1
+
+]( skh, a kh), it can be upper bounded by 
+
+[VhVk,h +1 ]( skh, a kh) − [VhV ∗
+
+> h+1
+
+]( skh, a kh)
+
+= [PhV 2
+
+> k,h +1
+
+]( skh, a kh) −  [PhVk,h +1 ]( skh, a kh)2 − [Ph(V ∗
+
+> h+1
+
+)2]( skh, a kh) +  [PhV ∗
+
+> h+1
+
+]( skh, a kh)2
+
+≤ [PhV 2
+
+> k,h +1
+
+]( skh, a kh) − [Ph(V ∗
+
+> h+1
+
+)2]( skh, a kh) +  [PhVk,h +1 ]( skh, a kh)2 −  [PhV ∗
+
+> h+1
+
+]( skh, a kh)2
+
+≤ 4 [PhVk,h +1 ]( skh, a kh) − [PhV ∗
+
+> h+1
+
+]( skh, a kh)
+
+≤  [PhVk,h +1 ]( skh, a kh) − [Ph qVk,h +1 ]( skh, a kh)
+
+≤ pfk,h (skh, a kh) − qfk,h (skh, a kh) + 2 βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), (F.22) where the first inequality holds due to |a + b| ≤ | a| + |b|, the second inequality holds due to 
+
+1 ≥ Vk,h +1 (·) ≥ V ∗
+
+> h+1
+
+(·) ≥ 0 (Lemma D.7), the third inequality holds due to V ∗
+
+> h+1
+
+(·) ≥ qVk,h +1 (·)
+
+(Lemma D.7) and the last inequality holds due to Lemma D.8. Combining the results in (F.21) and (F.22) with the fact that 0 ≤ Vk,h +1 (·), V ∗
+
+> h+1
+
+(·) ≤ 1, we have 
+
+[ ¯VhVk,h +1 ]( skh, a kh) − [VhV ∗
+
+> h+1
+
+]( skh, a kh)
+
+≤ [ ¯VhVk,h +1 ]( skh, a kh) − [VhVk,h +1 ]( skh, a kh) + [VhVk,h +1 ]( skh, a kh) − [VhV ∗
+
+> h+1
+
+]( skh, a kh)
+
+≤ Ek,h + Fk,h .
+
+Thus, we complete the proof of Lemma D.9. 
+
+F.3.3 Proof of Lemma D.10 
+
+Proof of Lemma D.10. On the events E pf and E pfh+1 , we have 
+
+Vh(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh)= [ Ph(Vi,h +1 − V ∗
+
+> h+1
+
+)2]( skh, a kh) −  [Ph(Vi,h +1 − V ∗
+
+> h+1
+
+)]( skh, a kh)2
+
+≤ [Ph(Vi,h +1 − V ∗
+
+> h+1
+
+)2]( skh, a kh)
+
+≤ 2Ph(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh)
+
+≤ 2 [PhVi,h +1 ]( skh, a kh) − [Ph qVk,h +1 ]( skh, a kh)
+
+≤ 2 [PhVk,h +1 ]( skh, a kh) − [Ph qVk,h +1 ]( skh, a kh), (F.23) where the first equation holds since the reward function is deterministic, the second inequality holds due to Lemma D.7 with the fact that 0 ≤ Vi,h +1 (s), V ∗
+
+> h+1
+
+(s) ≤ 1 and the third inequality holds due to Lemma D.7 and the last inequality holds due to the fact that Vk,h +1 ≥ Vi,h +1 .34 With a similar argument, on the events E qf and E qfh+1 , we have 
+
+Vh(V ∗ 
+
+> h+1
+
+− qVi,h +1 )(skh, a kh)= [ Ph(V ∗ 
+
+> h+1
+
+− qVi,h +1 )2]( skh, a kh) −  [Ph(V ∗ 
+
+> h+1
+
+− qVi,h +1 )]( skh, a kh)2
+
+≤ [Ph(V ∗ 
+
+> h+1
+
+− qVi,h +1 )2]( skh, a kh)
+
+≤ 2Ph(V ∗ 
+
+> h+1
+
+− qVi,h +1 )(skh, a kh)
+
+≤ 2 [PhVk,h +1 ]( skh, a kh) − [Ph qVi,h +1 ]( skh, a kh)
+
+≤ 2 [PhVk,h +1 ]( skh, a kh) − [Ph qVk,h +1 ]( skh, a kh), (F.24) where the first inequality holds since the reward function is deterministic, the second and third inequality holds due to Lemma D.7 with the fact that 0 ≤ qVi,h +1 (s), V ∗
+
+> h+1
+
+(s) ≤ H, the last inequality the fact qVk,h +1 (s) ≤ qVi,h +1 (s). For both variances Vh(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh) and 
+
+Vh(V ∗ 
+
+> h+1
+
+− qVi,h +1 )(skh, a kh), they are upper bounded by 
+
+2 [PhVk,h +1 ]( skh, a kh) − [Ph qVk,h +1 ]( skh, a kh)
+
+= 2 ThVk,h +1 (skh, a kh) − 2Th qVk,h +1 (skh, a kh)
+
+≤ 2 pfk,h (skh, a kh) − 2 qfk,h (skh, a kh) + 4 βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), (F.25) where the first inequality holds due to Lemma D.8 and the second inequality holds due to the definition of Fk,h . Substituting the result in (F.25) into (F.23) , (F.24) and combining the fact that 
+
+Vh(Vi,h +1 − V ∗
+
+> h+1
+
+)(skh, a kh), Vh(V ∗ 
+
+> h+1
+
+− qVi,h +1 )(skh, a kh) ≤ 1, we finish the proof of Lemma D.10. 
+
+F.4 Proof of Lemmas in Section D.4 F.4.1 Proof of Lemma D.11 
+
+Proof of Lemma D.11. We use induction to shows that the conclusion in Lemma D.7 and events 
+
+E pfh , E qfH hold for each stage h ∈ [H]. First, for the basic situation (stage H + 1 ), Qk,H +1 (s, a ) = 
+
+Q∗
+
+> h
+
+(s, a ) = qQk,h (s, a ) = 0 and Vk,h (s) = V ∗ 
+
+> h
+
+(s) = qVk,h (s) = 0 hold for all state s ∈ S and action 
+
+a ∈ A . Therefore, Lemma D.7 holds for the basic case (stage H + 1 )Second, if Lemma D.7 holds for stage h + 1 , then we focus on the stage h. According to Lemmas D.10 and Lemma D.9, we have the following inequalities: 
+
+σ2 
+
+> i,h
+
+= [ ¯VhVi,h +1 ]( sih, a ih) + Ei,h + Di,h ≥ [ ¯VhV ∗
+
+> h+1
+
+]( sih, a ih),σ2 
+
+> i,h
+
+≥ Fi,h ≥ (log NF (ϵ) + log Nϵ(K)) · Vh(Vk,h +1 − V ∗
+
+> h+1
+
+)(sih, a ih),σ2 
+
+> i,h
+
+≥ Fi,h ≥ (log NF (ϵ) + log Nϵ(K)) · Vh(V ∗ 
+
+> h+1
+
+− qVk,h +1 )(sih, a ih),
+
+where the first inequality holds due to Lemma D.9, the second and third inequality holds due to Lemma D.10. Thus, the indicator function in events ¯E pfh and ¯E qfh hold, which implies events E pfh , E qfH
+
+hold. Furthermore, when events E pfh , E qfH hold, then Lemma D.7 holds for stage h. Thus, we complete the proof of Lemma D.11 by induction. 
+
+F.4.2 Proof of Lemma D.13 
+
+Proof of Lemma D.13. For each stage h, we divide the episodes {1, 2, .., K } to the following sets: 
+
+I1 = {k ∈ [K] : DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h ≥ 1},
+
+I2 = {k ∈ [K] : DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h < 1, ¯σk,h = σk,h },
+
+I3 = {k ∈ [K] : DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h < 1, ¯σk,h = α},
+
+I4 = {k ∈ [K] : DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h < 1, ¯σk,h = γ × D1/2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h )}.
+
+35 The number of episode in set I1 is upper bounded by 
+
+|I 1| = X
+
+> k∈I 1
+
+min 
+
+
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σ2
+
+> k,h
+
+, 1
+
+
+
+≤ dim α,K (Fh),
+
+where the equation holds due to D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σ2 
+
+> k,h
+
+≥ 1 and the inequality holds due to the definition of Generalized Eluder dimension. Thus, for set I1, the summation of confidence radius is upper bounded by 
+
+X
+
+> k∈I 1
+
+min 
+
+
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+
+
+≤ |I 1| ≤ dim α,K (Fh). (F.26) For set I2, the summation of confidence radius is upper bounded by 
+
+X
+
+> k∈I 2
+
+min 
+
+
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+
+
+≤ X
+
+> k∈I 2
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+≤ β
+
+s X
+
+> k∈I 2
+
+σ2 
+
+> k,h
+
+·
+
+s X
+
+> k∈I 2
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σ2
+
+> k,h
+
+≤ β
+
+q
+
+dim α,K (Fh)
+
+s X
+
+> k∈I 2
+
+σ2
+
+> k,h
+
+, (F.27) where the second inequality holds due to Cauchy-Schwartz inequality with σk,h = ¯ σk,h and the last inequality holds due to the definition of Generalized Eluder dimension with the fact that 
+
+DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h < 1.With a similar argument, the summation of confidence radius over set I3 is upper bounded by 
+
+X
+
+> k∈I 3
+
+min 
+
+
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+
+
+≤ X
+
+> k∈I 3
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+≤ β
+
+s X
+
+> k∈I 3
+
+α2 ·
+
+s X
+
+> k∈I 3
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σ2
+
+> k,h
+
+≤ β
+
+q
+
+dim α,K (Fh)
+
+s X
+
+> k∈I 3
+
+α2, (F.28) where the second inequality holds due to Cauchy-Schwartz inequality with ¯σk,h = α and the last inequality holds due to the definition of Generalized Eluder dimension with the fact that 
+
+DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h < 1.Finally, the summation of confidence radius over set I4 is upper bounded by With a similar argument, the summation of confidence radius over set I3 is upper bounded by 
+
+X
+
+> k∈I 4
+
+min 
+
+
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+
+
+≤ X
+
+> k∈I 4
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h )= X
+
+> k∈I 4
+
+βγ 2D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σ2
+
+> k,h
+
+≤ βγ 2 dim α,K (Fh), (F.29) where the first equation holds due to ¯σk,h = γ × D1/2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) and the last inequality holds due to the definition of Generalized Eluder dimension with DFh (z; z[k−1] ,h , ¯σ[k−1] ,h )/¯σk,h <
+
+1.36 Combining the results in (F.26), (F.27), (F.28) and (F.29), we have 
+
+> K
+
+X
+
+> k=1
+
+min 
+
+
+
+βD Fh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+
+
+≤ (1 + βγ 2) dim α,K (Fh) + 2 β
+
+q
+
+dim α,K (Fh)
+
+vuut KX
+
+> k=1
+
+(σ2 
+
+> k,h
+
++ α2).
+
+Thus, we complete the proof of Lemma D.13. 
+
+F.4.3 Proof of Lemma D.14 
+
+Proof of Lemma D.14. First, for each stage h ∈ [H] and episode k ∈ [K], the gap between Vk,h (skh)
+
+and V πk 
+
+> h
+
+(skh) can be decomposed as: 
+
+Vk,h (skh) − V πk 
+
+> h
+
+(skh)= Qk,h (skh, a kh) − Qπk 
+
+> h
+
+(skh, a kh)
+
+≤ min 
+
+ pfklast ,h (s, a ) + bklast ,h (s, a ), 1
+
+
+
+− T hVk,h +1 (skh, a kh)+ ThVk,h +1 (skh, a kh) − T hV πk
+
+> h+1
+
+(skh, a kh)
+
+≤ Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) + min   pβklast DFh (z; z[klast −1] ,h , ¯σ[klast −1] ,h ), 1 + min  bklast ,h (skh, a kh), 1
+
+≤ Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) + 2 C · min   pβklast DFh (z; z[klast −1] ,h , ¯σ[klast −1] ,h ), 1
+
+≤ Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) + 2 C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+= Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 ) + Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) −  Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
++ 2 C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1, (F.30) where the first inequality holds due to the definition of value function Qk,h (skh, a kh), the sec-ond inequality holds due to Lemma D.6, the third inequality holds due to bklast ,h (skh, a kh) ≤
+
+C · DFh (z; z[klast −1] ,h , ¯σ[klast −1] ,h ) and the last inequality holds due to Lemma G.2. Taking a summa-tion of (F.30) over all episode k ∈ [K] and stage h′ ≥ h, we have 
+
+> K
+
+X
+
+> k=1
+
+ Vk,h (skh) − V πk 
+
+> h
+
+(skh)
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) −  Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+2C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+2C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
++ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+≤
+
+> H
+
+X
+
+> h′=h
+
+2C(1 + χ)(1 + pβkγ2) dim α,K (Fh′ ) + 
+
+> H
+
+X
+
+> h′=h
+
+4C(1 + χ) pβk
+
+q
+
+dim α,K (Fh′ )
+
+vuut KX
+
+> k=1
+
+(σ2 
+
+> k,h ′
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+37 ≤ 2CH (1 + χ)(1 + pβkγ2) dim α,K (Fh) + 4 C(1 + χ) pβk
+
+vuut HX
+
+> h′=h
+
+dim α,K (Fh′ )
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+(σ2 
+
+> k,h ′
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+≤ 2CH (1 + χ)(1 + pβkγ2) dim α,K (Fh) + 4 C(1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ ),
+
+(F.31) where the first inequality holds due to (F.30) , the second inequality holds due to event E1, the third inequality holds due to Lemma D.13, the fourth inequality holds due to Cauchy-Schwartz inequality and the last inequality holds due to PHh′=h dim α,K (Fh′ ) ≤ PHh′=1 dim α,K (Fh′ ) = H dim α,K (F).Furthermore, taking a summation of (F.31), we have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh)=
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − V πk
+
+> h+1
+
+)(skh, a kh) −  Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ Vk,h +1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )
+
++ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+≤ 2CH 2(1 + χ)(1 + pβkγ2) dim α,K (F) + 4 CH (1 + χ) pβk
+
+q
+
+dim α,K (Fh)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+ ,
+
+where the first inequality holds due to event E1 and the second inequality holds due to (F.31) . Thus, we complete the proof of Lemma D.14. 
+
+F.4.4 Proof of Lemma D.15 
+
+Proof of Lemma D.15. Similar to the proof of Lemma D.14, for each stage h ∈ [H] and episode 
+
+k ∈ [K], the gap between Vk,h (skh) and qVk,h (skh) can be decomposed as: 
+
+Vk,h (skh) − qVk,h (skh)
+
+≤ Qk,h (skh, a kh) − qQk,h (skh, a kh)
+
+≤ min 
+
+ pfklast ,h (s, a ) + bklast ,h (s, a ), 1
+
+
+
+− T hVk,h +1 (skh, a kh)
+
+− max 
+
+ qfklast ,h (s, a ) − bklast ,h (s, a ), 0
+
+
+
++ Th qVk,h +1 (skh, a kh)
+
+38 + ThVk,h +1 (skh, a kh) − T h qVk,h +1 (skh, a kh)
+
+≤ Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) + 2 · min   pβklast DFh (z; z[klast −1] ,h , ¯σ[klast −1] ,h ), 1
+
++ 2 · min  bklast ,h (skh, a kh), 1
+
+≤ Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) + 4 C · min   pβklast DFh (z; z[klast −1] ,h , ¯σ[klast −1] ,h ), 1
+
+≤ Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) + 4 C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+= Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 ) + Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) −  Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 )
+
++ 4 C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1, (F.32) where the first and second inequalities hold due to the definition of qVk,h (skh) and Vk,h (skh), the third inequality holds due to Lemma D.6 with pβklast = qβklast , the fourth inequality holds due to 
+
+bklast ,h (skh, a kh) ≤ C · DFh (z; z[klast −1] ,h , ¯σ[klast −1] ,h ) and the last inequality holds due to Lemma G.2. Taking a summation of (F.32) over all episode k ∈ [K] and stage h′ ≥ h, we have 
+
+> K
+
+X
+
+> k=1
+
+ Vk,h (skh) − qVk,h (skh)
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) −  Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 )
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+4C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+4C(1 + χ) · min   pβkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h ), 1
+
++ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+≤
+
+> H
+
+X
+
+> h′=h
+
+4C(1 + χ)(1 + pβkγ2) dim α,K (Fh′ ) + 
+
+> H
+
+X
+
+> h′=h
+
+8C(1 + χ) pβk
+
+q
+
+dim α,K (Fh′ )
+
+vuut KX
+
+> k=1
+
+(σ2 
+
+> k,h ′
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+≤ 4CH (1 + χ)(1 + pβkγ2) dim α,K (Fh) + 8 C(1 + χ) pβk
+
+vuut HX
+
+> h′=h
+
+dim α,K (Fh′ )
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+(σ2 
+
+> k,h ′
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+≤ 4CH (1 + χ)(1 + pβkγ2) dim α,K (Fh) + 8 C(1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h′=h
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ ),
+
+(F.33) where the first inequality holds due to (F.32) , the second inequality holds due to event E2, the third inequality holds due to Lemma D.13, the fourth inequality holds due to Cauchy-Schwartz inequality and the last inequality holds due to PHh′=h dim α,K (Fh′ ) ≤ PHh′=1 dim α,K (Fh′ ) = H dim α,K (F).39 Furthermore, taking a summation of (F.33), we have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh)=
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 )
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) −  Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 )
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ Vk,h +1 (skh+1 ) − qVk,h +1 (skh+1 )
+
++ H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 k2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+
+
+≤ 2CH 2(1 + χ)(1 + pβkγ2) dim α,K (Fh) + 4 CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+ ,
+
+where the first inequality holds due to event E2 and the last inequality holds due to (F.33). Thus, we complete the proof of Lemma D.15. 
+
+F.4.5 Proof of Lemma D.16 
+
+Proof of Lemma D.16. According to the definition of estimated variance σk,h , the summation of variance can be decomposed as following: 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+σ2 
+
+> k,h
+
+=
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[ ¯Vk,h Vk,h +1 ]( skh, a kh) + Ek,h + Fk,h 
+
+=
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ [ ¯Vk,h Vk,h +1 ]( skh, a kh) − [VhVk,h +1 ]( skh, a kh)| {z }
+
+> I1
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ek,h 
+
+| {z }
+
+> I2
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Fk,h 
+
+| {z }
+
+> I3
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ [VhVk,h +1 ]( skh, a kh) − [VhV πk
+
+> h+1
+
+]( skh, a kh)| {z }
+
+> I4
+
++
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[VhV πk
+
+> h+1
+
+]( skh, a kh)
+
+| {z }
+
+> I5
+
+.
+
+(F.34) For the term I1, it can be upper bounded by 
+
+I1 =
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ [ ¯Vk,h Vk,h +1 ]( skh, a kh) − [VhVk,h +1 ]( skh, a kh) ≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ek,h , (F.35) where the inequality holds due to Lemma D.9. For the second term I2 = PKk=1 
+
+PHh=1 Ek,h , we have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ek,h =
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(2 Lβ k + eβk) min 
+
+
+
+1, D Fh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+
+
+40 ≤
+
+> H
+
+X
+
+> h=1
+
+(2 Lβ k + eβk) × (1 + γ2) dim α,K (Fh)+
+
+> H
+
+X
+
+> h=1
+
+(2 Lβ k + eβk) × 2
+
+q
+
+dim α,K (Fh)
+
+vuut KX
+
+> k=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+≤ (2 Lβ k + eβk)H × (1 + γ2) dim α,K (F)+ (2 Lβ k + eβk) × 2
+
+vuut HX
+
+> h=1
+
+dim α,K (Fh)
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)= (2 Lβ k + eβk)H × (1 + γ2) dim α,K (F)+ (2 Lβ k + eβk) × 2
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2), (F.36) where the inequality holds due to Lemma D.13 and the second inequality holds due to Cauchy-Schwartz inequality. For the term I3, we have 
+
+I3 =
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Fk,h 
+
+= (log NF (ϵ) + log Nϵ(K)) 
+
+×
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+min 
+
+
+
+1, 2 pfk,h (skh, a kh) − 2 qfk,h (skh, a kh) + 4 βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+
+
+≤ (log NF (ϵ) + log Nϵ(K)) 
+
+×
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+min 
+
+
+
+1, 2ThVk,h +1 (skh, a kh) − 2Th qVk,h +1 (skh, a kh)( skh, a kh) + 8 βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+
+
+≤ (log NF (ϵ) + log Nϵ(K)) ×
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh)+ (log NF (ϵ) + log Nϵ(K)) ×
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+min  1, 8βkDFh (z; z[k−1] ,h , ¯σ[k−1] ,h )
+
+≤ (log NF (ϵ) + log Nϵ(K)) ×
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh)+ (log NF (ϵ) + log Nϵ(K)) × (1 + 8 βkγ2)H dim α,K (F)+ ((log NF (ϵ) + log Nϵ(K)) × 16 βk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2) (F.37) where the first inequality holds due to Lemma D.8, the second inequality holds due to Vk,h +1 (·) ≥
+
+V ∗
+
+> h+1
+
+(·) ≥ qVk,h +1 (·), the third inequality holds due to Lemma D.13 with Cauchy-Schwartz inequality. By Lemma D.15, 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh) ≤ 4CH 2(1 + χ)(1 + pβkγ2) dim α,K (Fh)+ 8 CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+41 + 2 H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − qVk,h +1 )]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+
+
+≤ 4CH 2(1 + χ)(1 + pβkγ2) dim α,K (Fh) + 8 CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ eO
+
+
+
+H
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh)
+
+
+
+, (F.38) where the last inequality follows from Lemma D.7. Notice that for each variable x, x ≤ a√x + b implies x ≤ a2 + 2 b, from (F.38), we further have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+Ph(Vk,h +1 − qVk,h +1 )(skh, a kh)
+
+≤ eO
+
+CH 2(1 + χ)(1 + pβkγ2) dim α,K (Fh) + CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+ .
+
+(F.39) Substituting (F.39) into (F.37), we obtain the following upper bound for I3,
+
+I3 ≤ eO
+
+(log NF (ϵ) + log Nϵ(K)) H pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+
+
++ eO
+
+
+
+(log NF (ϵ) + log Nϵ(K)) · H2(1 + pβkγ2) dim α,K (Fh)
+
+
+
+. (F.40) For the term I4, we have 
+
+I4 =
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ [VhVk,h +1 ]( skh, a kh) − [VhV πk
+
+> h+1
+
+]( skh, a kh)
+
+=
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+
+
+[PhV 2
+
+> k,h +1
+
+]( skh, a kh) −  [PhVk,h +1 ]( skh, a kh)2 − [Ph(V πk
+
+> h+1
+
+)2]( skh, a kh) +  [PhV πk
+
+> h+1
+
+]( skh, a kh)2
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ [PhV 2
+
+> k,h +1
+
+]( skh, a kh) − [Ph(V πk
+
+> h+1
+
+)2]( skh, a kh)
+
+≤ 2
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ [PhVk,h +1 ]( skh, a kh) − [PhV πk
+
+> h+1
+
+]( skh, a kh)
+
+≤ 8CH 2(1 + χ)(1 + pβkγ2) dim α,K (F) + 16 CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ 2 H
+
+2
+
+vuut KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[Vh(Vk,h +1 − V πk
+
+> h+1
+
+)]( skh, a kh) log(2 K2H/δ ) + 2 plog(2 K2H/δ ) + 2 log(2 K2H/δ )
+
+ ,
+
+≤ eO
+
+H2(1 + pβkγ2) dim α,K (F) + H pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+ (F.41) where the first inequality holds due to Vk,h +1 (·) ≥ V ∗
+
+> h+1
+
+(·) ≥ V πk
+
+> h+1
+
+(·), the second inequality holds due to 0 ≤ V ∗
+
+> h+1
+
+(·), V πk
+
+> h+1
+
+(·) ≤ 1, the third inequality holds due to Lemma D.14, and the last inequality follows from Lemma D.7 and the fact that x ≤ a√x + b implies x ≤ a2 + 2 b.42 For the term I5, according to the definition of Var K , we have 
+
+I5 =
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+[VhV πk
+
+> h+1
+
+]( skh, a kh) = Var K . (F.42) Substituting the results in (F.35), (F.36), (F.40), (F.41) and (F.42) into (F.34), we have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+σ2
+
+> k,h
+
+= I1 + I2 + I3 + I4 + I5
+
+≤ eO
+
+
+
+(4 Lβ k + 2 eβk)H × (1 + γ2) dim α,K (F)+ (4 Lβ k + 2 eβk) × 2
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2) + Var K
+
++ 8 CH 2(1 + χ)(1 + pβkγ2) dim α,K (F) + 16 CH (1 + χ) pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ (log NF (ϵ) + log Nϵ(K)) H pβk
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)+ (log NF (ϵ) + log Nϵ(K)) · H2(1 + pβkγ2) dim α,K (Fh)
+
+
+
+≤ Var K + (log NF (ϵ) + log Nϵ(K)) × eO (1 + γ2)( βk + H pβk + eβk)H dim α,K (F)
+
++ (log NF (ϵ) + log Nϵ(K)) × eO
+
+(βk + H pβk + eβk)
+
+q
+
+dim α,K (F)
+
+vuutH
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(σ2 
+
+> k,h
+
++ α2)
+
+
+
+Notice that for each variable x, x ≤ a√x + b implies x ≤ a2 + 2 b. With this fact, we have 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+σ2 
+
+> k,h
+
+≤ (log NF (ϵ) + log Nϵ(K)) × eO (1 + γ2)( βk + H pβk + eβk)H dim α,K (F)
+
++ (log NF (ϵ) + log Nϵ(K)) 2 × eO (βk + H pβk + eβk)2H dim α,K (F)
+
++ eO(Var K + KHα 2).
+
+Thus, we complete the proof of Lemma D.16. 
+
+## G Covering Number Argument 
+
+G.1 Rare Switching 
+
+Based on the policy-updating criterion, the following lemma provides a upper bound of the switching cost. 
+
+Lemma G.1. The number of episodes when the algorithm updates the value function is at most 
+
+O (dim α,K (F) · H).
+
+Proof. According to line 9, the policy is updated at episode k only when there exists a stage h ∈ [H]
+
+such that 
+
+X
+
+> i∈[klast ,k −1]
+
+1¯σ2
+
+> i,h
+
+D2 
+
+> Fh
+
+(zi,h ; z[klast −1] ,h , ¯σ[klast −1] ,h ) ≥ χ/C. 
+
+43 and 
+
+X
+
+> i∈[klast ,k −2]
+
+1¯σ2
+
+> i,h
+
+D2 
+
+> F
+
+(zi,h ; z[klast −1] ,h , ¯σ[klast −1] ,h ) < χ. (G.1) Then the following inequality holds, 
+
+sup 
+
+> f1,f 2∈F h
+
+P 
+
+> i∈[1 ,k −2] 1¯σ2
+> i,h
+
+(f1(zi,h ) − f2(zi,h )) 2 + λ
+
+P 
+
+> i∈[1 ,k last −1] 1¯σ2
+> i,h
+
+(f1(zi,h ) − f2(zi,h )) 2 + λ (G.2) 
+
+= 1 + sup 
+
+> f1,f 2∈F h
+
+P 
+
+> i∈[klast ,k −2] 1¯σ2
+> i,h
+
+(f1(zi,h ) − f2(zi,h )) 2
+
+P 
+
+> i∈[1 ,k last −1] 1¯σ2
+> i,h
+
+(f1(zi,h ) − f2(zi,h )) 2 + λ
+
+≤ 1 + X
+
+> i∈[klast ,k −2]
+
+1¯σ2
+
+> i,h
+
+D2 
+
+> Fh
+
+(zi,h ; z[klast −1] ,h , ¯σ[klast −1] ,h )
+
+≤ 1 + χ, (G.3) where the first inequality holds due to the definition of DFh (Definition 2.4), the second inequality follows from (G.1). (G.3) further gives a lower bound for the summation 
+
+X
+
+> i∈[klast ,k −1]
+
+1¯σ2
+
+> i,h
+
+D2 
+
+> F
+
+(zi,h ; z[i−1] ,h , ¯σ[i−1] ,h )
+
+≥ 11 + χ
+
+X
+
+> i∈[klast ,k −1]
+
+1¯σ2
+
+> i,h
+
+D2 
+
+> F
+
+(zi,h ; z[klast −1] ,h , ¯σ[klast −1] ,h )
+
+≥ χ/C 
+
+1 + χ .
+
+Note that χ/C  
+
+> 1+ χ
+
+≤ 1, we also have 
+
+X
+
+> i∈[klast ,k −1]
+
+min 
+
+(
+
+1, 1¯σ2
+
+> i,h
+
+D2 
+
+> F
+
+(zi,h ; z[i−1] ,h , ¯σ[i−1] ,h )
+
+)
+
+≥ χ/C 
+
+1 + χ .
+
+Then we have an upper bound and lower bound for the following summation: 
+
+lK · χ/C 
+
+1 + χ ≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+min 
+
+(
+
+1, 1¯σ2
+
+> k,h
+
+D2 
+
+> F
+
+(zk,h ; z[k−1] ,h , ¯σ[k−1] ,h )
+
+)
+
+≤ dim α,K (F) · H. 
+
+Therefore, the number of policy switching lK is of order O(dim α,K (F) · H).
+
+Lemma G.2 (Stability of uncertainty under rare switching strategy) . If the policy is not updated at episode k, the uncertainty of all state-action pair z = ( s, a ) ∈ S × A and stage h ∈ [H] satisfies the following stability property: 
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) ≥ 11 + χ D2 
+
+> Fh
+
+(z; z[klast −1] ,h , ¯σ[klast −1] ,h ).
+
+Proof. Due to the definition of klast in Algorithm 1, we have 
+
+X
+
+> i∈[klast ,k −1]
+
+1¯σ2
+
+> i,h
+
+D2 
+
+> F
+
+(zi,h ; z[klast −1] ,h , ¯σ[klast −1] ,h ) < χ. 
+
+As is shown in (G.3), here we also have 
+
+sup 
+
+> f1,f 2∈F h
+
+P 
+
+> i∈[1 ,k −1] 1¯σ2
+> i,h
+
+(f1(zi,h ) − f2(zi,h )) 2 + λ
+
+P 
+
+> i∈[1 ,k last −1] 1¯σ2
+> i,h
+
+(f1(zi,h ) − f2(zi,h )) 2 + λ ≤ 1 + χ. 
+
+44 From the definition of DFh ,
+
+D2 
+
+> Fh
+
+(z; z[k−1] ,h , ¯σ[k−1] ,h ) ≥ 11 + χ D2 
+
+> Fh
+
+(z; z[klast −1] ,h , ¯σ[klast −1] ,h ).
+
+The proof is then completed due to the arbitrariness of h.
+
+G.2 Value Function Class and Its Covering Number 
+
+The optimistic value functions at episode k and stage h ∈ [H] in our construction belong to the following function class: 
+
+Vk,h =
+
+
+
+V max  
+
+> a∈A
+
+min   
+
+> 1≤i≤lk+1
+
+min (1 , f i(·, a ) + β · b(·, a )) 
+
+
+
+, (G.4) where lk is the number of updated policies as defined in Algorithm 1, fi ∈ F h and b ∈ B .Similarly, we also define the following pessimistic value function classes for all k ≥ 1:
+
+qVk,h =
+
+
+
+V max  
+
+> a∈A
+
+max   
+
+> 1≤i≤lk+1
+
+max (0 , f i(·, a ) − β · b(·, a )) 
+
+
+
+, (G.5) 
+
+Lemma G.3 (ϵ-covering number of optimistic value function classes) . For optimistic value function class Vk,h defined in (G.4) , we define the distance between two value functions V1 and V2 as 
+
+∥V1 − V2∥∞ := max s∈S |V1(s) − V2(s)|. Then the ϵ-covering number with respect to the distance function can be upper bounded by 
+
+Nϵ(k) := [ NF (ϵ/ 2) · N (B, ϵ/ 2β)] lk +1 . (G.6) 
+
+Proof. By the definition of N (F, ϵ ), there exists an ϵ/ 2-net of F, denoted by C(F, ϵ/ 2) , such that for any f ∈ F , we can find f ′ ∈ C (F, ϵ/ 2) such that ∥f − f ′∥∞ ≤ ϵ/ 2. Also, there exists an ϵ/ 2β-net of B, C(B, ϵ/ 2β).Then we consider the following subset of Vk,
+
+Vc =
+
+
+
+V max  
+
+> a∈A
+
+min   
+
+> 1≤i≤lk+1
+
+min (1 , f i(·, a ) + β · bi(·, a )) , f i ∈ C (Fh, ϵ/ 2) , b i ∈ C (B, ϵ/ 2β)
+
+
+
+.
+
+Consider an arbitrary V ∈ V where V = max a∈A min 1≤i≤lk +1 min(1 , f i(·, a ) + β · bi(·, a )) . For each fi, there exists f ci ∈ C (F, ϵ/ 2) such that ∥fi − f ci ∥∞ ≤ ϵ/ 2. There also exists bc ∈ C (B, ϵ/ 2β)
+
+such that ∥b − bc∥∞ ≤ ϵ/ 2β. Let V c = max a∈A min 1≤i≤lk +1 min(1 , f ci (·, a ) + β · bc(·, a )) ∈ V c.It is then straightforward to check that ∥V − V c∥∞ ≤ ϵ/ 2 + β · ϵ/ 2β = ϵ.By direct calculation, we have |V c| = [ N (Fh, ϵ/ 2) · N (B, ϵ/ 2β)] lk +1 .
+
+Lemma G.4 (ϵ-covering number of pessimistic value function classes) . For pessimistic value function class qVk,h defined in (G.5) , we define the distance between two value functions V1 and V2 as 
+
+∥V1 − V2∥∞ := max s∈S |V1(s) − V2(s)|. Then the ϵ-covering number of qVk with respect to the distance function can be upper bounded by Nϵ(k) defined in (G.6). 
+
+Proof. The proof is nearly the same as that of Lemma G.3. 
+
+## H Auxiliary Lemmas 
+
+Lemma H.1 (Azuma-Hoeffding inequality) . Let {xi}ni=1 be a martingale difference sequence with respect to a filtration {G i} satisfying |xi| ≤ M for some constant M , xi is Gi+1 -measurable, 
+
+E[xi|G i] = 0 . Then for any 0 < δ < 1, with probability at least 1 − δ, we have 
+
+> n
+
+X
+
+> i=1
+
+xi ≤ M p2n log(1 /δ ).
+
+45 Lemma H.2 (Corollary 2, Agarwal et al. 2022) . Let M > 0, V > v > 0 be constants, and 
+
+{xi}i∈[t] be stochastic process adapted to a filtration {H i}i∈[t]. Suppose E[xi|H i−1] = 0,
+
+|xi| ≤ M and P 
+
+> i∈[t]
+
+E[x2 
+
+> i
+
+|H i−1] ≤ V 2 almost surely. Then for any δ, ϵ > 0, let ι =
+
+q
+
+log (2 log( V /v )+2) ·(log( M/m )+2)  
+
+> δ
+
+we have 
+
+P
+
+X
+
+> i∈[t]
+
+xi > ι 
+
+vuuut2
+
+2 X
+
+> i∈[t]
+
+E[x2 
+
+> i
+
+|H i−1] + v2
+
+ + 23 ι2
+
+
+
+2 max  
+
+> i∈[t]
+
+|xi| + m
+
+ ≤ δ. 
+
+Lemma H.3 (Lemma 7, Russo and Van Roy 2014) . Consider random variables (Zn|n ∈ N) adapted to the filtration (Hn : n = 0 , 1, ... ). Assume E [exp {λZ i}] is finite for all λ. Define the conditional mean μi = E [Zi | H i−1]. We define the conditional cumulant generating function of the centered random variable [Zi − μi] by ψi (λ) = log E [exp ( λ [Zi − μi]) | H i−1]. For all x ≥ 0 and λ ≥ 0,
+
+P
+
+> n
+
+X
+
+> 1
+
+λZ i ≤ x +
+
+> n
+
+X
+
+> 1
+
+[λμ i + ψi (λ)] ∀n ∈ N
+
+!
+
+≥ 1 − e−x.
+
+Lemma H.4 (Self-normalized bound for scalar-valued martingales) . Consider random variables 
+
+(vn|n ∈ N) adapted to the filtration (Hn : n = 0 , 1, ... ). Let {ηi}∞ 
+
+> i=1
+
+be a sequence of real-valued random variables which is Hi+1 -measurable and is conditionally σ-sub-Gaussian. Then for an arbitrarily chosen λ > 0, for any δ > 0, with probability at least 1 − δ, it holds that 
+
+> n
+
+X
+
+> i=1
+
+ϵivi ≤ λσ 2
+
+2 ·
+
+> n
+
+X
+
+> i=1
+
+v2 
+
+> i
+
++ log(1 /δ )/λ ∀n ∈ N.
+
+Lemma H.5 (Lemma 10, Zhang et al. 2020) . Let (Mn)n≥0 be a martingale such that M0 = 0 and 
+
+|Mn − Mn−1| ≤ c for some c > 0 and any n ≥ 1. Let Var n = Pnk=1 E[( Mk − Mk−1)2|F k−1] for 
+
+n ≥ 0, where Fk = σ(M1, M 2, . . . , M k). Then for any positive integer n and any ε, p > 0, we have that 
+
+P |Mn| ≥ 2
+
+s
+
+Var n log 
+
+ 1
+
+p
+
+
+
++ 2 
+
+s
+
+ε log 
+
+ 1
+
+p
+
+
+
++ 2 c log 
+
+ 1
+
+p
+
+!
+
+≤  2nc 2/ε + 2  p
+
+## NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer:[Yes] Justification: In both abstract and introduction, we highlight the contribution in our paper. The proposed algorithm and the corresponding theoretical results are discussed in the followed sections. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? 46 Answer: [Yes] Justification: We explicitly list all the necessary assumptions for our theoretical analysis. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory Assumptions and Proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] Justification: We state all the assumptions in Section 2 and give the proof of theorems in the appendix. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental Result Reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [NA] Justification:The paper does not include experiments. 47 Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [NA] Justification: Paper does not include experiments requiring code. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. 48 • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental Setting/Details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [NA] Justification: The paper does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment Statistical Significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [NA] Justification: The paper does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments Compute Resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [NA] Justification: The paper does not include experiments. Guidelines: • The answer NA means that the paper does not include experiments. 49 • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code Of Ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: The research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader Impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [NA] Justification: The paper is a theoretical work with no societal impact. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] 50 Justification: The paper poses no such risks. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [Yes] Justification: We have described the related works, especially those work which our work is based on with proper citations in corresponding sections. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New Assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [No] Justification: This is a theoretical paper without experiments. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and Research with Human Subjects 
+
+51 Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: This paper does not include crowdsourcing or human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional Review Board (IRB) Approvals or Equivalent for Research with Human Subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: This paper does not include crowdsourcing or human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 52

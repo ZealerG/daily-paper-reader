@@ -1,0 +1,12416 @@
+Title: 7882_Federated_Natural_Policy_.pdf
+
+URL Source: https://openreview.net/pdf?id=DUFD6vsyF8
+
+Number of Pages: 72
+
+Markdown Content:
+# Federated Natural Policy Gradient and Actor Critic Methods for Multi-task Reinforcement Learning 
+
+Tong Yang ∗
+
+CMU 
+
+Shicong Cen †
+
+CMU 
+
+Yuting Wei ‡
+
+UPenn 
+
+Yuxin Chen §
+
+UPenn 
+
+Yuejie Chi ¶
+
+CMU 
+
+## Abstract 
+
+Federated reinforcement learning (RL) enables collaborative decision making of multiple distributed agents without sharing local data trajectories. In this work, we consider a multi-task setting, in which each agent has its own private reward function corresponding to different tasks, while sharing the same transition kernel of the environment. Focusing on infinite-horizon Markov decision processes, the goal is to learn a globally optimal policy that maximizes the sum of the discounted total rewards of all the agents in a decentralized manner, where each agent only communicates with its neighbors over some prescribed graph topology. We develop federated vanilla and entropy-regularized natural policy gradient (NPG) methods in the tabular setting under softmax parameterization, where gradient tracking is applied to estimate the global Q-function to mitigate the impact of imperfect information sharing. We establish non-asymptotic global convergence guarantees under exact policy evaluation, where the rates are nearly independent of the size of the state-action space and illuminate the impacts of network size and connectivity, and further establish its robustness against inexact policy evaluation. We further propose a federated natural actor critic (NAC) method for multi-task RL with function approximation and stochastic policy evaluation, and establish its finite-time sample complexity taking the errors of function approximation into account. To the best of our knowledge, this is the first time that near dimension-free global convergence is established for federated multi-task RL using policy optimization. 
+
+## 1 Introduction 
+
+Federated reinforcement learning (FRL) is an emerging paradigm that combines the advantages of federated learning (FL) and reinforcement learning (RL) [ QZLZ21 , ZFL +19 ], allowing multiple agents to learn a shared policy from local experiences, without exposing their private data to a central server nor other agents. FRL is poised to enable collaborative and efficient decision making in scenar-ios where data is distributed, heterogeneous, and sensitive, which arise frequently in applications such as edge computing, smart cities, and healthcare [ WHM +23 , WKNL20 , ZFL +19 ], to name just a few. As has been observed [ LZZ +17 ], decentralized training can lead to performance improvements in FL by avoiding communication congestions at busy nodes such as the server, especially under high-latency scenarios. This motivates us to design algorithms for the fully decentralized setting, a 
+
+> ∗
+
+Department of Electrical and Computer Engineering, Carnegie Mellon University; email: 
+
+tongyang@andrew.cmu.edu .
+
+> †
+
+Department of Electrical and Computer Engineering, Carnegie Mellon University; email: 
+
+shicongc@andrew.cmu.edu .
+
+> ‡
+
+Department of Statistics and Data Science, Wharton School, University of Pennsylvania; email: 
+
+ytwei@wharton.upenn.edu .
+
+> §
+
+Department of Statistics and Data Science, Wharton School, University of Pennsylvania; email: 
+
+yuxinc@wharton.upenn.edu .
+
+> ¶
+
+Department of Electrical and Computer Engineering, Carnegie Mellon University; email: 
+
+yuejiechi@cmu.edu .38th Conference on Neural Information Processing Systems (NeurIPS 2024). scenario where the agents can only communicate with their local neighbors over a prescribed network topology. 6
+
+In this work, we study the problem of federated multi-task RL [ AR21 , QZLZ21 , YLS +20 ], where each agent collects its own reward — possibly unknown to other agents — corresponding to the local task at hand, while having access to the same dynamics (i.e., transition kernel) of the environment. The collective goal is to learn a shared policy that maximizes the total rewards accumulated from all the agents; in other words, one seeks a policy that performs well in terms of overall benefits, rather than biasing towards any individual task, achieving the Pareto frontier in a multi-objective context. There is no shortage of application scenarios where federated multi-task RL becomes highly relevant. For instance, in healthcare [ ZBW +20 ], different hospitals may be interested in finding an optimal treatment for all patients without disclosing private data, where the effectiveness of the treatment can vary across different hospitals due to demographical differences. See Appendix B.1 for more application scenarios of our setting. Nonetheless, despite the promise, provably efficient algorithms for federated multi-task RL remain substantially under-explored, especially in the fully decentralized setting. The heterogeneity of local tasks leads to a higher degree of disagreements between the global value function and local value functions of individual agents. Due to the lack of global information sharing, care needs to be taken to judiciously balance the use of neighboring information (to facilitate consensus) and local data (to facilitate learning) when updating the policy. To the best of our knowledge, very few algorithms are currently available to find the global optimal policy with non-asymptotic convergence guarantees even for tabular infinite-horizon Markov decision processes. Motivated by the connection with decentralized optimization, it is tempting to take a policy optimiza-tion perspective to tackle this challenge. Policy gradient (PG) methods, which seek to learn the policy of interest via first-order optimization methods, play an eminent role in RL due to their simplicity and scalability. In particular, natural policy gradient (NPG) methods [ Ama98 , Kak01 ] are among the most popular variants of PG methods, underpinning default methods used in practice such as trust region policy optimization (TRPO) [SLA +15] and proximal policy optimization (PPO) [SWD +17]. On the theoretical side, it has also been established recently that the NPG method enjoys fast global convergence to the optimal policy in an almost dimension-free manner [ AKLM21 , CWC21 ], where the iteration complexity is nearly independent of the size of the state-action space. These benefits can be translated to their sample-based counterparts such as the natural actor critic (NAC) method [BSGL09 , XWL20 , KDRM22 ], where the policies are evaluated via stochastic samples. It is natural to ask: 
+
+Can we develop federated NPG and NAC methods with non-asymptotic global convergence 
+
+guarantees for multi-task RL in the fully decentralized setting? 
+
+1.1 Our contributions 
+
+Focusing on infinite-horizon Markov decision processes (MDPs), we provide an affirmative answer to the above question, by developing federated NPG (FedNPG) methods for solving both the vanilla and entropy-regularized multi-task RL problems with finite-time global convergence guarantees. While entropy regularization is often incorporated as an effective strategy to encourage exploration during policy learning, solving the entropy-regularized RL problem is of interest in its own right, as the optimal regularized policy possesses desirable robust properties with respect to reward perturbations [EL21 , MP95 ]. Due to the multiplicative update nature of NPG methods under softmax parameteri-zation, it is more convenient to work with the logarithms of local policies in the decentralized setting. In each iteration of the proposed FedNPG method, the logarithms of local policies are updated by a weighted linear combination of two terms (up to normalization): a gossip mixing [ NO09 ] of the logarithms of neighboring local policies, and a local estimate of the global Q-function tracked via the technique of dynamic average consensus [ ZM10 ], a prevalent idea in decentralized optimization that allows for the use of large constant learning rates [ DLS16 , NOS17 , QL17 ] to accelerate convergence. We further develop sample-efficient federated NAC (FedNAC) methods that allow for both stochastic policy evaluation and function approximation. Our contributions are as follows. • We propose FedNPG methods for both the vanilla and entropy-regularized multi-task RL prob-lems, where each agent only communicates with its neighbors and performs local computation using its own reward or task information. 
+
+> 6Our work seamlessly handles the server-client setting as a special case, by assuming the network topology as a fully connected network.
+
+2setting algorithms iteration complexity optimality criteria unregularized NPG [AKLM21] O                                                 
+
+> 1(1 −γ)2ε+log |A|
+> ηε
+> 
+> V⋆−Vπ(t)
+> ≤ε
+> FedNPG (ours) O
+> σ√Nlog |A|
+> (1 −γ)92(1 −σ)ε32
+> +1(1 −γ)2ε
+> 1
+> T
+> PT−1
+> t=0
+>  V⋆−Vπ(t)≤ε
+> regularized NPG [CWC21] O
+> 1
+> τ η log  1
+> ε
+> 
+> V⋆τ−Vπ(t)
+> τ≤ε
+> FedNPG (ours) O
+> 
+> max
+> n1
+> τ η ,11−σ
+> o
+> log  1
+> ε
+> 
+> V⋆τ−Vπ(t)
+> τ≤ε
+
+Table 1: Iteration complexities of NPG and FedNPG (ours) methods to reach ε-accuracy of the vanilla and entropy-regularized problems, where we assume exact gradient evaluation, and only keep the dominant terms w.r.t. ε. The policy estimates in the t-iteration are π(t) and ¯π(t) for NPG and FedNPG, respectively, where T is the number of iterations. Here, N is the number of agents, τ ≤ 1 is the regularization parameter, σ ∈ [0 , 1] is the spectral radius of the network, γ ∈ [0 , 1) is the discount factor, |A| is the size of the action space, and η > 0 is the learning rate. The iteration complexities of FedNPG reduce to their centralized counterparts when σ = 0 . For vanilla FedNPG, the learning rate is set as η = η1 = O
+
+ (1 −γ)9(1 −σ)2 log |A| 
+
+> T N σ
+
+1/3
+
+; for entropy-regularized FedNPG, the learning rate satisfies 0 < η < η 0 = O
+
+ (1 −γ)7(1 −σ)2τσN 
+
+
+
+.• Assuming access to exact policy evaluation, we establish that the average iterate of vanilla FedNPG converges globally at a rate of O(1 /T 2/3) in terms of the sub-optimality gap for the multi-task RL problem, and that the last iterate of entropy-regularized FedNPG converges globally at a linear rate to the regularized optimal policy. Our convergence theory highlights the impacts of all salient problem parameters (see Table 1 for details), such as the size and connectivity of the communication network. In particular, the iteration complexities of FedNPG are again almost independent of the size of the state-action space, which recover prior results on the centralized NPG methods when the network is fully connected. • We further demonstrate the stability of the proposed FedNPG methods when policy evaluations are only available in an inexact manner. To be specific, we prove that their convergence rates remain unchanged as long as the approximation errors are sufficiently small in the ℓ∞ sense. • We go beyond the tabular setting and black-box policy evaluation by proposing FedNAC— a federated actor critic method for multi-task RL with function approximation and stochastic policy evaluation — and establish a finite-sample sample complexity on the order of O(1 /ε 7/2) for each agent in terms of the expected sub-optimality gap for the fully decentralized setting. To the best of our knowledge, the proposed federated NPG and NAC methods are the first policy opti-mization methods for multi-task RL that achieve near dimension-free global convergence guarantees in terms of iteration and sample complexities, allowing for fully decentralized communication without any need to share local reward/task information. We conduct numerical experiments in a multi-task GridWorld environment to corroborate the efficacy of the proposed methods (see Appendix H). We defer the readers to Appendix A for more related work, and Appendix B.2 for additional discussions on our theoretical contributions. 
+
+Notation. Boldface small and capital letters denote vectors and matrices, respectively. Sets are denoted with curly capital letters, e.g., S, A. We let (Rd, ∥·∥ ) denote the d-dimensional real coordinate space equipped with norm ∥·∥ . The ℓp-norm of v is denoted by ∥v∥p, where 1 ≤ p ≤ ∞ , and the spectral norm and the Frobenius norm of a matrix M are denoted by ∥M ∥2 and ∥M ∥F, resp. We let 
+
+[N ] denote {1, . . . , N }, use 1N to represent the all-one vector of length N , and denote by 0 a vector or a matrix consisting of all 0’s. We allow the application of functions such as log( ·) and exp( ·) to vectors or matrices, with the understanding that they are applied in an element-wise manner. 
+
+## 2 Model and backgrounds 
+
+Markov decision processes. We consider an infinite-horizon discounted Markov decision process (MDP) denoted by M = ( S, A, P, r, γ ), where S and A denote the state space and the action space, respectively, γ ∈ [0 , 1) indicates the discount factor, P : S × A → ∆( S) is the transition kernel, and 
+
+r : S × A → [0 , 1] stands for the reward function. To be more specific, for each state-action pair 
+
+(s, a ) ∈ S × A and any state s′ ∈ S , we denote by P (s′|s, a ) the transition probability from state 3s to state s′ when action a is taken, and r(s, a ) the instantaneous reward received in state s when action a is taken. Furthermore, a policy π : S → ∆( A) specifies an action selection rule, where 
+
+π(a|s) specifies the probability of taking action a in state s for each (s, a ) ∈ S × A .For any given policy π, we denote by V π : S 7 → R the corresponding value function, which is the expected discounted cumulative reward with an initial state s0 = s, given by 
+
+∀s ∈ S : V π (s) := E
+
+" ∞X
+
+> t=0
+
+γtr(st, a t)|s0 = s
+
+#
+
+, (1) where the randomness is over the trajectory generated following the policy at ∼ π(·| st) and the MDP dynamic st+1 ∼ P (·| st, a t). We also overload the notation V π (ρ) to indicate the expected value function of policy π when the initial state follows a distribution ρ over S, namely, V π (ρ) := 
+
+Es∼ρ [V π (s)] . Similarly, the Q-function Qπ : S × A 7 → R of policy π is defined by 
+
+Qπ (s, a ) := E
+
+" ∞X
+
+> t=0
+
+γtr(st, a t)|s0 = s, a 0 = a
+
+#
+
+(2) for all (s, a ) ∈ S ×A , which measures the expected discounted cumulative reward with an initial state 
+
+s0 = s and an initial action a0 = a, with expectation taken over the randomness of the trajectory. The optimal policy π⋆ refers to the policy that maximizes the value function V π (s) for all states s ∈ S ,which is guaranteed to exist [ Put14 ]. The corresponding optimal value function and Q-function are denoted as V ⋆ and Q⋆, respectively. 
+
+Entropy-regularized RL. Entropy regularization [ WP91 , ALRNS19 ] is a popular technique in practice that encourages stochasticity of the policy to promote exploration, as well as robustness against reward uncertainties. Mathematically, this can be viewed as adjusting the instantaneous reward based the current policy in use as 
+
+∀(s, a ) ∈ S × A : rτ (s, a ) := r(s, a ) − τ log π(a|s) , (3) where τ ≥ 0 denotes the regularization parameter. Typically, τ should not be too large to outweigh the actual rewards; for ease of presentation, we assume τ ≤ min 
+
+n
+
+1, 1log |A| 
+
+o
+
+[ CCDX22 ]. Equivalently, this amounts to the entropy-regularized (also known as “soft”) value function, defined as 
+
+∀s ∈ S : V πτ (s) := V π (s) + τ H(s, π ), (4) where 
+
+H(s, π ) := E
+
+" ∞X
+
+> t=0
+
+−γt log π(at|st) s0 = s
+
+#
+
+. (5) Analogously, for all (s, a ) ∈ S × A , the regularized (or soft) Q-function Qπτ of policy π is related to the soft value function V πτ (s) as 
+
+Qπτ (s, a ) = r(s, a ) + γEs′∈P (·| s,a ) [V πτ (s′)] , (6a) 
+
+V πτ (s) = Ea∼π(·| s) [−τ π (a|s) + Qπτ (s, a )] . (6b) The optimal regularized policy, the optimal regularized value function, and the Q-function are denoted by π⋆τ , V ⋆τ , and Q⋆τ , respectively. 
+
+Natural policy gradient methods. Natural policy gradient (NPG) methods lie at the heart of policy optimization, serving as the backbone of popular heuristics such as TRPO [ SLA +15 ] and PPO [ SWD +17 ]. Instead of directly optimizing the policy over the probability simplex, one often adopts the softmax parameterization, which parameterizes the policy as πθ := softmax( θ) or 
+
+πθ (a|s) := exp θ(s, a )
+
+P 
+
+> a′∈A
+
+exp θ(s, a ′) (7) for any θ: S × A → R and (s, a ) ∈ S × A .In the tabular setting, the update rule of vanilla NPG at the t-th iteration can be concisely represented as 
+
+π(t+1) (a|s) ∝ π(t)(a|s) exp 
+
+ ηQ (t)(s, a )1 − γ
+
+
+
+, (8) 4Turning to the regularized problem, we note that the update rule of entropy-regularized NPG becomes 
+
+π(t+1) (a|s) ∝ (π(t)(a|s)) 1− ητ  
+
+> 1−γ
+
+exp ηQ (t) 
+
+> τ
+
+(s, a )1 − γ
+
+!
+
+, (9) where η ∈ (0 , 1−γτ ] is the learning rate, and Q(t) 
+
+> τ
+
+= Qπ(t) 
+
+> τ
+
+is the soft Q-function of policy π(t).
+
+## 3 Federated NPG methods for multi-task RL 
+
+In this paper, we consider the federated multi-task RL setting, where a set of agents learn collabo-ratively a single policy that maximizes its average performance over all the tasks using only local computation and communication. 
+
+Multi-task RL. Each agent n ∈ [N ] has its own private reward function rn(s, a ) — corresponding to different tasks — while sharing the same transition kernel of the environment. The goal is to collectively learn a single policy π that maximizes the global value function given by V π (s) = 
+
+> 1
+> N
+
+PNn=1 V πn (s), where V πn is the value function of agent n ∈ [N ], defined by 
+
+V πn (s) := E
+
+" ∞X
+
+> t=0
+
+γtrn(st, a t)|s0 = s
+
+#
+
+.
+
+Clearly, the global value function corresponds to using the average reward of all agents r(s, a ) = 
+
+> 1
+> N
+
+PNn=1 rn(s, a ). The global Q-function Qπ (s, a ) and the agent Q-functions Qπn(s, a ) can be defined in a similar manner obeying Qπ (s, a ) = 1
+
+> N
+
+PNn=1 Qπn(s, a ).In parallel, we are interested in the entropy-regularized setting, where each agent n ∈ [N ] is equipped with a regularized reward function given by rτ,n (s, a ) := rn(s, a ) − τ log π(a|s). And we define similarly the regularized value functions as 
+
+V πτ,n (s) := E
+
+" ∞X
+
+> t=0
+
+γtrτ,n (st, a t)|s0 = s
+
+#
+
+for all n ∈ [N ] and V πτ (s) = 1
+
+> N
+
+PNn=1 V πτ,n (s), ∀s ∈ S . The soft Q-function of agent n is given by 
+
+Qπτ,n (s, a ) = rn(s, a ) + γEs′∈P (·| s,a )
+
+V πτ,n (s′) , (10) and the global soft Q-function is given by Qπτ (s, a ) = 1
+
+> N
+
+PNn=1 Qπτ,n (s, a ).
+
+Federated policy optimization in the fully decentralized setting. We consider a federated setting with fully decentralized communication, that is, all the agents are synchronized to perform information exchange over some prescribed network topology denoted by an undirected weighted graph G([ N ], E ).Here, E stands for the edge set of the graph with N nodes — each corresponding to an agent — and two agents can communicate with each other if and only if there is an edge connecting them. The information sharing over the graph is best described by a mixing matrix [ NO09 ], denoted by 
+
+W = [ wij ] ∈ [0 , 1] N ×N , where wij is a positive number if (i, j ) ∈ E and 0 otherwise. We also make the following standard assumptions on the mixing matrix. 
+
+Assumption 3.1 (double stochasticity) . The mixing matrix W = [ wij ] ∈ [0 , 1] N ×N is symmetric (i.e., W ⊤ = W ) and doubly stochastic (i.e., W 1N = 1N , 1⊤ 
+
+> N
+
+W = 1⊤ 
+
+> N
+
+). The following standard metric measures how fast information propagates over the graph. 
+
+Definition 3.2 (spectral radius) . The spectral radius of W is given as σ := ∥W − 1 
+
+> N
+
+1N 1⊤ 
+
+> N
+
+∥2 ∈ [0 , 1) .The spectral radius σ determines how fast information propagate over the network. For instance, in a fully-connected network, we can achieve σ = 0 by setting W = 1 
+
+> N
+
+1N 1⊤ 
+
+> N
+
+. For control of 1/(1 − σ)
+
+regarding different graphs, we refer the readers to [ NOR18 ]. In an Erdös-Rényi random graph, as long as the graph is connected, one has with high probability σ ≍ 1. Another immediate consequence is that for any x ∈ RN , letting x = 1 
+
+> N
+
+1⊤ 
+
+> N
+
+x be its average, we have 
+
+∥W x − x1N ∥2 ≤ σ ∥x − x1N ∥2 , (11) where the consensus error contracts by a factor of σ.5Algorithm 1 Federated NPG (FedNPG) 
+
+1: Input: learning rate η > 0, iteration number T ∈ N+, mixing matrix W ∈ RN ×N .
+
+2: Initialize: π(0) , T (0) = Q(0) .
+
+3: for t = 0 , 1, · · · T − 1 do 
+
+4: Update the policy for each (s, a ) ∈ S × A :
+
+log π(t+1) (a|s) = W
+
+
+
+log π(t)(a|s) + η
+
+1 − γ T (t)(s, a )
+
+
+
+− log z(t)(s) , (15) where z(t)(s) = P 
+
+> a′∈A
+
+exp 
+
+n
+
+W   log π(t)(a′|s) + η 
+
+> 1−γ
+
+T (t)(s, a ′)o
+
+.
+
+5: Evaluate Q(t+1) .
+
+6: Update the global Q-function estimate for each (s, a ) ∈ S × A :
+
+T (t+1) (s, a ) = W
+
+
+
+T (t)(s, a ) + Q(t+1) (s, a ) − Q(t)(s, a )
+
+| {z }
+
+> Q-tracking
+
+
+
+. (16) 
+
+7: end for 3.1 Proposed federated NPG algorithms 
+
+Assuming softmax parameterization, the problem can be formulated as decentralized optimization, (unregularized) max  
+
+> θ
+
+V πθ (s) = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+V πθ 
+
+> n
+
+(s), (12) (regularized) max  
+
+> θ
+
+V πθ 
+
+> τ
+
+(s) = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+V πθ
+
+> τ,n
+
+(s), (13) where πθ := softmax( θ) subject to communication constraints. Motivated by the success of NPG methods, we aim to develop federated NPG methods to achieve our goal. For notational convenience, let π(t) :=  π(t)1 , · · · , π (t)
+
+> N
+
+⊤ be the collection of policy estimates at all agents in the t-th iteration. Let 
+
+π(t) := softmax 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+log π(t)
+
+> n
+
+!
+
+, (14) which satisfies that π(t)(a|s) ∝
+
+QNn=1 π(t) 
+
+> n
+
+(a|s)
+
+1/N 
+
+for each (s, a ) ∈ S × A . Therefore, π(t)
+
+could be seen as the normalized geometric mean of {π(t) 
+
+> n
+
+}n∈[N ]. Define the collection of Q-function estimates as Q(t) := 
+
+
+
+Qπ(t)1 
+
+> 1
+
+, · · · , Q π(t)
+
+> N
+> N
+
+⊤
+
+and Q(t) 
+
+> τ
+
+:= 
+
+
+
+Qπ(t)1 
+
+> τ, 1
+
+, · · · , Q π(t)
+
+> N
+> τ,N
+
+⊤
+
+. We shall often abuse the notation and treat π(t), Q(t) 
+
+> τ
+
+as matrices in RN ×|S||A| , and treat π(t)(a|s), Q(t) 
+
+> τ
+
+(a|s) as vectors in RN , for all (s, a ) ∈ S × A .
+
+Vanilla federated NPG methods. To motivate the algorithm development, observe that the NPG method (cf. (8) ) applied to (12) adopts the update rule π(t+1) (a|s) ∝
+
+π(t)(a|s) exp 
+
+ η PNn=1 Qπ(t)  
+
+> n(s,a )
+> N(1 −γ)
+
+
+
+for all (s, a ) ∈ S × A . Two challenges arise when executing this update rule: the policy estimates are maintained locally without consensus, and the global Q-function are unavailable in the decentralized setting. To address these challenges, we apply the idea of dynamic average consensus [ ZM10 ], where each agent maintains its own estimate T (t) 
+
+> n
+
+(s, a ) of the global Q-function, which are collected as vector T (t) =  T (t)1 , · · · , T (t)
+
+> N
+
+⊤. At each iteration, each agent updates its policy estimates based on its neighbors’ information via gossip mixing, in addition to a correction term that tracks the difference Qπ(t+1)  
+
+> n
+> n
+
+(s, a ) − Qπ(t) 
+
+> n
+> n
+
+(s, a ) of the local Q-functions between consecutive policy updates. Note that the mixing is applied linearly to the logarithms of local policies, which translates into a multiplicative mixing of the local policies. Algorithm 1 summarizes the detailed procedure of the proposed algorithm written in a compact matrix form, which we dub as federated NPG (FedNPG). Note that the agents do not need to share their reward functions with 6others, and agent n ∈ [N ] will only be responsible to evaluate the local policy π(t) 
+
+> n
+
+using the local reward rn.
+
+Entropy-regularized federated NPG methods. Moving onto the entropy regularized case, we adopt similar algorithmic ideas to decentralize (9) , and propose the federated NPG (FedNPG) method with entropy regularization, summarized in Algorithm 2 (see Appendix C.1). Clearly, the entropy-regularized FedNPG method reduces to vanilla FedNPG in the absence of the regularization (i.e., when τ = 0 ). 
+
+3.2 Theoretical guarantees Global convergence of FedNPG with exact policy evaluation. We begin with the global conver-gence of FedNPG (cf. Algorithm 1), stated in the following theorem. The formal statement and proof can be found in Appendix D.3, and see Appendix B.2 for discussions on the technical challenges. 
+
+Theorem 3.3 (Global sublinear convergence of exact FedNPG (informal)) . Suppose π(0)  
+
+> n
+
+, n ∈ [N ] are set as the uniform distribution. Then when T ≥ 128 √N log |A| σ4 
+
+> (1 −σ)4
+
+and η =
+
+ (1 −γ)9(1 −σ)2 log |A| 
+
+> 32 T N σ 2
+
+1/3
+
+,we have 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V π(t)
+
+(ρ)
+
+
+
+≲ V ⋆(dπ⋆ 
+
+> ρ
+
+)(1 − γ)T + N 1/3σ2/3
+
+(1 − γ)3(1 − σ)2/3
+
+ log |A| 
+
+T
+
+2/3
+
+. (17a) 
+
+log π(t) 
+
+> n
+
+− log ¯ π(t)
+
+> ∞
+
+≲ N 2/3σ1/3
+
+(1 − γ)(1 − σ)1/3
+
+ log |A| 
+
+T
+
+1/3
+
+. (17b) Theorem 3.3 characterizes the average-iterate convergence of the average policy π(t) (cf. (14) ) across the agents, which depends logarithmically on the size of the action space, and independently on the size of the state space. Theorem 3.3 indicates that in the server-client setting with σ = 0 ,the convergence rate of FedNPG recovers the O(1 /T ) rate, matching that of the centralized NPG established in [ AKLM21 ]; on the other end, in the decentralized setting where σ > 0, FedNPG slows down and eventually converges at the slower O(1 /T 2/3) rate. We state the iteration complexity in Corollary 3.4. 
+
+Corollary 3.4 (Iteration complexity of exact FedNPG) . To reach 1
+
+> T
+
+PT −1
+
+> t=0
+
+ V ⋆(ρ) −
+
+V π(t)
+
+(ρ) ≤ ε, the iteration complexity of FedNPG is at most 
+
+O
+
+ σ 
+
+> (1 −γ)9/2(1 −σ)ε3/2
+
++ σ2
+
+> (1 −σ)4
+
+ √N log |A| + 1
+
+> ε(1 −γ)2
+
+
+
+.
+
+Global convergence of FedNPG with inexact policy evaluation. In practice, the policies need to be evaluated using samples collected by the agents, where the Q-functions are only estimated approximately. We are interested in gauging how the approximation error impacts the performance of FedNPG, as demonstrated in the following theorem. The formal statement, detailed discussions, and proof of this result is given in Appendix D.4. 
+
+Theorem 3.5 (Global sublinear convergence of inexact FedNPG (informal)) . Suppose that an estimate 
+
+qπ(t) 
+
+> n
+> n
+
+are used in replace of Qπ(t) 
+
+> n
+> n
+
+in Algorithm 1. Under the assumptions of Theorem 3.3, when 
+
+T ≳   
+
+> √Nlog |A| σ4
+> (1 −σ)4
+
+and η =
+
+ (1 −γ)9(1 −σ)2 log |A| 
+
+> 32 T N σ 2
+
+1/3
+
+, we have 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V π(t)
+
+(ρ)
+
+
+
+≲ V ⋆(dπ⋆ 
+
+> ρ
+
+)(1 − γ)T + N 1/3σ2/3
+
+(1 − γ)3(1 − σ)2/3
+
+ log |A| 
+
+T
+
+2/3
+
++ 1(1 − γ)2 max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> n
+
+− qπ(t) 
+
+> n
+> n∞
+
+. (18) Equipped with existing sample complexity bounds on policy evaluation, e.g. using a simulator as in [LWCC23a ], this immediate leads to the sample complexity per state-action pair at each agent to find an ε-optimal policy is at most 
+
+eO
+
+√N
+
+(1 − γ)11 .5(1 − σ)ε3.5
+
+!
+
+(19) 7for sufficiently small ε.
+
+Global convergence of entropy-regularized FedNPG with exact policy evaluation. Next, we present our global convergence guarantee of entropy-regularized FedNPG with exact policy evaluation (cf. Algorithm 2). 
+
+Theorem 3.6 (Global linear convergence of exact entropy-regularized FedNPG (informal)) . For any γ ∈ (0 , 1) and 0 < τ ≤ 1, there exists η0 = min 
+
+n 1−γτ , O
+
+ (1 −γ)7(1 −σ)2τσ2N
+
+o 
+
+, such that if 
+
+0 < η ≤ η0, then we have 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞ ≤ 2γC 1ρ(η)t log π⋆τ − log π(t) 
+
+> ∞
+
+≤ 2C1
+
+τ ρ(η)t , (20) 
+
+where Q(t) 
+
+> τ
+
+:= Qπ(t) 
+
+> τ
+
+, ρ(η) ≤ max {1 − τ η  
+
+> 2
+
+, 3+ σ 
+
+> 4
+
+} < 1, and C1 is some problem-dependent constant. Furthermore, the consensus error satisfies 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t) 
+
+> ∞
+
+≤ 2C1ρ(η)t. (21) The exact expressions of C1 and η0 are specified in Appendix D.1. Theorem 3.6 confirms that entropy-regularized FedNPG converges at a linear rate to the optimal regularized policy, which is almost independent of the size of the state-action space, highlighting the positive role of entropy regularization in federated policy optimization. When the network is fully connected, i.e. σ = 0 ,the iteration complexity of entropy-regularized FedNPG reduces to O
+
+ 1 
+
+> ητ
+
+log 1
+
+> ε
+
+
+
+, matching that of the centralized entropy-regularized NPG established in [ CWC21 ]. When the network is less connected, one needs to be more conservative in the choice of learning rates, leading to a higher iteration complexity, as described in the following corollary. 
+
+Corollary 3.7 (Iteration complexity of exact entropy-regularized FedNPG) . To reach 
+
+log π⋆τ − log π(t) 
+
+> ∞
+
+≤ ε, the iteration complexity of entropy-regularized FedNPG is at most 
+
+eO
+
+
+
+max 
+
+ 2
+
+τ η , 41 − σ
+
+
+
+log 1
+
+ε
+
+
+
+(22) 
+
+up to logarithmic factors. Especially, when η = η0, the best iteration complexity becomes 
+
+eO
+
+ N σ 2  
+
+> (1 −γ)7(1 −σ)2τ2
+
++ 11−γ
+
+
+
+log 1
+
+> τ ε
+
+
+
+.
+
+Global convergence of entropy-regularized FedNPG with inexact policy evaluation. Last but not the least, we present the informal convergence results of entropy-regularized FedNPG with inexact policy evaluation, whose formal version can be found in Appendix D.2. 
+
+Theorem 3.8 (Global linear convergence of inexact entropy-regularized FedNPG (informal)) . Sup-pose that an estimate qπ(t) 
+
+> n
+> τ,n
+
+are used in replace of Qπ(t) 
+
+> n
+> τ,n
+
+in Algorithm 2. Under the assumptions of Theorem 3.6, we have 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞ ≤ 2γ
+
+
+
+C1ρ(η)t + C2εq
+
+
+
+, log π⋆τ − log π(t) 
+
+> ∞
+
+≤ 2
+
+τ
+
+
+
+C1ρ(η)t + C2εq
+
+
+
+, (23) 
+
+where Q(t) 
+
+> τ
+
+:= Qπ(t) 
+
+> τ
+
+, εq := max n∈[N ],t ∈[T ] Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t) 
+
+> n
+> τ,n ∞
+
+, ρ(η) ≤ max {1 − τ η  
+
+> 2
+
+, 3+ σ 
+
+> 4
+
+} < 1, and 
+
+C1, C2 are problem-dependent constants. 
+
+## 4 Federated NAC with function approximation and stochastic evaluation 
+
+In this section, motivated by the design and analysis of FedNPG, we go beyond the tabular setting and exact policy evaluation, by proposing a federated natural actor-critic (FedNAC) method with function approximation and stochastic policy evaluation. Specifically, we consider the policy with function approximation under softmax parameterization is of the following form: 
+
+fξ (a|s) = exp( ϕ⊤(s, a )ξ)
+
+P 
+
+> a′∈A
+
+exp( ϕ⊤(s, a ′)ξ) , (24) for all (s, a ) ∈ S × A and ξ ∈ Rp, where ϕ : S × A → Rp is a known feature map. We assume ϕ is bounded over S × A , i.e., there exists Cϕ > 0 such that ∥ϕ(s, a )∥2 ≤ Cϕ holds for all (s, a ) ∈ S × A .8Following [ AKLM21 , YDG +22 ], given any w ∈ Rp, Q : S × A → R and probability distribution 
+
+ζ ∈ ∆( S × A ) over the state-action space, we define the function approximation error ℓ(w, Q, ζ ) as follows: 
+
+ℓ(w, Q, ζ ) := E(s,a )∼ζ
+
+h w⊤ϕ(s, a ) − Q(s, a )2i
+
+. (25) By searching for w that minimizes ℓ(w, Q, ζ ), it approximates Q(s, a ) using the feature map ϕ with respect to the distribution ζ.
+
+Algorithm design. Let us now discuss the high-level design of FedNAC, which is presented in Algorithm 3, with more details provided in Appendix C.2. At the t-th iteration ( t = 0 , . . . , T − 1), denote the actor (concerning the policies) parameters of all agents as ξ(t) = ( ξ(t)1 , . . . , ξ(t) 
+
+> N
+
+)⊤ ∈
+
+RN ×p, and the critic parameters of all agents as w(t) = ( w(t)1 , . . . , w(t) 
+
+> N
+
+)⊤ ∈ RN ×p (concerning the local Q-values) and h(t) = ( h(t)1 , . . . , h(t) 
+
+> N
+
+)⊤ ∈ RN ×p (concerning the global Q-values). • First, the critic parameter w(t) 
+
+> n
+
+is locally updated at each agent by aiming to minimize 
+
+ℓ(w, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+) (cf. (25) ) with gradient descent, where Q(t) 
+
+> n
+
+is the local Q-function of the local policy fξ(t)
+
+> n
+
+, and ˜d(t) 
+
+> n
+
+is the state-action visitation distribution induced by the local policy fξ(t)
+
+> n
+
+and an initial state-action distribution ν (determined from the data sampling mechanism, cf. (30) ). However, since Q(t) 
+
+> n
+
+is not directly available, it needs to be estimated from samples. Therefore, the critic update takes K steps of stochastic gradient descent with critic learning rate β, given by 
+
+ewk+1 = ewk − β  ew⊤ 
+
+> k
+
+ϕ(sk, a k) − bQξ (sk, a k)ϕ(sk, a k),
+
+for k = 0 , . . . , K − 1, where (sk, a k) is sampled on the local policy fξ(t)
+
+> n
+
+, and bQξ (sk, a k) is a careful estimate of the Q-value using a trajectory with expected length 1/(1 − γ) (see Algorithm 5 in Appendix C.2 adopted from [ YDG +22 , Lemma 4]), and ew0 = 0 for simplicity. The final critic is updated as w(t) 
+
+> n
+
+= 1
+
+> K
+
+PKk=1 ewk. The total sample complexity of the critic update per iteration is then on the order of K/ (1 − γ).• Next, the critic parameter h(t) 
+
+> n
+
+for estimating the global Q-function can then be esti-mated by averaging with the neighbors with the Q-tracking term, given by h(t) =
+
+W  h(t−1) + w(t) − w(t−1)  .
+
+• Finally, the actor parameter ξ(t) 
+
+> n
+
+can be updated via averaging with the neighbors along with the policy gradient informed by h(t) 
+
+> n
+
+, given by ξ(t+1) = W  ξ(t) + αh(t) , where α is the learning rate of the actor. Note that the sample complexity of FedNAC is on the order of KT / (1 − γ). An important aspect of the FedNAC method is that the policy is updated using trajectory data collected via executing the learned policy, which is closer to practice and more challenging to learn than using the generative model. 
+
+Theoretical guarantees. We first state the assumptions that are needed to guarantee the convergence of Algorithm 3, which are all commonly used in the literature, e.g., [ YDG +22 , AKLM21 ]. To begin, we require the covariance matrix of the feature map induced by the initial state-action distribution ν
+
+satisfies the following assumption to guarantee the convergence of the critic. 
+
+Assumption 4.1 (PSD of the covariance matrix of the feature map) . There exists μ > 0 such that 
+
+E(s,a )∼ν
+
+ϕ(s, a )ϕ⊤(s, a ) = Σ ν ≥ μI.We also need to ensure that the Q-values can be well approximated by the linear function approxima-tion using feature map ϕ(s, a ), which is captured next. 
+
+Assumption 4.2 (Bounded approximation error) . For each n ∈ [N ], there exists εn 
+
+> approx
+
+≥ 0
+
+such that for all t ∈ N, it holds that E
+
+h
+
+ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+i 
+
+≤ εn
+
+> approx
+
+, where w(t) 
+
+> ⋆,n
+
+:= arg min w ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+.We denote the average approximation error as ¯εapprox = 1
+
+> N
+
+PNn=1 εn
+
+> approx
+
+. Similar as [ YDG +22 ], we need the following assumption that bounds the transfer errors due to distribution shifts. 9Assumption 4.3 (Bounded transfer error) . There exists Cν > 0 such that for all n ∈ [N ] and t ∈ N,it holds that E(s,a )∼ ˜d(t)
+
+> n
+
+ hπ (s,a )˜d(t) 
+
+> n(s,a )
+
+2
+
+≤ Cν , where hπ (s, a ) is the state-action visitation distribution induced by any policy π from initial state distribution ρ.Note that if we choose ν(s, a ) > 0 for all (s, a ) ∈ S × A , then Assumption 4.3 is guaranteed to hold true (see Lemma E.4 in Appendix E). We are now ready to state the convergence guarantee, whose formal version and proof could be found in Appendix E. 
+
+Theorem 4.4 (Convergence rate of Algorithm 3 (informal)) . Let ξ(0) 1 = · · · = ξ(0)  
+
+> N
+
+in FedNAC. Denoting ¯ξ(t) := 1
+
+> N
+
+PNn=1 ξ(t) 
+
+> n
+
+, and ¯f (t) := f¯ξ(t) as the average policy. Then under Assumption 3.1, 4.1, 4.2 and 4.3, with appropriately chosen learning rates α and β, as long as the number of actor iterations satisfies 
+
+T ≳ max 
+
+ σε3/2(1 − γ)17 /4(1 − σ)3/2 , 1
+
+ε(1 − γ) , σ1/4
+
+ε3/4(1 − σ)3/8(1 − γ)7/8N 3/8 , σ4
+
+(1 − γ)2(1 − σ)6
+
+
+
+and the number of critic iterations satisfies K = O
+
+ 1(1 −γ)6ε2
+
+
+
+, it holds that 
+
+V ⋆(ρ) − 1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+V ¯f (t)
+
+(ρ) ≲ ε + ¯εapprox 
+
+1 − γ . (26) In the server-client setting when σ = 0 , to reach (26) , it suffices to choose T = O
+
+ 1(1 −γ)ε
+
+
+
+and 
+
+K = O
+
+ 1(1 −γ)6ε2
+
+
+
+, leading to a total sample complexity of KT / (1 − γ) = O
+
+ 1(1 −γ)8ε3
+
+
+
+per agent, and T = O
+
+ 1(1 −γ)ε
+
+
+
+rounds of communication. The sample complexity matches that of (centralized) Q-NPG established in [ YDG +22 ] with a single agent. On the other end, in the fully decentralized setting when σ is not close to 0, FedNAC requires O
+
+ 1(1 −γ)45 /4ε7/2(1 −σ)3/2
+
+
+
+samples for each agent and O
+
+ 1
+
+> ε3/2(1 −γ)17 /4(1 −σ)3/2
+
+
+
+rounds of communication to reach (26) , for sufficiently small ε. Encouragingly, the dependency on the accuracy level ε — the dominating factor — in the sample complexity matches that of FedNPG given in (19) when assuming access to the generative model, which allows query of arbitrary state-action pairs. In contrast, FedNAC only collects on-policy samples, and therefore is much more challenging to guarantee its convergence. 
+
+## 5 Conclusions 
+
+This work proposes the first provably efficient federated NPG (FedNPG) methods for solving vanilla and entropy-regularized multi-task RL problems in the fully decentralized setting. The established finite-time global convergence guarantees are almost independent of the size of the state-action space up to some logarithmic factor, and illuminate the impacts of the size and connectivity of the network. Furthermore, the proposed FedNPG methods are provably robust vis-a-vis inexactness of local policy evaluations. Last but not least, we also propose FedNAC, which can be viewed as an extension of FedNPG with function approximation and stochastic policy evaluation, and establish its finite-time sample complexity. Future directions include generalizing the framework of federated policy optimization to allow personalized policy learning in a shared environment. 
+
+## Acknowledgments and Disclosure of Funding 
+
+The work of T. Yang, S. Cen and Y. Chi are supported in part by the grants ONR N00014-19-1-2404, NSF CCF-1901199, CCF-2106778, AFRL FA8750-20-2-0504, and a CMU Cylab seed grant. The work of Y. Wei is supported in part by the the NSF grants DMS-2147546/2015447, CAREER award DMS-2143215, CCF-2106778, and the Google Research Scholar Award. The work of Y. Chen is supported in part by the Alfred P. Sloan Research Fellowship, the Google Research Scholar Award, the AFOSR grant FA9550-22-1-0198, the ONR grant N00014-22-1-2354, and the NSF grants CCF-2221009 and CCF-1907661. S. Cen is also gratefully supported by Wei Shen and Xuehong Zhang Presidential Fellowship, Boeing Scholarship, and JP Morgan Chase PhD Fellowship. 10 References 
+
+[AKLM21] A. Agarwal, S. M. Kakade, J. D. Lee, and G. Mahajan. On the theory of policy gradient methods: Optimality, approximation, and distribution shift. The Journal of Machine Learning Research , 22(1):4431–4506, 2021. [ALRNS19] Z. Ahmed, N. Le Roux, M. Norouzi, and D. Schuurmans. Understanding the impact of entropy on policy optimization. In International Conference on Machine Learning ,pages 151–160, 2019. [Ama98] S.-I. Amari. Natural gradient works efficiently in learning. Neural computation ,10(2):251–276, 1998. [AR21] A. Anwar and A. Raychowdhury. Multi-task federated reinforcement learning with adversaries. arXiv preprint arXiv:2103.06473 , 2021. [ARB +19] M. Assran, J. Romoff, N. Ballas, J. Pineau, and M. Rabbat. Gossip-based actor-learner architectures for deep reinforcement learning. Advances in Neural Information Processing Systems , 32, 2019. [BM13] F. Bach and E. Moulines. Non-strongly-convex smooth stochastic approximation with convergence rate o (1/n). Advances in neural information processing systems , 26, 2013. [BR21] J. Bhandari and D. Russo. On the linear convergence of policy gradient methods for finite MDPs. In International Conference on Artificial Intelligence and Statistics , pages 2386–2394. PMLR, 2021. [BSGL09] S. Bhatnagar, R. S. Sutton, M. Ghavamzadeh, and M. Lee. Natural actor-critic algo-rithms. Automatica , 45(11):2471–2482, 2009. [CCC +22a] S. Cen, C. Cheng, Y. Chen, Y. Wei, and Y. Chi. Fast global convergence of natural policy gradient methods with entropy regularization. Operations Research , 70(4):2563–2578, 2022. [CCC +22b] S. Cen, C. Cheng, Y. Chen, Y. Wei, and Y. Chi. Fast global convergence of natural policy gradient methods with entropy regularization. Operations Research , 70(4):2563–2578, 2022. [CCDX22] S. Cen, Y. Chi, S. S. Du, and L. Xiao. Faster last-iterate convergence of policy optimization in zero-sum Markov games. In The Eleventh International Conference on Learning Representations , 2022. [CFGW22] J. Chen, J. Feng, W. Gao, and K. Wei. Decentralized natural policy gradient with variance reduction for collaborative multi-agent reinforcement learning. arXiv preprint arXiv:2209.02179 , 2022. [CWC21] S. Cen, Y. Wei, and Y. Chi. Fast policy extragradient methods for competitive games with entropy regularization. Advances in Neural Information Processing Systems ,34:27952–27964, 2021. [CZC21] Z. Chen, Y. Zhou, and R. Chen. Multi-agent off-policy TDC with near-optimal sample and communication complexity. In 2021 55th Asilomar Conference on Signals, Systems, and Computers , pages 504–508. IEEE, 2021. [CZGB21] T. Chen, K. Zhang, G. B. Giannakis, and T. Ba¸ sar. Communication-efficient policy gradient methods for distributed reinforcement learning. IEEE Transactions on Control of Network Systems , 9(2):917–929, 2021. [DAW11] J. C. Duchi, A. Agarwal, and M. J. Wainwright. Dual averaging for distributed opti-mization: Convergence analysis and network scaling. IEEE Transactions on Automatic control , 57(3):592–606, 2011. [DLS16] P. Di Lorenzo and G. Scutari. Next: In-network nonconvex optimization. IEEE Transactions on Signal and Information Processing over Networks , 2(2):120–136, 2016. 11 [EL21] B. Eysenbach and S. Levine. Maximum entropy RL (provably) solves some robust RL problems. In International Conference on Learning Representations , 2021. [ESM +18] L. Espeholt, H. Soyer, R. Munos, K. Simonyan, V. Mnih, T. Ward, Y. Doron, V. Firoiu, T. Harley, I. Dunning, et al. Impala: Scalable distributed deep-rl with importance weighted actor-learner architectures. In International conference on machine learning ,pages 1407–1416. PMLR, 2018. [HJ12] R. A. Horn and C. R. Johnson. Matrix analysis . Cambridge university press, 2012. [Kak01] S. M. Kakade. A natural policy gradient. Advances in neural information processing systems , 14, 2001. [KDRM22] S. Khodadadian, T. T. Doan, J. Romberg, and S. T. Maguluri. Finite sample analysis of two-time-scale natural actor-critic algorithm. IEEE Transactions on Automatic Control ,2022. [KJVM21] S. Khodadadian, P. R. Jhunjhunwala, S. M. Varma, and S. T. Maguluri. On the linear convergence of natural policy gradient algorithm. In 2021 60th IEEE Conference on Decision and Control (CDC) , pages 3794–3799. IEEE, 2021. [KMP12] S. Kar, J. M. Moura, and H. V. Poor. Qd-learning: A collaborative distributed strategy for multi-agent reinforcement learning through consensus. arXiv preprint arXiv:1205.0047 , 2012. [KSJM22] S. Khodadadian, P. Sharma, G. Joshi, and S. T. Maguluri. Federated reinforcement learning: Linear speedup under Markovian sampling. In International Conference on Machine Learning , pages 10997–11057. PMLR, 2022. [Lan23] G. Lan. Policy mirror descent for reinforcement learning: Linear convergence, new sampling complexity, and generalized problem classes. Mathematical programming ,198(1):1059–1106, 2023. [LCCC20] B. Li, S. Cen, Y. Chen, and Y. Chi. Communication-efficient distributed optimization in networks with gradient tracking and variance reduction. The Journal of Machine Learning Research , 21(1):7331–7381, 2020. [LLZ23] G. Lan, Y. Li, and T. Zhao. Block policy mirror descent. SIAM Journal on Optimization ,33(3):2341–2378, 2023. [LO08] I. Lobel and A. Ozdaglar. Convergence analysis of distributed subgradient methods over random networks. In 2008 46th Annual Allerton Conference on Communication, Control, and Computing , pages 353–360. IEEE, 2008. [LWA +23] G. Lan, H. Wang, J. Anderson, C. Brinton, and V. Aggarwal. Improved communication efficiency in federated natural policy gradient via admm-based gradient updates. arXiv preprint arXiv:2310.19807 , 2023. [LWCC23a] G. Li, Y. Wei, Y. Chi, and Y. Chen. Breaking the sample size barrier in model-based reinforcement learning with a generative model. Operations Research , 2023. [LWCC23b] G. Li, Y. Wei, Y. Chi, and Y. Chen. Softmax policy gradient methods can take exponential time to converge. Mathematical Programming , pages 1–96, 2023. [LZZ +17] X. Lian, C. Zhang, H. Zhang, C.-J. Hsieh, W. Zhang, and J. Liu. Can decentralized algorithms outperform centralized algorithms? a case study for decentralized parallel stochastic gradient descent. Advances in neural information processing systems , 30, 2017. [MA22] M. M Alshater. Exploring the role of artificial intelligence in enhancing academic performance: A case study of chatgpt. Available at SSRN , 2022. [MBM +16] V. Mnih, A. P. Badia, M. Mirza, A. Graves, T. Lillicrap, T. Harley, D. Silver, and K. Kavukcuoglu. Asynchronous methods for deep reinforcement learning. In Interna-tional conference on machine learning , pages 1928–1937, 2016. 12 [MP95] R. D. McKelvey and T. R. Palfrey. Quantal response equilibria for normal form games. 
+
+Games and economic behavior , 10(1):6–38, 1995. [MXSS20] J. Mei, C. Xiao, C. Szepesvari, and D. Schuurmans. On the global convergence rates of softmax policy gradient methods. In International Conference on Machine Learning ,pages 6820–6829. PMLR, 2020. [NNXS17] O. Nachum, M. Norouzi, K. Xu, and D. Schuurmans. Bridging the gap between value and policy based reinforcement learning. In Advances in Neural Information Processing Systems , pages 2775–2785, 2017. [NO09] A. Nedic and A. Ozdaglar. Distributed subgradient methods for multi-agent optimiza-tion. IEEE Transactions on Automatic Control , 54(1):48–61, 2009. [NOR18] A. Nedi´ c, A. Olshevsky, and M. G. Rabbat. Network topology and communication-computation tradeoffs in decentralized optimization. Proceedings of the IEEE ,106(5):953–976, 2018. [NOS17] A. Nedic, A. Olshevsky, and W. Shi. Achieving geometric convergence for distributed optimization over time-varying graphs. SIAM Journal on Optimization , 27(4):2597– 2633, 2017. [OPA +17] S. Omidshafiei, J. Pazis, C. Amato, J. P. How, and J. Vian. Deep decentralized multi-task multi-agent reinforcement learning under partial observability. In International Conference on Machine Learning , pages 2681–2690. PMLR, 2017. [PN21] S. Pu and A. Nedi´ c. Distributed stochastic gradient tracking methods. Mathematical Programming , 187:409–457, 2021. [PP08] K. B. Petersen and M. S. Pedersen. The matrix cookbook. Technical University of Denmark , 7(15):510, 2008. [Put14] M. L. Puterman. Markov decision processes: discrete stochastic dynamic programming .John Wiley & Sons, 2014. [QL17] G. Qu and N. Li. Harnessing smoothness to accelerate distributed optimization. IEEE Transactions on Control of Network Systems , 5(3):1245–1260, 2017. [QZLZ21] J. Qi, Q. Zhou, L. Lei, and K. Zheng. Federated reinforcement learning: Techniques, applications, and open challenges. arXiv preprint arXiv:2108.11887 , 2021. [RTR +23] M. M. Rahman, H. J. Terano, M. N. Rahman, A. Salamzadeh, and M. S. Rahaman. Chatgpt and academic research: a review and recommendations based on practical examples. Rahman, M., Terano, HJR, Rahman, N., Salamzadeh, A., Rahaman, S.(2023). ChatGPT and Academic Research: A Review and Recommendations Based on Practical Examples. Journal of Education, Management and Development Studies , 3(1):1–12, 2023. [SEM20] L. Shani, Y. Efroni, and S. Mannor. Adaptive trust region policy optimization: Global convergence and faster rates for regularized MDPs. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 34, pages 5668–5675, 2020. [SLA +15] J. Schulman, S. Levine, P. Abbeel, M. Jordan, and P. Moritz. Trust region policy optimization. In International conference on machine learning , pages 1889–1897, 2015. [SWD +17] J. Schulman, F. Wolski, P. Dhariwal, A. Radford, and O. Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. [WCYW19] L. Wang, Q. Cai, Z. Yang, and Z. Wang. Neural policy gradient methods: Global optimality and rates of convergence. arXiv preprint arXiv:1909.01150 , 2019. [WHM +23] J. Wang, J. Hu, J. Mills, G. Min, M. Xia, and N. Georgalas. Federated ensemble model-based reinforcement learning in edge computing. IEEE Transactions on Parallel and Distributed Systems , 2023. 13 [WJC23] J. Woo, G. Joshi, and Y. Chi. The blessing of heterogeneity in federated q-learning: Linear speedup and beyond. arXiv preprint arXiv:2305.10697 , 2023. [WKNL20] H. Wang, Z. Kaplan, D. Niu, and B. Li. Optimizing federated learning on non-iid data with reinforcement learning. In IEEE INFOCOM 2020-IEEE Conference on Computer Communications , pages 1698–1707. IEEE, 2020. [WP91] R. J. Williams and J. Peng. Function optimization using connectionist reinforcement learning algorithms. Connection Science , 3(3):241–268, 1991. [WSJC24] J. Woo, L. Shi, G. Joshi, and Y. Chi. Federated offline reinforcement learning: Col-laborative single-policy coverage suffices. In Forty-first International Conference on Machine Learning , 2024. [Xia22] L. Xiao. On the convergence rates of policy gradient methods. The Journal of Machine Learning Research , 23(1):12887–12922, 2022. [XWL20] T. Xu, Z. Wang, and Y. Liang. Improving sample complexity bounds for actor-critic algorithms. arXiv preprint arXiv:2004.12956 , 2020. [YDG +22] R. Yuan, S. S. Du, R. M. Gower, A. Lazaric, and L. Xiao. Linear convergence of natural policy gradient methods with log-linear policies. arXiv preprint arXiv:2210.01400 ,2022. [YLS +20] T. Yu, T. Li, Y. Sun, S. Nanda, V. Smith, V. Sekar, and S. Seshan. Learning context-aware policies from multiple smart homes via federated multi-task learning. In 2020 IEEE/ACM Fifth International Conference on Internet-of-Things Design and Implemen-tation (IoTDI) , pages 104–115. IEEE, 2020. [ZAD +21] S. Zeng, M. A. Anwar, T. T. Doan, A. Raychowdhury, and J. Romberg. A decentralized policy gradient approach to multi-task reinforcement learning. In Uncertainty in Artificial Intelligence , pages 1002–1012. PMLR, 2021. [ZBW +20] F. Zerka, S. Barakat, S. Walsh, M. Bogowicz, R. T. Leijenaar, A. Jochems, B. Miraglio, D. Townend, and P. Lambin. Systematic review of privacy-preserving distributed ma-chine learning from federated databases in health care. JCO clinical cancer informatics ,4:184–200, 2020. [ZCH +23] W. Zhan, S. Cen, B. Huang, Y. Chen, J. D. Lee, and Y. Chi. Policy mirror descent for regularized reinforcement learning: A generalized framework with linear convergence. 
+
+SIAM Journal on Optimization , 33(2):1061–1091, 2023. [ZFL +19] H. H. Zhuo, W. Feng, Y. Lin, Q. Xu, and Q. Yang. Federated deep reinforcement learning. arXiv preprint arXiv:1901.08277 , 2019. [ZLK +22] R. Zhou, T. Liu, D. Kalathil, P. Kumar, and C. Tian. Anchor-changing regularized natural policy gradient for multi-objective reinforcement learning. Advances in Neural Information Processing Systems , 35:13584–13596, 2022. [ZM10] M. Zhu and S. Martínez. Discrete-time dynamic average consensus. Automatica ,46(2):322–329, 2010. [ZRY +23] F. Zhao, X. Ren, S. Yang, P. Zhao, R. Zhang, and X. Xu. Federated multi-objective reinforcement learning. Information Sciences , 624:811–832, 2023. 14 A Related work 
+
+Global convergence of NPG methods for tabular MDPs. [AKLM21 ] first establishes a O(1 /T )
+
+last-iterate convergence rate of the NPG method under softmax parameterization with constant step size, assuming access to exact policy evaluation. When entropy regularization is in place, [ CWC21 ]establishes a global linear convergence to the optimal regularized policy for the entire range of admissible constant learning rates using softmax parameterization and exact policy evaluation, which is further shown to be stable in the presence of ℓ∞ policy evaluation errors. The iteration complexity of NPG methods is nearly independent with the size of the state-action space, which is in sharp contrast to softmax policy gradient methods that may take exponential time to converge [ LWCC23b , MXSS20 ]. [ Lan23 ] proposed a more general framework through the lens of mirror descent for regularized RL with global linear convergence guarantees, which is further generalized in [ ZCH +23 , LLZ23 ]. Earlier analysis of regularized MDPs can be found in [ SEM20 ]. Besides, [ Xia22 ] proves that vanilla NPG also achieves linear convergence when geometrically increasing learning rates are used; see also [ KJVM21 , BR21 ]. [ ZLK +22 ] developed an anchor-changing NPG method for multi-task RL under various optimality criteria in the centralized setting. 
+
+Convergence and sample complexity results of NAC. The convergence and sample complex-ity of a variety of natural actor–critic methods (NACs) are extensively studied in the litera-ture [ BSGL09 , WCYW19 , KDRM22 , AKLM21 , YDG +22 ]. More pertinent to our work, [ AKLM21 ]introduced Q-NPG—a sample version of the NPG method with function approximation under softmax parameterization —and obtained a convergence rate of O(1 /√T ). [ YDG +22 ] weakens some of its assumptions and improves the convergence rate to O(1 /T ) and gives the eO(1 /ε 3) sample complexity using a constant actor learning rate. The FedNAC method we propose in this paper can be seen as a decentralized version of Q-NPG, and in the server-client setting where the network is fully connected, our convergence rate and sample complexity match those in [YDG +22]. 
+
+Distributed and federated RL. There have been a variety of settings being set forth for distributed and federated RL. [ MBM +16 , ESM +18 , ARB +19 , KSJM22 , WJC23 ] focused on developing feder-ated versions of RL algorithms to accelerate training, assuming all agents share the same transition kernel and reward function; in particular, [ KSJM22 , WJC23 , WSJC24 ] established the provable ben-efits of federated learning in terms of linear speedup. More pertinent to our work, [ ZRY +23 , AR21 ]considered the federated multi-task framework, allowing different agents having private reward functions. [ ZRY +23 ] proposed an empirically probabilistic algorithm that can seek an optimal policy under the server-client setting, while [ AR21 ] developed new attack methods in the presence of adver-sarial agents. Recently [ LWA +23 ] discussed how to avoid transmitting the Hessian matrix during communication in the server-client setting where all agents share the same reward function. Different from the FRL framework, [ CZGB21 , CZC21 , OPA +17 , KMP12 , CFGW22 , ZAD +21 ] considered the distributed multi-agent RL setting where the agents interact with a dynamic environment through a multi-agent Markov decision process, where each agent can have their own state or action spaces. [ ZAD +21 ] developed a decentralized policy gradient method where different agents have different MDPs, where a special case of their setting recovers ours. However, the convergence rate developed in [ ZAD +21 ] has rather pessimistic dependencies with the size of the state-action space, together with other parameters, without leveraging natural policy gradients and gradient tracking techniques. 
+
+Decentralized first-order optimization algorithms. Early work of consensus-based first-order optimization algorithms for the fully decentralized setting include but are not limited to [ LO08 ,NO09 , DAW11 ]. Gradient tracking, which leverages the idea of dynamic average consensus [ ZM10 ]to track the gradient of the global objective function, is a popular method to improve the convergence speed [QL17, NOS17, DLS16, PN21, LCCC20]. 
+
+## B Additional Discussion 
+
+B.1 Application Related to Federated Multi-task RL 
+
+In this section, we elaborate more on our motivation and the application scenarios where federated multi-task RL becomes highly relevant. We first provide some key motivations for our federated multi-task RL setting as follows. 15 • Efficient knowledge transfer: multi-task RL enables agents to transfer knowledge across related tasks, accelerating learning and improving performance by leveraging experiences gained from one task to another. For instance, in our healthcare example in Section 1, by learning across hospitals with varying demographics, the agent can identify treatment strategies that are effective across diverse patient populations without directly accessing sensitive patient information. • Generalization and adaptability: agents trained with multi-task RL can generalize their learned policies, adapt to new tasks, and handle diverse environments more effectively, enhancing their robustness and adaptability. In the healthcare example, an optimal treatment over different hospitals better adapts to variations in patient characteristics. • Resource optimization: training a single policy for multiple tasks optimizes resource usage compared to training separate policies for each task, making it more efficient in scenarios with limited data or computational resources. In the healthcare example, the collabora-tive approach enhances learning efficiency and scalability while preserving data privacy, particularly in settings where each hospital has limited access to patient information. Below we provide more application scenarios of our setting. 1. To enhance ChatGPT’s performance across different tasks or domains [ MA22 , RTR +23 ], one might consult domain experts to chat and rate ChatGPT’s outputs for solving different tasks, and train ChatGPT in a federated manner without exposing private data or feedback of each expert. 2. Our setting is especially suitable for the multi-task problems where each agent only have partial access of the "global" task. There are a lot of such problems. • An example is the problem we consider in our experiments (see Appendix H), where we distributedly train the agents to learn a shared policy to follow a predetermined trajectory while each agent only has partial information of this trajectory. • The above problem could be seen as a simplified version of the Unmanned Aerial Vehicle (UAV) Patrol Mission, each unmanned aerial vehicle (UAV) patrols only in a specific area, and they need to collectively train a strategy utilizing information from the entire patrol range. • In the game setting, different agents aim to train a character to perform well in multiple tasks, and each agent trains on one task. Despite the promise, provably efficient algorithms for federated multi-task RL remain substantially under-explored, especially in the fully decentralized setting. Our work is the first to provide efficient algorithms with global convergence guarantees for federated multi-task RL. 
+
+B.2 Theoretical Contribution 
+
+In this section, we stress that while our work is built upon the algorithmic ideas in the distributed learning, reinforcement learning and optimization literature, it is not a strightforward combination and the theoretical analysis is by no means trivial. One key difficulty is to estimate the global Q-functions using only neighboring information and local data. To address this issue, we invoke the “Q-tracking” step (see Algorithm 1, 2), which is inspired by the gradient tracking method in decentralized optimization. Note that this generalization is highly non-trivial: to the best of our knowledge, the utility of gradient tracking has not been exploited in policy optimization, and the intrinsic nonconcavity issue, together with the use of natural gradients, prevents us from directly using the results from decentralized optimization. It is thus of great value to study if the combination of NPG and gradient tracking could lead to fast globally convergent algorithms as in the standard decentralized optimization literature despite the nonconcavity. Besides, due to the lack of global information sharing, care needs to be taken to judiciously balance the use of neighboring information (to facilitate consensus) and local data (to facilitate learning) when updating the policy. Compared to the centralized version of our proposed algorithms, a much more delicate theoretical analysis is required to prove our convergence results. For example, the key step to establish the convergence rate of the single-agent exact entropy-regularized NPG is to form the 2nd-order linear system in Eq. (46) in [ CCC +22a ], while in our corresponding analysis, 16 a 4th-order linear system in Eq. (49) is needed, where the inequality in each line is non-trivial and requires the introduction of some intricate and novel auxiliary lemmas, see Appendix D. 
+
+## C Omitted Algorithms 
+
+C.1 Federated NPG (FedNPG) with entropy regularization 
+
+We record the entropy-regularized FedNPG method in Algorithm 2 here due to space limits. 
+
+Algorithm 2 Federated NPG (FedNPG) with entropy regularization 
+
+1: Input: learning rate η > 0, iteration number T ∈ N+, mixing matrix W ∈ RN ×N , regulariza-tion coefficient τ > 0.
+
+2: Initialize: π(0) , T (0) = Q(0)  
+
+> τ
+
+.
+
+3: for t = 0 , 1, · · · do 
+
+4: Update the policy for each (s, a ) ∈ S × A :
+
+log π(t+1) (a|s) = W
+
+ 
+
+1 − ητ 
+
+1 − γ
+
+
+
+log π(t)(a|s) + η
+
+1 − γ T (t)(s, a )
+
+
+
+− log z(t)(s) ,
+
+(27) where z(t)(s) = P 
+
+> a′∈A
+
+exp 
+
+n
+
+W
+
+ 
+
+1 − ητ 
+
+> 1−γ
+
+
+
+log π(t)(a′|s) + η 
+
+> 1−γ
+
+T (t)(s, a ′)
+
+o 
+
+.
+
+5: Evaluate Q(t+1)  
+
+> τ
+
+.
+
+6: Update the global Q-function estimate for each (s, a ) ∈ S × A :
+
+T (t+1) (s, a ) = W
+
+
+
+T (t)(s, a ) + Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a )
+
+| {z }
+
+> Q-tracking
+
+
+
+. (UT )
+
+7: end for C.2 Development of FedNAC 
+
+For any policy π, we let dπs0 denote the discounted state visitation distribution of π given an initial state s0 ∈ S , i.e., 
+
+∀s ∈ S : dπs0 (s) := (1 − γ)
+
+> ∞
+
+X
+
+> t=0
+
+γtP(st = s|s0) . (28) For a distribution ρ ∈ ∆( S), we define dπρ (s) = Es0∼ρ[dπs0 (s)] . We also define the state-action visitation distribution ¯dπρ as 
+
+¯dπρ (s, a ) := dπρ (s)π(a|s) = (1 − γ)Es0∼ρ
+
+" ∞X
+
+> t=0
+
+γtP(st = s, a t = a|s0)
+
+#
+
+. (29) Furthermore, we extend the definition of ¯dπρ by specifying the initial state-action distribution ν ∈
+
+∆( S × A ) and define 
+
+˜dπν (s, a ) := (1 − γ) E
+
+> (s0,a 0)∼ν
+
+" ∞X
+
+> t=0
+
+γtP(st = s, a t = a|s0, a 0)
+
+#
+
+. (30) Our proposed federated NAC method FedNAC could be seen as a decentralized version of Q-NPG method [AKLM21, YDG +22], which we briefly review as follows. 
+
+Q-NPG method. Q-NPG is a sample version of NPG with function approximation which is suitable for the case where S or A is large or infinite. We consider the policy with function approximation under softmax parameterization (24). Given an approximate solution w(t) for minimizing the function approximation error 
+
+ℓ(w, Q fξ(t) , ˜dfξ(t) 
+
+> ν
+
+) (see (25) ), the Q-NPG update rule ξ(t+1) = ξ(t) + αw(t), when plugged in 17 parameterization (24), results in the following policy update rule when we set α = η/ (1 − γ):
+
+f (t+1) (a|s) ∝ f (t)(a|s) exp 
+
+ ηϕ ⊤(s, a )w(t)
+
+1 − γ
+
+
+
+, (31) which could be seen as the function approximation version of the update rule (8) of vanilla NPG method. 
+
+Federated NAC method. FedNAC (describe in Section 4) is presented in Algorithm 3, whose subroutines are written in Algorithm 4, 5. In each iteration t of FedNAC, each agent n updates the critic parameter w(t) 
+
+> n
+
+locally using Algorithm 4, which aims to minimize ℓ(w, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+) by stochastic gradient descent. Note that since we don’t know the Q-function Q(t) 
+
+> n
+
+in the gradients, we need to invoke Algorithm 5 [ YDG +22 , Algorithm 3] to give an unbiased estimate bQ(t) 
+
+> n
+
+(s, a ), where 
+
+(s, a ) is sampled from ˜d(t) 
+
+> n
+
+(cf. Theorem E.1). As a consequence, in line 4 of Algorithm 4, we have 
+
+E
+
+h b∇wℓ( ewk, bQπ , ˜dfξ )
+
+i
+
+= ∇wℓ( ewk, bQπ , ˜dfξ ) . (32) In each actor iteration, agents share with their neighbors actor and critic parameters, where the tracking scheme is also used. 
+
+Algorithm 3 Federated Natural Actor-Critic (FedNAC) 
+
+1: Input: number of actor iterations T , number of critic iterations K, actor learning rate α, critic learning rate β, discounted factor γ ∈ [0 , 1) 
+
+2: Initialization: initial state-action distribution ν, actor parameter ξ(0) = ( ξ(0) ⊤ 
+
+> 1
+
+, · · · , ξ(0) ⊤ 
+
+> N
+
+)⊤ ∈
+
+RN ×p, h(−1) = w(−1) = 0 ∈ RN ×p
+
+3: for t = 0 , · · · , T − 1 do 
+
+4: Critic update: w(t) 
+
+> n
+
+= Critic( K, ν, ξ(t) 
+
+> n
+
+, γ, β, rn), n ∈ [N ] (Algorithm 4) 
+
+5: Update the critic parameter for estimating the global Q-function: 
+
+h(t) = W
+
+
+
+h(t−1) + w(t) − w(t−1) 
+
+(33) 
+
+6: Actor update: 
+
+ξ(t+1) = W
+
+
+
+ξ(t) + αh(t)
+
+(34) 
+
+7: end for Algorithm 4 Critic (K, ν, ξ, γ, β, r ): sample-based regression solver to minimize ℓ(w, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+)
+
+1: Initialize: critic parameter w0 ∈ Rp
+
+2: for k = 0 , · · · , K − 1 do 
+
+3: Sampling: (sk, a k), bQπ (sk, a k) = Q-Sampler( ν, f ξ , γ , r) (Algorithm 5) 
+
+4: Compute the stochastic gradient estimator of LQ:
+
+b∇wℓ( ewk, bQπ , ˜dfξ ) = 2 
+
+ew⊤ 
+
+> k
+
+ϕ(sk, a k) − bQπ (sk, a k)
+
+
+
+ϕ(sk, a k) (35) 
+
+5: Critic Update: ewk+1 = ewk − β b∇wℓ( ewk, bQπ , ˜dfξ )
+
+6: end for 
+
+7: Output: wout = 1
+
+> K
+
+PKk=1 ewk
+
+## D Convergence analysis of FedNPG 
+
+For technical convenience, we present first the analysis for entropy-regularized FedNPG and then for vanilla FedNPG. 18 Algorithm 5 Q-Sampler (ν, π, γ, r )
+
+1: Initialize: (s0, a 0) ∼ ν, time step h, t = 0 , variable X ∼ Bernoulli( γ)
+
+2: while X = 1 do 
+
+3: Sample sh+1 ∼ P (·| sh, a h)
+
+4: Sample ah+1 ∼ π(·| sh+1 )
+
+5: h ← h + 1 
+
+6: X ∼ Bernoulli( γ)
+
+7: end while 
+
+8: Set xc (sh, a h) = r(sh, a h), X ∼ Bernoulli( γ), t = h
+
+9: while X = 1 do 
+
+10: Sample st+1 ∼ P (·| st, a t)
+
+11: Sample at+1 ∼ π(·| st+1 )
+
+12: bQπ (sh, a h) ← bQπ (sh, a h) + r(st+1 , a t+1 )
+
+13: t ← t + 1 
+
+14: X ∼ Bernoulli( γ)
+
+15: end while 
+
+16: Output: (sh, a h) and bQπ (sh, a h)
+
+D.1 Analysis of entropy-regularized FedNPG with exact policy evaluation 
+
+To facilitate analysis, we introduce several notation below. For all t ≥ 0, we recall π(t) as the normalized geometric mean of {π(t) 
+
+> n
+
+}n∈[N ]:
+
+π(t) := softmax 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+log π(t)
+
+> n
+
+!
+
+, (36) from which we can easily see that for each (s, a ) ∈ S × A , π(t)(a|s) ∝
+
+QNn=1 π(t) 
+
+> n
+
+(a|s)
+
+ 1
+
+> N
+
+. We denote the soft Q-functions of π(t) by Q(t) 
+
+> τ
+
+:
+
+Q(t) 
+
+> τ
+
+:= 
+
+
+
+Qπ(t)
+
+> τ, 1
+
+...
+
+Qπ(t)
+
+> τ,N
+
+ . (37) In addition, we define bQ(t) 
+
+> τ
+
+, Q(t) 
+
+> τ
+
+∈ R|S||A| and V (t) 
+
+> τ
+
+∈ R|S| as follows 
+
+bQ(t) 
+
+> τ
+
+:= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> τ,n
+
+, (38a) 
+
+Q(t) 
+
+> τ
+
+:= Qπ(t) 
+
+> τ
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> τ,n
+
+. (38b) 
+
+V (t) 
+
+> τ
+
+:= V π(t) 
+
+> τ
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+V π(t) 
+
+> τ,n
+
+. (38c) For notational convenience, we also denote 
+
+α := 1 − ητ 
+
+1 − γ . (39) Following [ CCC +22b ], we introduce the following auxiliary sequence {ξ(t) = ( ξ(t)1 , · · · , ξ (t) 
+
+> N
+
+)⊤ ∈
+
+RN ×|S||A| }t=0 ,1,··· , each recursively defined as 
+
+∀(s, a ) ∈ S × A : ξ(0) (s, a ) := ∥exp ( Q⋆τ (s, ·)/τ )∥1
+
+exp 
+
+ 1
+
+> N
+
+PNn=1 log π(0)  
+
+> n
+
+(·| s)
+
+
+
+> 1
+
+· π(0) (a|s) , (40a) 
+
+log ξ(t+1) (s, a ) = W
+
+
+
+α log ξ(t)(s, a ) + (1 − α)T (t)(s, a )/τ 
+
+
+
+, (40b) 19 where T (t)(s, a ) is updated via (16) . Similarly, we introduce an averaged auxiliary sequence {ξ(t) ∈
+
+R|S||A| } given by 
+
+∀(s, a ) ∈ S × A : ξ(0) (s, a ) := ∥exp ( Q⋆τ (s, ·)/τ )∥1 · π(0) (a|s) , (41a) 
+
+log ξ(t+1) (s, a ) = α log ξ(t)(s, a ) + (1 − α) bQ(t) 
+
+> τ
+
+(s, a )/τ. (41b) We introduces four error metrics defined as 
+
+Ω(t)1 := u(t) 
+
+> ∞
+
+, (42a) 
+
+Ω(t)2 := v(t) 
+
+> ∞
+
+, (42b) 
+
+Ω(t)3 := Q⋆τ − τ log ξ(t) 
+
+> ∞
+
+, (42c) 
+
+Ω(t)4 := max 
+
+
+
+0, − min 
+
+> s,a
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+
+
+, (42d) where u(t), v (t) ∈ R|S||A| are defined as 
+
+u(t)(s, a ) := log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2 , (43) 
+
+v(t)(s, a ) := T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N 2 . (44) We collect the error metrics above in a vector Ω(t) ∈ R4:
+
+Ω(t) := 
+
+
+
+Ω(t)1 , Ω(t)2 , Ω(t)3 , Ω(t)4
+
+⊤
+
+. (45) With the above preparation, we are ready to state the convergence guarantee of Algorithm 2 in Theorem D.1 below, which is the formal version of Theorem 3.6. 
+
+Theorem D.1. For any N ∈ N+, τ > 0, γ ∈ (0 , 1) , there exists η0 > 0 which depends only on 
+
+N, γ, τ, σ, |A| , such that if 0 < η ≤ η0 and 1 − σ > 0, then the updates of Algorithm 2 satisfy 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞ ≤ 2γρ (η)t Ω(0)  
+
+> 2
+
+, (46) 
+
+log π⋆τ − log π(t) 
+
+> ∞
+
+≤ 2
+
+τ ρ(η)t Ω(0)  
+
+> 2
+
+, (47) 
+
+where 
+
+ρ(η) ≤ max 
+
+n
+
+1 − τ η 
+
+2 , 3 + σ
+
+4
+
+o
+
+< 1 .
+
+Moreover, the consensus errors satisfy: 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t) 
+
+> ∞
+
+≤ 2ρ(η)t Ω(0)  
+
+> 2
+
+. (48) The dependency of η0 on N, γ, τ, σ, |A| is made clear in Lemma D.3 that will be presented momen-tarily in this section. The rest of this section is dedicated to the proof of Theorem D.1. We first state a key lemma that tracks the error recursion of Algorithm 2. 
+
+Lemma D.2. The following linear system holds for all t ≥ 0:
+
+Ω(t+1) ≤
+
+
+
+σα ησ  
+
+> 1−γ
+
+0 0
+
+Sσ 
+
+
+
+1 + ηM √N 
+
+> 1−γ
+
+σ
+
+
+
+σ (2+ γ)ηM N  
+
+> 1−γ
+
+σ γηM N  
+
+> 1−γ
+
+σ
+
+(1 − α)M 0 (1 − α)γ + α (1 − α)γ 
+
+> 2γ+ητ
+> 1−γ
+
+M 0 0 α
+
+| {z }
+
+> =: A(η)
+
+Ω(t) , (49) 
+
+where we let 
+
+S := M √N
+
+
+
+2α + (1 − α) · √2N + 1 − ατ · √N M 
+
+
+
+, (50) 
+
+and 
+
+M := 1 + γ + 2 τ (1 − γ) log |A| 
+
+(1 − γ)2 · γ . 
+
+20 In addition, it holds for all t ≥ 0 that 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
+≤ γΩ(t)3 + γΩ(t)4 , (51) 
+
+log π(t) − log π⋆τ ∞ ≤ 2
+
+τ Ω(t)3 . (52) 
+
+Proof. See Appendix F.1. Let ρ(η) denote the spectral norm of A(η). As Ω(t) ≥ 0, it is immediate from (49) that 
+
+Ω(t) 
+
+> 2
+
+≤ ρ(η)t Ω(0)  
+
+> 2
+
+,
+
+and therefore we have 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
+≤ 2γ Ω(t) 
+
+> ∞
+
+≤ 2γρ (η)t Ω(0)  
+
+> 2
+
+,
+
+and 
+
+log π(t) − log π⋆τ ∞ ≤ 2
+
+τ Ω(t) 
+
+> ∞
+
+≤ 2
+
+τ ρ(η)t Ω(0)  
+
+> 2
+
+.
+
+It remains to bound the spectral radius ρ(η), which is achieved by the following lemma. 
+
+Lemma D.3 (Bounding the spectral norm of A(η)). Let 
+
+ζ := (1 − γ)(1 − σ)2τ
+
+8 ( τ S 0σ2 + 10 M cσ 2/(1 − γ) + (1 − σ)2τ 2/16) , (53) 
+
+where S0 := M √N
+
+
+
+2 + √2N + M √Nτ
+
+
+
+, c := M N/ (1 − γ). For any N ∈ N+, τ > 0, γ ∈ (0 , 1) ,if 
+
+0 < η ≤ η0 := min 
+
+n 1 − γτ , ζ 
+
+o
+
+, (54) 
+
+then we have 
+
+ρ(η) ≤ max 
+
+n 3 + σ
+
+4 , 1 + (1 − α)γ + α
+
+2
+
+o
+
+< 1 . (55) 
+
+Proof. See Appendix F.2. 
+
+D.2 Analysis of entropy-regularized FedNPG with inexact policy evaluation 
+
+We define the collection of inexact Q-function estimates as 
+
+q(t) 
+
+> τ
+
+:= 
+
+
+
+qπ(t)1 
+
+> τ, 1
+
+, · · · , q π(t)
+
+> N
+> τ,N
+
+⊤
+
+,
+
+and then the update rule ( UT ) should be understood as 
+
+T (t+1) (s, a ) = W
+
+
+
+T (t)(s, a ) + q(t+1)  
+
+> τ
+
+(s, a ) − q(t) 
+
+> τ
+
+(s, a )
+
+
+
+(56) in the inexact setting. For notational simplicity, we define en ∈ R as 
+
+en := max   
+
+> t∈[T]
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t) 
+
+> n
+> τ,n ∞
+
+, n ∈ [N ] , (57) and let e = ( e1, · · · , e n)⊤. Define bq(t) 
+
+> τ
+
+, the approximation of bQ(t) 
+
+> τ
+
+as 
+
+bq(t) 
+
+> τ
+
+:= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+qπ(t) 
+
+> n
+> τ,n
+
+. (58) With slight abuse of notation, we adapt the auxiliary sequence {ξ(t)}t=0 ,··· to the inexact updates as 
+
+ξ(0) (s, a ) := ∥exp ( Q⋆τ (s, ·)/τ )∥1 · π(0) (a|s) , (59a) 
+
+ξ(t+1) (s, a ) := 
+
+h
+
+ξ(t)(s, a )
+
+iα
+
+exp (1 − α) bq(t) 
+
+> τ
+
+(s, a )
+
+τ
+
+!
+
+, ∀(s, a ) ∈ S × A , t ≥ 0 . (59b) 21 In addition, we define 
+
+Ω(t)1 := u(t)
+
+> ∞
+
+, (60a) 
+
+Ω(t)2 := v(t)
+
+> ∞
+
+, (60b) 
+
+Ω(t)3 := Q⋆τ − τ log ξ(t) 
+
+> ∞
+
+, (60c) 
+
+Ω(t)4 := max 
+
+
+
+0, − min 
+
+> s,a
+
+
+
+q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+
+
+, (60d) where 
+
+u(t)(s, a ) := log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2
+
+, (61) 
+
+v(t)(s, a ) := T (t)(s, a ) − bq(t) 
+
+> τ
+
+(s, a )1N 2
+
+. (62) We let Ω(t) be 
+
+Ω(t) := 
+
+
+
+Ω(t)1 , Ω(t)2 , Ω(t)3 , Ω(t)4
+
+⊤
+
+. (63) With the above preparation, we are ready to state the inexact convergence guarantee of Algorithm 2 in Theorem D.4 below, which is the formal version of Theorem 3.8. 
+
+Theorem D.4. Suppose that qπ(t) 
+
+> n
+> τ,n
+
+are used in replace of Qπ(t) 
+
+> n
+> τ,n
+
+in Algorithm 2. For any N ∈ N+, τ > 
+
+0, γ ∈ (0 , 1) , there exists η0 > 0 which depends only on N, γ, τ, σ, |A| , such that if 0 < η ≤ η0 and 
+
+1 − σ > 0, we have 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞ ≤ 2γ
+
+
+
+ρ(η)t Ω(0)  
+
+> 2
+
++ C2 max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t) 
+
+> n
+> τ,n ∞
+
+
+
+, (64) 
+
+log π⋆τ − log π(t) 
+
+> ∞
+
+≤ 2
+
+τ
+
+
+
+ρ(η)t Ω(0)  
+
+> 2
+
++ C2 max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t) 
+
+> n
+> τ,n ∞
+
+
+
+. (65) 
+
+Moreover, the consensus errors satisfy: 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t) 
+
+> ∞
+
+≤ 2
+
+
+
+ρ(η)t Ω(0) 
+
+> 2
+
++ C2 max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t) 
+
+> n
+> τ,n ∞
+
+
+
+,
+
+(66) 
+
+where ρ(η) ≤ max {1 − τ η  
+
+> 2
+
+, 3+ σ 
+
+> 4
+
+} < 1 is the same as in Theorem D.1, and C2 :=    
+
+> σ√N(2(1 −γ)+ M√N η )+2 γ2+ητ
+> (1 −γ)(1 −ρ(η))
+
+.
+
+From Theorem D.4, we can conclude that if 
+
+max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t)  
+
+> n
+> τ,n ∞
+
+≤ (1 − γ)(1 − ρ(η)) ε
+
+2γ
+
+
+
+σ√N (2(1 − γ) + M √N η ) + 2 γ2 + ητ 
+
+ , (67) then inexact entropy-regularized FedNPG could still achieve 2 ε-accuracy (i.e. Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
+≤ 2ε)within max 
+
+n 2 
+
+> τ η
+
+, 41−σ
+
+o
+
+log 2γ∥Ω(0) ∥2 
+
+> ε
+
+iterations. 
+
+Remark D.5 . When η = η0 (cf. (54) and (53)) and τ ≤ 1, the RHS of (67) is of the order 
+
+O
+
+ (1 − γ)τ η 0εγ(γ2 + σ√N (1 − γ)) 
+
+
+
+= O
+
+ (1 − γ)8τ 2(1 − σ)2εγ(γ2 + σ√N (1 − γ))( γ2N σ 2 + (1 − σ)2τ 2(1 − γ)6)
+
+
+
+,
+
+which can be translated into a crude sample complexity bound when using fresh samples to estimate the soft Q-functions in each iteration. The rest of this section outlines the proof of Theorem D.4. We first state a key lemma that tracks the error recursion of Algorithm 2 with inexact policy evaluation, which is a modified version of Lemma D.2. 22 Lemma D.6. The following linear system holds for all t ≥ 0:
+
+Ω(t+1) ≤ A(η)Ω(t) +
+
+
+
+0
+
+σ√N
+
+
+
+2 + M √N η 
+
+> 1−γ
+
+
+
+> ητ
+> 1−γ
+> 2γ2
+> 1−γ
+
+ ∥e∥∞
+
+| {z }
+
+> =: b(η)
+
+, (68) 
+
+where A(η) is provided in Lemma D.2. In addition, it holds for all t ≥ 0 that 
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
+≤ γΩ(t)3 + γΩ(t)4 , (69) 
+
+log π(t) − log π⋆τ ∞ ≤ 2
+
+τ Ω(t)3 . (70) 
+
+Proof. See Appendix F.3. By (68), we have 
+
+∀t ∈ N+ : Ω(t) ≤ A(η)tΩ(0) +
+
+> t
+
+X
+
+> s=1
+
+A(η)t−sb(η) ,
+
+which gives 
+
+Ω(t)
+
+> 2
+
+≤ ρ(η)t Ω(0) 
+
+> 2
+
++
+
+> t
+
+X
+
+> s=1
+
+ρ(η)t−s ∥b(η)∥2 ∥e∥∞
+
+≤ ρ(η)t Ω(0) 
+
+> 2
+
++ σ√N (2(1 − γ) + M √N η ) + 2 γ2 + ητ 
+
+(1 − γ)(1 − ρ(η)) ∥e∥∞ . (71) Here, (71) follows from ∥b(η)∥2 ≤ ∥b(η)∥1 = σ√N (2(1 −γ)+ M √N η )+2 γ2+ητ  
+
+> 1−γ
+
+∥e∥∞ and 
+
+Pts=1 ρ(η)t−s ≤ 1/(1 − ρ(η)) . Recall that the bound on ρ(η) has already been established in Lemma D.3. Therefore we complete the proof of Theorem D.4 by combining the above inequality with (69) and (70) in a similar fashion as before. We omit further details for conciseness. 
+
+D.3 Analysis of FedNPG with exact policy evaluation 
+
+We state the formal version of Theorem 3.3 below. 
+
+Theorem D.7. Suppose all π(0)  
+
+> n
+
+in Algorithm 1 are initialized as uniform distribution. When 
+
+0 < η ≤ η1 := (1 − σ)2(1 − γ)3
+
+8(1 + γ)γ√N σ 2 ,
+
+we have 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V π(t)
+
+(ρ)
+
+
+
+≤ V ⋆(dπ⋆ 
+
+> ρ
+
+)(1 − γ)T + log |A| 
+
+ηT + 8(1 + γ)2γ2N σ 2
+
+(1 − γ)9(1 − σ)2 η2 (72) 
+
+for any fixed state distribution ρ. Furthermore, we have 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t)
+
+> ∞
+
+≤ 32 N σ 
+
+3(1 − γ)4(1 − σ) η . (73) The rest of this section is dedicated to prove Theorem D.7. Similar to (37) , we denote the Q-functions of π(t) by Q(t):
+
+Q(t) := 
+
+
+
+Qπ(t)
+
+> 1
+
+...
+
+Qπ(t)
+
+> N
+
+ . (74) 23 In addition, similar to (38), we define bQ(t), Q(t) ∈ R|S||A| and V (t) ∈ R|S| as follows 
+
+bQ(t) := 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> n
+
+, (75a) 
+
+Q(t) := Qπ(t)
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+
+. (75b) 
+
+V (t) := V π(t)
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+V π(t) 
+
+> n
+
+. (75c) Following the same strategy in the analysis of entropy-regularized FedNPG, we introduce the auxiliary sequence {ξ(t) = ( ξ(t)1 , · · · , ξ (t) 
+
+> N
+
+)⊤ ∈ RN ×|S||A| } recursively: 
+
+ξ(0) (s, a ) := 1
+
+exp 
+
+ 1
+
+> N
+
+PNn=1 log π(0)  
+
+> n
+
+(·| s)
+
+
+
+> 1
+
+· π(0) (a|s) , (76a) 
+
+log ξ(t+1) (s, a ) = W
+
+
+
+log ξ(t)(s, a ) + η
+
+1 − γ T (t)(s, a )
+
+
+
+, (76b) as well as the averaged auxiliary sequence {ξ(t) ∈ R|S||A| }:
+
+ξ(0) (s, a ) := π(0) (a|s) , (77a) 
+
+log ξ(t+1) (s, a ) := log ξ(t)(s, a ) + η
+
+1 − γ bQ(t)(s, a ) , ∀(s, a ) ∈ S × A , t ≥ 0 . (77b) As usual, we collect the consensus errors in a vector Ω(t) = ( u(t)
+
+> ∞
+
+, v(t)
+
+> ∞
+
+)⊤, where u(t), v (t) ∈
+
+R|S||A| are defined as: 
+
+u(t)(s, a ) := log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2 , (78) 
+
+v(t)(s, a ) := T (t)(s, a ) − bQ(t)(s, a )1N 2 . (79) 
+
+Step 1: establishing the error recursion. The next key lemma establishes the error recursion of Algorithm 1. 
+
+Lemma D.8. The updates of FedNPG satisfy 
+
+Ω(t+1) ≤
+
+σ η 
+
+> 1−γ
+
+σJσ σ
+
+
+
+1 + (1+ γ)γ√N η  
+
+> (1 −γ)3
+
+σ
+
+!| {z }
+
+> =: B(η)
+
+Ω(t) +
+
+ 0 
+
+> (1+ γ)γN σ
+> (1 −γ)4
+
+η
+
+| {z }
+
+> =: d(η)
+
+(80) 
+
+for all t ≥ 0, where 
+
+J := 2(1 + γ)γ
+
+(1 − γ)2
+
+√N . (81) 
+
+In addition, we have 
+
+ϕ(t+1) (η) ≤ ϕ(t)(η) + 2(1 + γ)γ
+
+(1 − γ)4 η u(t) 
+
+> ∞
+
+− η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+, (82) 
+
+where 
+
+ϕ(t)(η) := Es∼dπ⋆ρ
+
+h
+
+KL  π⋆(·| s) ∥ π(t)(·| s)i
+
+− η
+
+1 − γ V (t)(dπ⋆ 
+
+> ρ
+
+) , ∀t ≥ 0 . (83) 
+
+Moreover, when η ≤ η1, we have 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t)
+
+> ∞
+
+≤ 2
+
+ 38 σ + 58
+
+t
+
+Ω(0) 
+
+> 2
+
++ 32 N σ 
+
+3(1 − γ)4(1 − σ) η . (84) 
+
+Proof. See Appendix F.4. 24 Note that when all π(0)  
+
+> n
+
+in Algorithm 1 are initialized as uniform distribution, Ω(0) = 0 and (84) indicates (73) in Theorem D.7. 
+
+Step 2: bounding the value functions. Let p ∈ R2 be defined as: 
+
+p(η) = 
+
+p1(η)
+
+p2(η)
+
+
+
+:= 2(1 + γ)γ
+
+(1 − γ)4
+
+
+
+> σ(1 −γ)
+
+(1−σ−(1+ γ)γ√N ση/ (1 −γ)3)η
+
+> (1 −γ)
+
+(1−σ−(1+ γ)γ√N σ 2η/ (1 −γ)3)(1 −σ)−Jσ 2ηση 2
+
+> (1 −γ)
+
+(1−σ−(1+ γ)γ√N σ 2η/ (1 −γ)3)(1 −σ)−Jσ 2η
+
+ ; (85) the rationale for this choice will be made clear momentarily. We define the following Lyapunov function 
+
+Φ(t)(η) = ϕ(t)(η) + p(η)⊤Ω(t) , ∀t ≥ 0 , (86) which satisfies 
+
+Φ(t+1) (η) = ϕ(t+1) (η) + p(η)⊤Ω(t+1) 
+
+≤ ϕ(t)(η) + 2(1 + γ)γ
+
+(1 − γ)4 η u(t) 
+
+> ∞
+
+− η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
++ p(η)⊤ 
+
+B(η)Ω(t) + d(η)
+
+
+
+= Φ (t)(η) + 
+
+
+
+p(η)⊤ (B(η) − I) + 
+
+ 2(1 + γ)γ
+
+(1 − γ)4 η, 0
+
+ 
+
+Ω(t) − η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
++ p2(η) (1 + γ)γN σ 
+
+(1 − γ)4 η . (87) Here, the second inequality follows from (82) . One can verify that the second term vanishes due to the choice of p(η):
+
+p(η)⊤ (B(η) − I) + 
+
+ 2(1 + γ)γ
+
+(1 − γ)4 η, 0
+
+
+
+= (0 , 0) . (88) Therefore, we conclude that 
+
+V ⋆(ρ) − V (t)(ρ) ≤ Φ(t)(η) − Φ(t+1) (η)
+
+η + p2(η) (1 + γ)γN σ 
+
+(1 − γ)4 .
+
+Averaging over t = 0 , · · · , T − 1,
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+≤ Φ(0) (η) − Φ(T )(η)
+
+ηT + 2(1 + γ)2γ2
+
+(1 − γ)8 · N σ 2η2
+
+(1 − γ)(1 − σ − (1 + γ)γ√N σ 2η/ (1 − γ)3)(1 − σ) − σ2Jη .
+
+(89) 
+
+Step 3: simplifying the expression. We first upper bound the first term in the RHS of (89) . Assuming uniform initialization for all π(0)  
+
+> n
+
+in Algorithm 1, we have u(0)  
+
+> ∞
+
+= v(0)  
+
+> ∞
+
+= 0 , and 
+
+Es∼dπ⋆ρ
+
+h
+
+KL  π⋆(·| s) ∥ π(0) (·| s)i
+
+≤ log |A| .
+
+Therefore, putting together relations (86) and (221) we have 
+
+Φ(0) (η) − Φ(T )(η)
+
+ηT ≤ log |A| 
+
+T η + 1
+
+T p(η)⊤Ω(0) /η + V ⋆(dπ⋆ 
+
+> ρ
+
+)1 − γ
+
+!
+
+= log |A| 
+
+T η + V ⋆(dπ⋆ 
+
+> ρ
+
+)
+
+T (1 − γ) , (90) To continue, we upper bound the second term in the RHS of (89). Note that 
+
+η ≤ η1 ≤ (1 − σ)(1 − γ)3
+
+2(1 + γ)γ√N σ 2 ,
+
+which gives 
+
+(1 + γ)γ√N σ 2
+
+(1 − γ)3 η ≤ 1 − σ
+
+2 . (91) 25 Thus we have 
+
+(1 − γ)(1 − σ − (1 + γ)γ√N σ 2η/ (1 − γ)3)(1 − σ) − Jσ 2η
+
+≥ (1 − γ)(1 − σ)2/2 − Jσ 2η1
+
+≥ (1 − γ)(1 − σ)2/4 , (92) where the first inequality follows from (91) and the second inequality follows from the definition of 
+
+η1 and J. By (92), we deduce 
+
+2(1 + γ)2γ2
+
+(1 − γ)8 · N σ 2η2
+
+(1 − γ)(1 − σ − (1 + γ)γ√N σ 2η/ (1 − γ)3)(1 − σ) − Jσ 2η ≤ 8(1 + γ)2γ2N σ 2
+
+(1 − γ)9(1 − σ)2 η2 ,
+
+(93) and our advertised bound (72) thus follows from plugging (90) and (93) into (89). 
+
+D.4 Analysis of FedNPG with inexact policy evaluation 
+
+We state the formal version of Theorem 3.5 below. 
+
+Theorem D.9. Suppose that qπ(t) 
+
+> n
+> n
+
+are used in replace of Qπ(t) 
+
+> n
+> n
+
+in Algorithm 1. Suppose all π(0)  
+
+> n
+
+in Algorithm 1 set to uniform distribution. Let 
+
+0 < η ≤ η1 := (1 − σ)2(1 − γ)3
+
+8(1 + γ)γ√N σ 2 ,
+
+we have 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V π(t)
+
+(ρ)
+
+
+
+≤ V ⋆(dπ⋆ 
+
+> ρ
+
+)(1 − γ)T + log |A| 
+
+ηT + 8(1 + γ)2γ2N σ 2
+
+(1 − γ)9(1 − σ)2 η2
+
++
+
+"
+
+8(1 + γ)γ
+
+(1 − γ)5(1 − σ)2
+
+√N ση (1 + γ)γη √N
+
+(1 − γ)3 + 2 
+
+!
+
++ 2(1 − γ)2
+
+#
+
+max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> n
+
+− qπ(t) 
+
+> n
+> n∞
+
+for any fixed state distribution ρ.Furthermore, we have 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t)
+
+> ∞
+
+≤ 32 3(1 − σ)
+
+N σ 
+
+(1 − γ)4 η + √N σ η√N
+
+(1 − γ)3 + 1 
+
+!
+
+max    
+
+> n∈[N],t ∈[T]
+
+Qπ(t) 
+
+> n
+> n
+
+− qπ(t) 
+
+> n
+> n∞
+
+!
+
+.
+
+(94) We next outline the proof of Theorem D.9. With slight abuse of notation, we again define en ∈ R as 
+
+en := max   
+
+> t∈[T]
+
+Qπ(t) 
+
+> n
+> n
+
+− qπ(t) 
+
+> n
+> n∞
+
+, n ∈ [N ] , (95) and let e = ( e1, · · · , e n)⊤. We define the collection of inexact Q-function estimates as 
+
+q(t) := 
+
+
+
+qπ(t)1 
+
+> 1
+
+, · · · , q π(t)
+
+> N
+> N
+
+⊤
+
+,
+
+and then the update rule (16) should be understood as 
+
+T (t+1) (s, a ) = W
+
+
+
+T (t)(s, a ) + q(t+1) (s, a ) − q(t)(s, a )
+
+
+
+(96) in the inexact setting. Define bq(t), the approximation of bQ(t) as 
+
+bq(t) := 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+qπ(t) 
+
+> n
+> n
+
+, (97) 26 we adapt the averaged auxiliary sequence {ξ(t) ∈ R|S||A| } to the inexact updates as follows: 
+
+ξ(0) (s, a ) := π(0) (a|s) , (98a) 
+
+ξ(t+1) (s, a ) := ξ(t)(s, a ) exp 
+
+ η
+
+1 − γ bq(t)(s, a )
+
+
+
+, ∀(s, a ) ∈ S × A , t ≥ 0 . (98b) As usual, we define the consensus error vector as Ω(t) = ( u(t)
+
+> ∞
+
+, v(t)
+
+> ∞
+
+)⊤, where u(t), v (t) ∈
+
+R|S||A| are given by 
+
+u(t)(s, a ) := log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2
+
+, (99) 
+
+v(t)(s, a ) := T (t)(s, a ) − bq(t)(s, a )1N 2
+
+. (100) The following lemma characterizes the dynamics of the error vector Ω(t), perturbed by additional approximation error. 
+
+Lemma D.10. The updates of inexact FedNPG satisfy 
+
+Ω(t+1) ≤ B(η)Ω(t) + d(η) + 0
+
+√N σ 
+
+ (1+ γ)γη √N 
+
+> (1 −γ)3
+
++ 2 
+
+!
+
+e ∞
+
+| {z }
+
+> =: c(η)
+
+. (101) 
+
+In addition, we have 
+
+ϕ(t+1) (η) ≤ ϕ(t)(η) + 2(1 + γ)γ
+
+(1 − γ)4 η u(t)
+
+> ∞
+
++ 2η
+
+(1 − γ)2 ∥e∥∞ − η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+, (102) 
+
+where ϕ(t)(η) is defined in (83) .Moreover, when η ≤ η1, we have 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log π(t)
+
+> ∞
+
+≤ 2
+
+ 38 σ + 58
+
+t
+
+Ω(0) 
+
+> 2
+
++ 32 3(1 − σ)
+
+N σ 
+
+(1 − γ)4 η + √N σ η√N
+
+(1 − γ)3 + 1 
+
+!
+
+∥e∥∞
+
+!
+
+.
+
+(103) 
+
+Proof. See Appendix F.5. Similar to (87), we can recursively bound Φ(t)(η) (defined in (86)) as 
+
+Φ(t+1) (η) = ϕ(t+1) (η) + p(η)⊤Ω(t+1) 
+
+> (102)
+
+≤ ϕ(t)(η) + 2(1 + γ)γ
+
+(1 − γ)4 η u(t)
+
+> ∞
+
++ 2η
+
+(1 − γ)2 ∥e∥∞ − η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
++ p(η)⊤ 
+
+B(η)Ω(t) + d(η) + c(η)
+
+
+
+= Φ (t)(η) + 
+
+
+
+p(η)⊤ (B(η) − I) + 
+
+ 2(1 + γ)γ
+
+(1 − γ)4 η, 0
+
+ | {z }  
+
+> =(0 ,0) via (88)
+
+Ω(t) − η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
++ p2(η) (1 + γ)γN σ 
+
+(1 − γ)4 η +
+
+"
+
+p2(η)√N σ (1 + γ)γη √N
+
+(1 − γ)3 + 2 
+
+!
+
++ 2η
+
+(1 − γ)2
+
+#
+
+∥e∥∞ .
+
+(104) From the above expression we know that 
+
+V ⋆(ρ)−V (t)(ρ) ≤ Φ(t)(η) − Φ(t+1) (η)
+
+η +p2(η) (1 + γ)γN σ 
+
+(1 − γ)4 +
+
+"
+
+p2(η)√N σ (1 + γ)γ√N
+
+(1 − γ)3 + 2
+
+η
+
+!
+
++ 2(1 − γ)2
+
+#
+
+∥e∥∞ ,
+
+27 which gives 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+≤ Φ(0) (η) − Φ(T )(η)
+
+ηT + p2(η) (1 + γ)γN σ 
+
+(1 − γ)4
+
++
+
+"
+
+p2(η)√N σ (1 + γ)γ√N
+
+(1 − γ)3 + 2
+
+η
+
+!
+
++ 2(1 − γ)2
+
+#
+
+∥e∥∞
+
+(105) via telescoping. Combining the above expression with (90), (92) and (93), we have 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+≤ log |A| 
+
+T η + V ⋆(dπ⋆ 
+
+> ρ
+
+)
+
+T (1 − γ) + 8(1 + γ)2γ2N σ 
+
+(1 − γ)9(1 − σ)2 η2
+
++
+
+"
+
+8(1 + γ)γ
+
+(1 − γ)5(1 − σ)2
+
+√N ση (1 + γ)γη √N
+
+(1 − γ)3 + 2 
+
+!
+
++ 2(1 − γ)2
+
+#
+
+∥e∥∞ ,
+
+(106) which establishes (94). 
+
+## E Convergence analysis of FedNAC 
+
+Let π⋆ be an optimal policy and does not need to belong to the log-linear policy class. Fix a state distribution ρ ∈ ∆( S) and a state-action distribution ν. To simplify the notation, we denote dπ⋆ 
+
+> ρ
+
+as 
+
+d⋆, df ¯ξ(t) as d(t), ˜d(t) 
+
+> n
+
+as ˜dfξ(t) 
+
+> n
+> ν
+
+, and define d(t) 
+
+> n
+
+and ¯d(t) 
+
+> n
+
+analogously. We also let Q(t) 
+
+> n
+
+denote Qξ(t) 
+
+> n
+> n
+
+.Define 
+
+ϑρ := 11 − γ
+
+d⋆
+
+ρ ∞
+
+≥ 11 − γ (107) and assume ϑρ < ∞.We also introduce a weighted KL divergence given by 
+
+D(t) 
+
+> ⋆
+
+:= Es∼d⋆
+
+h
+
+KL  π⋆(·| s) ∥ π(t)(·| s)i
+
+, (108) where KL  · ∥ ·  : R|A| × R|A| → R is the Kullback-Leibler (KL) divergence: 
+
+∀f, g ∈ R|A| : KL  f ∥ g := X
+
+> a∈A
+
+f (a) log 
+
+ f (a)
+
+g(a)
+
+
+
+. (109) Given a state distribution ρ and an optimal policy π⋆, we define a state-action measure ˜d⋆ as 
+
+˜d⋆(s, a ) := d⋆(s) · Unif A(a) = d⋆(s)
+
+|A| . (110) The following theorem guarantees that for any fixed policy π and state-action distribution ν ∈
+
+∆( S × A ), the Q-Sampler algorithm (cf. Algorithm 5) samples (s, a ) from ˜dπν and gives an unbiased estimate bQπ (s, a ) of Qπ (s, a ), whose proof can be found in [YDG +22, Lemma 4]. 
+
+Lemma E.1 (Lemma 4 in [ YDG +22 ]) . Consider the output (sh, a h) and bQπ (sh, a h) of Algorithm 5. It follows that 
+
+E[h + 1] = 11 − γ ,P (sh = s, a h = a) = ˜dπν (s, a ) ,
+
+E
+
+h bQπ (sh, a h)|sh, a h
+
+i
+
+= Qπ (sh, a h) .
+
+28 To present the convergence results of FedNAC, we further introduce the following notation, where 
+
+t ∈ N represents the iteration step in FedNAC: 
+
+ˆw(t) := 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+w(t) 
+
+> n
+
+, (111a) 
+
+¯ξ(t) := 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+ξ(t) 
+
+> n
+
+, (111b) 
+
+¯f (t) := f¯ξ(t) , (111c) 
+
+f (t) 
+
+> n
+
+:= fξ(t)
+
+> n
+
+, (111d) 
+
+w(t) 
+
+> ⋆,n
+
+∈ arg min  
+
+> w
+
+ℓ
+
+
+
+w, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+, (111e) 
+
+ˆw(t) 
+
+> ⋆
+
+:= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+w(t)
+
+> ⋆,n
+
+. (111f) For convenience of narration, we introduce the following bounded statistical error assumption. 
+
+Assumption E.2 (Bounded statistical error) . For all n ∈ [N ], there exists εn 
+
+> stat
+
+> 0 such that for all 
+
+t ∈ N in Algorithm 3, we have 
+
+E
+
+h
+
+ℓ
+
+
+
+w(t) 
+
+> n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+− ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+i 
+
+≤ εn
+
+> stat
+
+. (112) When solving the regression problem with sampling based approaches, we can expect εn 
+
+> stat
+
+= O(1 /K ),where K is the iteration number of Algorithm 4. 
+
+Theorem E.3 (Convergence rate of Critic (Algorithm 4)) . For Algorithm 4, let w0 = 0 and β = 12Cϕ .Then under Assumption 4.1, we have 
+
+E
+
+h
+
+ℓ
+
+
+
+wout , Q ξ , ˜dξ
+
+i 
+
+− ℓ
+
+
+
+w⋆, Q ξ , ˜dξ
+
+
+
+≤ 4
+
+K
+
+√2p
+
+1 − γ
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!
+
++ C2
+
+> ϕ
+
+μ(1 − γ)2
+
+!2
+
+, (113) 
+
+where w⋆ ∈ arg min w ℓ
+
+
+
+w, Q ξ , ˜dξ
+
+
+
+.
+
+The proof of Theorem E.3 is postponed to Appendix G.5. The following lemma provide a (very pessimistic) upper bound of Cν in Assumption 4.3. 
+
+Lemma E.4 (Upper bound of Cν ). If ν(s, a ) > 0 for all state-action pairs (s, a ) ∈ S × A , then we have 
+
+Cν ≤ 1(1 − γ)2ν2min 
+
+.
+
+Proof. We only need to note that 
+
+vuuutE(s.a )∼ ˜d(t)
+
+ h(t)(s, a )˜d(t) 
+
+> n
+
+(s, a )
+
+!2 ≤ max 
+
+> (s,a )∈S×A
+
+h(t)(s, a )˜d(t) 
+
+> n
+
+(s, a ) ≤ 1(1 − γ)νmin 
+
+,
+
+where the last inequality follows from ( ?? ). We give some key lemmas which will be used in our proof of Theorem 4.4. 
+
+Lemma E.5 (consensus properties) . For all t ∈ N, we have 
+
+ξ(t+1) = ξ(t) + α ˆw(t), (114) 
+
+1
+
+N 1⊤h(t) = 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+h(t) 
+
+> n
+
+= ˆ w(t). (115) 29 Proof. (115) could be obtained directly by using mathematical induction and update rule (33) (note that 1 
+
+> N
+
+1⊤h(−1) = ˆ w(−1) = 0, see line 2 of Algorithm 3), and (114) could be obtained by averaging both sides of (34) and using (115). 
+
+Lemma E.6 (Young’s inequalities) . Let {x1, · · · , xm} be a set of m vectors in Rl. Then for any 
+
+ζ > 0, we have 
+
+∥xi + xj ∥22 ≤ (1 + ζ) ∥xi∥22 + (1 + 1 /ζ ) ∥xj ∥22 , (116) 
+
+> m
+
+X
+
+> i=1
+
+xi
+
+> 22
+
+≤ m
+
+> m
+
+X
+
+> i=1
+
+∥xi∥22 . (117) 
+
+Lemma E.7 (Lipschitzness of Q-function with function approximation) . Assume that r(s, a ) ∈
+
+[0 , 1] , ∀(s, a ) ∈ S × A . For any ξ, ξ′ ∈ Rp, we have 
+
+∀(s, a ) ∈ S × A : |Qfξ′ (s, a ) − Qfξ (s, a )| ≤ 2Cϕγ(1 + γ)(1 − γ)2
+
+| {z }
+
+> := LQ
+
+∥ξ′ − ξ∥2 . (118) 
+
+Proof. See Appendix G.6. For each iteration step t in Algorithm 3, we let ¯ξ(t) := 1
+
+> N
+
+PNn=1 ξ(t) 
+
+> n
+
+= 1 
+
+> N
+
+ξ(t)⊤1N . We define 
+
+Ω(t)1 := E ξ(t) − 1N ξ(t)⊤ 2F
+
+, (119) 
+
+Ω(t)2 := E h(t) − 1N ˆw(t)⊤ 2F
+
+, (120) We let 
+
+¯εstat := 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+εn 
+
+> stat
+
+, (121) 
+
+¯εapprox := 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+εn 
+
+> approx
+
+, (122) and define δ(t) := V ⋆ − ¯V (t)(ρ), where ¯V (t) is shorthand for V ¯f (t)
+
+. We give the following perfor-mance improvement lemma. 
+
+Lemma E.8 (Performance improvement of FedNAC) . Fix a state distribution ρ, then we have 
+
+ϑρδ(t+1) + D(t+1) 
+
+> ⋆
+
+(1 − γ)α ≤ ϑρδ(t) + D(t)
+
+> ⋆
+
+(1 − γ)α − δ(t)
+
++ 2√Cν (ϑρ + 1) 1 − γ
+
+√¯εstat +
+
+vuut2 ¯εapprox + L2
+
+> Q
+
+N ξ(t) − 1N ¯ξ(t)⊤ 2F
+
+! .
+
+(123) 
+
+Proof. See Appendix G.7. 
+
+Lemma E.9 (linear system) . For any t ∈ N, we let Ω(t) = (Ω (t)1 , Ω(t)2 )⊤. Then for any ζ > 0, we have 
+
+Ω(t+1) ≤ CΩ(t) + s, (124) 
+
+where 
+
+C = ( cij ) = (1 + ζ)σ2 α2(1 + 1 /ζ )σ2
+
+(1 + 1 /ζ ) 96 σ2L2 
+
+> Q
+> (1 −γ)μ
+
+σ2
+
+
+
+1 + ζ + (1 + 1 /ζ ) 24 L2
+
+> Qα2
+> (1 −γ)μ
+
+!
+
+, (125) 
+
+and 
+
+s =
+
+s1
+
+s2
+
+
+
+= 0(1 + 1 /ζ ) 6σ2
+
+> (1 −γ)μ
+
+
+
+N (¯ εstat + Cν ¯εapprox ) + 4 L2
+
+> Q
+
+ α2N ¯εstat  
+
+> (1 −γ)μ
+
++ α2N C 2
+
+> ϕ
+> μ2(1 −γ)2
+
+ !
+
+. (126) 30 Proof. See Appendix G.8. Now we are ready to give the formal version of Theorem 4.4 and its proof. 
+
+Theorem E.10 (Convergence rate of FedNAC (formal)) . Let ξ(0) 1 = · · · = ξ(0)  
+
+> N
+
+in FedNAC (Algo-rithm 3), let the w(0) = 0 and the critic stepsize β = 12Cϕ in Algorithm 4. Then under Assumptions 3.1, 4.1, 4.2 and 4.3, when the actor stepsize satisfies 
+
+α ≤ α1 := (1 − σ2)3p(1 − γ)μ
+
+768 √6σL Q
+
+, (127) 
+
+where LQ is defined in Lemma E.7, we have 
+
+V ⋆(ρ) − 1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+E
+
+h ¯V (t)(ρ)
+
+i
+
+≤ D(0)  
+
+> ⋆
+
++ αϑ ρ
+
+T (1 − γ)α + 1
+
+T · 512 √6Cϕ
+
+√Cν (ϑρ + 1) σα 
+
+(1 − σ2)3/2(1 − γ)3√N
+
+q
+
+Ω(0) 2
+
++
+
+ 2√Cν (ϑρ + 1) 1 − γ +
+
+s
+
+1 + 64 C2
+
+> ϕ
+
+α2
+
+(1 − γ)5μ · 3072 √3Cϕ
+
+√Cν (ϑρ + 1) σ2α
+
+(1 − σ2)3(1 − γ)7/2√μ
+
+
+
+· 2(1 − γ)2√K
+
+
+
+(p2p + 1) C2 
+
+> ϕ
+
++ p2pμ (1 − γ)
+
+
+
++
+
+"
+
+2√2Cν (ϑρ + 1) 1 − γ + 3072 √3CϕCν (ϑρ + 1) σ2α
+
+(1 − σ2)3(1 − γ)7/2√μ
+
+# p¯εapprox + 6144 √2σ2Cν (ϑρ + 1) C3
+
+> ϕ
+
+α2
+
+(1 − γ)13 /2μ3/2(1 − σ2)3 .
+
+(128) 
+
+Moreover, the consensus errors could be upper bounded by 
+
+E ξ(t) − 1N ξ(t)⊤ 2F
+
+≤
+
+ 49 64 σ2 + 15 64 
+
+t
+
+E h(0) − 1N ˆw(0) ⊤ 2F
+
++ 64 δ(α, K )15(1 − σ2) , (129) 
+
+where 
+
+δ(α, K ) := 18 σ2N
+
+(1 − σ2)(1 − γ)μ (¯ εstat + Cν ¯εapprox ) + 72 σ2L2
+
+> Q
+
+N
+
+(1 − γ)3μ3(1 − σ2)
+
+ (1 − γ)μ¯εstat + C2
+
+> ϕ
+
+ α2 ,
+
+(130) 
+
+and 
+
+¯εstat ≤ 4(1 − γ)4K
+
+
+
+(p2p + 1) C2 
+
+> ϕ
+
++ p2pμ (1 − γ)
+
+2
+
+.
+
+Remark E.11 (Sample and communication complexity) . When σ > 0 and 
+
+α =
+
+√μ(D(0)  
+
+> ⋆
+
+)1/3
+
+6144 1/321/6C1/3 
+
+> ν
+
+(1 + ϑρ)1/3Cϕ
+
+· (1 − γ)11 /6(1 − σ2)
+
+T 1/3σ2/3 ,
+
+it follows from Theorem E.10 that 
+
+V ⋆(ρ) − 1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+E
+
+h ¯V (t)(ρ)
+
+i
+
+≤ 31/3 · 229 /6(D(0)  
+
+> ⋆
+
+)2/3C1/3 
+
+> ν
+
+(1 + ϑρ)1/3Cϕσ2/3
+
+T 2/3(1 − γ)17 /6(1 − σ2)√μ + ϑρ
+
+(1 − γ)T + 217 /331/6C1/6 
+
+> ν
+
+(1 + ϑρ)2/3σ1/3√μ(D(0)  
+
+> ⋆
+
+)1/3
+
+T 4/3(1 − σ2)1/2(1 − γ)7/6√N
+
++
+
+ 2√Cν (ϑρ + 1) 1 − γ +
+
+vuut1 + (D(0)  
+
+> ⋆
+
+)2/3(1 − σ2)2
+
+33/2 · 4C2/3 
+
+> ν
+
+(1 − γ)4/3(1 + ϑρ)1/3T 2/3σ4/3 · 237 /6 · 37/6C1/6 
+
+> ν
+
+(ϑρ + 1) 2/3σ4/3(D(0)  
+
+> ⋆
+
+)1/3
+
+(1 − σ2)2(1 − γ)5/3T 1/3
+
+
+
+· 2(1 − γ)2√K
+
+
+
+(p2p + 1) C2 
+
+> ϕ
+
++ p2pμ (1 − γ)
+
+
+
++
+
+"
+
+2√2Cν (ϑρ + 1) 1 − γ + 237 /6 · 37/6C1/6 
+
+> ν
+
+(ϑρ + 1) 2/3σ4/3(D(0)  
+
+> ⋆
+
+)1/3
+
+(1 − σ2)2(1 − γ)5/3T 1/3
+
+# p¯εapprox . (131) 31 Consequently, we need 
+
+T ≳
+
+ σε3/2(1 − γ)17 /4(1 − σ2)3/2 , 1
+
+ε(1 − γ) , σ1/4
+
+ε3/4(1 − σ2)3/8(1 − γ)7/8N 3/8 , σ4
+
+(1 − γ)2(1 − γ2)6
+
+
+
+and 
+
+K = O
+
+ 1(1 − γ)6ε2
+
+
+
+such that V ⋆(ρ) − 1
+
+> T
+
+PT −1 
+
+> t=0
+
+E  ¯V (t)(ρ) ≲ ε + ¯εapprox  
+
+> 1−γ
+
+. In Algorithm 5, each trajectory has the expected length 1/(1 − γ). Consider only the term where ε dominates, FedNAC requires 
+
+O
+
+ 1(1 −γ)45 /4ε7/2(1 −σ2)3/2
+
+
+
+samples for each agent and O
+
+ 1
+
+> ε3/2(1 −γ)17 /4(1 −σ2)3/2
+
+
+
+rounds of com-munication. On the other end, when σ = 0 , (128) becomes: 
+
+V ⋆(ρ) − 1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+E
+
+h ¯V (t)(ρ)
+
+i
+
+≤ D(0)  
+
+> ⋆
+
++ αϑ ρ
+
+T (1 − γ)α + 4√Cν (ϑρ + 1) (1 − γ)3√K
+
+
+
+(p2p + 1) C2 
+
+> ϕ
+
++ p2pμ (1 − γ)
+
+
+
++ 2√2Cν (ϑρ + 1) 1 − γ
+
+p¯εapprox , (132) Consequently, for any fixed α > 0, when σ = 0 or close to 0, with T = O
+
+ 1(1 −γ)ε
+
+
+
+and K =
+
+O
+
+ 1(1 −γ)6ε2
+
+
+
+, FedNAC requires KT / (1 − γ) = O
+
+ 1(1 −γ)8ε3
+
+
+
+samples for each agent and T =
+
+O
+
+ 1(1 −γ)ε
+
+
+
+rounds of communication such that V ⋆(ρ) − 1
+
+> T
+
+PT −1 
+
+> t=0
+
+E  ¯V (t)(ρ) ≲ ε + ¯εapprox  
+
+> 1−γ
+
+.
+
+E.1 Proof of Theorem E.10 
+
+We suppose Assumptions 3.1, E.2, 4.1, 4.2 and 4.3 holds. By Lemma E.9 and nonnegativity of each entry of C, s and Ω(t) where t ∈ N, it’s easy to see that 
+
+p
+
+Ω(t+1) ≤ √C
+
+p
+
+Ω(t) + √s, (133) where √· is exerted element-wise. In addition, taking expectation on both sides of (123) and using the act that 
+
+E
+
+vuut2 ¯εapprox + L2
+
+> Q
+
+N ξ(t) − 1N ¯ξ(t)⊤ 2F
+
+! ≤ p2¯ εapprox +
+
+s
+
+2L2
+
+> Q
+
+N Ω(t)1 ,
+
+we have 
+
+ϑρE[δ(t+1) ] + E[D(t+1)  
+
+> ⋆
+
+](1 − γ)α ≤ ϑρE[δ(t)] + E[D(t) 
+
+> ⋆
+
+](1 − γ)α − E[δ(t)]+ 2√Cν (ϑρ + 1) 1 − γ
+
+√¯εstat + p2¯ εapprox +
+
+s
+
+2L2
+
+> Q
+
+N Ω(t)1
+
+ . (134) We define the Lyapunov function Φ(t) as follows: 
+
+Φ(t) := ϑρE[δ(t)] + E[D(t) 
+
+> ⋆
+
+](1 − γ)α + q⊤p
+
+Ω(t), (135) where 
+
+q =
+
+q1
+
+q2
+
+
+
+=
+
+  
+
+> 2LQ
+> √2Cν(ϑρ+1) (1 −γ)√N
+
+· 11−√1+ ζσ −√(1+1 /ζ )c21 σα/ (1 −√c22 )2LQ  
+
+> √2Cν(ϑρ+1) (1 −γ)√N
+
+·√1+1 /ζσα 
+
+> (1 −√1+ ζσ )(1 −√c22 )−
+
+√(1+1 /ζ )c21 σα 
+
+ . (136) 32 It’s straightforward to verify that when ζ = 1−σ2 
+
+> 2
+
+, we have the entries in C (cf. (125)) satisfies 
+
+c11 < 1 + σ2
+
+2 , (137) 
+
+c12 ≤ 3σ2α2
+
+1 − σ2 . (138) Moreover, from α ≤√(1 −γ)μ(1 −σ2)12 √2σL Q
+
+we deduce 
+
+c22 ≤ 3 + σ2
+
+4 , (139) which gives 
+
+1 − √c22 ≥ 1 −
+
+r 3 + σ2
+
+4 ≥ 1 − σ2
+
+8 , (140) Also note that α ≤ (1 −σ2)3√(1 −γ)μ
+
+> 768 √6σ2LQ
+
+yields 
+
+p(1 + 1 /ζ )c21 σα ≤ (1 − √1 + ζσ )(1 − √c22 )2 .
+
+which together with (140) and the fact 1 − √1 + ζσ ≥ 1−σ2 
+
+> 4
+
+indicates q1, q 2 > 0 and that 
+
+q1 ≤ 16 √2LQ
+
+√Cν (ϑρ + 1) (1 − σ2)(1 − γ)√N , (141) 
+
+q2 ≤ 128 √6LQ
+
+√Cν (ϑρ + 1) σα 
+
+(1 − σ2)5/2(1 − γ)√N . (142) Thus by (133) and (134) we have 
+
+Φ(t+1) = ϑρE[δ(t+1) ] + E[D(t+1)  
+
+> ⋆
+
+](1 − γ)α + q⊤p
+
+Ω(t+1) 
+
+≤ ϑρE[δ(t)] + E[D(t) 
+
+> ⋆
+
+](1 − γ)α − E[δ(t)] + q⊤ √C
+
+p
+
+Ω(t) + √s
+
+
+
++ 2√Cν (ϑρ + 1) 1 − γ
+
+√¯εstat + p2¯ εapprox +
+
+s
+
+2L2
+
+> Q
+
+N Ω(t)1
+
+
+
+= Φ (t) +
+
+q⊤(√C − I) + 
+
+ 2LQ
+
+√2Cν (ϑρ + 1) (1 − γ)√N , 0
+
+| {z }
+
+> =(0 ,0)
+
+p
+
+Ω(t)
+
++ 2√Cν (ϑρ + 1) 1 − γ
+
+ √¯εstat + p2¯ εapprox 
+
+ + q2
+
+√s2 − E[δ(t)], (143) which gives 
+
+E[δ(t)] ≤ Φ(t) − Φ(t+1) + 2√Cν (ϑρ + 1) 1 − γ
+
+ √¯εstat + p2¯ εapprox 
+
+ + q2
+
+√s2. (144) Summing the above inequality over t = 0 , 1, · · · , T − 1 and divide both sides by T , we have 
+
+1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+E[δ(t)] ≤ Φ(0) − Φ(t)
+
+T + 2√Cν (ϑρ + 1) 1 − γ
+
+ √¯εstat + p2¯ εapprox 
+
+ + q2
+
+√s2. (145) Since 
+
+s2 ≤ 18 σ2N
+
+(1 − σ2)(1 − γ)μ (¯ εstat + Cν ¯εapprox ) + 72 σ2L2
+
+> Q
+
+N
+
+(1 − γ)3μ3(1 − σ2)
+
+ (1 − γ)μ¯εstat + C2
+
+> ϕ
+
+ α2, (146) 33 and 
+
+Φ(0) −Φ(t) ≤ Φ(0) ≤ ϑρ
+
+1 − γ + E[D(0)  
+
+> ⋆
+
+](1 − γ)α + 16 √2LQ
+
+√Cν (ϑρ + 1) (1 − σ2)(1 − γ)√N
+
+q
+
+Ω(0) 1 + 8√3σα 
+
+√1 − σ2
+
+q
+
+Ω(0) 2
+
+!
+
+,
+
+(147) we have (recall that LQ = 2Cϕγ(1+ γ)(1 −γ)2 ≤ 4Cϕ 
+
+> (1 −γ)2
+
+)
+
+V ⋆(ρ) − 1
+
+T 
+
+> T−1
+
+X
+
+> t=0
+
+E
+
+h ¯V (t)(ρ)
+
+i
+
+≤ D(0)  
+
+> ⋆
+
++ αϑ ρ
+
+T (1 − γ)α + 1
+
+T · 64 √2Cϕ
+
+√Cν (ϑρ + 1) (1 − σ2)(1 − γ)3√N
+
+q
+
+Ω(0) 1 + 8√3σα 
+
+√1 − σ2
+
+q
+
+Ω(0) 2
+
+!
+
++
+
+ 2√Cν (ϑρ + 1) 1 − γ +
+
+s
+
+18 σ2N
+
+(1 − σ2)(1 − γ)μ + 1152 σ2C2
+
+> ϕ
+
+N α 2
+
+(1 − γ)6μ2(1 − σ2) · 512 √6Cϕ
+
+√Cν (ϑρ + 1) σα 
+
+(1 − σ2)5/2(1 − γ)3√N
+
+ √¯εstat 
+
++
+
+"
+
+2√2Cν (ϑρ + 1) 1 − γ +
+
+s
+
+18 σ2N C ν
+
+(1 − σ2)(1 − γ)μ · 512 √6Cϕ
+
+√Cν (ϑρ + 1) σα 
+
+(1 − σ2)5/2(1 − γ)3√N
+
+# p¯εapprox 
+
++ 6144 √2σ2√Cν (ϑρ + 1) C3
+
+> ϕ
+
+α2
+
+(1 − γ)13 /2μ3/2(1 − σ2)3 . (148) By Theorem E.3 we know that √¯εstat could be upper bounded as follows: 
+
+√¯εstat ≤ 2(1 − γ)2√K
+
+
+
+(p2p + 1) C2 
+
+> ϕ
+
++ p2pμ (1 − γ)
+
+
+
+. (149) (128) follows from plugging (149) into (148) and noting that when ξ(0) 1 = · · · = ξ(0)  
+
+> N
+
+, Ω(0) 1 = 0 .
+
+Bounding the consensus errors. Similar to Step 4 in Appendix F.4, to bound the consensus error 
+
+log f (t) 
+
+> n
+
+− log ¯f (t)
+
+> ∞
+
+for all n ∈ [N ], we first upper bound the eigenvalue of ρ(C)—the spectral norm of C.The characteristic polynomial of C is 
+
+f (λ) = ( λ − c11 )( λ − c22 ) − c12 c21 
+
+= λ2 − (c11 + c22 )λ + c11 c22 − c12 c21 ,
+
+which gives 
+
+ρ(C) ≤ c11 + c22 + p(c11 + c22 )2 − 4( c11 c12 − c12 c21 )2= c11 + c22 + p(c22 − c11 )2 + 4 c12 c21 
+
+2
+
+≤ c11 + c22 + c22 − c11 + 2 √c12 c21 
+
+2= c22 + √c12 c21 
+
+≤ 3 + σ2
+
+4 +
+
+√3σα 
+
+√1 − σ2 · 12 √2LQσ
+
+√1 − σ2(1 − γ)μ
+
+≤ 3 + σ2
+
+4 + σ(1 − σ2)2
+
+64 
+
+≤ 49 + 15 σ2
+
+64 < 1 , (150) where the third inequality uses (138), (139), and the fourth inequality uses (127). Therefore, similar to (230), when α ≤ α1, we have 
+
+Ω(t)
+
+> 2
+
+≤
+
+ 49 64 σ + 15 64 
+
+t
+
+Ω(0) 
+
+> 2
+
++ 64 s2
+
+15(1 − σ2) . (151) Combining the above inequality with (146), and (149), we obtain (129). 34 E.2 Proof of Theorem E.3 
+
+The proof of Theorem E.3 could be found in Appendix C.5 in [ YDG +22 ]. We present it for completeness. To prove Theorem E.3, we need the following Theorem G.2. 
+
+Theorem E.12 (Theorem 1 in [BM13]) . Consider the following assumptions: (i) The observations (ak, bk) ∈ Rp × Rp are independent and identically distributed. (ii) E
+
+h
+
+∥ak∥2i7 and E
+
+h
+
+∥bk∥2i
+
+are finite. The covariance E aka⊤
+
+> k
+
+ is invertible. (iii) The global minimum of g(w) = 12 E ⟨w, ak⟩2 − 2⟨w, bk⟩ is attained at a certain w⋆ ∈ Rp.Let ∆k = bk − ⟨ w⋆, ak⟩ak denote the residual. We have E[∆ k] = 0 .(iv) ∃R > 0 and σ > 0 such that E ∆k∆⊤
+
+> k
+
+ ≤ σ2E aka⊤
+
+> k
+
+ and E
+
+h
+
+∥ak∥2 aka⊤
+
+> k
+
+i
+
+≤
+
+R2E aka⊤
+
+> k
+
+.Consider the stochastic gradient recursion 
+
+wk+1 = wk − η (⟨wk, a k⟩ak − bk)
+
+started from w0 ∈ Rp. Let wout = 1
+
+> K
+
+PKk=1 wk. When η = 14R2 , we have 
+
+E [g(wout ) − g(w⋆)] ≤ 2
+
+K (σ√p + R ∥w0 − w⋆∥)2. (152) In the proof of Theorem E.3 we’ll show that for Algorithm 4, the assumptions in Theorem G.2 are all satisfied and thus we can use the result (267). 
+
+Proof of Theorem E.3. We let ak and bk in Theorem G.2 be ϕ(s, a ) and bQξ ϕ(s, a ) in Algo-rithm 4, respectively. And we let ∥·∥ = ∥·∥ 2 in Theorem G.2. Since the observations 
+
+ϕ(s, a ), bQξ (s, a )ϕ(s, a )
+
+
+
+∈ Rp × Rp are i.i.d., (i) is satisfied. As we assume ∥ϕ(s, a )∥2 ≤ Cϕ, E
+
+h
+
+∥ϕ(s, a )∥22
+
+i
+
+is finite. From Assumption 4.1 we know that 
+
+E ϕ(s, a )ϕ(s, a )⊤ is invertible. Let H be the length of trajectory for estimating bQξ (s, a ). Then 
+
+ bQξ (s, a )
+
+2
+
+is bounded by 
+
+E
+
+ bQξ (s, a )
+
+2
+
+= E(s,a )∼ ˜dπξν
+
+
+
+> ∞
+
+X 
+
+> τ=0
+
+P r (H = τ )E
+
+
+
+> τ
+
+X
+
+> t=0
+
+r(st, a t)
+
+!2
+
+H = τ, s 0 = s, a 0 = a
+
+
+
+= E(s,a )∼ ˜dπξν
+
+(1 − γ)
+
+> ∞
+
+X 
+
+> τ=0
+
+γτ E
+
+
+
+> τ
+
+X
+
+> t=0
+
+r(st, a t)
+
+!2
+
+H = τ, s 0 = s, a 0 = a
+
+
+
+≤ E(s,a )∼ ˜dπξν
+
+"
+
+(1 − γ)
+
+> ∞
+
+X 
+
+> τ=0
+
+γτ (τ + 1) 2
+
+#
+
+≤ 2(1 − γ)2 , (153) from which we deduce E
+
+bQξ (s, a )ϕ(s, a ) 22
+
+
+
+≤ C2
+
+> ϕ
+
+E
+
+h bQξ (s, a )2
+
+i
+
+is bounded. Thus (ii) holds. Furthermore, we introduce the residual 
+
+∆ := 
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆
+
+ϕ(s, a ) , (154) then from Lemma 7 in [YDG +22] we know that E[∆] = 12 ∇wℓ(w, bQξ , d πξ 
+
+> ν
+
+) = 0 , which gives (iii). 
+
+> 7
+
+Here ∥·∥ could be any norm in Rp.
+
+35 To verify (iv), we let R = Cϕ in Theorem G.2, then E
+
+h
+
+∥ϕ(s, a )∥22 ϕ(s, a )ϕ(s, a )⊤
+
+i
+
+≤
+
+C2
+
+> ϕ
+
+E ϕ(s, a )ϕ(s, a )⊤. Also note that 
+
+w⋆ =
+
+
+
+E(s,a )∼ ˜dπξν
+
+ϕ(s, a )ϕ(s, a )⊤†
+
+E(s,a )∼ ˜dπξν
+
+h bQξ (s, a )ϕ(s, a )
+
+i
+
+≤ 11 − γ
+
+ E(s,a )∼ν
+
+ϕ(s, a )ϕ(s, a )⊤ † E(s,a )∼ ˜dπξν
+
+h bQξ (s, a )ϕ(s, a )
+
+i
+
+, (155) from which we deduce 
+
+∥w⋆∥2 ≤ Bμ(1 − γ)2 . (156) 
+
+E
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆2
+
+|s, a 
+
+
+
+= E
+
+ bQξ (s, a )
+
+2
+
+|s, a 
+
+
+
+− 2Qξ (s, a )ϕ(s, a )⊤w⋆ + ( ϕ(s, a )⊤w⋆)2
+
+(157) 
+
+≤ 2(1 − γ)2 + 2C2
+
+> ϕ
+
+μ(1 − γ)3 + C4
+
+> ϕ
+
+μ2(1 − γ)4
+
+≤ 2(1 − γ)2
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!2
+
+. (158) The above expression implies 
+
+E ∆∆ ⊤ = E(s,a )∼ ˜dπξν
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆2
+
+ϕ(s, a )ϕ(s, a )⊤ s, a 
+
+
+
+= E(s,a )∼ ˜dπξν
+
+
+
+E
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆2
+
+s, a 
+
+
+
+ϕ(s, a )ϕ(s, a )⊤
+
+
+
+≤
+
+
+
+√21 − γ
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!| {z }
+
+> σ
+
+ E[ϕ(s, a )ϕ(s, a )⊤] . (159) Therefore, (iv) is verified. Thus by (267), with stepsize β = 12C2
+
+> ϕ
+
+, initialization w0 = 0 and K steps of critic updates, we have 
+
+E
+
+h
+
+ℓ
+
+
+
+wout , bQξ , ˜dξ
+
+i 
+
+− ℓ
+
+
+
+w⋆, bQξ , ˜dξ
+
+
+
+≤ 4
+
+K (σ√p + Cϕ ∥w⋆∥2)2
+
+≤ 4
+
+K
+
+√2p
+
+1 − γ
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!
+
++ C2
+
+> ϕ
+
+μ(1 − γ)2
+
+!2
+
+,
+
+which gives (113). 
+
+## F Proof of key lemmas 
+
+F.1 Proof of Lemma D.2 
+
+Before proceeding, we summarize several useful properties of the auxiliary sequences (cf. (40) and (41)), whose proof is postponed to Appendix G.1. 
+
+Lemma F.1 (Properties of auxiliary sequences {ξ(t)} and {ξ(t)}). {ξ(t)} and {ξ(t)} have the following properties: 1. ξ(t) can be viewed as an unnormalized version of π(t), i.e., 
+
+π(t) 
+
+> n
+
+(·| s) = ξ(t) 
+
+> n
+
+(s, ·)
+
+ξ(t) 
+
+> n
+
+(s, ·) 1
+
+, ∀n ∈ [N ], s ∈ S . (160) 36 2. For any t ≥ 0, log ξ(t) keeps track of the average of log ξ(t), i.e., 
+
+1
+
+N 1⊤ 
+
+> N
+
+log ξ(t) = log ξ(t) . (161) 
+
+It follows that 
+
+∀s ∈ S , t ≥ 0 : π(t)(·| s) = ξ(t)(s, ·)
+
+ξ(t)(s, ·) 1
+
+. (162) 
+
+Lemma F.2 ( [CCC +22b, Appendix. A.2] ). For any vector θ = [ θa]a∈A ∈ R|A| , we denote by 
+
+πθ ∈ R|A| the softmax transform of θ such that 
+
+πθ (a) = exp( θa)
+
+P 
+
+> a′∈A
+
+exp( θa′ ) , a ∈ A . (163) 
+
+For any θ1, θ 2 ∈ R|A| , we have 
+
+log( ∥exp( θ1)∥1) − log( ∥exp( θ2)∥1) ≤ ∥ θ1 − θ2∥∞ , (164) 
+
+∥log πθ1 − log πθ2 ∥∞ ≤ 2 ∥θ1 − θ2∥∞ . (165) 
+
+Step 1: bound u(t+1) (s, a ) = log ξ(t+1) (s, a ) − log ξ(t+1) (s, a )1N 2. By (40b) and (41b) we have 
+
+u(t+1) (s, a ) = log ξ(t+1) (s, a ) − log ξ(t+1) (s, a )1N 2
+
+= α
+
+
+
+W log ξ(t)(s, a ) − log ξ(t)(s, a )1N
+
+
+
++ (1 − α)
+
+
+
+W T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N
+
+
+
+/τ 2
+
+≤ σα log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2 + 1 − ατ σ T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N 2
+
+≤ σα u(t) 
+
+> ∞
+
++ 1 − ατ σ v(t)
+
+> ∞
+
+, (166) where the penultimate step results from the averaging property of W (property (11) ). Taking maximum over (s, a ) ∈ S × A establishes the bound on Ω(t+1) 1 in (49). 
+
+Step 2: bound v(t+1) (s, a ) = T (t+1) (s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )1N 2. By ( UT ) we have 
+
+T (t+1) (s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )1N 2
+
+= W
+
+
+
+T (t)(s, a ) + Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a )
+
+
+
+− bQ(t+1)  
+
+> τ
+
+(s, a )1N 2
+
+=
+
+
+
+W T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N
+
+
+
++ W
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a )
+
+
+
++
+
+ bQ(t) 
+
+> τ
+
+(s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )
+
+
+
+1N 2
+
+≤ σ T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N 2 + σ
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a )
+
+
+
++
+
+ bQ(t) 
+
+> τ
+
+(s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )
+
+
+
+1N 2
+
+≤ σ T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N 2 + σ Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2 , (167) where the penultimate step uses property (11), and the last step is due to 
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a )
+
+
+
++
+
+ bQ(t) 
+
+> τ
+
+(s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )
+
+
+
+1N
+
+> 22
+
+= Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 22 + N   bQ(t) 
+
+> τ
+
+(s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )2
+
+− 2
+
+> N
+
+X
+
+> n=1
+
+
+
+Qπ(t+1)  
+
+> n
+> τ,n
+
+(s, a ) − Qπ(t) 
+
+> n
+> τ,n
+
+(s, a )
+
+  bQ(t+1)  
+
+> τ
+
+(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )
+
+
+
+= Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 22 − N   bQ(t) 
+
+> τ
+
+(s, a ) − bQ(t+1)  
+
+> τ
+
+(s, a )2
+
+≤ Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 22 .
+
+Step 3: bound Q⋆τ − τ log ξ(t+1) 
+
+> ∞
+
+. We decompose the term of interest as 
+
+Q⋆τ − τ log ξ(t+1) = Q⋆τ − τ α log ξ(t) − (1 − α) bQ(t)
+
+> τ
+
+= α(Q⋆τ − τ log ξ(t)) + (1 − α)( Q⋆τ − Q(t) 
+
+> τ
+
+) + (1 − α)( Q(t) 
+
+> τ
+
+− bQ(t) 
+
+> τ
+
+),
+
+37 which gives 
+
+Q⋆τ − τ log ξ(t+1)  
+
+> ∞
+
+≤ α Q⋆τ − τ log ξ(t) 
+
+> ∞
+
++ (1 − α) Q⋆τ − Q(t)  
+
+> τ∞
+
++ (1 − α) Q(t) 
+
+> τ
+
+− bQ(t)  
+
+> τ∞
+
+.
+
+(168) Note that we can upper bound Q(t) 
+
+> τ
+
+− bQ(t)  
+
+> τ∞
+
+by 
+
+Q(t) 
+
+> τ
+
+− bQ(t)  
+
+> τ∞
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t)
+
+> τ,n
+> ∞
+
+≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− Qπ(t) 
+
+> τ,n ∞
+
+≤ MN
+
+> N
+
+X
+
+> n=1
+
+log ξ(t) 
+
+> n
+
+− log ξ(t)
+
+> ∞
+
+⩽M u(t)
+
+> ∞
+
+. (169) The last step is due to log ξ(t) 
+
+> n
+
+(s, a ) − log ξ(t)(s, a ) ≤ u(t)(s, a ), while the penultimate step results from writing 
+
+π(t)(·| s) = softmax 
+
+
+
+log ξ(t)(s, ·)
+
+
+
+,π(t) 
+
+> n
+
+(·| s) = softmax 
+
+
+
+log ξ(t) 
+
+> n
+
+(s, ·)
+
+
+
+,
+
+and applying the following lemma. 
+
+Lemma F.3 (Lipschitz constant of soft Q-function) . Assume that r(s, a ) ∈ [0 , 1] , ∀(s, a ) ∈ S × A 
+
+and τ ≥ 0. For any θ, θ′ ∈ R|S||A| , we have 
+
+∥Qπθ′ 
+
+> τ
+
+− Qπθ 
+
+> τ
+
+∥∞ ≤ 1 + γ + 2 τ (1 − γ) log |A| 
+
+(1 − γ)2 · γ
+
+| {z }
+
+> =: M
+
+∥θ′ − θ∥∞ . (170) Plugging (169) into (168) gives 
+
+Q⋆τ −τ log ξ(t+1)  
+
+> ∞
+
+≤ α Q⋆τ −τ log ξ(t) 
+
+> ∞
+
++(1 −α) Q⋆τ −Q(t)  
+
+> τ∞
+
++(1 −α)M u(t) 
+
+> ∞
+
+. (171) 
+
+Step 4: bound Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2.
+
+Let w(t) : S × A → R be defined as 
+
+∀(s, a ) ∈ S ×A : w(t)(s, a ) := log ξ(t+1) (s, a )−log ξ(t)(s, a )−(1 −α)V ⋆τ (s)1N /τ 2 . (172) Again, we treat w(t) as vectors in R|S||A| whenever it is clear from context. For any (s, a ) ∈ S × A 
+
+and n ∈ [N ], by Lemma F.3 it follows that 
+
+Qπ(t+1)  
+
+> n
+> τ,n
+
+(s, a ) − Qπ(t) 
+
+> n
+> τ,n
+
+(s, a ) ≤ M max  
+
+> s∈S
+
+log ξ(t+1)  
+
+> n
+
+(s, ·) − log ξ(t) 
+
+> n
+
+(s, ·) − (1 − α)V ⋆τ (s)1|A| /τ ∞
+
+≤ M max  
+
+> s∈S
+
+max  
+
+> a∈A
+
+w(t)(s, a ) ≤ M w(t) 
+
+> ∞
+
+, (173) and consequently 
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2 ≤ M √N w(t) 
+
+> ∞
+
+. (174) It boils down to control w(t)
+
+> ∞
+
+. To do so, we first note that for each (s, a ) ∈ S × A , we have 
+
+w(t)(s, a )= W
+
+
+
+α log ξ(t)(s, a ) + (1 − α)T (t)(s, a )/τ 
+
+
+
+− log ξ(t)(s, a ) − (1 − α)V ⋆τ (s)1N /τ 2(a)
+
+= α(W − IN )
+
+
+
+log ξ(t)(s, a ) − log ξ(t)(s, a )1N
+
+
+
++ (1 − α)
+
+
+
+W T (t)(s, a )/τ − log ξ(t)(s, a ) − V ⋆τ (s)1N /τ 
+
+
+
+> 2(b)
+
+≤ 2α log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2 + 1 − ατ W T (t)(s, a ) − τ log ξ(t)(s, a ) − V ⋆τ (s)1N 2
+
+(175) 38 where (a) is due to the doubly stochasticity property of W and (b) is from the fact ∥W − IN ∥2 ≤ 2.We further bound the second term as follows: 
+
+W T (t)(s, a ) − τ log ξ(t)(s, a ) − V ⋆τ (s)1N 2
+
+= W T (t)(s, a ) − τ log ξ(t)(s, a ) −  Q⋆τ (s, a ) − τ log π⋆τ (a|s)1N 2
+
+≤ W T (t)(s, a ) − Q⋆τ (s, a )1N 2 + τ log ξ(t)(s, a ) − log π⋆τ (a|s)1N 2
+
+≤ W T (t)(s, a ) − bQτ (s, a )1N 2 + bQτ (s, a )1N − Q⋆τ (s, a )1N 2
+
++ τ log ξ(t)(s, a ) − log π(t)(a|s)1N 2 + τ log π(t)(a|s)1N − log π⋆τ (a|s)1N 2
+
+= σ T (t)(s, a ) − bQ(t) 
+
+> τ
+
+(s, a )1N 2 + √N bQ(t) 
+
+> τ
+
+(s, a ) − Q⋆τ (s, a )
+
++ τ log ξ(t)(s, a ) − log π(t)(a|s)1N 2 + τ √N log π(t)(a|s) − log π⋆τ (a|s) . (176) Here, the first step results from the following relation established in [NNXS17]: 
+
+∀(s, a ) ∈ S × A : V ⋆τ (s) = −τ log π⋆τ (a|s) + Q⋆τ (s, a ) , (177) which also leads to 
+
+log π(t) − log π⋆τ ∞ ≤ 2
+
+τ Q⋆τ − τ log ξ(t) 
+
+> ∞
+
+(178) by Lemma F.2. For the remaining terms in (176), we have 
+
+bQ(t) 
+
+> τ
+
+(s, a ) − Q⋆τ (s, a ) ≤ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
++ Q(t) 
+
+> τ
+
+− Q⋆τ ∞ , (179) and 
+
+log ξ(t)(s, a ) − log π(t)(a|s)1N 2 =
+
+vuut NX
+
+> n=1
+
+
+
+log ξ(t) 
+
+> n
+
+(s, a ) − log π(t)(a|s)
+
+2
+
+≤
+
+vuut NX
+
+> n=1
+
+2 log ξ(t) 
+
+> n
+
+− log ξ(t) 2
+
+> ∞
+
+≤
+
+vuut NX
+
+> n=1
+
+2 u(t) 2 
+
+> ∞
+
+= √2N u(t) 
+
+> ∞
+
+, (180) where the first inequality again results from Lemma F.2. Plugging (178) , (179) , (180) into (176) and using the definition of u(t), v (t), we arrive at 
+
+w(t)(s, a ) ≤
+
+
+
+2α + (1 − α) · √2N
+
+
+
+u(t) 
+
+> ∞
+
++ 1 − ατ v(t) 
+
+> ∞
+
++ 1 − ατ · √N
+
+ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
++ Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
+
+
++ 1 − ατ · 2√N Q⋆τ − τ log ξ(t) 
+
+> ∞
+
+.
+
+Using previous display, we can write (174) as 
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2
+
+≤ M √N
+
+ 
+
+2α + (1 − α) · √2N
+
+
+
+u(t) 
+
+> ∞
+
++ 1 − ατ σ v(t)
+
+> ∞
+
++ 1 − ατ · √N
+
+
+
+M u(t) 
+
+> ∞
+
++ Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
+
+
++ 1 − ατ · 2√N Q⋆τ − τ log ξ(t)
+
+> ∞
+
+
+
+.
+
+(181) Combining (167) with the above expression (181), we get 
+
+v(t+1)  
+
+> ∞
+
+≤ σ 1 + ηM √N
+
+1 − γ σ
+
+!
+
+v(t) 
+
+> ∞
+
++ σM √N
+
+( 
+
+2α + (1 − α) · √2N + 1 − ατ · √N M 
+
+
+
+u(t)
+
+> ∞
+
++ 1 − ατ · √N Q(t) 
+
+> τ
+
+− Q⋆τ ∞ + 1 − ατ · 2√N Q⋆τ − τ log ξ(t)
+
+> ∞
+
+)
+
+. (182) 39 Step 5: bound Q(t+1)  
+
+> τ
+
+− Q⋆τ ∞. For any state-action pair (s, a ) ∈ S × A , we observe that 
+
+Q⋆τ (s, a ) − Q(t+1)  
+
+> τ
+
+(s, a )= r(s, a ) + γ E 
+
+> s′∼P(·| s,a )
+
+[V ⋆τ (s′)] −
+
+
+
+r(s, a ) + γ E 
+
+> s′∼P(·| s,a )
+
+h
+
+V π(t+1)  
+
+> τ
+
+(s′)
+
+i
+
+= γ E 
+
+> s′∼P(·| s,a )
+
+
+
+τ log 
+
+
+
+exp 
+
+ Q⋆τ (s′, ·)
+
+τ
+
+
+
+> 1
+
+ 
+
+− γ E 
+
+> s′∼P(·| s,a ),a′∼π(t+1) (·| s′)
+
+h
+
+Q(t+1)  
+
+> τ
+
+(s′, a ′) − τ log π(t+1) (a′|s′)
+
+i
+
+,
+
+(183) where the first step invokes the definition of Qτ (cf. (6a) ), and the second step is due to the following expression of V ⋆τ established in [NNXS17]: 
+
+V ⋆τ (s) = τ log 
+
+
+
+exp 
+
+ Q⋆τ (s, ·)
+
+τ
+
+
+
+> 1
+
+
+
+. (184) To continue, note that by (162) and (41b) we have 
+
+log π(t+1) (a|s) = log ξ(t+1) (s, a ) − log 
+
+
+
+ξ(t+1) (s, ·) 1
+
+
+
+= α log ξ(t)(s, a ) + (1 − α) bQ(t) 
+
+> τ
+
+(s, a )
+
+τ − log 
+
+
+
+ξ(t+1) (s, ·) 1
+
+
+
+. (185) Plugging (185) into (183) and (181) establishes the bounds on 
+
+Q⋆τ (s, a ) − Q(t+1)  
+
+> τ
+
+(s, a ) = γ E 
+
+> s′∼P(·| s,a )
+
+
+
+τ log 
+
+
+
+exp 
+
+ Q⋆τ (s′, ·)
+
+τ
+
+
+
+> 1
+
+
+
+− τ log 
+
+
+
+ξ(t+1) (s′, ·) 1
+
+
+
+− γ E 
+
+> s′∼P(·| s,a ),a′∼π(t+1) (·| s′)
+
+"
+
+Q(t+1)  
+
+> τ
+
+(s′, a ′) − τ α log ξ(t)(s′, a ′) + (1 − α) bQ(t) 
+
+> τ
+
+(s′, a ′)
+
+τ
+
+!| {z } 
+
+> =log ξ(t+1) (s′,a ′)
+
+#
+
+(186) for any (s, a ) ∈ S × A . In view of property (164) , the first term on the right-hand side of (186) can be bounded by 
+
+τ log 
+
+
+
+exp 
+
+ Q⋆τ (s′, ·)
+
+τ
+
+
+
+> 1
+
+
+
+− τ log 
+
+
+
+ξ(t+1) (s′, ·) 1
+
+
+
+≤ Q⋆τ − τ log ξ(t+1)  
+
+> ∞
+
+.
+
+Plugging the above expression into (186), we have 
+
+0 ≤ Q⋆τ (s, a )−Q(t+1)  
+
+> τ
+
+(s, a ) ≤ γ Q⋆τ −τ log ξ(t+1) 
+
+> ∞
+
+−γ min 
+
+> s,a
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ log ξ(t+1) (s, a )
+
+
+
+,
+
+which gives 
+
+Q⋆τ −Q(t+1)   
+
+> τ∞
+
+≤ γ Q⋆τ −τ log ξ(t+1) 
+
+> ∞
+
++γ max 
+
+n
+
+0, − min 
+
+> s,a
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ log ξ(t+1) (s, a )
+
+ o 
+
+.
+
+(187) Plugging the above inequality into (171) and (182) establishes the bounds on Ω(t+1) 3 and Ω(t+1) 2
+
+in (49) , respectively. Step 6: bound − min s,a 
+
+ Q(t+1)  
+
+> τ
+
+(s, a ) − τ log ξ(t+1) (s, a ). We need the following lemma which is adapted from Lemma 1 in [CCC +22b]: 
+
+Lemma F.4 (Performance improvement of FedNPG with entropy regularization) . Suppose 0 < η ≤
+
+(1 − γ)/τ . For any state-action pair (s0, a 0) ∈ S × A , one has 
+
+V (t+1)  
+
+> τ
+
+(s0) − V (t) 
+
+> τ
+
+(s0) ≥ 1
+
+η E
+
+> s∼dπ(t+1)
+> s0
+
+h
+
+αKL  π(t+1) (·| s0) ∥ π(t)(·| s0) + KL  π(t)(·| s0) ∥ π(t+1) (·| s0)i
+
+− 21 − γ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
+, (188) 
+
+Q(t+1)  
+
+> τ
+
+(s0, a 0) − Q(t) 
+
+> τ
+
+(s0, a 0) ≥ − 2γ
+
+1 − γ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
+. (189) 40 Proof. See Appendix G.3. Using (189), we have 
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ α log ξ(t)(s, a ) + (1 − α) bQ(t) 
+
+> τ
+
+(s, a )
+
+τ
+
+!
+
+≥ Q(t) 
+
+> τ
+
+(s, a ) − τ α log ξ(t)(s, a ) + (1 − α) bQ(t) 
+
+> τ
+
+(s, a )
+
+τ
+
+!
+
+− 2γ
+
+1 − γ bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
+≥ α
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+
+
+− 2γ + ητ 
+
+1 − γ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
+, (190) which gives 
+
+− min 
+
+> s,a
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ log ξ(t+1) (s, a )
+
+
+
+≤ − α min 
+
+> s,a
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+
+
++ 2γ + ητ 
+
+1 − γ M u(t)
+
+> ∞
+
+≤ α max 
+
+n
+
+0, min 
+
+> s,a
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+ o 
+
++ 2γ + ητ 
+
+1 − γ M u(t) 
+
+> ∞
+
+. (191) This establishes the bounds on Ω(t+1) 4 in (49). 
+
+F.2 Proof of Lemma D.3 
+
+Let f (λ) denote the characteristic function. In view of some direct calculations, we obtain 
+
+f (λ) = ( λ − α)
+
+
+
+(λ − σα )( λ − σ(1 + σbη ))( λ − (1 − α)γ − α)
+
+| {z }
+
+> =: f0(λ)
+
+− ησ 2
+
+1 − γ [S(λ − (1 − α)γ − α) + γcdM η + (1 − α)(2 + γ)M cη ]
+
+| {z }
+
+> =: f1(λ)
+
+
+
+− τ η 3γ
+
+(1 − γ)2 · 2cdM σ 2 ,
+
+(192) where, for the notation simplicity, we let 
+
+b := M √N
+
+1 − γ , (193a) 
+
+c := M N 
+
+1 − γ = √N b , (193b) 
+
+d := 2γ + ητ 
+
+1 − γ . (193c) Note that among all these new notation we introduce, S, d are dependent of η. To decouple the dependence, we give their upper bounds as follows 
+
+d0 := 1 + γ
+
+1 − γ ≥ d , (194) 
+
+S0 := M √N 2 + √2N + M √Nτ
+
+!
+
+≥ S , (195) where (194) follows from η ≤ (1 − γ)/τ , and (195) uses the fact that α ≤ 1 and 1 − α ≤ 1.Let 
+
+λ⋆ := max 
+
+n 3 + σ
+
+4 , 1 + (1 − α)γ + α
+
+2
+
+o
+
+. (196) Since A(ρ) is a nonnegative matrix, by Perron-Frobenius Theorem (see [ HJ12 ], Theorem 8.3.1), ρ(η)
+
+is an eigenvalue of A(ρ). So to verify (55) , it suffices to show that f (λ) > 0 for any λ ∈ [λ⋆, ∞).To do so, in the following we first show that f (λ⋆) > 0, and then we prove that f is non-decreasing on [λ⋆, ∞).41 • Showing f (λ⋆) > 0. We first lower bound f0(λ⋆). Since λ⋆ ≥ 3+ σ 
+
+> 4
+
+, we have 
+
+λ⋆ − σ(1 + σbη ) ≥ 1 − σ
+
+4 , (197) and from λ⋆ ≥ 1+(1 −α)γ+α 
+
+> 2
+
+we deduce 
+
+λ⋆ − (1 − α)γ − α ≥ (1 − γ)(1 − α)2 (198) and 
+
+λ⋆ > 1 + α
+
+2 , (199) which gives 
+
+λ⋆ − σα ≥ 1 + α
+
+2 − σα . (200) Combining (200), (197), (198), we have that 
+
+f0(λ⋆) ≥ 1 − σ
+
+8
+
+ 1 + α
+
+2 − σα 
+
+
+
+ητ . (201) To continue, we upper bound f1(λ⋆) as follows. 
+
+f1(λ⋆) ≤ Sτ η + γcdM η + 2 + γ
+
+1 − γ cM τ η 2
+
+= η
+
+
+
+τ
+
+
+
+S + 2 + γ
+
+1 − γ M cη 
+
+
+
++ γcdM 
+
+
+
+. (202) Plugging (201),(202) into (192) and using (199), we have 
+
+f (λ⋆) > 1 − α
+
+2
+
+
+
+f0(λ⋆) − ησ 2
+
+1 − γ f1(λ⋆)
+
+
+
+− τ η 3γ
+
+(1 − γ)2 · 2cdM σ 2
+
+≥ τ η 2
+
+2(1 − γ)
+
+ 1 − σ
+
+8 τ
+
+
+
+1 − σ + (1 − α)( σ − 12 )
+
+
+
+− ησ 2
+
+1 − γ
+
+
+
+τ
+
+
+
+S + 2 + γ
+
+1 − γ M cη 
+
+
+
++ 5 γcdM 
+
+ 
+
+= τ η 2
+
+2(1 − γ)
+
+ (1 − σ)2
+
+8 τ − η
+
+1 − γ
+
+
+
+Sτ σ 2 + 2 + γ
+
+1 − γ M cσ 2τ η + τ 2
+
+ 12 − σ2
+
+
+
+· 1 − σ
+
+8 + 5 γcdM σ 2
+
+ 
+
+≥ τ η 2
+
+2(1 − γ)
+
+ (1 − σ)2
+
+8 τ − η
+
+1 − γ
+
+
+
+S0τ σ 2 + (1 − σ)2
+
+16 τ 2 + (2 + γ + 5 γd 0) cM σ 2
+
+ 
+
+≥ 0 ,
+
+where the penultimate inequality uses 12 − σ ≤ 1−σ 
+
+> 2
+
+, and the last inequality follows from the definition of ζ (cf. (53)). • Proving f is non-decreasing on [λ⋆, ∞). Note that 
+
+η ≤ ζ ≤ (1 − γ)(1 − σ)2
+
+8S0σ2 ,
+
+thus we have 
+
+∀λ ≥ λ⋆ : f ′
+
+> 0
+
+(λ) − ησ 2
+
+1 − γ f ′
+
+> 1
+
+(λ) ≥ (λ − σα )( λ − σ(1 + σbη )) − η
+
+1 − γ Sσ 2 ≥ 0 ,
+
+which indicates that f0 − f1 is non-decreasing on [λ⋆, ∞). Therefore, f is non-decreasing on [λ⋆, ∞).
+
+F.3 Proof of Lemma D.6 
+
+Note that bounding u(t+1) (s, a ) is identical to the proof in Appendix F.1 and shall be omitted. The rest of the proof also follows closely that of Lemma D.2, and we only highlight the differences due to approximation error for simplicity. 42 Step 2: bound v(t+1) (s, a ) = T (t+1) (s, a ) − bq(t+1)  
+
+> τ
+
+(s, a )1N 2. Let q(t) 
+
+> τ
+
+:= 
+
+
+
+qπ(t)1 
+
+> τ, 1
+
+, · · · , q π(t)
+
+> N
+> τ,N
+
+⊤
+
+.
+
+Similar to (167) we have 
+
+T (t+1) (s, a ) − bq(t+1)  
+
+> τ
+
+(s, a )1N 2
+
+≤ σ T (t)(s, a ) − bq(t) 
+
+> τ
+
+(s, a )1N 2 + σ q(t+1)  
+
+> τ
+
+(s, a ) − q(t) 
+
+> τ
+
+(s, a ) 2
+
+≤ σ T (t)(s, a ) − bq(t) 
+
+> τ
+
+(s, a )1N 2 + σ Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2 + 2 σ ∥e∥2 . (203) 
+
+Step 3: bound Q⋆τ − τ log ξ(t+1) 
+
+> ∞
+
+. In the context of inexact updates, (168) writes 
+
+Q⋆τ − τ log ξ(t+1)  
+
+> ∞
+
+≤ α Q⋆τ − τ log ξ(t) 
+
+> ∞
+
++ (1 − α) Q⋆τ − Q(t)  
+
+> τ∞
+
++ (1 − α) Q(t) 
+
+> τ
+
+− bq(t)  
+
+> τ∞
+
+.
+
+For the last term, following a similar argument in (169) leads to 
+
+Q(t) 
+
+> τ
+
+− bq(t)  
+
+> τ∞
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t)
+
+> τ,n
+> ∞
+
++ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+
+
+Qπ(t) 
+
+> n
+> τ,n
+
+− qπ(t)
+
+> n
+> τ,n
+
+
+
+> ∞
+
+≤ M · 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+log ξ(t) 
+
+> n
+
+− log ξ(t) 
+
+> ∞
+
++ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+en
+
+≤ M u(t) 
+
+> ∞
+
++ ∥e∥∞ .
+
+Combining the above two inequalities, we obtain 
+
+Q⋆τ −τ log ξ(t+1)  
+
+> ∞
+
+≤ α Q⋆τ −τ log ξ(t)
+
+> ∞
+
++(1 −α) Q⋆τ −Q(t) 
+
+> τ∞
+
++(1 −α)
+
+
+
+M u(t) 
+
+> ∞
+
++ e ∞
+
+
+
+.
+
+(204) 
+
+Step 4: bound Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2
+
+. We remark that the bound established in (174) still holds in the inexact setting, with the same definition for w(t):
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − Q(t) 
+
+> τ
+
+(s, a ) 2
+
+≤ M √N w(t)
+
+> ∞
+
+. (205) To deal with the approximation error, we rewrite (176) as 
+
+W T (t)(s, a ) − τ log ξ(t)(s, a ) − V ⋆τ (s)1N 2
+
+= W T (t)(s, a ) − τ log ξ(t)(s, a ) −  Q⋆τ (s, a ) − τ log π⋆τ (a|s)1N 2
+
+≤ W T (t)(s, a ) − Q⋆τ (s, a )1N 2 + τ log ξ(t)(s, a ) − log π⋆τ (a|s)1N 2
+
+≤ W T (t)(s, a ) − bqτ (s, a )1N 2 + bqτ (s, a )1N − Q⋆τ (s, a )1N 2
+
++ τ log ξ(t)(s, a ) − log π(t)(a|s)1N 2 + τ log π(t)(a|s)1N − log π⋆τ (a|s)1N 2
+
+≤ σ T (t)(s, a ) − bq(t) 
+
+> τ
+
+(s, a )1N 2
+
++ √N bq(t) 
+
+> τ
+
+(s, a ) − Q⋆τ (s, a )
+
++ τ log ξ(t)(s, a ) − log π(t)(a|s)1 2
+
++ τ √N log π(t)(a|s) − log π⋆τ (a|s) , (206) where the second term can be upper-bounded by 
+
+bq(t) 
+
+> τ
+
+(s, a ) − Q⋆τ (s, a ) ≤ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
++ Q(t) 
+
+> τ
+
+− Q⋆τ ∞ + bq(t) 
+
+> τ
+
+(s, a ) − bQ(t) 
+
+> τ
+
+(s, a ) ∞
+
+≤ bQ(t) 
+
+> τ
+
+− Q(t)  
+
+> τ∞
+
++ Q(t) 
+
+> τ
+
+− Q⋆τ ∞ + ∥e∥∞ . (207) Combining (207), (206) and the established bounds in (175), (178), (180) leads to 
+
+w(t)(s, a ) ≤
+
+
+
+2α + (1 − α) · √2N
+
+
+
+u(t)
+
+> ∞
+
++ 1 − ατ v(t)
+
+> ∞
+
++ 1 − ατ · √N
+
+ bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
++ Q(t) 
+
+> τ
+
+− Q⋆τ ∞
+
++ ∥e∥∞
+
+
+
++ 1 − ατ · 2√N Q⋆τ − τ log ξ(t)
+
+> ∞
+
+.
+
+43 Combining the above inequality with (205) and (203) gives 
+
+v(t+1)  
+
+> ∞
+
+≤ σ 1 + ηM √N
+
+1 − γ σ
+
+!
+
+v(t) 
+
+> ∞
+
++ σM √N
+
+( 
+
+2α + (1 − α) · √2N + 1 − ατ · √N M 
+
+
+
+u(t)
+
+> ∞
+
++ 1 − ατ · √N
+
+
+
+Q(t) 
+
+> τ
+
+− Q⋆τ ∞ + e ∞
+
+
+
++ 1 − ατ · 2√N Q⋆τ − τ log ξ(t)
+
+> ∞
+
+)
+
++ 2 σ√N ∥e∥∞ .
+
+(208) 
+
+Step 5: bound Q(t+1)  
+
+> τ
+
+− Q⋆τ ∞
+
+. It is straightforward to verify that (187) applies to the inexact updates as well: 
+
+Q⋆τ − Q(t+1)  
+
+> τ∞
+
+≤ γ Q⋆τ − τ log ξ(t+1) 
+
+> ∞
+
++ γ
+
+
+
+− min 
+
+> s,a
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ log ξ(t+1) (s, a )
+
+
+
+.
+
+Plugging the above inequality into (204) and (208) establishes the bounds on Ω(t+1) 3 and Ω(t+1) 2 in (68) , respectively. Step 6: bound − min s,a 
+
+ Q(t+1)  
+
+> τ
+
+(s, a )−τ log ξ(t+1) (s, a ). We obtain the follow-ing lemma by interpreting the approximation error e as part of the consensus error bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
+in Lemma F.4. 
+
+Lemma F.5 (inexact version of Lemma F.4) . Suppose 0 < η ≤ (1 − γ)/τ . For any state-action pair 
+
+(s0, a 0) ∈ S × A , one has 
+
+V (t+1)  
+
+> τ
+
+(s0) − V (t) 
+
+> τ
+
+(s0) ≥ 1
+
+η E
+
+> s∼dπ(t+1)
+> s0
+
+h
+
+αKL  π(t+1) (·| s0) ∥ π(t)(·| s0) + KL  π(t)(·| s0) ∥ π(t+1) (·| s0)i
+
+− 21 − γ
+
+ bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
++ ∥e∥∞
+
+
+
+, (209) 
+
+Q(t+1)  
+
+> τ
+
+(s0, a 0) − Q(t) 
+
+> τ
+
+(s0, a 0) ≥ − 2γ
+
+1 − γ
+
+ bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
++ ∥e∥∞
+
+
+
+. (210) Using (210), we have 
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ α log ξ(t)(s, a ) + (1 − α) bQ(t) 
+
+> τ
+
+(s, a )
+
+τ
+
+!
+
+≥ Q(t) 
+
+> τ
+
+(s, a ) − τ α log ξ(t)(s, a ) + (1 − α) bQ(t) 
+
+> τ
+
+(s, a )
+
+τ
+
+!
+
+− 2γ
+
+1 − γ
+
+ bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
++ ∥e∥∞
+
+
+
+≥ α
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+
+
+− 2γ + ητ 
+
+1 − γ bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ∞
+
+− 2γ
+
+1 − γ ∥e∥∞ , (211) which gives 
+
+− min 
+
+> s,a
+
+
+
+Q(t+1)  
+
+> τ
+
+(s, a ) − τ log ξ(t+1) (s, a )
+
+
+
+≤ − α min 
+
+> s,a
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) − τ log ξ(t)(s, a )
+
+
+
++ 2γ + ητ 
+
+1 − γ M u(t)
+
+> ∞
+
++ 2γ
+
+1 − γ ∥e∥∞ .
+
+(212) 
+
+F.4 Proof of Lemma D.8 Step 1: bound u(t+1) (s, a ) = log ξ(t+1) (s, a ) − log ξ(t+1) (s, a )1N 2
+
+. Following the same strat-egy in establishing (166), we have 
+
+log ξ(t+1) (s, a ) − log ξ(t+1) (s, a )1N 2
+
+=
+
+
+
+W log ξ(t)(s, a ) − log ξ(t)(s, a )1N
+
+
+
++ η
+
+1 − γ
+
+
+
+W T (t)(s, a ) − bQ(t)(s, a )1N
+
+
+
+> 2
+
+≤ σ log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2
+
++ η
+
+1 − γ σ T (t)(s, a ) − bQ(t)(s, a )1N 2
+
+, (213) 44 or equivalently 
+
+u(t+1)  
+
+> ∞
+
+≤ σ u(t) 
+
+> ∞
+
++ η
+
+1 − γ σ v(t) 
+
+> ∞
+
+. (214) 
+
+Step 2: bound v(t+1) (s, a ) = T (t+1) (s, a ) − bQ(t+1) (s, a )1N 2. In the same vein of establishing (167), we have 
+
+T (t+1) (s, a ) − bQ(t+1) (s, a )1N 2
+
+≤ σ T (t)(s, a ) − bQ(t)(s, a )1N 2 + σ Q(t+1) (s, a ) − Q(t)(s, a ) 2 , (215) The term Q(t+1) (s, a ) − Q(t)(s, a ) 2 can be bounded in a similar way in (174): 
+
+Q(t+1) (s, a ) − Q(t)(s, a ) 2 ≤ (1 + γ)γ
+
+(1 − γ)2
+
+√N w(t)0 ∞ , (216) where the coefficient (1+ γ)γ 
+
+> (1 −γ)2
+
+comes from M in Lemma F.3 when τ = 0 , and w(t)0 ∈ R|S||A| is defined as 
+
+∀(s, a ) ∈ S × A : w(t)0 (s, a ) := log ξ(t+1) (s, a ) − log ξ(t)(s, a ) − η
+
+1 − γ V ⋆(s)1N
+
+> 2
+
+. (217) It remains to bound w(t)0 ∞. Towards this end, we rewrite (175) as 
+
+w(t)0 (s, a )= W
+
+
+
+log ξ(t)(s, a ) + η
+
+1 − γ T (t)(s, a )
+
+
+
+− log ξ(t)(s, a ) − η
+
+1 − γ V ⋆(s)1N 2
+
+= (W − I)
+
+
+
+log ξ(t)(s, a ) − log ξ(t)(s, a )1N
+
+
+
++ η
+
+1 − γ
+
+
+
+W T (t)(s, a ) − V ⋆(s)1N
+
+
+
+> 2
+
+≤ 2 log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2 + η
+
+1 − γ W T (t)(s, a ) − V ⋆(s)1N 2
+
+≤ 2 log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2 + η
+
+1 − γ W T (t)(s, a ) − bQ(t)(s, a )1N 2
+
++ η
+
+1 − γ · √N bQ(t)(s, a ) − V ⋆(s) . (218) Note that it holds for all (s, a ) ∈ S × A :
+
+bQ(t)(s, a ) − V ⋆(s) ≤ 11 − γ
+
+since bQ(t)(s, a ) and V ⋆(s) are both in [0 , 1/(1 − γ)] . This along with (218) gives 
+
+w(t)0 (s, a ) ≤ 2 u(t) 
+
+> ∞
+
++ η
+
+1 − γ v(t) 
+
+> ∞
+
++ η√N
+
+(1 − γ)2 .
+
+Combining the above inequality with (216) and (215), we arrive at 
+
+v(t+1)  
+
+> ∞
+
+≤ σ 1 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!
+
+v(t) 
+
+> ∞
+
++ (1 + γ)γ
+
+(1 − γ)2
+
+√N σ 
+
+(
+
+2 u(t) 
+
+> ∞
+
++ η
+
+(1 − γ)2 · √N
+
+)
+
+.
+
+(219) 
+
+Step 3: establish the descent equation. The following lemma characterizes the improvement in 
+
+ϕ(t)(η) for every iteration of Algorithm 1, with the proof postponed to Appendix G.4. 
+
+Lemma F.6 (Performance improvement of exact FedNPG) . For all starting state distribution ρ ∈
+
+∆( S), we have the iterates of FedNPG satisfy 
+
+ϕ(t+1) (η) ≤ ϕ(t)(η) + 2η
+
+(1 − γ)2 bQ(t) − Q(t) 
+
+> ∞
+
+− η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+, (220) 
+
+where 
+
+ϕ(t)(η) := Es∼dπ⋆ρ
+
+h
+
+KL  π⋆(·| s) ∥ π(t)(·| s)i
+
+− η
+
+1 − γ V (t)(dπ⋆ 
+
+> ρ
+
+) , ∀t ≥ 0 . (221) 45 It remains to control the term Q(t) − bQ(t)
+
+> ∞
+
+. Similar to (169), for all t ≥ 0, we have 
+
+Q(t) − bQ(t) 
+
+> ∞
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> n
+
+− 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t)
+
+> n
+> ∞
+> (a)
+
+≤ (1 + γ)γ
+
+(1 − γ)2 · 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+log ξ(t) 
+
+> n
+
+− log ξ(t)
+
+> ∞
+> (b)
+
+≤ (1 + γ)γ
+
+(1 − γ)2 u(t) 
+
+> ∞
+
+, (222) where (a) invokes Lemma F.3 with τ = 0 and (b) stems from the definition of u(t). This along with (220) gives 
+
+ϕ(t+1) (η) ≤ ϕ(t)(η) + 2(1 + γ)γ
+
+(1 − γ)4 η u(t) 
+
+> ∞
+
+− η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+.
+
+Step 4: bound the consensus error. To bound the consensus error log π(t) 
+
+> n
+
+− log ¯ π(t)
+
+> ∞
+
+for all 
+
+n ∈ [N ], we first upper bound the spectral norm of B(η) which we denote as ρ(B(η)) . Since B(η)
+
+is a nonnegative matrix, by Perron-Frobenius Theorem, ρ(B(η)) is an eigenvalue of B(η). So we only need to upper bound the eigenvalue of ρ(B(η)) .The characteristic polynomial of B(η) is 
+
+f (λ) =( λ − σ) λ − σ 1 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!! 
+
+− ηJ 
+
+1 − γ σ2
+
+=λ2 − 2 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!
+
+σλ + 1 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ − ηJ 
+
+1 − γ
+
+!
+
+σ2 .
+
+which gives 
+
+ρ(B(η)) ≤ σ
+
+2
+
+ 2 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!
+
++
+
+vuut 2 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!2
+
+− 4 1 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!
+
++ 4 ηJ 
+
+1 − γ
+
+
+
+≤ σ
+
+2
+
+ 2 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!
+
++
+
+vuut (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!2
+
++ 4 ηJ 
+
+1 − γ
+
+
+
+≤σ
+
+"
+
+1 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ +
+
+s
+
+ηJ 
+
+1 − γ
+
+#
+
+. (223) Note that when η ≤ η1, we have (recall that J = 2(1+ γ)γ
+
+> (1 −γ)2
+
+√N ): 
+
+(1 + γ)γ√N η 
+
+(1 − γ)3 σ ≤ (1 − σ)2
+
+8 ,
+
+and 
+
+ηJ 
+
+1 − γ ≤ (1 − σ)2
+
+4σ .
+
+Plugging the above two expressions into (223) yields 
+
+ρ(B(η)) ≤σ  1 + (1 − σ)2/8 + (1 − σ)/(2 √σ)
+
+≤σ (1 + (1 − σ)/(8 σ) + (1 − σ)/(2 σ)) = 38 σ + 58 < 1 .
+
+46 Therefore, when η ≤ η1, we have 
+
+Ω(t)
+
+> 2
+
+≤ρ(B(η)) Ω(t−1) 
+
+> 2
+
++ d2(η)
+
+≤ · · · ≤ ρt(B(η)) Ω(0) 
+
+> 2
+
++
+
+> t−1
+
+X
+
+> i=0
+
+ρi(B(η)) (1 + γ)γN σ 
+
+(1 − γ)4 η
+
+≤ρt(B(η)) Ω(0) 
+
+> 2
+
++ 2N σ 
+
+(1 − γ)4(1 − ρ(B(η))) η
+
+≤
+
+ 38 σ + 58
+
+t
+
+Ω(0) 
+
+> 2
+
++ 16 N σ 
+
+3(1 − γ)4(1 − σ) η . (224) Combining the above inequality with the following fact: 
+
+∀n ∈ [N ] : log π(t) 
+
+> n
+
+− log ¯ π(t)
+
+> ∞
+
+≤ 2 log ξ(t) 
+
+> n
+
+− log ¯ξ(t)
+
+> ∞
+
+≤ Ω(t)1 ≤ Ω(t)
+
+> 2
+
+where the first inequality uses (165), we obtain (84). 
+
+F.5 Proof of Lemma D.10 
+
+The bound on u(t+1) (s, a ) is already established in Step 1 in Appendix F.1 and shall be omitted. As usual we only highlight the key differences with the proof of Lemma D.8 due to approximation error. 
+
+Step 1: bound v(t+1) (s, a ) = T (t+1) (s, a ) − bq(t+1) (s, a )1N 2. Let q(t) := 
+
+
+
+qπ(t)1 
+
+> 1
+
+, · · · , q π(t)
+
+> N
+> N
+
+⊤
+
+.From (96), we have 
+
+T (t+1) (s, a ) − bq(t+1) (s, a )1N 2
+
+= W
+
+
+
+T (t)(s, a ) + q(t+1) (s, a ) − q(t)(s, a )
+
+
+
+− bq(t+1) (s, a )1N 2
+
+=
+
+
+
+W T (t)(s, a ) − bq(t)(s, a )1N
+
+
+
++ W
+
+
+
+q(t+1) (s, a ) − q(t)(s, a )
+
+
+
++
+
+bq(t)(s, a ) − bq(t+1) (s, a )
+
+
+
+1N 2
+
+≤ σ T (t)(s, a ) − bq(t)(s, a )1N 2 + σ
+
+
+
+q(t+1) (s, a ) − q(t)(s, a )
+
+
+
++
+
+bq(t)(s, a ) − bq(t+1) (s, a )
+
+
+
+1N 2
+
+≤ σ T (t)(s, a ) − bq(t)(s, a )1N 2 + σ q(t+1) (s, a ) − q(t)(s, a ) 2
+
+≤ σ T (t)(s, a ) − bq(t)(s, a )1N 2 + σ Q(t+1) (s, a ) − Q(t)(s, a ) 2 + 2 σ√N ∥e∥∞ . (225) Note that (216) still holds for inexact FedNPG: 
+
+Q(t+1) (s, a ) − Q(t)(s, a ) 2
+
+≤ (1 + γ)γ
+
+(1 − γ)2
+
+√N w(t)0 ∞
+
+, (226) where w(t)0 is defined in (217). We rewrite (218), the bound on w(t)0 (s, a ), as 
+
+w(t)0 (s, a ) ≤ 2 log ξ(t)(s, a ) − log ξ(t)(s, a )1N 2
+
++ η
+
+1 − γ T (t)(s, a ) − bq(t)(s, a )1N 2 + ησ 
+
+1 − γ · √N bq(t)(s, a ) − V ⋆(s) . (227) With the following bound 
+
+∀(s, a ) ∈ S × A : bq(t)(s, a ) − V ⋆(s) ≤ bq(t) − Q(t) 
+
+> ∞
+
++ 11 − γ
+
+in mind, we write (218) as 
+
+w(t)0 (s, a ) ≤ 2 u(t) 
+
+> ∞
+
++ ησ 
+
+1 − γ v(t) 
+
+> ∞
+
++ η
+
+1 − γ · √N
+
+bq(t) − q(t) 
+
+> ∞
+
++ 11 − γ
+
+
+
+.
+
+Putting all pieces together, we obtain 
+
+v(t+1)  
+
+> ∞
+
+≤ σ 1 + (1 + γ)γ√N η 
+
+(1 − γ)3 σ
+
+!
+
+v(t)
+
+> ∞
+
++ (1 + γ)γ
+
+(1 − γ)2
+
+√N σ 
+
+(
+
+2 u(t) 
+
+> ∞
+
++ η√N
+
+(1 − γ)2 + η√N
+
+1 − γ ∥e∥∞
+
+)
+
++ 2 σ√N ∥e∥∞ .
+
+(228) 47 Step 2: establish the descent equation. Note that Lemma F.6 directly applies by replacing bQ(t)
+
+with bq(t):
+
+ϕ(t+1) (η) ≤ ϕ(t)(η) + 2η
+
+(1 − γ)2 bq(t) − Q(t)
+
+> ∞
+
+− η
+
+
+
+V ⋆(ρ) − V (t)(ρ)
+
+
+
+.
+
+To bound the middle term, for all t ≥ 0, we have 
+
+Q(t) − bq(t)
+
+> ∞
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t) 
+
+> n
+> n
+
+− 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+Qπ(t)
+
+> n
+> ∞
+
++ 1
+
+N
+
+> N
+
+X
+
+> n=0
+
+
+
+qπ(t) 
+
+> n
+> n
+
+− Qπ(t)
+
+> n
+> n
+
+
+
+> ∞
+
+≤ (1 + γ)γ
+
+(1 − γ)2 · 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+log ξ(t) 
+
+> n
+
+− log ξ(t)
+
+> ∞
+
++ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+en
+
+≤ (1 + γ)γ
+
+(1 − γ)2 u(t)
+
+> ∞
+
++ ∥e∥∞ . (229) Hence, (102) is established by combining the above two inequalities. 
+
+Step 4: bound the consensus error. Similar as (224), here we have 
+
+Ω(t)
+
+> 2
+
+≤ρ(B(η)) Ω(t−1) 
+
+> 2
+
++ ( d2(η) + c2(η)) 
+
+≤ · · · ≤ ρt(B(η)) Ω(0) 
+
+> 2
+
++
+
+> t−1
+
+X
+
+> i=0
+
+ρi(B(η)) (1 + γ)γN σ 
+
+(1 − γ)4 η + √N σ (1 + γ)γη √N
+
+(1 − γ)3 + 2 
+
+!
+
+∥e∥∞
+
+!
+
+≤ρt(B(η)) Ω(0) 
+
+> 2
+
++ 21 − ρ(B(η)) 
+
+N σ 
+
+(1 − γ)4 η + √N σ η√N
+
+(1 − γ)3 + 1 
+
+!
+
+∥e∥∞
+
+!
+
+≤
+
+ 38 σ + 58
+
+t
+
+Ω(0) 
+
+> 2
+
++ 16 3(1 − σ)
+
+N σ 
+
+(1 − γ)4 η + √N σ η√N
+
+(1 − γ)3 + 1 
+
+!
+
+∥e∥∞
+
+!
+
+,
+
+(230) which indicates 103. 
+
+## G Proof of auxiliary lemmas 
+
+G.1 Proof of Lemma F.1 
+
+The first claim is easily verified as log ξ(t) 
+
+> n
+
+(s, ·) always deviate from log π(t) 
+
+> n
+
+(·| s) by a global constant shift, as long as it holds for t = 0 :
+
+log ξ(t+1)  
+
+> n
+
+(s, ·) = 
+
+> N
+
+X
+
+> n′=1
+
+[W ]n,n ′
+
+
+
+α log ξ(t) 
+
+> n′
+
+(s, ·) + (1 − α)T (t) 
+
+> n
+
+(s, ·)/τ 
+
+
+
+= α
+
+> N
+
+X
+
+> n′=1
+
+[W ]n,n ′
+
+
+
+α
+
+
+
+log π(t) 
+
+> n′
+
+(s, ·) + c(t) 
+
+> n′
+
+(s)1|A| 
+
+
+
++ (1 − α)T (t) 
+
+> n
+
+(s, ·)/τ 
+
+
+
+= α
+
+> N
+
+X
+
+> n′=1
+
+[W ]n,n ′
+
+
+
+α log π(t) 
+
+> n′
+
+(s, ·) + (1 − α)T (t) 
+
+> n
+
+(s, ·)/τ 
+
+
+
+− log z(t) 
+
+> n
+
+(s)1|A| + c(t+1)  
+
+> n
+
+(s)1|A| 
+
+= log π(t+1)  
+
+> n
+
+(·| s) + c(t+1)  
+
+> n
+
+(s)1|A| ,
+
+where z(t) 
+
+> n
+
+is the normalization term (cf. line 5, Algorithm 2) and {c(t) 
+
+> n
+
+(s)} are some constants. To prove the second claim, ∀t ≥ 0, ∀(s, a ) ∈ S × A , let 
+
+T (t)(s, a ) := 1
+
+N 1⊤T (t)(s, a ) . (231) Taking inner product with 1 
+
+> N
+
+1 for both sides of (UT ) and using the double stochasticity property of 
+
+W , we get 
+
+T (t+1) (s, a ) = T (t)(s, a ) + bQ(t+1)  
+
+> τ
+
+(s, a ) − bQ(t) 
+
+> τ
+
+(s, a ) . (232) 48 By the choice of T (0) (line 2 of Algorithm 2), we have T (0) = bQ(0)  
+
+> τ
+
+and hence by induction 
+
+∀t ≥ 0 : T (t) = bQ(t) 
+
+> τ
+
+. (233) This implies 
+
+log ξ(t+1) (s, a ) − α log ξ(t)(s, a ) = (1 − α) bQ(t) 
+
+> τ
+
+(s, a )/τ 
+
+= (1 − α)T (t)(s, a )/τ 
+
+= 1
+
+N 1⊤ log ξ(t+1) (s, a ) − α 1
+
+N 1⊤ log ξ(t)(s, a ).
+
+Therefore, to prove (161), it suffices to verify the claim for t = 0 :
+
+1
+
+N 1⊤ log ξ(0) (s, a ) = log ∥exp ( Q⋆τ (s, ·)/τ )∥1 + 1
+
+N 1⊤ log π(0) (a|s) − log exp 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+log π(0)  
+
+> n
+
+(·| s)
+
+!
+
+> 1
+
+= log ∥exp ( Q⋆τ (s, ·)/τ )∥1 + log π(0) (a|s) = log ξ(0) (s, a ) .
+
+By taking logarithm over both sides of the definition of π(t+1) (cf. (27)), we get 
+
+log π(t+1) (a|s) = α log π(t)(a|s) + (1 − α) bQ(t)(s, a )/τ − z(t)(s) (234) for some constant z(t)(s), which deviate from the update rule of log ξ(t+1) by a global constant shift and hence verifies (162). 
+
+G.2 Proof of Lemma F.3 
+
+For notational simplicity, we let Qθ′ 
+
+> τ
+
+and Qθτ denote Qπθ′ 
+
+> τ
+
+and Qπθ 
+
+> τ
+
+, respectively. From (6a) we immediately know that to bound Qθ′ 
+
+> τ
+
+− Qθτ ∞
+
+, it suffices to control V θτ (s) − V θ′ 
+
+> τ
+
+(s) for each 
+
+s ∈ S . By (4) we have 
+
+V θτ (s) − V θ′ 
+
+> τ
+
+(s) ≤ V θ (s) − V θ′
+
+(s) + τ H(s, π θ ) − H (s, π θ′ ) , (235) so in the following we bound both terms in the RHS of (235). 
+
+Step 1: bounding H(s, π θ ) − H (s, π θ′ ) . We first bound H(s, π θ ) − H (s, π θ′ ) using the idea in the proof of Lemma 14 in [MXSS20]. We let 
+
+θ(t) = θ + t(θ′ − θ) , ∀t ∈ R , (236) and let h(t) ∈ R|S| be 
+
+∀s ∈ S : h(t)(s) := − X
+
+> a∈A
+
+πθ(t) (a|s) log πθ(t) (a|s) . (237) Note that h(t) 
+
+> ∞
+
+≤ log |A| . We also denote H(t) : S → R|A|×|A| by: 
+
+∀s ∈ S : H(t)(s) := ∂π θ (·| s)
+
+∂θ θ=θ(t)
+
+= diag {πθ(t) (·| s)} − πθ(t) (·| s)πθ(t) (·| s)⊤ , (238) then we have 
+
+∀s ∈ S : dh (t)(s)
+
+dt =
+
+ ∂h (t)(s)
+
+∂θ (t)(·| s) , θ ′(s, ·) − θ(s, ·)
+
+
+
+=
+
+D
+
+H(t)(s) log πθ(t) (·| s), θ ′(s, ·) − θ(s, ·)
+
+E
+
+≤ H(t)(s) log πθ(t) (·| s) 1
+
+∥θ′(s, ·) − θ(s, ·)∥∞ , (239) where ∂h (t)(s) 
+
+> ∂θ (t)(·| s)
+
+stands for ∂h (t)(s)  
+
+> ∂θ (·| s)θ=θ(t)
+
+. The first term in (239) is further upper bounded as 
+
+H(t)(s) log πθ(t) (·| s) 1
+
+= X
+
+> a∈A
+
+πθ(t) (a|s) log πθ(t) (a|s) − πθ(t) (·| s)⊤ log πθ(t) (·| s)
+
+≤ X
+
+> a∈A
+
+πθ(t) (a|s)  |log πθ(t) (a|s)| + πθ(t) (·| s)⊤ log πθ(t) (·| s) 
+
+= −2 X
+
+> a∈A
+
+πθ(t) (a, s ) log πθ(t) (a|s) ≤ 2 log |A| .
+
+49 By Lagrange mean value theorem, there exists t ∈ (0 , 1) such that 
+
+|h1(s) − h0(s)| = dh (t)(s)
+
+dt ≤ 2 log |A| ∥ θ′(s, ·) − θ(s, ·)∥∞ ,
+
+where the inequality follows from (239) and the above inequality. Combining (5) with the above inequality, we arrive at 
+
+H(s, π θ ) − H (s, π θ′ ) ≤ 2 log |A| 
+
+1 − γ ∥θ′ − θ∥∞ . (240) 
+
+Step 2: bounding V θ (s) − V θ′
+
+(s) . Similar to the previous proof, we bound V θ (s) − V θ′
+
+(s) by bounding dV θ(t) 
+
+> dt
+
+(s) . By Bellman’s consistency equation, the value function of πθ(t) is given by 
+
+V θ(t)
+
+(s) = X
+
+> a∈A
+
+πθ(t) (a|s)r(s, a ) + γ X
+
+> a
+
+πθα (a|s) X
+
+> s′∈S
+
+P(s′|s, a )V θ(t)
+
+(s′) ,
+
+which can be represented in a matrix-vector form as 
+
+V θ(t) 
+
+> ⋆
+
+(s) = e⊤ 
+
+> s
+
+Mtrt , (241) where es ∈ R|S| is a one-hot vector whose s-th entry is 1, 
+
+Mt := ( I − γPt)−1 , (242) with Pt ∈ R|S|×|S| denoting the induced state transition matrix by πθ(t)
+
+Pt(s, s ′) = X
+
+> a∈A
+
+πθ(t) (a|s)P(s′|s, a ) , (243) and rt ∈ R|S| is given by 
+
+∀s ∈ S : rt(s) := X
+
+> a∈A
+
+πθ(t) (a|s)r(s, a ) . (244) Taking derivative w.r.t. t in (241), we obtain [PP08] 
+
+dV θ(t)
+
+(s)
+
+dt = γ · e⊤ 
+
+> s
+
+Mt
+
+dPt
+
+dt Mtrt + e⊤ 
+
+> s
+
+Mt
+
+dr t
+
+dt . (245) We now calculate each term respectively. • For the first term, it follows that 
+
+γ · e⊤ 
+
+> s
+
+Mt
+
+dPt
+
+dt Mtrt ≤ γ Mt
+
+dPt
+
+dt Mtrt
+
+> ∞
+
+≤ γ
+
+1 − γ
+
+dPt
+
+dt Mtrt
+
+> ∞
+
+≤ 2γ
+
+1 − γ ∥Mtrt∥∞ ∥θ′ − θ∥∞ (246) 
+
+≤ 2γ
+
+(1 − γ)2 ∥rt∥∞ ∥θ′ − θ∥∞
+
+≤ 2γ
+
+(1 − γ)2 ∥θ′ − θ∥∞ . (247) where the second and fourth lines use the fact ∥Mt∥1 ≤ 1/(1 − γ) [ LWCC23a , Lemma 10], and the last line follow from 
+
+∥rt∥∞ = max 
+
+> s∈S
+
+X
+
+> a∈A
+
+πθ(t) (a|s)r(s, a ) ≤ 1.
+
+We defer the proof of (246) to the end of proof. 50 • For the second term, it follows that 
+
+e⊤ 
+
+> s
+
+Mt
+
+dr t
+
+dt ≤ 11 − γ
+
+dr t
+
+dt ∞
+
+≤ 11 − γ ∥θ′ − θ∥∞ . (248) where the first inequality follows again from ∥Mt∥1 ≤ 1/(1 − γ), and the second inequality follows from 
+
+dr t
+
+dt ∞
+
+= max 
+
+> s∈S
+
+dr t(s)
+
+dt = max 
+
+> s∈S
+
+ ∂π θ(t) (·| s)⊤r(s, ·)
+
+∂θ (t)(s, ·) , θ ′(s, ·) − θ(s, ·)
+
+
+
+≤ max 
+
+> s∈S
+
+∂π θ(t) (·| s)⊤
+
+∂θ (t)(s, ·) r(s, ·)
+
+> 1
+
+∥θ′(s, ·) − θ(s, ·)∥∞
+
+= max 
+
+> s∈S
+
+X
+
+> a∈A
+
+πθ(t) (a|s) r(s, a ) − πθ(t) (·| s)⊤r(s, ·)
+
+!
+
+∥θ′(s, ·) − θ(s, ·)∥∞
+
+≤ max  
+
+> s∈S
+
+max  
+
+> a∈A
+
+r(s, a ) − πθ(t) (·| s)⊤r(s, ·)
+
+| {z }  
+
+> ≤1since r(s,a )∈[0 ,1]
+
+∥θ′(s, ·) − θ(s, ·)∥∞
+
+≤ max  
+
+> s∈S
+
+∥θ′(s, ·) − θ(s, ·)∥∞ = ∥θ′ − θ∥∞ . (249) Plugging the above two inequalities into (245) and using Lagrange mean value theorem, we have 
+
+V θ (s) − V θ′
+
+(s) ≤ 1 + γ
+
+(1 − γ)2 ∥θ′ − θ∥∞ . (250) 
+
+Step 3: sum up. Combining (250), (240) and (235), we have 
+
+∀s ∈ S : V θτ (s) − V θ′ 
+
+> τ
+
+(s) ≤ 1 + γ + 2 τ (1 − γ) log |A| 
+
+(1 − γ)2 ∥log π − log π′∥∞ . (251) Combining (251) and (6a), (170) immediately follows. 
+
+Proof of (246) . For any vector x ∈ R|S| , we have 
+
+ dPt
+
+dt x
+
+
+
+> s
+
+= X
+
+> s′∈S
+
+X
+
+> a∈A
+
+dπ θ(t) (a|s)
+
+dt P(s′|s, a )x(s′) ,
+
+from which we can bound the l∞ norm as 
+
+dPt
+
+dt x
+
+> ∞
+
+≤ max 
+
+> s
+
+X
+
+> a∈A
+
+X
+
+> s′∈S
+
+P(s′|s, a ) dπ θ(t) (a|s)
+
+dt ∥x∥∞
+
+= max 
+
+> s
+
+X
+
+> a∈A
+
+dπ θ(t) (a|s)
+
+dt ∥x∥∞
+
+≤ 2 ∥θ′ − θ∥∞ ∥x∥∞ (252) as desired, where the last line follows from the following fact: 
+
+X
+
+> a∈A
+
+dπ θ(t) (a|s)
+
+dt = X
+
+> a∈A
+
+ ∂π θ(t) (a|s)
+
+∂θ (t) , θ ′ − θ
+
+
+
+= X
+
+> a∈A
+
+ ∂π θ(t) (a|s)
+
+∂θ (t)(s, ·) , θ ′(s, ·) − θ(s, ·)
+
+
+
+= X
+
+> a∈A
+
+πθ(t) (a|s) (θ′(s, a ) − θ(s, a )) − πθ(t) (·| s)⊤ (θ′(s, ·) − θ(s, ·)) 
+
+≤ max  
+
+> a
+
+|θ′(s, a ) − θ(s, a )| + πθ(t) (·| s)⊤ (θ′(s, ·) − θ(s, ·)) 
+
+≤ 2 ∥θ′ − θ∥∞ .
+
+51 G.3 Proof of Lemma F.4 
+
+To simplify the notation, we denote 
+
+δ(t) := bQ(t) 
+
+> τ
+
+− Q(t) 
+
+> τ
+
+. (253) We first rearrange the terms of (234) and obtain 
+
+−τ log π(t)(a|s)+ 
+
+
+
+Q(t) 
+
+> τ
+
+(s, a ) + δ(t)(s, a )
+
+
+
+= 1 − γη
+
+
+
+log π(t+1) (a|s) − log π(t)(a|s)
+
+
+
++ 1 − γη z(t)(s) .
+
+(254) This in turn allows us to express V (t) 
+
+> τ
+
+(s0) for any s0 ∈ S as follows 
+
+V (t) 
+
+> τ
+
+(s0) = E
+
+> a0∼π(t)(·| s0)
+
+h
+
+−τ log π(t)(a0|s0) + Q(t) 
+
+> τ
+
+(s0, a 0)
+
+i
+
+= E
+
+> a0∼π(t)(·| s0)
+
+ 1 − γη z(t)(s0)
+
+
+
++ E
+
+> a0∼π(t)(·| s0)
+
+ 1 − γη
+
+
+
+log π(t+1) (a0|s0) − log π(t)(a0|s0)
+
+
+
+− δ(t)(s0, a 0)
+
+
+
+= 1 − γη z(t)(s0) − 1 − γη KL  π(t)(·| s0) ∥ π(t+1) (·| s0) − E
+
+> a0∼π(t)(·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
+= E
+
+> a0∼π(t+1) (·| s0)
+
+ 1 − γη z(t)(s0)
+
+
+
+− 1 − γη KL  π(t)(·| s0) ∥ π(t+1) (·| s0) − E
+
+> a0∼π(t)(·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
+,
+
+(255) where the first identity makes use of (6b) , the second line follows from (254) . Invoking (6b) again to rewrite the z(s0) appearing in the first term of (255), we reach 
+
+V (t) 
+
+> τ
+
+(s0)= E
+
+> a0∼π(t+1) (·| s0)
+
+
+
+−τ log π(t+1) (a0|s0) + Q(t) 
+
+> τ
+
+(s0, a 0) + 
+
+
+
+τ − 1 − γη
+
+ 
+
+log π(t+1) (a0|s0) − log π(t)(a|s)
+
+
+
+− 1 − γη KL  π(t)(·| s0) ∥ π(t+1) (·| s0) − E
+
+> a0∼π(t)(·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
++ E
+
+> a0∼π(t+1) (·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
+= E 
+
+> a0∼π(t+1) (·| s0),s1∼P(·| s0,a 0)
+
+h
+
+−τ log π(t+1) (a0|s0) + r(s0, a 0) + γV (t) 
+
+> τ
+
+(s0)
+
+i
+
+−
+
+ 1 − γη − τ
+
+
+
+KL  π(t+1) (·| s0) ∥ π(t)(·| s0) − 1 − γη KL  π(t)(·| s0) ∥ π(t+1) (·| s0)
+
+− E
+
+> a0∼π(t)(·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
++ E
+
+> a0∼π(t+1) (·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
+. (256) Note that for any (s0, a 0) ∈ S × A , we have 
+
+− E
+
+> a0∼π(t)(·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
++ E
+
+> a0∼π(t+1) (·| s0)
+
+h
+
+δ(t)(s0, a 0)
+
+i
+
+= X
+
+> a0∈A
+
+
+
+π(t+1) (a0|s0) − π(t)(a0|s0)
+
+
+
+δ(t)(s0, a 0)
+
+≤ π(t+1) (·| s0) − π(t)(·| s0) 1 δ(t) 
+
+> ∞
+
+≤ 2 δ(t) 
+
+> ∞
+
+. (257) 52 To finish up, applying (256) recursively to expand V (t) 
+
+> τ
+
+(si), i ≥ 1 and making use of (257) , we arrive at 
+
+V (t) 
+
+> τ
+
+(s0)
+
+≤
+
+> ∞
+
+X
+
+> i=1
+
+γi · 2 δ(t)
+
+> ∞
+
++ E 
+
+> ai∼π(t+1) (·| si),si+1 ∼P(·| si,a i),∀i≥0
+
+" ∞X
+
+> i=1
+
+γi n
+
+r(si, a i) − τ log π(t+1) (ai|si)
+
+o
+
+−
+
+> ∞
+
+X
+
+> i=1
+
+γi
+
+ 1 − γη − τ
+
+
+
+KL  π(t+1) (·| si) ∥ π(t)(·| si) + 1 − γη KL  π(t)(·| si) ∥ π(t+1) (·| si) #
+
+= 21 − γ δ(t)
+
+> ∞
+
++ V (t+1)  
+
+> τ
+
+(s0)
+
+− E
+
+> s∼dπ(t+1)
+> s0
+
+ 1
+
+η − τ
+
+1 − γ
+
+
+
+KL  π(t+1) (·| si) ∥ π(t)(·| si) + 1
+
+η KL  π(t)(·| si) ∥ π(t+1) (·| si)
+
+,
+
+(258) where the third line follows since V (t+1)  
+
+> τ
+
+can be viewed as the value function of π(t+1) with adjusted rewards r(t+1) (s, a ) := r(s, a ) − τ log π(t+1) (s|a). And (188) follows immediately from the above inequality (258). By (6a) we can easily see that (189) is a consequence of (188). 
+
+G.4 Proof of Lemma F.6 
+
+We first introduce the famous performance difference lemma which will be used in our proof. 
+
+Lemma G.1 (Performance difference lemma) . For any policy π, π ′ ∈ ∆( A)S and ρ ∈ ∆( S), we have 
+
+V π (ρ) − V π′
+
+(ρ) = 11 − γ E(s,a )∼ ¯dπ
+
+h
+
+Aπ′
+
+(s, a )
+
+i
+
+(259) 
+
+= 11 − γ Es∼dπ
+
+h
+
+⟨Qπ′
+
+(s), π (s) − π′(s)⟩
+
+i
+
+. (260) 
+
+Proof. See Lemma 3 in [YDG +22]. For all t ≥ 0, we define the advantage function A(t) as: 
+
+∀(s, a ) ∈ S × A : A(t)(s, a ) := Q(t)(s, a ) − V (t)(s) . (261) Then for Alg. 1, the update rule of π (Eq. (234)) can be written as 
+
+log π(t+1) (a|s) = log π(t)(a|s) + η
+
+1 − γ
+
+
+
+A(t)(s, a ) + δ(t)(s, a )
+
+
+
+− log bz(t)(s) , (262) where δ(t) is defined in (253) and 
+
+log bz(t)(s) = log X
+
+> a′∈A
+
+π(t)(a′|s) exp 
+
+ η
+
+1 − γ
+
+
+
+A(t)(s, a ′) + δ(t)(s, a ′)
+
+
+
+≥ X
+
+> a′∈A
+
+π(t)(a′|s) log exp 
+
+ η
+
+1 − γ
+
+
+
+A(t)(s, a ′) + δ(t)(s, a ′)
+
+
+
+= η
+
+1 − γ
+
+X
+
+> a′∈A
+
+π(t)(a′|s)
+
+
+
+A(t)(s, a ′) + δ(t)(s, a ′)
+
+
+
+= η
+
+1 − γ
+
+X
+
+> a′∈A
+
+π(t)(a′|s)δ(t)(s, a ′) ≥ − η
+
+1 − γ δ(t)
+
+> ∞
+
+, (263) where the first inequality follows by Jensen’s inequality on the concave function log x and the last equality uses P 
+
+> a′∈A
+
+π(t)(a′|s)A(t)(s, a ′) = 0 .53 For all starting state distribution μ, we use d(t+1) as shorthand for dπ(t+1)  
+
+> μ
+
+, the performance difference lemma (Lemma G.1) implies: 
+
+V (t+1) (μ) − V (t)(μ)= 11 − γ Es∼d(t+1) 
+
+X
+
+> a∈A
+
+π(t+1) (a|s)
+
+
+
+A(t)(s, a ) + δ(t)(s, a )
+
+
+
+− 11 − γ Es∼d(t+1) Ea∼π(t+1) (·| s)
+
+h
+
+δ(t)(s, a )
+
+i
+
+= 1
+
+η Es∼d(t+1) 
+
+X
+
+> a∈A
+
+π(t+1) (a|s) log π(t+1) (a|s)bz(t)(s)
+
+π(t)(a|s) − 11 − γ Es∼d(t+1) Ea∼π(t+1) (·| s)
+
+h
+
+δ(t)(s, a )
+
+i
+
+= 1
+
+η Es∼d(t+1) KL  π(t+1) (·| s) ∥ π(t)(·| s) + 1
+
+η Es∼d(t+1) log bz(t)(s) − 11 − γ Es∼d(t+1) Ea∼π(t+1) (·| s)
+
+h
+
+δ(t)(s, a )
+
+i
+
+≥ 1
+
+η Es∼d(t+1) 
+
+
+
+log bz(t)(s) + η
+
+1 − γ δ(t)
+
+> ∞
+
+
+
+− 21 − γ δ(t) 
+
+> ∞
+
+,
+
+from which we can see that 
+
+V (t+1) (μ) − V (t)(μ) ≥ − 21 − γ δ(t) 
+
+> ∞
+
+, (264) where we use (263), and that 
+
+V (t+1) (μ) − V (t)(μ) ≥ 1 − γη Es∼μ
+
+
+
+log bz(t)(s) + η
+
+1 − γ δ(t)
+
+> ∞
+
+
+
+− 21 − γ δ(t) 
+
+> ∞
+
+, (265) which follows from d(t+1) = dπ(t+1)  
+
+> μ
+
+≥ (1 − γ)μ and the fact that log bz(t)(s) + η 
+
+> 1−γ
+
+δ(t) 
+
+> ∞
+
+≥ 0
+
+(by (263)). For any fixed ρ, we use d⋆ as shorthand for dπ⋆ 
+
+> ρ
+
+. By the performance difference lemma (Lemma G.1), 
+
+V ⋆(ρ) − V (t)(ρ)= 11 − γ Es∼d⋆
+
+X
+
+> a∈A
+
+π⋆(a|s)
+
+
+
+A(t)(s, a ) + δ(t)(s, a )
+
+
+
+− 11 − γ Es∼d⋆ Ea∼π⋆(·| s)
+
+h
+
+δ(t)(s, a )
+
+i
+
+= 1
+
+η Es∼d⋆
+
+X
+
+> a∈A
+
+π⋆(a|s) log π(t+1) (a|s)bz(t)(s)
+
+π(t)(a|s) − 11 − γ Es∼d⋆ Ea∼π⋆(·| s)
+
+h
+
+δ(t)(s, a )
+
+i
+
+= 1
+
+η Es∼d⋆
+
+
+
+KL  π⋆(·| s) ∥ π(t)(·| s) − KL  π⋆(·| s) ∥ π(t+1) (·| s) + log bz(t)(s)
+
+
+
+− 11 − γ Es∼d⋆ Ea∼π⋆(·| s)
+
+h
+
+δ(t)(s, a )
+
+i
+
+≤ 1
+
+η Es∼d⋆
+
+
+
+KL  π⋆(·| s) ∥ π(t)(·| s) − KL  π⋆(·| s) ∥ π(t+1) (·| s) +
+
+
+
+log bz(t)(s) + η
+
+1 − γ δ(t)
+
+> ∞
+
+ 
+
+,
+
+(266) where we use (262) in the second equality. By applying (265) with μ = d⋆ as the initial state distribution, we have 
+
+1
+
+η Es∼μ
+
+
+
+log bz(t)(s) + η
+
+1 − γ δ(t)
+
+> ∞
+
+
+
+≤ 11 − γ
+
+
+
+V (t+1) (d⋆) − V (t)(d⋆)
+
+
+
++ 2(1 − γ)2 δ(t) 
+
+> ∞
+
+.
+
+Plugging the above equation into (266), we obtain 
+
+V ⋆(ρ) − V (t)(ρ) ≤ 1
+
+η Es∼d⋆
+
+
+
+KL  π⋆(·| s) ∥ π(t)(·| s) − KL  π⋆(·| s) ∥ π(t+1) (·| s)
+
++ 11 − γ
+
+
+
+V (t+1) (d⋆) − V (t)(d⋆)
+
+
+
++ 2(1 − γ)2 δ(t) 
+
+> ∞
+
+,
+
+which gives Lemma F.6. 
+
+G.5 Proof of Theorem E.3 
+
+The proof of Theorem E.3 could be found in Appendix C.5 in [ YDG +22 ]. We present it for completeness. To prove Theorem E.3, we need the following Theorem G.2. 54 Theorem G.2 (Theorem 1 in [BM13]) . Consider the following assaumptions: (i) The observations (ak, bk) ∈ Rp × Rp are independent and identically distributed. (ii) E
+
+h
+
+∥ak∥2i8 and E
+
+h
+
+∥bk∥2i
+
+are finite. The covariance E aka⊤
+
+> k
+
+ is invertible. (iii) The global minimum of g(w) = 12 E ⟨w, ak⟩2 − 2⟨w, bk⟩ is attained at a certain w⋆ ∈ Rp.Let ∆k = bk − ⟨ w⋆, ak⟩ak denote the residual. We have E[∆ k] = 0 .(iv) ∃R > 0 and σ > 0 such that E ∆k∆⊤
+
+> k
+
+ ≤ σ2E aka⊤
+
+> k
+
+ and E
+
+h
+
+∥ak∥2 aka⊤
+
+> k
+
+i
+
+≤
+
+R2E aka⊤
+
+> k
+
+.Consider the stochastic gradient recursion 
+
+wk+1 = wk − η (⟨wk, ak⟩ak − bk)
+
+started from w0 ∈ Rp. Let wout = 1
+
+> K
+
+PKk=1 wk. When η = 14R2 , we have 
+
+E [g(wout ) − g(w⋆)] ≤ 2
+
+K (σ√p + R ∥w0 − w⋆∥)2. (267) In the proof of Theorem E.3 we’ll show that for Algorithm 4, the assumptions in Theorem G.2 are all satisfied and thus we can use the result (267). 
+
+Proof of Theorem E.3. We let ak and bk in Theorem G.2 be ϕ(s, a ) and bQξ ϕ(s, a ) in Algo-rithm 4, respectively. And we let ∥·∥ = ∥·∥ 2 in Theorem G.2. Since the observations 
+
+ϕ(s, a ), bQξ (s, a )ϕ(s, a )
+
+
+
+∈ Rp × Rp are i.i.d., (i) is satisfied. As we assume ∥ϕ(s, a )∥2 ≤ Cϕ, E
+
+h
+
+∥ϕ(s, a )∥22
+
+i
+
+is finite. From Assumption 4.1 we know that 
+
+E ϕ(s, a )ϕ(s, a )⊤ is invertible. Let H be the length of trajectory for estimating bQξ (s, a ). Then 
+
+ bQξ (s, a )
+
+2
+
+is bounded by 
+
+E
+
+ bQξ (s, a )
+
+2
+
+= E(s,a )∼ ˜dπξν
+
+
+
+> ∞
+
+X 
+
+> τ=0
+
+P r (H = τ )E
+
+
+
+> τ
+
+X
+
+> t=0
+
+r(st, a t)
+
+!2
+
+H = τ, s 0 = s, a 0 = a
+
+
+
+= E(s,a )∼ ˜dπξν
+
+(1 − γ)
+
+> ∞
+
+X 
+
+> τ=0
+
+γτ E
+
+
+
+> τ
+
+X
+
+> t=0
+
+r(st, a t)
+
+!2
+
+H = τ, s 0 = s, a 0 = a
+
+
+
+≤ E(s,a )∼ ˜dπξν
+
+"
+
+(1 − γ)
+
+> ∞
+
+X 
+
+> τ=0
+
+γτ (τ + 1) 2
+
+#
+
+≤ 2(1 − γ)2 , (268) from which we deduce E
+
+bQξ (s, a )ϕ(s, a ) 22
+
+
+
+≤ C2
+
+> ϕ
+
+E
+
+h bQξ (s, a )2
+
+i
+
+is bounded. Thus (ii) holds. Furthermore, we introduce the residual 
+
+∆ := 
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆
+
+ϕ(s, a ) , (269) then from [YDG +22, Lemma 7] we know that E[∆] = 12 ∇wℓ(w⋆, bQξ , d πξ 
+
+> ν
+
+) = 0 , which gives (iii). To verify (iv), we let R = Cϕ in Theorem G.2, then E
+
+h
+
+∥ϕ(s, a )∥22 ϕ(s, a )ϕ(s, a )⊤
+
+i
+
+≤
+
+C2
+
+> ϕ
+
+E ϕ(s, a )ϕ(s, a )⊤. Also note that 
+
+w⋆ =
+
+
+
+E(s,a )∼ ˜dπξν
+
+ϕ(s, a )ϕ(s, a )⊤†
+
+E(s,a )∼ ˜dπξν
+
+h bQξ (s, a )ϕ(s, a )
+
+i
+
+≤ 11 − γ
+
+ E(s,a )∼ν
+
+ϕ(s, a )ϕ(s, a )⊤ † E(s,a )∼ ˜dπξν
+
+h bQξ (s, a )ϕ(s, a )
+
+i
+
+, (270) 
+
+> 8
+
+Here ∥·∥ could be any norm in Rp.
+
+55 from which we deduce 
+
+∥w⋆∥2 ≤ Bμ(1 − γ)2 . (271) 
+
+E
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆2
+
+|s, a 
+
+
+
+= E
+
+ bQξ (s, a )
+
+2
+
+|s, a 
+
+
+
+− 2Qξ (s, a )ϕ(s, a )⊤w⋆ + ( ϕ(s, a )⊤w⋆)2
+
+(272) 
+
+≤ 2(1 − γ)2 + 2C2
+
+> ϕ
+
+μ(1 − γ)3 + C4
+
+> ϕ
+
+μ2(1 − γ)4
+
+≤ 2(1 − γ)2
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!2
+
+. (273) The above expression implies 
+
+E ∆∆ ⊤ = E(s,a )∼ ˜dπξν
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆2
+
+ϕ(s, a )ϕ(s, a )⊤ s, a 
+
+
+
+= E(s,a )∼ ˜dπξν
+
+
+
+E
+
+ bQξ (s, a ) − ϕ(s, a )⊤w⋆2
+
+s, a 
+
+
+
+ϕ(s, a )ϕ(s, a )⊤
+
+
+
+≤
+
+
+
+√21 − γ
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!| {z }
+
+> σ
+
+ E[ϕ(s, a )ϕ(s, a )⊤] . (274) Therefore, (iv) is verified. Thus by (267) , with stepsize β = 12C2
+
+> ϕ
+
+, initialization w0 = 0 and K steps of critic updates, we have 
+
+E
+
+h
+
+ℓ
+
+
+
+wout , Q ξ , ˜dξ
+
+i 
+
+− ℓ
+
+
+
+w⋆, Q ξ , ˜dξ
+
+
+
+≤ 4
+
+K (σ√p + Cϕ ∥w⋆∥2)2
+
+≤ 4
+
+K
+
+√2p
+
+1 − γ
+
+C2
+
+> ϕ
+
+μ(1 − γ) + 1 
+
+!
+
++ C2
+
+> ϕ
+
+μ(1 − γ)2
+
+!2
+
+,
+
+which gives (113). 
+
+G.6 Proof of Lemma E.7 
+
+Proof of Lemma E.7. For notational simplicity we let V ξ , V ξ′
+
+denote V fξ , V fξ′ , resp. Same as in Lemma F.3, We define ξ(t) = ξ + t(ξ′ − ξ) and define Pt, Mt, r t by replacing πξ(t) with fξ(t) in (243),(242) and (244), respectively. Define 
+
+¯ϕξ (s, a ) = ϕ(s, a ) − Ea′∼fξ(t) [ϕ(s, a ′)] ,
+
+then we have 
+
+∂f ξ (a|s)
+
+∂ξ = fξ (a|s) ¯ϕξ (s, a ) . (275) Analogous to (252), we have 
+
+dPt
+
+dt x ∞
+
+≤ max 
+
+> s
+
+X
+
+> a∈A
+
+X
+
+> s′∈S
+
+P(s′|s, a ) dπ ξ(t) (a|s)
+
+dt ∥x∥∞
+
+= max 
+
+> s
+
+X
+
+> a∈A
+
+dπ ξ(t) (a|s)
+
+dt ∥x∥∞
+
+≤ 2Cϕ ∥ξ′ − ξ∥2 ∥x∥∞
+
+56 where the last line follows is due to 
+
+X
+
+> a∈A
+
+df ξ(t) (a|s)
+
+dt = X
+
+> a∈A
+
+ ∂f ξ(t) (a|s)
+
+∂ξ(t) , ξ′ − ξ
+
+
+
+= X
+
+> a∈A
+
+fξ(t) (a|s) ⟨ ¯ϕξ (s, a ), ξ′ − ξ⟩
+
+≤ X
+
+> a∈A
+
+fξ(t) (a|s) ¯ϕξ (s, a ) 2 ∥ξ′ − ξ∥2
+
+≤ 2Cϕ ∥ξ′ − ξ∥∞ .
+
+Same as (245) in Lemma F.3, we have 
+
+dV ξ(t)
+
+(s)
+
+dt = γ · e⊤ 
+
+> s
+
+Mt
+
+dPt
+
+dt Mtrt + e⊤ 
+
+> s
+
+Mt
+
+dr t
+
+dt . (276) And similar to (249), we deduce 
+
+dr t
+
+dt ∞
+
+= max 
+
+> s∈S
+
+dr t(s)
+
+dt = max 
+
+> s∈S
+
+* ∂f ξ(t) (·| s)⊤r(s, ·)
+
+∂ξ(t) , ξ′ − ξ
+
++
+
+= ⟨X
+
+> a∈A
+
+fξ (a|s) ¯ϕξ (s, a )r(s, a ), ξ′ − ξ⟩
+
+= X
+
+> a∈A
+
+fξ (a|s)r(s, a ) ⟨ ¯ϕξ (s, a ), ξ′ − ξ⟩
+
+≤ 2Cϕ ∥ξ′ − ξ∥2 ,
+
+which gives 
+
+e⊤ 
+
+> s
+
+Mt
+
+dr t
+
+dt ≤ 11 − γ
+
+dr t
+
+dt ∞
+
+≤ 2Cϕ
+
+1 − γ ∥ξ′ − ξ∥2 . (277) Following the same steps in (247), we deduce 
+
+γ · e⊤ 
+
+> s
+
+Mt
+
+dPt
+
+dt Mtrt ≤ 2γC ϕ
+
+(1 − γ)2 ∥ξ′ − ξ∥2 . (278) Combining the above two expressions (277) and (278) with (276), we deduce 
+
+|V ξ (s) − V ξ′
+
+(s)| ≤ 2Cϕ(1 + γ)(1 − γ)2 ∥ξ′ − ξ∥2 , (279) which implies 
+
+∀(s, a ) ∈ S × A : |Qξ (s, a ) − Qξ′
+
+(s, a )| ≤ 2Cϕγ(1 + γ)(1 − γ)2 ∥ξ′ − ξ∥2 . (280) 
+
+G.7 Proof of Lemma E.8 
+
+This proof is inspired by the proof of [ YDG +22 , Theorem 1]. To give the proof, we first introduce the following three-point descent lemma: 
+
+Lemma G.3 (Three-point descent lemma Lemma 6 in [ Xia22 ]) . Suppose that C ⊂ Rm is a closed convex set, g : C → R is a proper, closed, convex function, Dh(·, ·) is the Bregman divergence generated by a function h of Lengendre type and rint dom h ∩ C̸ = ∅. For any x ∈ rintdom h, let 
+
+x+ ∈ arg min 
+
+> u∈dom h∩C
+
+{f (u) + Dh(u, x )} ,
+
+then x+ ∈ dom h ∩ C and for any u ∈ dom h ∩ C , it holds that 
+
+f (x+) + Dh(x+, x ) ≤ f (u) + Dh(u, x ) − Dh(u, x +) . (281) 57 Proof of Lemma E.8. By the update rule (114) and the parameterization (24) we know know that 
+
+∀(s, a ) ∈ S × A : ¯f (t+1) (a|s) = 1
+
+Z(t)(s) f (t)(a|s) exp 
+
+
+
+αϕ ⊤(s, a ) ˆ w(t)
+
+,
+
+where Z(t)(s) is a normalization coefficient to ensure P 
+
+> a∈A
+
+f (t+1) (s, a ) = 1 for each s ∈ S . Note that the above π(t+1) could also be obtained by a mirror descent update: 
+
+∀s ∈ S : f (t+1) (·| s) = arg min 
+
+> g∈∆( A)
+
+n
+
+−α⟨Φ( s) ˆ w(t), g ⟩ + D(g, f (t)(·| s)) 
+
+o
+
+, (282) where Φ( s) ∈ R|A|× p is a matrix with rows ϕ⊤(s, a ) ∈ Rp for a ∈ A , and D(·, ·) denotes the KL divergence defined in (109). We apply the three-point descent lemma—Lemma G.3 with C = ∆( A), f = −α⟨Φ( s) ˆ w(t), ·⟩ and 
+
+h : ∆( A) → R is the negative entropy with h(q) = P 
+
+> a∈A
+
+q(a) log q(a) and deduce that for any 
+
+q ∈ ∆( A), we have 
+
+−α⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s)⟩+D
+
+ ¯f (t+1) (·| s), ¯f (t)(·| s)
+
+
+
+≤ − α⟨Φ( s) ˆ w(t), q ⟩+D
+
+
+
+q, ¯f (t)(·| s)
+
+
+
+−D
+
+
+
+q, ¯f (t+1) (·| s)
+
+
+
+.
+
+Rearranging terms and dividing both sides by −α, we obtain 
+
+⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s)−q⟩− 1
+
+α D
+
+ ¯f (t+1) (·| s), ¯f (t)(·| s)
+
+
+
+≥ − 1
+
+α D
+
+
+
+q, ¯f (t)(·| s)
+
+
+
++ 1
+
+α D
+
+
+
+q, ¯f (t+1) (·| s)
+
+
+
+.
+
+(283) Let q = ¯f (t)(·| s) and π⋆(·| s),resp., we have the following two inequalities: 
+
+⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s)− ¯f (t)(·| s)⟩ ≥ 1
+
+α D
+
+ ¯f (t+1) (·| s), ¯f (t)(·| s)
+
+
+
++ 1
+
+α D
+
+ ¯f (t)(·| s), ¯f (t+1) (·| s)
+
+
+
+≥ 0 .
+
+(284) 
+
+⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩ + ⟨Φ( s) ˆ w(t), ¯f (t)(·| s) − π⋆(·| s)⟩≥ − 1
+
+α D
+
+
+
+π⋆(·| s), ¯f (t)(·| s)
+
+
+
++ 1
+
+α D
+
+
+
+π⋆(·| s), ¯f (t+1) (·| s)
+
+
+
+. (285) Taking expectation w.r.t. distribution d⋆ on both sides of (285), we arrive at 
+
+Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩
+
+i
+
++Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t), ¯f (t)(·| s) − π⋆(·| s)⟩
+
+i
+
+≥ 1
+
+α (D(t+1)  
+
+> ⋆
+
+−D(t) 
+
+> ⋆
+
+) .
+
+(286) To simplify the notation we let ¯Q(t) and ¯V (t) denote Q ¯f (t)
+
+and V ¯f (t)
+
+, respectively. Note that the first expectation in the above expression (286) could be upper bounded as follows: 
+
+Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩
+
+i
+
+= X
+
+> s∈S
+
+d⋆(s)⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩
+
+= X
+
+> s∈S
+
+d⋆(s)
+
+d ¯f (k+1) (s) d ¯f (k+1) 
+
+(s)⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩≤ ϑρ
+
+X
+
+> s∈S
+
+d ¯f (k+1) 
+
+(s)⟨Φ( s) ˆ w(t), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩
+
+= ϑρ
+
+X
+
+> s∈S
+
+d ¯f (k+1) 
+
+(s)⟨ ¯Q(t)(s, ·), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩ + ϑρ
+
+X
+
+> s∈S
+
+d ¯f (k+1) 
+
+(s)⟨ ¯Φ( s) ˆ w(t) − ¯Q(t)(s, ·), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩
+
+= ϑρ(1 − γ)
+
+ ¯V (t+1) (ρ) − ¯V (t)(ρ)
+
+
+
++ ϑρ
+
+X
+
+> s∈S
+
+d ¯f (k+1) 
+
+(s)⟨ ¯Φ( s) ˆ w(t) − ¯Q(t)(s, ·), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩ ,
+
+(287) 58 where the first inequality uses (?? ) and the definition of ϑρ (107) and the last line follows from (260) in Lemma G.1. We separate the second term of the last line into four terms as follows: 
+
+X
+
+> s∈S
+
+d ¯f (t+1) 
+
+(s)⟨ ¯Φ( s) ˆ w(t) − ¯Q(t)(s, ·), ¯f (t+1) (·| s) − ¯f (t)(·| s)⟩
+
+= X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t+1) (a|s)ϕ⊤(s, a )( ˆ w(t) − ˆw(t) 
+
+> ⋆
+
+)
+
+| {z }
+
+> (I)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t+1) (a|s)
+
+
+
+ϕ⊤(s, a ) ˆ w(t) 
+
+> ⋆
+
+− ¯Q(t)(s, a )
+
+| {z }
+
+> (II )
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t)(a|s)ϕ⊤(s, a )( ˆ w(t) 
+
+> ⋆
+
+− ˆw(t))
+
+| {z }
+
+> (III )
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t)(a|s)
+
+ ¯Q(t)(s, a ) − ϕ⊤(s, a ) ˆ w(t)
+
+> ⋆
+
+| {z } 
+
+> (IV )
+
+.
+
+(288) Applying again Lemma G.1, we deduce the equivalent form of the second expectation in (286) as follows: 
+
+Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t), ¯f (t)(·| s) − π⋆(·| s)⟩
+
+i
+
+= Es∼d⋆
+
+h
+
+⟨ ¯Q(t)(s, ·), ¯f (t)(·| s) − π⋆(·| s)⟩
+
+i
+
++ Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t) − ¯Q(t)(s, ·), ¯f (t)(·| s) − π⋆(·| s)⟩
+
+i
+
+= (1 − γ)
+
+ ¯V (t)(ρ) − V π⋆
+
+(ρ)
+
+
+
++ Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t) − ¯Q(t)(s, ·), ¯f (t)(·| s) − π⋆(·| s)⟩
+
+i
+
+, (289) where the second term of the last line could be decomposed into the following terms: 
+
+Es∼d⋆
+
+h
+
+⟨Φ( s) ˆ w(t) − ¯Q(t)(s, ·), ¯f (t)(·| s) − π⋆(·| s)⟩
+
+i
+
+= X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s) ¯f (t)(a|s)ϕ⊤(s, a )( ˆ w(t) − ˆw(t) 
+
+> ⋆
+
+)
+
+| {z }
+
+> (A)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s) ¯f (t)(a|s)
+
+
+
+ϕ⊤(s, a ) ˆ w(t) 
+
+> ⋆
+
+− ¯Q(t)(s, a )
+
+| {z }
+
+> (B)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s)π⋆(a|s)ϕ⊤(s, a )( ˆ w(t) 
+
+> ⋆
+
+− ˆw(t))
+
+| {z }
+
+> (C)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s)π⋆(a|s)
+
+ ¯Q(t)(s, a ) − ϕ⊤(s, a ) ˆ w(t)
+
+> ⋆
+
+| {z }
+
+> (D)
+
+.
+
+(290) Plugging (288), (290) into (287) and (289), resp., and making use of (286), we have 
+
+ϑρ(1 − γ)
+
+ ¯V (t+1) (ρ) − ¯V (t)(ρ)
+
+
+
++ (1 − γ)
+
+ ¯V (t)(ρ) − V π⋆
+
+(ρ)
+
+
+
++ ϑρ
+
+ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t+1) (a|s)ϕ⊤(s, a )( ˆ w(t) − ˆw(t) 
+
+> ⋆
+
+)
+
+| {z }
+
+> (I)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t+1) (a|s)
+
+
+
+ϕ⊤(s, a ) ˆ w(t) 
+
+> ⋆
+
+− ¯Q(t)(s, a )
+
+| {z }
+
+> (II )
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t)(a|s)ϕ⊤(s, a )( ˆ w(t) 
+
+> ⋆
+
+− ˆw(t))
+
+| {z }
+
+> (III )
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d ¯f (t+1) 
+
+(s) ¯f (t)(a|s)
+
+ ¯Q(t)(s, a ) − ϕ⊤(s, a ) ˆ w(t)
+
+> ⋆
+
+| {z } 
+
+> (IV )
+
+
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s) ¯f (t)(a|s)ϕ⊤(s, a )( ˆ w(t) − ˆw(t) 
+
+> ⋆
+
+)
+
+| {z }
+
+> (A)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s) ¯f (t)(a|s)
+
+
+
+ϕ⊤(s, a ) ˆ w(t) 
+
+> ⋆
+
+− ¯Q(t)(s, a )
+
+| {z }
+
+> (B)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s)π⋆(a|s)ϕ⊤(s, a )( ˆ w(t) 
+
+> ⋆
+
+− ˆw(t))
+
+| {z }
+
+> (C)
+
++ X
+
+> s∈S
+
+X
+
+> a∈A
+
+d⋆(s)π⋆(a|s)
+
+ ¯Q(t)(s, a ) − ϕ⊤(s, a ) ˆ w(t)
+
+> ⋆
+
+| {z }
+
+> (D)
+
+≥ 1
+
+α (D(t+1)  
+
+> ⋆
+
+− D(t) 
+
+> ⋆
+
+).
+
+(291) 59 Below we upper bound |(I)|-|(IV )| and |(A)|-|(D)|.For any t ∈ N and n ∈ [N ], we define matrix Σ ˜d(t)
+
+> n
+
+∈ Rp×p as 
+
+Σ ˜d(t)
+
+> n
+
+:= E(s,a )∼ ˜d(t)
+
+> n
+
+ϕ(s, a )ϕ⊤(s, a ) , (292) and we define 
+
+ε(t) 
+
+> stat ,n
+
+:= ℓ
+
+
+
+w(t) 
+
+> n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+− ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+, (293) 
+
+ε(t) 
+
+> approx ,n
+
+:= ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+, (294) then for all n ∈ [N ], by Assumption E.2 and Assumption 4.2 we have 
+
+E
+
+h
+
+ε(t)
+
+> stat ,n
+
+i
+
+≤ εn 
+
+> stat
+
+, and E
+
+h
+
+ε(t)
+
+> approx ,n
+
+i
+
+≤ εn 
+
+> approx
+
+. (295) We let ¯ε(t) 
+
+> stat
+
+:= 1
+
+> N
+
+PNn=1 ε(t) 
+
+> stat ,n
+
+and ¯ε(t) 
+
+> approx
+
+:= 1
+
+> N
+
+PNn=1 ε(t)
+
+> approx ,n
+
+. By Cauchy-Schwartz’s inequality we have 
+
+|(I)| ≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+X
+
+> (s,a )∈S×A
+
+d ¯f (t+1) 
+
+(s) ¯f (t+1) (a|s)|ϕ⊤(s, a )( w(t) 
+
+> n
+
+− w(t)
+
+> ⋆,n
+
+)|≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+vuut X
+
+> (s,a )∈S×A
+
+ d ¯f (t+1) (s)2   ¯f (t+1) (a|s)2
+
+˜d(t) 
+
+> n
+
+(s, a ) · X
+
+> (s,a )∈S×A
+
+˜d(t) 
+
+> n
+
+(s, a )
+
+
+
+ϕ⊤(s, a )( w(t) 
+
+> n
+
+− w(t)
+
+> ⋆,n
+
+)
+
+2
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+vuuutE(s,a )∼ ˜d(t)
+
+> n
+
+ d ¯f (t+1) (s)   ¯f (t+1) (a|s)
+
+˜d(t) 
+
+> n
+
+(s, a )
+
+!2 w(t) 
+
+> n
+
+− w(t) 
+
+> ⋆,n
+> 2Σ˜d(t)
+> n
+
+≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+s
+
+Cν w(t) 
+
+> n
+
+− w(t) 
+
+> ⋆,n
+> 2Σ˜d(t)
+> n
+
+≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+q
+
+Cν ε(t) 
+
+> stat ,n
+
+≤
+
+q
+
+Cν ¯ε(t) 
+
+> stat
+
+, (296) where the third inequality follows from Assumption 4.3, the last inequality uses Jensen’s inequality, and the penultimate inequality by Assumption E.2 and by noticing that for all w ∈ Rp, we have 
+
+ℓ
+
+
+
+w, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+− ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+= E(s,a )∼ ˜d(t)
+
+> n
+
+
+
+ϕ⊤(s, a )w − ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
++ ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )
+
+2
+
+− ℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+= E(s,a )∼ ˜d(t)
+
+> n
+
+
+
+ϕ⊤(s, a )w − ϕ⊤(s, a )w(t)
+
+> ⋆,n
+
+2
+
++ 2 
+
+
+
+w − w(t)
+
+> ⋆,n
+
+⊤
+
+E(s,a )∼ ˜d(t)
+
+> n
+
+h 
+
+ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )
+
+
+
+ϕ(s, a )
+
+i
+
+= w − w(t)  
+
+> ⋆,n Σ˜d(t)
+> n
+
++
+
+
+
+w − w(t)
+
+> ⋆,n
+
+⊤
+
+∇wℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+≥ w − w(t)  
+
+> ⋆,n Σ˜d(t)
+> n
+
+, (297) where the last line follows from the first-order optimality condition for the minimum point w(t) 
+
+> ⋆,n
+
+∈
+
+arg min w ℓ
+
+
+
+w, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+:
+
+∀w ∈ Rp :
+
+
+
+w − w(t)
+
+> ⋆,n
+
+⊤
+
+∇wℓ
+
+
+
+w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t)
+
+> n
+
+
+
+≥ 0.
+
+Analogous to bounding |(I)|, by simply substituting ¯f (t+1) with ¯f (t) or π⋆ or substituting d ¯f (t+1) 
+
+into d⋆, we obtain the same upper bound for |(III )|, |(A)| and |(C)|, i.e., 
+
+|(III )|, |(A)|, |(C)| ≤ 
+
+q
+
+Cν ¯ε(t) 
+
+> stat
+
+. (298) 60 Now we upper bound |(II )| as follows: 
+
+|(II )| ≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+X
+
+> (s,a )∈S×A
+
+d ¯f (t+1) 
+
+(s) ¯f (t+1) (a|s)
+
+
+
+|ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )| + |Q(t) 
+
+> n
+
+(s, a ) − ¯Q(t)(s, a )|
+
+
+
+≤ 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+vuut X
+
+> (s,a )∈S×A
+
+ d ¯f (t+1) (s)2   ¯f (t+1) (a|s)2
+
+˜d(t) 
+
+> n
+
+(s, a ) ··
+
+vuut2 X
+
+> (s,a )∈S×A
+
+˜d(t) 
+
+> n
+
+(s, a )
+
+
+
+ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )
+
+2
+
++
+
+
+
+Q(t) 
+
+> n
+
+(s, a ) − ¯Q(t)(s, a )
+
+2
+
+= 1
+
+N
+
+> N
+
+X
+
+> n=1
+
+vuuutE(s,a )∼ ˜d(t)
+
+> n
+
+ d ¯f (t+1) (s)   ¯f (t+1) (a|s)
+
+˜d(t) 
+
+> n
+
+(s, a )
+
+!2 · 2
+
+
+
+ε(t) 
+
+> approx ,n
+
++ L2 
+
+> Q
+
+ξ(t) 
+
+> n
+
+− ¯ξ(t) 22
+
+
+
+≤
+
+vuut2Cν ¯ε(t) 
+
+> approx
+
++ L2
+
+> Q
+
+N ξ(t) − 1( ¯ξ(t))⊤ 2F
+
+!
+
+, (299) where LQ is defined in Lemma E.7, the second line uses Cauchy-Schwartz’s inequality and Young’s inequality (117) and the last inequality uses Assumption 4.3 and Jensen’s inequality. Analogous to bounding |(II )|, by simply substituting ¯f (t+1) with ¯f (t) or π⋆ or substituting d ¯f (t+1) 
+
+into d⋆, we obtain the same upper bound for |(IV )|, |(B)| and |(D)|, i.e., 
+
+|(IV )|, |(B)|, |(D)| ≤ 
+
+vuut2Cν ¯ε(t) 
+
+> approx
+
++ L2
+
+> Q
+
+N ξ(t) − 1( ¯ξ(t))⊤ 2F
+
+!
+
+. (300) Plugging (296),(298),(299),(300) into (291) and dividing both sides by (1 − γ) yield 
+
+ϑρ
+
+
+
+δ(t+1) − δ(t)
+
++δ(t) ≤ D(t)
+
+> ⋆
+
+(1 − γ)α − D(t+1) 
+
+> ⋆
+
+(1 − γ)α + 2√Cν (ϑ + 1) 1 − γ
+
+q
+
+¯ε(t) 
+
+> stat
+
++
+
+vuut2 ¯ε(t) 
+
+> approx
+
++ L2
+
+> Q
+
+N ξ(t) − 1( ¯ξ(t))⊤ 2F
+
+! .
+
+Taking expectation on both sides of the above expression and making use of the simple fact that 
+
+E √x ≤ pE[x] ,
+
+we reach the conclusion (123). 
+
+G.8 Proof of Lemma E.9 
+
+Proof of Lemma E.9. For any ζ > 0, by the actor update rule (34) and (114) we have that 
+
+ξ(t+1) − 1N ¯ξ(t+1) ⊤ 2F
+
+= W (ξ(t) + αh(t)) − 1N ( ¯ξ(t) + α ˆw(t))⊤ 2F
+
+≤ (1 + ζ)σ2 ξ(t) − 1N ¯ξ(t)⊤ 2F
+
++ α2(1 + 1 /ζ )σ2 h(t) − 1N ˆw(t)⊤ 2F
+
+,
+
+(301) where the last line follows from Young’s inequality (116) and (11) . By the gradient tracking step (33) , Young’s inequality (116) and (11), we have 
+
+h(t+1) − 1 ˆw(t+1) ⊤ 2F
+
+= W (h(t) + w(t+1) − w(t)) − 1 ˆw(t)⊤ + 1( ˆ w(t)⊤ − ˆw(t+1) ⊤) 2F
+
+= W h (t) − 1 ˆw(t)⊤ + W (w(t+1) − w(t)) − 1( ˆ w(t+1) ⊤ − ˆw(t)⊤) 2F
+
+≤ (1 + ζ)σ2 h(t) − 1N ˆw(t)⊤ + (1 + 1 /ζ )σ2 w(t+1) − w(t) − 1( ˆ w(t+1) ⊤ − ˆw(t)⊤) 2F
+
+≤ (1 + ζ)σ2 h(t) − 1N ˆw(t)⊤ + (1 + 1 /ζ )σ2 w(t+1) − w(t) 2F ,
+
+(302) 61 where the last inequality follows from the fact 
+
+w(t+1) − w(t) − 1( ˆ w(t+1) ⊤ − ˆw(t)⊤) 2F
+
+= w(t+1) − w(t) 2F
+
++ N ˆw(t+1) − ˆw(t) 22
+
+− 2
+
+> N
+
+X
+
+> n=1
+
+⟨w(t+1)  
+
+> n
+
+− w(t) 
+
+> n
+
+, ˆw(t+1) − ˆw(t)⟩
+
+= w(t+1) − w(t) 2F
+
+− N ˆw(t+1) − ˆw(t) 22
+
+≤ w(t+1) − w(t) 2F
+
+. (303) Then for any n ∈ [N ], t ∈ N and w ∈ Rp, we have 
+
+ℓ(w, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+) − ℓ(w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+)= E(s,a )∼ ˜d(t)
+
+> n
+
+
+
+ϕ⊤(s, a )w − ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
++ ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )
+
+2
+
+− ℓ(w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+)= E(s,a )∼ ˜d(t)
+
+> n
+
+
+
+ϕ⊤(s, a )w − ϕ⊤(s, a )w(t)
+
+> ⋆,n
+
+2
+
++ 2( w − w(t)
+
+> ⋆,n
+
+)⊤E(s,a )∼ ˜d(t)
+
+> n
+
+h 
+
+ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )
+
+
+
+ϕ(s, a )
+
+i
+
+= w − w(t) 
+
+> ⋆,n
+> 2Σ˜d(t)
+> n
+
++ ( w − w(t)
+
+> ⋆,n
+
+)⊤∇wℓ(w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+)
+
+≥ w − w(t) 
+
+> ⋆,n
+> 2Σ˜d(t)
+> n
+
+≥ (1 − γ)μ w − w(t)
+
+> ⋆,n
+> 22
+
+, (304) where the penultimate line follows from the first-order optimality conditions for the optima w(t)
+
+> ⋆,n
+
+:
+
+∀w ∈ Rp : (w − w(t)
+
+> ⋆,n
+
+)⊤∇wℓ(w(t)
+
+> ⋆,n
+
+, Q (t) 
+
+> n
+
+, ˜d(t) 
+
+> n
+
+) ≥ 0 (305) and the last line is by Assumption 4.1 and ( ?? ). Note that 
+
+ℓ(w(t)
+
+> ⋆,n
+
+, Q (t+1)  
+
+> n
+
+, ˜d(t+1)  
+
+> n
+
+)= E(s,a )∼ ˜d(t+1) 
+
+> n
+
+h
+
+(ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t+1)  
+
+> n
+
+(s, a )) 2i
+
+≤ 2 X
+
+> (s,a )∈S×A
+
+˜d(t) 
+
+> n
+
+(s, a ) ˜d(t+1)  
+
+> n
+
+(s, a )˜d(t) 
+
+> n
+
+(s, a ) (ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )) 2 + 2 E(s,a )∼ ˜d(t+1) 
+
+> n
+
+(Q(t+1)  
+
+> n
+
+(s, a ) − Q(t) 
+
+> n
+
+(s, a )) 2
+
+≤ 2Cν E(s,a )∼ ˜d(t)
+
+> n
+
+(ϕ⊤(s, a )w(t) 
+
+> ⋆,n
+
+− Q(t) 
+
+> n
+
+(s, a )) 2 + 2 LQ ξ(t+1)  
+
+> n
+
+− ξ(t)
+
+> n
+> 22
+
+≤ 2Cν εn 
+
+> approx
+
++ 2 L2 
+
+> Q
+
+ξ(t+1)  
+
+> n
+
+− ξ(t)
+
+> n
+> 22
+
+, (306) where the second inequality uses Assumption 4.3 and Lemma E.7, and the last line uses Assump-tion 4.2. The above equation (306) together with (304) gives 
+
+w(t+1)  
+
+> ⋆
+
+− w(t)
+
+> ⋆
+> 2F
+
+=
+
+> N
+
+X
+
+> n=1
+
+w(t+1)  
+
+> ⋆,n
+
+− w(t)
+
+> ⋆,n
+> 22
+
+≤ 1(1 − γ)μ
+
+> N
+
+X
+
+> n=1
+
+
+
+ℓ(w(t)
+
+> ⋆,n
+
+, Q (t+1)  
+
+> n
+
+, ˜d(t+1)  
+
+> n
+
+) − ℓ(w(t+1)  
+
+> ⋆,n
+
+, Q (t+1)  
+
+> n
+
+, ˜d(t+1)  
+
+> n
+
+)
+
+
+
+≤ 2(1 − γ)μ CνNX
+
+> n=1
+
+εn 
+
+> approx
+
++ L2 
+
+> Q
+
+ξ(t+1) − ξ(t) 2F
+
+!
+
+. (307) where w(t) 
+
+> ⋆
+
+:= ( w(t)1 , · · · , w(t) 
+
+> N
+
+)⊤, ∀t.62 Also note that by Assumption E.2 and (304) we have 
+
+∀t ∈ N : w(t) − w(t)
+
+> ⋆
+> 2F
+
+≤
+
+PNn=1 εn
+
+> stat
+
+(1 − γ)μ . (308) Therefore, by (306) and (308) we have 
+
+w(t+1) − w(t) 2F ≤ 3
+
+
+
+w(t+1) − w(t+1)  
+
+> ⋆
+> 2F
+
++ w(t+1)  
+
+> ⋆
+
+− w(t) 
+
+> ⋆
+> 2F
+
++ w(t) − w(t)
+
+> ⋆
+> 2F
+
+
+
+≤ 6(1 − γ)μ
+
+
+
+N (Cν ¯εapprox + ¯ εstat ) + L2 
+
+> Q
+
+ξ(t+1) − ξ(t) 2F
+
+
+
+. (309) where the first inequality uses Young’s inequality (117). Note that by the update rule (34) , the double stochasticity of the mixing matrix W and the consensus property (11) we have 
+
+ξ(t+1) − ξ(t) 2F
+
+= W (ξ(t) + αh(t)) − ξ(t) 2F
+
+= (W − I)( ξ(t) − 1N ¯ξ(t)⊤) + α(W h (t) − 1N ˆw(t)⊤) + α1( ˆ w(t) − ˆw(t) 
+
+> ⋆
+
+)⊤ + 1( ˆ w(t) 
+
+> ⋆
+
+)⊤ 2F
+
+≤ 16 ξ(t) − 1N ¯ξ(t)⊤ 2F
+
++ 4 α2σ2 h(t) − 1N ˆw(t)⊤ 2F
+
++ 4 α2N ˆw(t) − ˆw(t)
+
+> ⋆
+> 22
+
++ 4 α2N ˆw(t)
+
+> ⋆
+> 22
+
+≤ 16 ξ(t) − 1N ¯ξ(t)⊤ 2F
+
++ 4 α2σ2 h(t) − 1N ˆw(t)⊤ 2F
+
++ 4 α2
+
+> N
+
+X
+
+> n=1
+
+w(t) 
+
+> n
+
+− w(t)
+
+> ⋆,n
+> 22
+
++ 4 α2
+
+> N
+
+X
+
+> n=1
+
+w(t)
+
+> ⋆,n
+> 22
+
+≤ 16 ξ(t) − 1N ¯ξ(t)⊤ 2F
+
++ 4 α2σ2 h(t) − 1N ˆw(t)⊤ 2F
+
++ 4α2N ¯εstat 
+
+(1 − γ)μ + 4α2N C 2
+
+> ϕ
+
+μ2(1 − γ)4 , (310) where the penultimate line uses Jensen’s inequality and the last line follows from (304) , Assump-tion E.2 and (271). Combining (310) and (309) with (302), we deduce 
+
+h(t+1) − 1 ˆw(t+1) ⊤ 2F
+
+≤ (1 + 1 /ζ ) 96 σ2L2
+
+> Q
+
+(1 − γ)μ ξ(t) − 1 ¯ξ(t)⊤ 2F
+
++ σ2 1 + ζ + (1 + 1 /ζ ) 24 L2
+
+> Q
+
+α2
+
+(1 − γ)μ
+
+!
+
+h(t) − 1 ˆw(t)⊤ 2F
+
++ (1 + 1 /ζ ) 6σ2
+
+(1 − γ)μ N (¯ εstat + Cν ¯εapprox ) + 4 L2
+
+> Q
+
+α2N ¯εstat 
+
+(1 − γ)μ + α2N C 2
+
+> ϕ
+
+μ2(1 − γ)2
+
+!! 
+
+. (311) Finally, (124) follows from taking expectations on both sides of (301) and (311). 
+
+## H Numerical experiments 
+
+Experimental setup. We study the empirical performance of FedNPG (Algorithm 1) and entropy-regularized FedNPG (Algorithm 2) on a K × K GridWorld problem. To be specific, the collective goal of N agents is to learn a global optimal policy to follow a predetermined path which starts at the top left corner and ends at the bottom right corner. However, each agent only has access to partial information about the whole map: in figure 1 (where we take N = 3 and K = 9 as an example), agent n explores on map n, n ∈ [N ]. After taking an action, only when the agent is at the shaded positions can it get reward 1, otherwise it gets 0. We stipulate the action space of all agents to be 
+
+A = {right , down }, i.e. movement is allowed only to the right or down. If an agent takes an action that will lead it out of the boarder of the map, we stipulate the agent’s state doesn’t change and receive reward 0. Each agent starts at the top left corner. To learn a shared policy to follow the path, we aim to maximize the average value function of all agents. 
+
+Results. In the following we discuss the empirical results of our algorithms. In all the experiments, we fix the discounted factor γ = 0 .99 . In our experiments, we also don’t require the mixing matrix to 63 Figure 1: Gridworld experiement. N agents ( N = 3 here) aim to learn a shared policy to follow a predetermined path, which is the red dashed line in the complete map. Each agent only has access to partial information about the path and gets reward 1 only at the shaded positions and 0 at other positions. Each agent starts at the top left corner. strictly adhere to Assumption 3.1. In Figure 2, we validate the effectiveness of vanilla FedNPG and entropy-regularized FedNPG across different map size K, where we set τ = 0 , 0.005 , 0.05 , η = 0 .1,
+
+N = 10 , and use a standard ring graph where agent n receives information from agent n + 1 for 
+
+n ∈ [N − 1] , and agent N receives information from agent 1, and we set all the weights on each edge of the communication graph to be 0.5. The corresponding mixing matrix of the standard ring graph is as follows: 
+
+W =
+
+
+
+0.5 0.5 0 0 · · · 0 00 0.5 0.5 0 · · · 0 00 0 0.5 0.5 · · · 0 0
+
+... ... ... ... ... ...
+
+0 0 0 0 · · · 0.5 0.50.5 0 0 0 · · · 0 0.5
+
+
+
+. (312) Here, W in (312) satisfies the double stochasticity assumption but is not symmetric. 2 4 6 8 10 12 14       
+
+> iteration number
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> 0.35
+> (V * V )/ V *
+> K= 5
+> K= 10
+> K= 20
+> K= 30
+> K= 50
+> K= 70
+
+(a) τ = 0 2 4 6 8 10 12 14        
+
+> iteration number
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> 0.30
+> 0.35
+> (V * V )/ V *
+> K= 5
+> K= 10
+> K= 20
+> K= 30
+> K= 50
+> K= 70
+
+(b) τ = 0 .005 
+
+Figure 2: Changing map size K. we let τ = 0 , 0.005 and change K for each τ . We plot the curves of (V ⋆τ − V (t)
+
+τ )/V ⋆τ changing with the iteration number. We can see that both vanilla and entropy-regularized NPG converges to the optimal value function in a few iterations, and the convergence speed is almost the same across different K.64 Figure 2 illustrates the normalized sub-optimality gap (V ⋆τ − V (t)
+
+τ )/V ⋆τ with respect to the iteration number. It can be seen that both vanilla and entropy-regularized NPG converge to the optimal value function in a few iterations, and the convergence speed is almost the same across different K, i.e. the impact of K on the convergence speed is minimal. 0 5 10 15 20 25 
+
+> iteration number
+> 9
+> 10
+> 11
+> 12
+> 13
+> 14
+> 15
+> 16
+> value function
+> 10
+> 20
+> 30
+> 40
+> 50
+> N
+
+(a) K = 10 0 5 10 15 20 25  
+
+> iteration number
+> 15.0
+> 17.5
+> 20.0
+> 22.5
+> 25.0
+> 27.5
+> 30.0
+> 32.5
+> value function
+> 10
+> 20
+> 30
+> 40
+> 50
+> N
+
+(b) K = 20 0 5 10 15 20 25  
+
+> iteration number
+> 20
+> 25
+> 30
+> 35
+> 40
+> 45
+> value function
+> 10
+> 20
+> 30
+> 40
+> 50
+> N
+
+(c) K = 30 
+
+Figure 3: Changing number of agents N . we let K = 10 , 20 , 30 and change N for each K.We plot the curves of value functions changing with the iteration number. The green dashed line represents the optimal value. We can see that the convergence speed decreases as N increases. Same as before, the convergence speed is insensitive to the change of K.In Figure 3, we study the performance of our algorithms when the number of agents N varies. We set 
+
+K = 10 , 20 , 30 , τ = 0 .005 , η = 0 .1 and the communication graph to be the standard ring graph. We can see that the convergence speed decreases as N increases. Same as before, the convergence speed is insensitive to the change of K.In Figure 4, we illustrate the effect of the communication network topology to our algorithms. To be specific, we change the number of neighbors of each agent (i.e., the number of non-zero entries in each row of W ) and (i) randomly generalize the weights of the graph such that each row of W
+
+sum up to 1, i.e., W 1 = 1, see Figure 4(a); (ii) set the non-zero entries in each row of W all to be 
+
+1
+
+number of neighbors , see Figure 4(b). We fix η = 0 .1, K = 10 , τ = 0 .005 . We plot the curves of value functions changing with the iteration number. The green dashed line represents the optimal value. For both 4(a) and 4(b), the convergence speed increase as number of neighbors of each agent increases. FedNPG performs better when using equal weights. 0 10 20 30 40 50 60 
+
+> iteration number
+> 6
+> 8
+> 10
+> 12
+> 14
+> 16
+> value function
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> #neighbors
+
+(a) Random weights 0 10 20 30 40 50 60  
+
+> iteration number
+> 6
+> 8
+> 10
+> 12
+> 14
+> 16
+> value function
+> 2.5
+> 5.0
+> 7.5
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> #neighbors
+
+(b) Equal weights 
+
+Figure 4: Changing communication network topology. We change the number of neighbors of each agent. (i) In Figure 4(a), we randomly generalize the weights of the graph such that each row of W sum up to 1; (ii) In Figure 4(b), we set the non-zero entries in each row of W all to be 
+
+1
+
+number of neighbors . We plot the curves of value functions changing with the iteration number. The green dashed line represents the optimal value. For both 4(a) and 4(b), the convergence speed increase as number of neighbors increases. FedNPG performs better when using equal weights. 
+
+H.1 Discussion on the Experiments 
+
+Note that even though there are many existing works in federated RL, none of the existing works, to the best of our knowledge, studies federated multi-tasks RL in the decentralized setting. Therefore, 65 we are not able to compare our work with existing works. However, here we include a comparison between FedNPG and a naïve baseline without the Q-tracking technique (line 6 in Algorithm 1). 0 5 10 15 20 25        
+
+> iteration number
+> 10
+> 15
+> 20
+> 25
+> 30
+> 35
+> 40
+> 45
+> value function  V*
+> N= 10, tracking:
+> N= 20, tracking:
+> N= 30, tracking:
+> N= 10, tracking:×
+> N= 20, tracking:×
+> N= 30, tracking:×
+
+Figure 5: Comparison between FedNPG and a naïve baseline without the Q-tracking technique. The plot shows that while FedNPG converges within a few iterates, the algorithm without Q-tracking diverges, confirming the positive role of Q-tracking in ensuring convergence. For this plot, we use the standard ring graph (Eq. 312). We fix the size of the maze K = 30 , learning rate η = 0 .1, and regularity coefficient τ = 0 .005 . We experiment on different number of agents N
+
+and plot the curves of value function changing with the iteration number. The plot shows that while FedNPG converges within a few iterates, the algorithm without Q-tracking diverges, confirming the positive role of Q-tracking in ensuring convergence. 66 NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: we clearly state in the abstract and introduction the claims we made, including the contributions made in the paper and important assumptions and limitations. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: we clearly state our assumptions. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory Assumptions and Proofs 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] 67 Justification: we provide the full set of assumptions and a complete (and correct) proof. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental Result Reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: see Appendix H. Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? 68 Answer: [No] Justification: The experiments are simple and can be easily reproduced by following the instructions in the paper. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental Setting/Details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [Yes] Justification: Experiment details are included in Section H. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment Statistical Significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [No] Justification: stochasticity is not critical in our experiments. Guidelines: • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). 69 • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments Compute Resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [NA] Justification: the results are irrelevant to the compute resources. Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code Of Ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: the research conducted in the paper conforms with the NeurIPS Code of Ethics. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader Impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [NA] Justification: this is a theoretical paper and it has no societal impact. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. 70 • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: the paper aims to provide a better understanding on existing algorithms and thus poses no such risks. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [NA] Justification: the paper does not use existing assets. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. 71 • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New Assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [NA] Justification: the paper does not release new assets. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and Research with Human Subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: the paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional Review Board (IRB) Approvals or Equivalent for Research with Human Subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: the paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 72

@@ -1,0 +1,1802 @@
+Title: 15329_Taming_data_hungry_reinf.pdf
+
+URL Source: https://openreview.net/pdf?id=CbHz30KeA4
+
+Number of Pages: 29
+
+Markdown Content:
+# Taming “data-hungry” reinforcement learning? Stability in continuous state-action spaces 
+
+Yaqi Duan 
+
+Department of Technology, Operations, and Statistics Stern School of Business, New York University New York, NY 10012 
+
+yaqi.duan@stern.nyu.edu 
+
+Martin J. Wainwright 
+
+Laboratory for Information and Decision Systems, Statistics and Data Science Center Department of Electrical Engineering and Computer Science, and Department of Mathematics Massachusetts Institute of Technology Cambridge, MA 02139 
+
+wainwrigwork@gmail.com 
+
+# Abstract 
+
+We introduce a novel framework for analyzing reinforcement learning (RL) in continuous state-action spaces, and use it to prove fast rates of convergence in both off-line and on-line settings. Our analysis highlights two key stability properties, relating to how changes in value functions and/or policies affect the Bellman operator and occupation measures. We argue that these properties are satisfied in many continuous state-action Markov decision processes. Our analysis also offers fresh perspectives on the roles of pessimism and optimism in off-line and on-line RL. 
+
+# 1 Introduction 
+
+Many domains of science and engineering involve making a sequence of decisions over time, with previous decisions influencing the future in uncertain ways [ 1 , 13 , 22 , 31 , 32 ]. For instance, clinicians managing diabetes [ 36 ] or engineers optimizing plasma control in tokamak systems [ 5] must develop policies that adapt based on evolving conditions and lead to desirable outcomes over a longer period. Markov decision processes (MDPs) and reinforcement learning (RL) provide frameworks and methods for estimating effective policies for such sequential problems. While RL excels in data-rich scenarios such as competitive gaming (e.g., AlphaGo and its extensions [ 30 ]), its application in data-scarce areas like healthcare [ 36 ] and finance [ 27 ] remains challenging due to lack of history, or underlying non-stationarity. With limited data, characterizing and improving the sample complexity 
+
+of RL methods becomes critical. Considerable research effort has been devoted to studying RL sample complexity in many settings. Existing studies for either the generative or the off-line settings (e.g., [ 21 , 37 , 35 ]) give procedures that, when applied to a dataset of size n, yield a value gap that decays at the rate 1/√n. In the on-line setting, there are various procedures that yield cumulative regret that grows at the rate √T
+
+(e.g., [ 18 , 20 , 19 , 6]). In contrast, the main result of this paper is to formalize conditions, suitable for RL in continuous domains, under which much faster rates can be obtained using the same dataset ,achieving a value gap decay of 1/n and reducing regret growth to log T .As revealed by our analysis, these accelerated rates depend on certain stability properties , ones that—as we argue—are naturally satisfied in many control problems with continuous state-action 
+
+38th Conference on Neural Information Processing Systems (NeurIPS 2024). spaces. Roughly speaking, these conditions ensure that the evolution of the dynamic system depends in a “smooth” way on the influence of decision policy. Such notions of stability should be expected in various controlled systems with continuous state-action spaces. In robotics, for example, a minor torque or motion perturbation that occurs during a single step should not cause a notable deviation from the intended trajectory. Similarly, in clinical treatment, slight deviations in medication dosage should not significantly compromise effectiveness or safety. 
+
+1.1 A simple illustrative example: Mountain Car 
+
+The “Mountain Car” problem, a benchmark continuous control task, illustrates the acceleration phenomenon and underlying stability. In this task, as shown in Figure 1(a), a car must reach the top of a hill by adjusting its acceleration within the interval [−1, 1] . We employed fitted Q-iteration (FQI) with carefully selected linear basis functions to derive near-optimal policies with off-line data. This learning procedure exhibits a value sub-optimality decay at a rate of 1/n , a significant improvement over the classical rate of 1/√n, as detailed in Figure 1(b). (See Appendix D for further explanation. The experiment ran for 3 days on two laptops, each equipped with an Apple M2 Pro CPU and 16 GB RAM.) In this example, slight perturbations in the driving policy lead to only modest changes in future trajectories, which shows the stability. Our theoretical analysis confirms that fast rates are achievable in this and similar continuous control tasks when such stability properties are present. +1      
+
+> −1 0e11 e12 e13
+> Sample size n
+> 10 °2
+> 10 °1
+> 10 0
+> Value sub-optimality  "(bº)
+> Value sub-optimality versus sample size
+> e11 e12 e13
+> Sample size n
+> 10 °2
+> 10 °1
+> 10 0
+> Value sub-optimality  "(bº)
+> Value sub-optimality versus sample size
+
+(a) (b) Figure 1: Illustration of the “fast rate” phenomenon using FQI on the Mountain Car problem. Each 
+
+red point in the plot represents the average value sub-optimality J(π⋆) − J(bπn) from T = 80 Monte Carlo trials, with the shaded area showing twice the standard errors. The blue dashed line is a least-squares fit to the last 6 data points, yielding a 95% confidence interval of (−1.084 , −0.905) for the slope, significantly faster than the typical −0.5 “slow rate”. 
+
+1.2 Contributions of this paper 
+
+With this high-level perspective in mind, let us summarize the key contributions of this paper. 
+
+Fast rate of convergence: We develop a framework for analyzing RL in continuous state-action spaces, and use it to prove a general result (Theorem 1) under which fast rates can be obtained. The key insight is that stability conditions lead to upper bounds on the value sub-optimality that are proportional to the squared norm of Bellman residuals. In the off-line setting, this quadratic scaling improves convergence from a rate of n− 12 to n−1, while in on-line learning, it enhances the regret bound from √T to log T .
+
+Reconsidering pessimism and optimism principles: Our framework provides a novel perspective on the roles of pessimism [ 21 , 4] and optimism [ 18 , 20 , 19 , 6, 12 ] in off-line and on-line RL. Our theory reveals that there are settings in which neither pessimism nor optimism are required for effective policy optimization—in particular, they are not required as long as one has a sufficiently accurate pilot estimate policy. Moreover, our analysis shows that some procedures based on certainty 2equivalence can achieve fast-rate convergence, showing that the benefits gained from incorporating additional pessimism or optimism measures may be limited in this context. 
+
+1.3 Related work 
+
+In this section, we discuss related work having to do with fast rates in optimization and statistics. 
+
+Fast rates in stochastic optimization and risk minimization: For many statistical estimators (e.g., likelihood methods, empirical risk minimization), it is well-understood that the local geometry around the optimum determines whether fast rates can be obtained. For instance, when the loss function ex-hibits some form of strong convexity (such as exp-concave loss) or strict saddle properties, it can lead to significant reductions in additive regret from O(√T ) to just O(log T ) in stochastic approximation (e.g., [ 15 ]), or a decrease in the error rate from n− 12 to n−1 in empirical risk minimization [ 23 , 14 ]. These fast rate phenomena rely on a form of stability, one which relates the similarity of functions to the closeness of their optima. Our work develops a new framework for analyzing value-based RL methods, focusing on identifying specific stability conditions and inherent curvature properties that promote fast rate convergence in RL, similar to the role of stability analysis in statistical learning. 
+
+Fast rates in reinforcement learning: In the RL literature, there are various lines of work related to fast rates, but the underlying mechanisms are typically different from those considered here. For problems with discrete state-action spaces, there is a line of recent work [ 17 , 16 , 33 , 25 ] that performs gap/marginal-dependent analyses of RL algorithms. However, such separation assumptions are not helpful for continuous action spaces. Other work for discrete state-action spaces [ 28 ] has shown convergence rates in off-line RL are influenced by data quality, with a nearly-expert dataset enabling faster rate. In contrast, our analysis reveals that for off-line RL in continuous domains, fast convergence can occur whether or not the dataset has good coverage properties. An important sub-class of continuous state-action problems are those with linear dynamics and quadratic reward functions (LQR for short). For such problems, it has been shown [ 24 , 29 ] that value sub-optimality can be connected with the squared error in system identification. Our general theory can also be used to derive guarantees for LQR problems, as we explore in more detail in a follow-up paper [ 8]. Stability also arises in the analysis of (deterministic) policy optimization and Newton-type algorithms [ 26 , 3 ], where it is possible to show superlinear convergence in a local neighborhood. This accelerated rate stems from the smoothness of the on-policy transition operator Pπf with respect to changes in the value function f; for instance, see condition (10) in Puterman and Brumelle [ 26 ]. Our framework exploits related notions of smoothness, but is tailored to the stochastic setting of reinforcement learning, in which understanding the effect of function approximation and finite sample sizes is essential. 
+
+# 2 Fast rates for value-based reinforcement learning 
+
+Let us now set up and state the main result of this paper. We begin in Section 2.1 with background on Markov decision processes (MDPs) and value-based methods, before turning to the statement of our main result in Section 2.2. In Section 2.3, we provide intuition for why stability leads to faster rates, and discuss consequences for both the off-line and on-line settings of RL. 
+
+2.1 Markov decision processes and value-based methods Basic set-up: We consider an episodic Markov decision process (MDP) defined by a quadru-ple  S, A, P = {P h}H−1 
+
+> h=1
+
+, {rh}Hh=1 
+
+. We assume that the rewards rh : S × A → R are known; however, this condition can be relaxed. A policy πh at time h is a mapping from any state s to a distribution πh(· | s) over the action space A. If the support of πh(· | s) is a singleton, we also let πh(s) ∈ A denote the single action to be chosen at state s. Given an initial distribution 
+
+ξ1 over the states at time h = 1 , the expected reward obtained by choosing actions according to a policy sequence π = ( π1, . . . , π H ) is given by J(π) ≡ J(π; ξ1): = Eξ1,π
+
+ P Hh=1 rh(Sh, A h),where S1 ∼ ξ1, Sh+1 ∼ P h(· | Sh, A h) and Ah ∼ πh(· | Sh) for h = 1 , 2, . . . , H . Our goal is to estimate an optimal policy π⋆ ∈ arg max π J(π).3Value functions and Bellman operators: Starting from a given state-action pair (s, a )
+
+at stage h, the expected return over subsequent stages defines the state-action value function Qπ 
+
+> h
+
+(s, a ) : = Eπ
+
+ P Hh′=h r(Sh′ , A h′ ) Sh = s, A h = a . The sequence of functions 
+
+Qπ = ( Qπ 
+
+> 1
+
+, . . . , Q π 
+
+> H
+
+) known as the Q-functions associated with π.The Q-functions Qπ have an important connection with the Bellman evaluation operator for π.For any policy π and stage h, we introduce a linear transition operator (Pπ 
+
+> h
+
+f)( s, a ) : = R 
+
+> S×A
+
+f(s′, a ′) Ph(ds ′ | s, a ) πh+1 (da ′ | s′) for any function f ∈ RS×A . With this notation, the Bellman evaluation operator at stage h takes the form 
+
+(T π 
+
+> h
+
+f )( s, a ) : = rh(s, a ) + ( Pπ 
+
+> h
+
+f)( s, a ). (1) From classical dynamic programming, the Q-functions Qπ must satisfy the Bellman relations 
+
+Qπ 
+
+> h
+
+(s, a ) = ( T π 
+
+> h
+
+Qπ
+
+> h+1
+
+)( s, a ) for h = 1 , . . . , H − 1.
+
+Bellman principle for optimal policies: Under mild regularity conditions, there is at least one policy π⋆ such that, for any other policy π, we have Qπ⋆ 
+
+> h
+
+(s, a ) ≥ Qπ 
+
+> h
+
+(s, a ), for any h ∈ [H], and uniformly over all state-action pairs (s, a ). Any optimal policy π⋆ must be greedy with respect to the optimal Q-function Q⋆. By classical dynamic programming, the optimal Q-function Q⋆ is obtained by setting Q⋆H = rH , and then recursively computing Q⋆h = T ⋆h Q⋆h+1 for h = H − 1, . . . , 2, 1, with the Bellman optimality operator defined as 
+
+(T ⋆h f )( s, a ) : = rh(s, a ) + Eh
+
+ max  
+
+> a′∈A
+
+f (S′, a ′) s, a  for S′ ∼ P h(· | s, a ). (2) 
+
+Value-based RL methods The main result of this paper applies to a broad class of methods for reinforcement learning. They are known as value-based , due to their reliance on the following two step approach for approximating an optimal policy π⋆: (1) Construct an estimate bQ = ( bf1, . . . , bfH )
+
+of the optimal value function Q⋆ = ( Q⋆
+
+> 1
+
+, . . . , Q ⋆H ). (2) Use bQ to compute the greedy-optimal policy 
+
+bπh(s) ∈ arg max a bfh(s, a ) for h = 1 , 2, . . . , H . It should be noted that there is considerable freedom in the design of a value-based method, since different methods can be used to approximate value functions in Step 1. Rather than applying to a single method, our main result applies to a very broad class of these methods. Underlying any value-based method is a class F of functions (s, a ) 7 → f (s, a ) used to approximate the state-action value functions. 1 We assume that the function class F is rich enough—relative to the Bellman evaluation operators—to ensure that for any greedy policy π induced by some 
+
+f = ( f1, . . . , f H ) ∈ F H , we have the inclusion T π 
+
+> h
+
+F ⊆ F for h = 1 , . . . , H −1. We see that this condition depends on the structure of the transition distributions Ph(· | s, a ). In many practical examples, the reward function itself has some number of derivatives, and these transition distributions perform some type of smoothing, so that we expect that the output of the Bellman update, given a suitably differentiable function, will remain suitably differentiable. 
+
+2.2 Stable problems have fast rates 
+
+We now turn the central question in understanding the behavior of any value-based method: 
+
+How to translate “closeness” of the Q-function estimate bQ
+
+to a bound on the value gap J(π⋆) − J(bπ)?
+
+At a high level, existing theory provides guarantees of the following type: if the Q-function estimates are ε-accurate for some ε ∈ (0 , 1) , then the value gap is bounded by a quantity proportional to ε.In contrast, our main result shows that when the MDP is stable in a suitable sense, the value gap can be upper bounded by a quantity proportional to ε2. This quadratic as opposed to linear scaling 
+
+encapsulates the “fast rate” phenomenon of this paper. Our analysis isolates two key stability properties required for faster rates; both are Lipschitz conditions with respect to a certain norm. Here we define them with respect to the L2-norm induced by the      
+
+> 1In general, different function classes may be selected at each stage h= 1 ,2, . . . , H ; here, so as to reduce notational clutter, we assume that the same function class Fis used for each stage.
+
+4state-action occupation measure induced by the optimal policy—namely 
+
+∥f ∥h : = 
+
+q
+
+Eπ⋆
+
+f 2(Sh, A h) for any f ∈ ∂F 2, (3) and over a neighborhood N of the optimal Q-value function Q⋆.
+
+Bellman stability: The first condition measures the stability of the Bellman optimality operator (2) :in particular, we require that there is a scalar κ⋆h such that 
+
+T ⋆h fh+1 − T ⋆h Q⋆h+1 h ≤ κ⋆h fh+1 − Q⋆h+1 h+1 (Stb( T )) 
+
+for any f ∈ N . Moreover, for any pair (h, h ′) of indices such that 1 ≤ h < h ′ ≤ H − 1, we define 
+
+κh,h ′ (T ⋆) : = κ⋆h κ⋆h+1 . . . κ ⋆h′−1 .
+
+Condition (Stb( T )) is directly linked to the stability of estimating the Q-function Q⋆. In typical estimation procedures, such as approximate dynamic programming, the estimation is carried out iteratively in a backward manner, so that it is important to control the propagation of estimation errors across the iterations. Condition (Stb( T )) captures this property, since it implies that 
+
+T ⋆h T ⋆h+1 . . . T ⋆h′−1 fh′ − T ⋆h T ⋆h+1 . . . T ⋆h′−1 Q⋆h′ h ≤ κh,h ′ (T ⋆) · fh′ − Q⋆h′ h′ ,
+
+which shows how the estimation error  fh′ − Q⋆h′
+
+ at step h′ can be controlled in terms of estimation error at an earlier time step h ≤ h′.
+
+Occupation measure stability: Our second condition is more subtle, and is key in our argument. Let us begin with some intuition. Consider two sequences of policies 
+
+ π⋆ 
+
+> 1
+
+, . . . , π ⋆h−1, π ⋆h, π ⋆h+1 , . . . , π ⋆h′
+
+ and  π⋆ 
+
+> 1
+
+, . . . , π ⋆h−1, π h, π ⋆h+1 , . . . , π ⋆h′
+
+
+
+that only differ at the h-th step, where π⋆h has been replaced by πh. These two policy sequences induce Markov chains whose distributions differ from stage h onwards, and our second condition controls this difference in terms of the difference ∥fh − Q⋆h∥h between the two Q-functions fh and Q⋆h that induce πh and π⋆h, respectively. We adopt P⋆h as a convenient shorthand for the transition operator Pπ⋆ 
+
+> h
+
+, and define the multi-step transition operator P⋆h,h ′ : = P⋆h P⋆h+1 · · · P ⋆h′−1. Using this notation, for any h′ ≥ h + 1 , we require that there is a scalar κh,h ′ (π⋆) such that 
+
+sup  
+
+> g∈∂F
+> ∥g∥h′>0
+
+Eπ⋆
+
+  P⋆h,h ′ g(Sh, π ⋆h(Sh)) −  P⋆h,h ′ g(Sh, π h(Sh)) 
+
+∥g∥h′
+
+≤ κh,h ′ (π⋆) fh − Q⋆h h
+
+Q⋆h h
+
+(Stb( ξ)) 
+
+for any f ∈ N . The renormalization in this definition serves to enforce a natural scale invariance. With these notions of stability in hand, we are now equipped to state our main result. Taking as input a value function estimate bQ, it relates the induced value gap to the Bellman residuals T ⋆h bfh+1 − bfh.Note that these residuals are a way of quantifying proximity to the optimal value function Q⋆, which has Bellman residual zero by definition. We assume that bQ has Bellman residuals bounded as 
+
+T ⋆h bfh+1 − bfh h ≤ εh for h = 1 , 2, . . . , H − 1 (4a) for some sequence ε = ( ε1, . . . , ε H−1, ε H = 0) that satisfies the constraint 
+
+εh ≥ 1
+
+H − h
+
+> H
+
+X
+
+> h′=h+1
+
+εh′ for h = 1 , 2, . . . , H − 1. (4b) This last condition means that the Bellman residual εh is larger than or equal to the average of the bounds established after step h + 1 . It is natural because estimating at step h is at least as challenging as a stage h′ > h ; indeed, any such state h′ occurs earlier in the dynamic programming backward iteration process. As a special case, the bound (4b) holds when εh = ε for all stages. With this set-up, we have the following guarantee in terms of the stability coefficients κh,h ′ (π⋆) and 
+
+κh,h ′ (T ⋆) from conditions (Stb( ξ)) and (Stb( T )) .
+
+> 2
+
+We let ∂F be the set of all difference functions of the form g = f − ef for some f, ef ∈ F .
+
+5Theorem 1. There is a neighborhood of Q⋆ such that for any value function estimate bf with 
+
+ε-bounded Bellman residuals (4a) , the induced greedy policy bπ has value gap bounded as 
+
+J(π⋆) − J(bπ) ≤ 2
+
+> H−1
+
+X
+
+> h=1
+
+1
+
+∥Q⋆h∥h
+
+ H−1X
+
+> h′=h
+
+κh,h ′ (π⋆) εh′
+
+ H−1X
+
+> h′=h
+
+κh,h ′ (T ⋆) εh′
+
+
+
+. (5) See Appendix A for the proof. Treating dependence on the stability coefficients as constant, the main take-away is that value sub-optimality is bounded above by a quantity proportional to the squared norm of the Bellman residuals. Concretely, if the Bellman residuals are uniformly upper bounded by some ε, then equation (5) leads to an upper bound of the form 
+
+J(π⋆) − J(bπ) ≤ c H 3 ε2,
+
+where c is a universal constant. Due to the quadratic scaling in the Bellman residual error ε, this bound is substantially tighter than the linear in ε rates afforded by a conventional analysis. 
+
+2.3 Intuition for fast rates: Smoothness and cancelling terms in the telescope bound 
+
+Why does “fast rate” phenomenon formalized in Theorem 1 arise? The fast rates proved in this paper are established by a novel argument, starting from a known telescope bound, which we begin by stating. Given a Q-function estimate bf =   bf1, . . . , bfH
+
+, let bπ denote the induced greedy policy. Then the value gap of bπ with respect to an arbitrary comparator policy π is bounded as 
+
+J(π) − J(bπ) ≤
+
+> H−1
+
+X
+
+> h=1
+
+ Eπ − Ebπ
+
+  T ⋆h bfh+1 − bfh
+
+(Sh, A h) . (6) This result follows by a “telescope” relation induced by the structure of the Bellman updates. 3 For completeness, we provide a proof of the telescope bound in Appendix E.2. A key feature of inequality (6) is the difference of two expectations Eπ − Ebπ , corresponding to the occupation measures under π versus bπ. In standard uses of this inequality, an initial argument is used to guarantee that one of these expectations is negative, and so can be dropped [20, 21]. In contrast, the proof of our Theorem 1 exploits a more refined approach, one that handles the differ-ence of expectations directly. Doing so can be beneficial—and lead to “fast rates”— because various terms in this difference can cancel each other out. Specifically, under the smoothness conditions that underlie Theorem 1, when applying the telescope inequality (6) with comparator π = π⋆, we show that the discrepancy between the occupation measures associated with π⋆ and bπ is of the same order 
+
+as the Bellman residual associated with bf . Note that the Bellman residuals of bf already appear on the right-hand side of inequality (6) , so that this fortuitous cancellation can be exploited—along with a number of auxiliary results laid out in the proof—so as to upper bound the value gap by a quantity proportional to the squared Bellman residual ε2.It is worthwhile making an explicit comparison of our cancellation approach with the more standard uses of the telescope relation, which typically consider only one portion of the Bellman residuals (e.g., [18, 20, 21, 19, 6, 12, 35]). We do so in the following two subsections. 
+
+2.3.1 Pessimism for off-line RL 
+
+In the off-line instantiation of RL, the goal is to learn a “good” policy based on a pre-collected dataset D. Note that no further interaction with the environment is permitted, hence the notion of the learning being off-line. More precisely, an off-line dataset D of size n consists of quadruples 
+
+D =
+
+n sh, i , a h, i , s ′
+
+> h, i
+
+, r h, i 
+
+oni=1 
+
+,
+
+where sh, i and ah, i represent the i-th state and action at the h-th step in the MDP; s′ 
+
+> h, i
+
+is the successive state; and rh, i = rh(sh, i , a h, i ) denotes the scalar reward. Note that while the successive 
+
+> 3Results of this type are known; for example, analogous results can be found in past work (e.g., Theorem 2 of the paper [34]; or Lemma 3.2 in the paper [7]).
+
+6states are defined by transition dynamics, and the rewards by the reward function, there are no restrictions on how the state-action pairs (sh, i , a h, i ) are collected. That is, they need not have been generated by any fixed policy, but may have collected from some ensemble of behavioral policies, or even adaptively by human experts. The goal of off-line reinforcement learning is to use the n-sample dataset D so as to estimate a policy bπ ≡ bπn that (approximately) maximizes the expected return J(bπn). We expect that—at least for a sensible method for estimating bπn—the value gap J(π⋆) − J(bπn) should decay to zero as n increases to infinity, and we are interested in understanding this rate of decay. The use of pessimism is standard in off-line RL algorithms. Its purpose is to mitigate risks associated with “poor coverage” of the off-line dataset. For instance, the naive approach of simply maximizing 
+
+Q-function estimates based on an off-line dataset can behave poorly when certain portions of the state-action space are not well covered by the given dataset. The pessimism principle suggests to form a conservative estimate of the value function—say with 
+
+bfh(s, a ) ≤ T ⋆h bfh+1 (s, a ) (7a) with high probability over state-action pairs (s, a ). Thus, the estimated value bfh(s, a ) is an under-estimate of the Bellman update, a form of conservatism that protects against unrealistically high estimates due to poor coverage. Doing so in the appropriate way ensures that 
+
+−Ebπ
+
+  T ⋆h bfh+1 − bfh
+
+(Sh, A h) ≤ 0. (7b) Applying this upper bound to the inequality (6) yields the sub-optimality bound 
+
+J(π) − J(bπ) ≤
+
+> H−1
+
+X
+
+> h=1
+
+Eπ
+
+  T ⋆h bfh+1 − bfh
+
+(Sh, A h) .
+
+Upper bounds derived in this manner only contain one portion of the Bellman residual. When the value functions are approximated in a parametric way (e.g., tabular problems, linear function approximation), this line of analysis leads to value sub-optimality decaying at a “slow” 1/√n rate in terms of the sample size n (e.g., [ 21 ]). In contrast, an application of Theorem 1 can lead to value gaps bounded by 1/n .
+
+2.3.2 Optimism in on-line RL 
+
+In the setting of on-line RL, a learning agent interacts with the environment in a sequential manner, receiving feedback in the form of rewards based on its actions. At the beginning, the learner possesses no prior knowledge of the system’s dynamics. In the t-th episode, the agent learns an optimal pol-icy bπ(t) using existing observations, implements the policy and collects data   s(t) 
+
+> h
+
+, a (t) 
+
+> h
+
+, r (t)
+
+> h
+
+ Hh=1 
+
+from the new episode. In each round, the system starts at an initial state s(t)1 independently drawn from a fixed distribution ξ1.In this on-line setting, it is common to measure the performance of an algorithm by comparing it, over the T rounds of learning, with an oracle that knows and implements an optimal policy. At each round t, we incur the instantaneous regret J(π⋆) − J(bπ(t)), where π⋆ is any optimal policy. Over T
+
+rounds, we measure performance in terms of the cumulative regret 
+
+Regret  {bπ(t)}Tt=1 
+
+ : = max  
+
+> policy π
+> T
+
+X
+
+> t=1
+
+n
+
+J(π) − J(bπ(t))
+
+o
+
+=
+
+> T
+
+X
+
+> t=1
+
+n
+
+J(π⋆) − J(bπ(t))
+
+o| {z }
+
+Regret at round t. (8) In a realistic problem, the cumulative regret of any procedure grows with T , and our goal is to obtain algorithms whose regret grows as slowly as possible. In contrast to off-line RL, the on-line setting allows for exploring state-action pairs that have been rarely encountered; doing so makes sense since they might be associated with high rewards. Principled exploration of this type can be effected via the optimism principle : one constructs function estimates such that 
+
+bfh(s, a ) ≥ T ⋆h bfh+1 (s, a ) (9a) 7with high probability over state-action pairs. 4 Note that bfh(s, a ) is optimistic in the sense that it is an over-estimate of the Bellman update T ⋆h bfh+1 (s, a ). In this way, we can ensure that 
+
+Eπ
+
+  T ⋆h bfh+1 − bfh
+
+(Sh, A h) ≤ 0. (9b) Combining this inequality with the telescope bound (6) allows one to upper bound the regret as Regret  {bπ(t)}Tt=1 
+
+ =
+
+> T
+
+X
+
+> t=1
+
+J(π⋆) − J(bπ(t)) ≤
+
+> T
+
+X
+
+> t=1
+> H−1
+
+X
+
+> h=1
+
+Ebπ(t)
+
+  bfh − T ⋆h bfh+1 
+
+(Sh, A h) .
+
+which only includes a single portion of the Bellman residual. In the case of tabular or linear representations of the Q-functions, it results in a regret rate of √T (e.g., see the papers [ 18 , 20 ]). In contrast, an appropriate use of Theorem 1 leads to regret growing only as log( T ), which corresponds to a much better guarantee. In summary, then, the fast rates obtained in this paper are based on a different approach than the standard pessimism or optimism principles. Since we deal directly with the difference of expectations in the bound (6) , there is no need to nullify either of them through the use of these principles. However, it should be noted that we are assuming smoothness conditions that allow us to control this difference. As we discuss in the sequel, such smoothness conditions rule out certain “hard instances” used in past work on lower bounds (e.g. [18, 20, 21, 37]). 
+
+# 3 Consequences for linear function approximation 
+
+In this section, we explore some consequences of our general theory when applied to value-based methods using (finite-dimensional) linear function approximation. Let ϕ : S × A → Rd be a given feature map on the state-action space, and consider linear expansions of the form fw(s, a ) = ⟨ϕ(s, a ), w⟩ ≡ Pdj=1 wj ϕj (s, a ) where w ∈ Rd is a weight vector. We adopt the conventional assumption that ∥ϕ(s, a )∥2 ≤ 1 and rh(s, a ) ∈ [0 , 1] for all state-action pairs. Defining the linear function class F : = fw | w ∈ Rd , we note that the Minkowski difference class ∂F is equal to F .In our analysis of linear approximation, we make use of the norm ∥f ∥h : = pEπ⋆ [f 2(Sh, A h)] ,corresponding to L2-norm under the occupation measure induced by the optimal policy π⋆.
+
+3.1 Consequences for off-line RL 
+
+We now turn to some implications of Theorem 1 for off-line reinforcement learning. Let us recall the off-line setting: for each h = 1 , . . . , H − 1, we are given a dataset Dh = {(sh,i , a h,i , s ′
+
+> h,i
+
+, r h,i )}ni=1 
+
+of quadruples, from which we can compute estimates bf = ( bfh)Hh=1 with certain Bellman residu-als {εh}H−1 
+
+> h=1
+
+, which then appear in the bound (5) . The remaining factors on the right-hand side of inequality (5) do not depend on the dataset itself (but rather on structural properties of the MDP). Consequently, in terms of statistical understanding, the main challenge is to establish high-probability bounds on the Bellman residuals {εh}H−1 
+
+> h=1
+
+for a particular estimator. 
+
+3.1.1 Fitted Q-iteration (FQI) 
+
+As an illustration, let us analyze the use of fitted Q-iteration (FQI) for computing estimates of the 
+
+Q-function. At a given stage h = 1 , . . . , H − 1, we can use the associated data Dh to define a regularized objective function 
+
+Lh
+
+ f, g  : = 1
+
+|D h|
+
+ X
+
+> (sh,i ,a h,i ,s ′
+> h,i ,r h,i )∈D h
+
+f (sh, i , a h, i ) −  rh, i + max  
+
+> a∈A
+
+g(s′
+
+> h, i
+
+, a ) 2
+
+
+
++ Λ 2
+
+> h
+
+(f ) .
+
+Here g represents the target function from stage h + 1 , and it defines the targeted responses 
+
+yh,i (g) : = rh,i + max a∈A g(s′
+
+> h,i
+
+, a ). For a given target g, we obtain a Q-function estimate for 
+
+> 4Please refer to, for example, Lemma B.3 in the paper [20] for further details.
+
+8stage h by minimizing the functional f 7 → L h(f, g ). Given that our objective is defined with a quadratic cost, doing so can be understood as a regression method for estimating the conditional ex-pectation that underlies the Bellman update—viz. T ⋆h g(s, a ) = E[ yh, i (g) | (sh, i , a h, i ) = ( s, a ) ] .Here Λ2
+
+> h
+
+(f ) = λh ∥w∥22 for f = ⟨ϕ(·), w⟩ is a regularizer, with λh ≥ 0 being the regulariza-tion weight. Given this set-up, we can generate a Q-function estimate bf = ( bf1, . . . , bfH ) by first initializing bfH = rH , and then recursively computing bfh = arg min f ∈F Lh
+
+ f, bfh+1 
+
+, for 
+
+h = H − 1, H − 2, . . . , 2, 1.
+
+3.1.2 Fast rates for FQI-based estimates 
+
+In the analysis here, we assume that the dataset consists of i.i.d. tuples (but this can be relaxed as needed). We now state a corollary of Theorem 1, applicable to value function estimates based on FQI with ridge regression. 
+
+Corollary 1 (Fast rates for ridge-based FQI) . For FQI based on ridge regression, with a suffi-ciently large sample size n and with suitable choices of the regularization parameters {λh}H−1 
+
+> h=1
+
+, the bound (5) from Theorem 1 holds with 
+
+εh = c p{d(H − h)/n } log( dH/δ ) (10) 
+
+with probability at least 1 − δ.
+
+We omit the proof of Corollary 1, as it follows from standard ridge regression analysis. 
+
+Fast rates and comparisons to past work: So as to be able to compare with results from past work, let us consider some consequences of the bound (10) under the following assumptions: (i) κh,h ′ (T ⋆) = O(1) ; (ii) κh,h ′ (π⋆) = O(√d); (iii) ∥Q⋆h∥h ≍ H − h + 1 . Then it can be shown that the bound from Corollary 1 takes the form 
+
+J(π⋆) − J(bπ) ≤ c d 3/2 H3 n−1 log( dH/δ ), (11a) and is valid for a sample size n ≥ cd 2H3. Alternatively stated, Corollary 1 guarantees that for FQI using ridge regression with d-dimensional function approximation, the number of samples n(ϵ)
+
+required to obtain ϵ-optimal policy is at most 
+
+nfast (ϵ) ≍ d 32 H3/ϵ + d2H3, (11b) where we use ≍ to denote a scaling that ignores constants and logarithmic factors. Let us compare this guarantee to related work by Zanette et al. [ 37 ], who analyzed the use of pessimistic actor-critic methods for linear function classes. When translated into the notation of our paper, their analysis established 5 a sample complexity of the order nZan (ϵ) ≍ d2H3/ϵ 2. Consequently, we see that once the target error ϵ is relatively small— ϵ ∈ (0 , 1) —then stable MDPs can exhibit a much smaller (1 /ϵ ) sample complexity. It should be noted that past work (e.g., [ 21 , 37 ]) has established (1 /ϵ 2)-lower bounds on the sample complexity of estimating ϵ policies in the off-line setting. However, these lower bounds do not 
+
+contradict our fast rate guarantee (11b) , because the “hard instances” used in these lower bound proofs violate the stability condition (Stb( ξ)) . In particular, even infinitessimally small perturbations in policy lead to occupation measures that are significantly different. 
+
+When is pessimism necessary? An interesting aspect of the guarantee from Corollary 1 is that it provides guarantees for off-policy RL (and with fast rates) using a method that does not incorporate any form of pessimism. This is a sharp contrast with many other methods for off-policy RL, such as pessimistic forms of Q-learning and actor-critic methods (e.g., [21, 37]). To be clear, as noted following the bound (11a), the guarantee from Corollary 1 requires the sample size to be lower bounded as n ≥ cd 2H3. In contrast, pessimistic schemes only require a sample size sufficiently large to ensure validity of the Bellman residual upper bounds that underlie Corollary 1— meaning that n ≳ d up to logarithmic factors. Thus, the pessimism principle can be useful for problems with smaller sample sizes. 
+
+> 5See Appendix C.2 for the details of this calculation.
+
+93.2 Consequences for on-line RL 
+
+In this section, we explore some consequences of Theorem 1 for on-line reinforcement learning. We begin by describing a two-stage procedure 6 that allows us to convert the risk bounds for FQI from off-line RL into regret in on-line RL: 
+
+Phase 1 (Exploration ) In the initial T0f episodes, the focus is purely on exploration, resulting in an estimate of Q-function denoted as bf (T0).
+
+Phase 2 (Fine-tuning ) For k = 0 , 1, . . . , K −1 with K : = ⌈log 2(T /T 0)⌉, repeat: • In the t-th episode, for each t = T0 2k + 1 , . . . , T 0 2k+1 , execute the greedy policy induced by function bf (T0 2k ).• Update the Q-function estimate bf (T0 2k+1 ) using FQI based on observations collected from episodes T0 2k + 1 , T 0 2k + 2 , . . . , T 0 2k+1 .We assume the burn-in time T0 is large enough so as to ensure the pilot Q-function estimate bf (T0)
+
+obtained in Phase 1 falls within a certain “absorbing” region N (ρ) around Q⋆. Under these conditions, we have the following bound on the regret. 
+
+Corollary 2. For FQI based on ridge regression with rewards in [0 , 1] , with a sufficiently large burn-in time T0 and with suitable choices of the regularization parameters {λh}H−1 
+
+> h=1
+
+, the two-phase scheme achieves regret bounded as Regret (T ) ≤ c T0 · H + d√d H 4 log T · log( dHK/δ )
+
+with probability at least 1 − δ.
+
+See Appendix C.1 for the proof. 
+
+Sharper bound on regret: The leading term (as T grows) in the regret bound grows as log T ,which is much smaller than the typical √T -rate found in past work [ 18 , 20 ]. The √T rate has been shown to be unimprovable in general, but the worst-case instances[ 18 , 20 ] that lead to √T -regret violate the stability conditions used in our analysis. 
+
+When is optimism needed? The use of optimism—by adding bonuses to the current value function estimates so as to encourage exploration—underlies many schemes in on-line RL. An interesting take-away from Corollary 2 is that under the stability conditions highlighted by our theory, it is possible to achieve excellent regret bounds without the use of optimism. In our two-phase scheme, the only exploration occurs in Phase 1. All other data is simply collected using the greedy policy induced by the current Q-function estimate. A well-designed exploration scheme—one that might incorporate the optimism principle—is necessary only during the burn-in Phase 1. 
+
+# 4 Discussion 
+
+This paper introduces a novel approach for the analysis of value-based RL methods for continuous state-action spaces. Our analysis highlights two key stability properties of MDPs under which much sharper bounds on value sub-optimality can be guaranteed. Our analysis offers fresh perspectives on the commonly used pessimism and optimism principles, in off-line and on-line settings respectively. Our study leaves open various questions for future work. First, our main result (Theorem 1) has consequences for linear quadratic control, to be described in an upcoming paper [ 8]. It provides insight into the role of covariate shift in linear quadratic control, as well as efficient exploration in the on-line setting. Second, our current statistical analysis focused on i.i.d. data with linear function approximation. It is interesting to consider the extensions to dependent data and non-parametric function approximation (e.g. kernels, boosting, and neural networks). Third, while this paper has provided upper bounds, it remains to address the complementary question of lower bounds for policy optimization over the classes of stable MDPs isolated here. Last, to better align our framework with real-world scenarios, we intend to go beyond the idealized completeness condition used in this paper, and treat the role of model mis-specification. 
+
+> 6To be clear, the purpose of this scheme is primarily conceptual, rather than practical in nature.
+
+10 Acknowledgements 
+
+This work was partially supported by NSF grant CCF-1955450, ONR grant N00014-21-1-2842, and NSF DMS-2311072 to MJW. 
+
+# References 
+
+[1] A. Altamimi, C. Lagoa, J. G. Borges, M. E. McDill, C. Andriotis, and K. Papakonstantinou. Large-scale wildfire mitigation through deep reinforcement learning. Frontiers in Forests and Global Change , 5:734330, 2022. [2] H. Bastani, M. Bayati, and K. Khosravi. Mostly exploration-free algorithms for contextual bandits. Management Science , 67(3):1329–1349, 2021. [3] D. Bertsekas. Lessons from AlphaZero for optimal, model predictive, and adaptive control .Athena Scientific, 2022. [4] S. Dean, H. Mania, N. Matni, B. Recht, and S. Tu. On the sample complexity of the linear quadratic regulator. Foundations of Computational Mathematics , 20(4):633–679, 2020. [5] J. Degrave, F. Felici, and J. B. et al. Magnetic control of tokamak plasmas through deep reinforcement learning. Nature , 602:414–419, 2022. [6] S. Du, S. Kakade, J. Lee, S. Lovett, G. Mahajan, W. Sun, and R. Wang. Bilinear classes: A structural framework for provable generalization in RL. In International Conference on Machine Learning , pages 2826–2836. PMLR, 2021. [7] Y. Duan, C. Jin, and Z. Li. Risk bounds and Rademacher complexity in batch reinforcement learning. In International Conference on Machine Learning , pages 2892–2902. PMLR, 2021. [8] Y. Duan and M. J. Wainwright. Covariate shift in linear quadratic control. Manuscript .[9] Y. Duan and M. J. Wainwright. Policy evaluation from a single path: Multi-step methods, mixing and mis-specification. arXiv preprint arXiv:2211.03899 , 2022. [10] Y. Duan and M. Wang. Minimax-optimal off-policy evaluation with linear function approxima-tion. In International Conference on Machine Learning , pages 2701–2709. PMLR, 2020. [11] Y. Duan, M. Wang, and M. J. Wainwright. Optimal policy evaluation using kernel-based temporal difference methods. arXiv preprint arXiv:2109.12002 , 2021. [12] D. J. Foster, S. M. Kakade, J. Qian, and A. Rakhlin. The statistical complexity of interactive decision making. arXiv preprint arXiv:2112.13487 , 2021. [13] J. Gijsbrechts, R. N. Boute, J. A. Van Mieghem, and D. J. Zhang. Can deep reinforcement learning improve inventory management? Performance on lost sales, dual-sourcing, and multi-echelon problems. Manufacturing & Service Operations Management , 24(3):1349–1368, 2022. [14] A. Gonen and S. Shalev-Shwartz. Fast rates for empirical risk minimization of strict saddle problems. In Conference on Learning Theory , pages 1043–1063. PMLR, 2017. [15] E. Hazan, A. Agarwal, and S. Kale. Logarithmic regret algorithms for online convex optimiza-tion. Machine Learning , 69:169–192, 2007. [16] J. He, D. Zhou, and Q. Gu. Logarithmic regret for reinforcement learning with linear function approximation. In International Conference on Machine Learning , pages 4171–4180. PMLR, 2021. [17] Y. Hu, N. Kallus, and M. Uehara. Fast rates for the regret of offline reinforcement learning. 
+
+Conference on Learning Theory , 134:2462–2462, 2021. [18] C. Jin, Z. Allen-Zhu, S. Bubeck, and M. I. Jordan. Is Q-learning provably efficient? Advances in neural information processing systems , 31, 2018. 11 [19] C. Jin, Q. Liu, and S. Miryoosefi. Bellman eluder dimension: New rich classes of RL problems, and sample-efficient algorithms. Advances in neural information processing systems , 34:13406– 13418, 2021. [20] C. Jin, Z. Yang, Z. Wang, and M. I. Jordan. Provably efficient reinforcement learning with linear function approximation. In Conference on Learning Theory , pages 2137–2143. PMLR, 2020. [21] Y. Jin, Z. Yang, and Z. Wang. Is pessimism provably efficient for offline RL? International Conference on Machine Learning , pages 5084–5096, 2021. [22] B. R. Kiran, I. Sobh, V. Talpaert, P. Mannion, A. A. Al Sallab, S. Yogamani, and P. Pérez. Deep reinforcement learning for autonomous driving: A survey. IEEE Transactions on Intelligent Transportation Systems , 23(6):4909–4926, 2021. [23] T. Koren and K. Levy. Fast rates for exp-concave empirical risk minimization. Advances in Neural Information Processing Systems , 28, 2015. [24] H. Mania, S. Tu, and B. Recht. Certainty equivalence is efficient for linear quadratic control. 
+
+Advances in Neural Information Processing Systems , 32, 2019. [25] T. Nguyen-Tang, M. Yin, S. Gupta, S. Venkatesh, and R. Arora. On instance-dependent bounds for offline reinforcement learning with linear function approximation. Association for the Advancement of Artificial Intelligence , 2023. [26] M. L. Puterman and S. L. Brumelle. On the convergence of policy iteration in stationary dynamic programming. Mathematics of Operations Research , 4(1):60–69, 1979. [27] A. Rao and T. Jelvis. Foundations of Reinforcement Learning with Applications to Finance .CRC Press, Boca Raton, FL, 2022. [28] P. Rashidinejad, B. Zhu, C. Ma, J. Jiao, and S. Russell. Bridging offline reinforcement learning and imitation learning: A tale of pessimism. Advances in Neural Information Processing Systems , 34:11702–11716, 2021. [29] B. Recht. A tour of reinforcement learning: The view from continuous control. Annual Review of Control, Robotics, and Autonomous Systems , 2:253–279, 2019. [30] D. Silver, J. Schrittwieser, K. Simonyan, I. Antonoglou, A. Huang, et al. Mastering the game of Go without human knowledge. Nature , 550(7676):354, 2017. [31] S. Spielberg, A. Tulsyan, N. P. Lawrence, P. D. Loewen, and R. B. Gopaluni. Toward self-driving processes: A deep reinforcement learning approach to control. Amer. Inst. Chem. Eng. Journal ,65:e16689, 2022. [32] L. Tai, G. Paolo, and M. Liu. Virtual-to-real deep reinforcement learning: Continuous control of mobile robots for mapless navigation. In 2017 IEEE/RSJ International Conference on Intelligent Robots and Systems (IROS) , pages 31–36. IEEE, 2017. [33] X. Wang, Q. Cui, and S. S. Du. On gap-dependent bounds for offline reinforcement learning. 
+
+Advances in Neural Information Processing Systems , 35:14865–14877, 2022. [34] T. Xie and N. Jiang. Q∗ approximation schemes for batch reinforcement learning: A theoretical comparison. In Conference on Uncertainty in Artificial Intelligence , pages 550–559. PMLR, 2020. [35] M. Yin, Y. Duan, M. Wang, and Y.-X. Wang. Near-optimal offline reinforcement learning with linear representation: Leveraging variance information with pessimism. arXiv preprint arXiv:2203.05804 , 2022. [36] C. Yu, J. Liu, S. Nemati, and G. Yin. Reinforcement learning in healthcare: A survey. ACM Computing Surveys (CSUR) , 55(1):1–36, 2021. [37] A. Zanette, M. J. Wainwright, and E. Brunskill. Provable benefits of actor-critic methods for offline reinforcement learning. Advances in neural information processing systems , 34:13626– 13640, 2021. 12 A Proofs of Theorem 1 
+
+This section is devoted to the proof of Theorem 1, which consists of three main steps. These steps rely on two auxiliary lemmas whose proofs are fairly technical, so that they are deferred to in Appendices B.1 and B.2. 
+
+High-level outline: Let us outline the three steps of the proof. In Step 1, we use a one-step expansion of the difference in the occupation measures to reformulate the standard telescope inequality (6) .Doing so results in a relation with structure similar to that of the left-hand side of inequality (Stb( ξ)) .In Step 2, we develop a constraint on the function estimation error dh
+
+  bfh, Q ⋆h
+
+ that ensures the occupation measure produced by policy bπ remains stable and does not deviate too much from the occupation measure associated with the optimal policy π⋆. In Step 3, we use Bellman stability 
+
+(Stb( T )) to connect the Q-function error bfh − Q⋆h with Bellman residuals. With this high-level view in place, we now work through the three steps. 
+
+A.1 Step 1: Reformulation of the telescope inequality. 
+
+Recall the standard telescope inequality (6) . Our proof makes use of an alternative form, which involves the functions 
+
+∆h(π; s, a ) = 
+
+> H−1
+
+X
+
+> h′=h
+
+Pπ
+
+> h,h ′
+
+ T ⋆h′ bfh′+1 − bfh′
+
+(s, a ). (12) 
+
+Lemma 1. Given a Q-function estimate bf =   bf1, . . . , bfH−1, bfH = rH
+
+ and the associated greedy policy bπ, we have the bound 
+
+J(π) − J(bπ) ≤
+
+> H−1
+
+X
+
+> h=1
+
+Ebπ
+
+∆h(π; sh, π h(sh)) − ∆h(π; sh, bπh(sh))  (13) 
+
+valid for any policy π.
+
+See Appendix B.1 for the proof. We apply the bound (13) with π = π⋆. Following some algebra, we find that 
+
+J(π⋆) − J(bπ) ≤
+
+> H−1
+
+X
+
+> h=1
+> H−1
+
+X
+
+> h′=h
+
+bβ(h, h ′) · εh′ ,
+
+where εh′ is an upper bound on the Bellman residual T ⋆h′ bfh′+1 − bfh′ h′ as given in equation (4a) .The term bβ(h, h ′) is given by 
+
+bβ(h, h ′) : = sup    
+
+> f∈∂F:∥f∥h′>0
+
+ 1
+
+∥f∥h′
+
+Ebπ
+
+h P⋆h,h ′ f (sh, π ⋆h(sh)) −  P⋆h,h ′ f (sh, bπh(sh)) 
+
+i 
+
+.
+
+(14a) We note that the left-hand side of inequality (Stb( ξ)) has a similar form to the term bβ(h, h ′), differing only in that the expectation is taken over the occupation measure of running the optimal policy π⋆,rather than the estimated policy bπ.
+
+A.2 Step 2: Constraint to ensure stability 
+
+Our next step is to establish an upper bound on the coefficient bβ(h, h ′) defined by the estimated policy bπ in terms of the analogous quantity defined by the optimal policy π⋆—namely, the coefficient 
+
+β(h, h ′) : = sup    
+
+> f∈∂F:∥f∥h′>0
+
+ 1
+
+∥f∥h′
+
+Eπ⋆
+
+h P⋆h,h ′ f (sh, π ⋆h(sh)) −  P⋆h,h ′ f (sh, bπh(sh)) 
+
+i 
+
+.
+
+(14b) 13 In order to do so, we demonstrate that a sufficiently small function estimation error dh
+
+  bfh, Q ⋆h
+
+
+
+ensures the inequality 
+
+> H−1
+
+X
+
+> h=1
+> H−1
+
+X
+
+> h′=h
+
+bβ(h, h ′) · εh′ ≤ 2
+
+> H−1
+
+X
+
+> h=1
+> H−1
+
+X
+
+> h′=h
+
+β(h, h ′) · εh′ . (15) Once we have established this bound, we can replace the term β(h, h ′) with 
+
+κh,h ′ (π⋆)· bfh −Q⋆h h
+
+∥Q⋆h∥h, using the inequality (Stb( ξ)) .We summarize the result in the following auxiliary lemma: 
+
+Lemma 2. Suppose that the function estimation errors satisfy dh
+
+ Qh, Q ⋆h
+
+ ≤ 12 bF (H − h + 1) −1
+
+for h = 2 , 3, . . . , H − 1 and the sequence ε = ( ε1, . . . , ε H−1, ε H = 0) satisfies the regularity condition (4b) . Then we have 
+
+J(π⋆) − J(bπ) ≤ 2
+
+> H−1
+
+X
+
+> h=1
+
+bfh − Q⋆h h
+
+∥Q⋆h∥h
+
+n H−1X
+
+> h′=h
+
+κh,h ′ (π⋆) εh′
+
+o
+
+. (16) See Appendix B.2 for the proof. 
+
+A.3 Step 3: Connecting Q-function error and Bellman residuals 
+
+The remaining piece of the proof is to connect the function difference bfh − Q⋆h with Bellman residuals 
+
+T ⋆h bfh+1 − bfh, using the stability condition (Stb( T )) on the Bellman operator T ⋆. This is relatively straightforward: indeed, we claim that 
+
+bfh − Q⋆h h ≤
+
+> H−1
+
+X
+
+> h′=h
+
+κh,h ′ (T ⋆) · T ⋆h′ bfh′+1 − bfh′ h′ . (17) Recall that Q⋆h = T ⋆h Q⋆h+1 for h = 1 , 2, . . . , H − 1. Therefore, we have 
+
+bfh − Q⋆h =  T ⋆h bfh+1 − T ⋆h Q⋆h+1 
+
+ −  T ⋆h bfh+1 − bfh
+
+ .
+
+By employing the triangle inequality and the Bellman stability given in equation (Stb( T )) , we derive that 
+
+bfh − Q⋆h h ≤ T ⋆h bfh+1 − bfh h + T ⋆h bfh+1 − T ⋆h Q⋆h+1 h
+
+≤ T ⋆h bfh+1 − bfh h + κ⋆h bfh+1 − Q⋆h+1 h+1 .
+
+Applying this inequality recursively yields the claim (17). With this piece in place, we can complete the proof of Theorem 1. Indeed, we have 
+
+J(π⋆) − J(bπ) (a)
+
+≤ 2
+
+> H−1
+
+X
+
+> h=1
+
+bfh − Q⋆h h
+
+∥Q⋆h∥h
+
+n H−1X
+
+> h′=h
+
+κh,h ′ (π⋆) εh′
+
+o
+
+> (b)
+
+≤ 2
+
+> H−1
+
+X
+
+> h=1
+
+1
+
+∥Q⋆h∥h
+
+n H−1X
+
+> h′=h
+
+κh,h ′ (T ⋆) εh′
+
+o n H−1X
+
+> h′=h
+
+κh,h ′ (π⋆) εh′
+
+o
+
+.
+
+Here step (a) is a restatement of the bound (16) from Lemma 2, whereas step (b) follows from inequality (17). Thus, we have established the claim given in Theorem 1. 
+
+# B Proof of auxiliary lemmas for Theorem 1 
+
+We now turn to proofs of the two auxiliary results used to establish our main theorem, with Lemmas 1 and 2 treated in Appendices B.1 and B.2, respectively. 14 B.1 Proof of Lemma 1 
+
+For any integrable vector function g = ( g1, . . . , g H ) ∈ RS×A× H , we define 
+
+D(g) = 
+
+> H
+
+X
+
+> h=1
+
+ Eπ − Ebπ
+
+ gh(Sh, A h) . (18a) We claim that this functional satisfies the recursive relation 
+
+D(g) = 
+
+> H
+
+X
+
+> h=1
+
+Ebπ
+
+gh(Sh, π h(Sh)) − gh(Sh, bπh(Sh))  + D(Pπ g), (18b) where we have introduced the shorthand Pπ g : =  Pπ 
+
+> 1
+
+g2, . . . , Pπ 
+
+> H−1
+
+gH , 0 ∈ RS×A× H .Taking this claim as given for the moment, let us prove the bound (13) from Lemma 1. First, we set g := ( Pπ )h g =  Pπ 
+
+> 1,1+ h
+
+g1+ h, . . . , Pπ 
+
+> H−h,H
+
+gH , 0, . . . , 0 in equation (18b) for h = 0 , 1, . . . , H −1,which yields 
+
+D (Pπ )h g = X
+
+> 1≤h′≤j≤H, j−h′=h
+
+Ebπ
+
+{P π 
+
+> h′,j
+
+gj }(Sh′ , π h′ (Sh′ )) − {P π 
+
+> h′,j
+
+gj }(Sh′ , bπh′ (Sh′ )) 
+
++ D (Pπ )h+1 g.
+
+Note that (Pπ )H g = 0 , which implies D (Pπ )H g = 0 . We then sum the resulting bounds so as to obtain 
+
+D(g) = X
+
+> 1≤h≤h′≤H
+
+Ebπ
+
+{P π 
+
+> h,h ′
+
+gh′ }(Sh, π h(Sh)) − {P π 
+
+> h,h ′
+
+gh′ }(Sh, bπh(Sh)) . (19) Setting g = T ⋆ bf − bf , or equivalently gh = T ⋆h bfh+1 − bfh, in equation (19), we find that 
+
+D T ⋆ bf − bf  =
+
+> H−1
+
+X
+
+> h=1
+
+Ebπ
+
+∆h(π; Sh, π h(Sh)) − ∆h(π; Sh, bπh(Sh))  ,
+
+where we have used the fact (12) that ∆h(π; ·) = PHh′=h Pπ
+
+> h,h ′
+
+ T ⋆h′ bfh′+1 − bfh′
+
+. Thus, we have established the bound (13) stated in Lemma 1. It remains to establish the auxiliary claim (18b) . Note that the functional D can be decomposed as 
+
+D(g) = D1 + D2, where 
+
+D1 : = 
+
+> H
+
+X
+
+> h=1
+
+Ebπ
+
+gh(Sh, π h(Sh)) − gh(Sh, bπh(Sh))  and 
+
+D2 : = 
+
+> H
+
+X
+
+> h=1
+
+ Eπ − Ebπ
+
+ gh(Sh, π h(Sh))  .
+
+Applying the tower property of conditional expectation, we find that 
+
+D2 =
+
+> H−1
+
+X
+
+> h=1
+
+ Eπ − Ebπ
+
+ E[gh+1 (Sh+1 , π h+1 (Sh+1 )) | Sh, A h]
+
+=
+
+> H−1
+
+X
+
+> h=1
+
+ Eπ − Ebπ
+
+ (Pπ 
+
+> h
+
+gh+1 )( Sh, A h) = D Pπ g.
+
+Combining the expressions for D1 and D2 above yields the claim (18b). 15 B.2 Proof of Lemma 2 
+
+The key step in proving Lemma 2 is establishing that inequality (15) holds when the function estimation error dh
+
+  bfh, Q ⋆h
+
+ is sufficiently small. In order to do so, we need to establish upper bounds on the term bβ(h, h ′) by using β(h, h ′). In particular, we will show that for any 1 ≤ h ≤ h′ ≤ H − 1,
+
+bβ(h, h ′) ≤ β(h, h ′) + 
+
+> h−1
+
+X
+
+> j=1
+
+bβ(j, h − 1) · bF · dh
+
+  bfh, Q ⋆h
+
+ . (20) The inequality (20) is derived based on the definitions of metric dh and parameter bF = 1 . After a close examination of the right-hand side of this inequality, it becomes evident that as long as the function estimation error dh
+
+  bfh, Q ⋆h
+
+ is sufficiently small, the terms associated with dh
+
+  bfh, Q ⋆h
+
+ are negligible and are dominated by β(h, h ′). Consequently, inequality (15) within the arguments in Appendix A.2 is likely to hold true. With claim (20) assumed to be valid at this point, we now establish a proper upper bound on the estimation error dh
+
+  bfh, Q ⋆h
+
+ under which inequality (15) is satisfied. By taking linear combinations of inequality (20) using weights ε = ( ε1, . . . , ε H−1, ε H = 0) , we obtain 
+
+> H−1
+
+X
+
+> h=1
+> H−1
+
+X
+
+> h′=h
+
+bβ(h, h ′) · εh′ ≤
+
+> H−1
+
+X
+
+> h=1
+> H−1
+
+X
+
+> h′=h
+
+β(h, h ′) · εh′
+
++
+
+> H−1
+
+X
+
+> h=2
+> h−1
+
+X
+
+> j=1
+
+bβ(j, h − 1) · bF · dh
+
+  bfh, Q ⋆h
+
+ H−1X
+
+> h′=h
+
+εh′ . (21) When the sequence ε = ( ε1, . . . , ε H−1, ε H = 0) is regular in the sense that inequality (4b) holds, the bound (21) reduces to 
+
+X
+
+> 1≤h≤h′≤H
+
+bβ(h, h ′) · εh′ ≤ X
+
+> 1≤h≤h′≤H
+
+β(h, h ′) · εh′
+
++ X
+
+> 1≤h≤h′≤H−2
+
+bβ(h, h ′) · εh′ · bF (H − h′) · dh′+1 
+
+  bfh′+1 , Q ⋆h′+1 
+
+ .
+
+Under the condition dh
+
+  bfh, Q ⋆h
+
+ ≤ 12 bF (H − h + 1) −1 for 2 ≤ h ≤ H − 1, the inequality above implies bound (15), which further establishes the bound (16), as stated in Lemma 2. It remains to prove the relation between bβ(h, h ′) and β(h, h ′), as shown in inequality (20). 
+
+Proof of bound (20) : It is evident that inequality (20) holds for h = 1 , therefore, we focus on its validation for indices 2 ≤ h ≤ H − 1. Recall the definitions of functions bβ(h, h ′) and β(h, h ′), as given by equations (14a) and (14b). We apply the triangle inequality and derive that 
+
+bβ(h, h ′) − β(h, h ′)
+
+≤ sup    
+
+> f∈∂F:∥f∥h′>0
+
+ 1
+
+∥f∥h′
+
+ Ebπ − Eπ⋆
+
+h P⋆h,h ′ f (Sh, π ⋆h(Sh)) −  P⋆h,h ′ f (Sh, bπh(Sh)) 
+
+i 
+
+= sup    
+
+> f∈∂F:∥f∥h′>0
+
+ 1
+
+∥f∥h′
+
+ Ebπ − Eπ⋆
+
+h  P⋆h−1 − P bπ
+
+> h−1
+
+ P⋆h,h ′ f (Sh−1, A h−1)
+
+i 
+
+= : ∆ β(h, h ′) .
+
+The term ∆β(h, h ′) involves differences from two sources: (i) the difference in transition kernels 
+
+P⋆h−1 − P bπ 
+
+> h−1
+
+that captures the divergence between policies π⋆h and bπh; (ii) the discrepancy of occupation measures at the ( h − 1)-th step reflected by the difference in expectations Eπ⋆ − Ebπ ,which is determined by the policies (π⋆ 
+
+> 1
+
+, . . . , π ⋆h−1) and (bπ1, . . . , bπh−1) until the ( h − 1)-th step. We treat them separately and write 
+
+∆β(h, h ′) ≤ ν1(h − 1, h ′) · ν2(h − 1) , (22) 16 where the functionals ν2 and ν1 are defined as 
+
+ν1(h − 1, h ′) : = sup    
+
+> f∈∂F:∥f∥h′>0
+
+ 1
+
+∥f∥h′
+
+ P⋆h−1 − P bπ
+
+> h−1
+
+ P⋆h,h ′ f h−1
+
+
+
+,ν2(h − 1) : = sup   
+
+> f∈∂F:∥f∥h−1>0
+
+ 1
+
+∥f∥h−1
+
+ Ebπ − Eπ⋆
+
+ f(Sh−1, A h−1) 
+
+.
+
+We first consider the term ν1. According to the definitions of metric dh and parameter bF we find that 
+
+ P⋆h−1 − P bπ
+
+> h−1
+
+ P⋆h,h ′ f h−1 ≤ dh
+
+  bfh, Q ⋆h
+
+ · P⋆h,h ′ f h
+
+> (∗)
+
+≤ dh
+
+  bfh, Q ⋆h
+
+ · bF ∥f∥h′ ,
+
+which in turn implies 
+
+ν1(h − 1, h ′) ≤ bF · dh
+
+  bfh, Q ⋆h
+
+ . (23a) The proof of inequality (∗) for bF = 1 , as mentioned above, can be found in Appendix E.1. As for term ν2, we claim that 
+
+ν2(h − 1) ≤
+
+> h−1
+
+X
+
+> j=1
+
+bβ(j, h − 1) . (23b) Combining the bound bβ(h, h ′) ≤ β(h, h ′) + ∆ β(h, h ′) with inequalities (22) , (23a) and (23b) , we establish the bound (20), as claimed. It remains to prove the claim (23b). 
+
+Proof of inequality (23b) : This proof is analogous to that of Lemma 1. We begin by introducing an analogue of the functional D(g) from equation (18a) ; in particular, for any index h ∈ [H − 1] and function g ∈ ∂F , define 
+
+D⋆h(g) : =  Eπ⋆ − Ebπ
+
+ g(Sh, A h) .
+
+Using the notation of D⋆h, we can rewrite the left-hand side of inequality (23b) as ν2(h − 1) = sup f∈∂F : ∥f∥h−1>0
+
+|D⋆h−1(f)|/∥f∥h−1 . Following the same arguments as in the proof of inequal-ity (18b), we can show that 
+
+D⋆h(g) = Ebπ
+
+g(Sh, π ⋆h(Sh)) − g(Sh, bπh(Sh))  + D⋆h−1(P⋆h−1 g) for h = 1 , 2, . . . , H, (24) where we set D⋆ 
+
+> 0
+
+≡ 0.We consider function g : = P⋆j,h −1 f for 1 ≤ j < h ≤ H − 1. It follows from equation (24) that 
+
+D⋆j
+
+ P⋆j,h −1 f  = Ebπ
+
+  P⋆j,h −1f (Sj , π ⋆j (Sj )) − P⋆j,h −1f (Sj , bπj (Sj ))  + D⋆j−1
+
+ P⋆j−1,h −1 f  ,
+
+where we have used the relation P⋆j−1P⋆j,h −1 = P⋆j−1,h −1. Recalling the definition of bβ(j, h − 1) in equation (14a), applying the triangle inequality yields 
+
+D⋆j
+
+ P⋆j,h −1 f  ≤ bβ(j, h − 1) · ∥ f∥h−1 + D⋆j−1
+
+ P⋆j−1,h −1 f  .
+
+Summing this equation over indices j = 1 , 2, 3, . . . , h − 1 yields 
+
+|D⋆h−1(f)| ≤ 
+
+> h−1
+
+X
+
+> j=1
+
+bβ(j, h − 1) · ∥ f∥h−1 ,
+
+which establishes inequality (23b). 17 C Proof of corollaries 
+
+This section cotains proofs of several corollaries. 
+
+C.1 Proof of Corollary 2 
+
+We now turn to proving Corollary 2 regarding ridge-based FQI in on-line settings. In Phase 1 of pure exploration, the cumulative regret is always bounded from above by T0 · H.During Phase 2 of fine-tuning, we let bπk be the policy employed in the rounds T02k +1 , T02k +2 ,. . . ,
+
+T02k+1 , which is determined by the estimate bf (T02k ) calculated at the end of the (T02k)-th round. To estimate the regret, we consider the decomposition 
+
+> T
+
+X
+
+> t=T0+1
+
+J(π⋆) − J(bπ(t)) ≤
+
+> K−1
+
+X
+
+> k=0
+> T02k+1
+
+X
+
+> t=T02k
+
+J(π⋆) − J(bπ(t)) =
+
+> K−1
+
+X
+
+> k=0
+
+T0 2kJ(π⋆) − J(bπk) .
+
+We leverage our bound (11a) for off-line RL in Section 3.1.2 to control the value sub-optimality 
+
+J(π⋆) − J(bπk). Recall that the policy bπk is derived from i.i.d. trajectories collected from the rounds 
+
+T0 2k−1 + 1 , T 0 2k−1 + 2 , . . . , T 0 2k. We divide those T0 2k−1 trajectories into H − 1 equal shares and use each share to conduct estimation in one iteration of the FQI procedure. This subsampling technique ensures the independence of samples used in different iterations. It is primarily adopted for the sake of convenience (to keep the explanations concise) and is not essential in general. It follows from inequality (11a) that the bound 
+
+J(π⋆) − J(bπk) ≤ c d√d H 4
+
+T0 2k log( dHK/δ )
+
+holds uniformly for indices k = 0 , 1, . . . , K − 1 with a probability exceeding 1 − δ.Putting together the pieces, we arrive at Regret (T ) ≤ T0 · H + c d √d H 4 K log( dHK/δ ) .
+
+We then derive the regret bound in Corollary 2 by noticing that K = O(log T ).
+
+C.2 Comparing to known off-line bounds 
+
+In this section, we derive the sample complexity nZan (ϵ) ≍ d2H3 
+
+> ϵ2
+
+in Section 3.1.2 based on the results of Zanette et al. [ 37 ]; it gives the conventional 1/√n slow rate to which we compare. Zanette et al. [ 37 ] proved upper bounds on a pessimistic actor-critic scheme based on d-dimensional linear function approximation. Using our notation, Theorem 1 in their paper [37] can be expressed as 
+
+J(π⋆) − J(bπ) ≤ c
+
+ 1
+
+H
+
+> H−1
+
+X
+
+> h=1
+
+q
+
+ϕh⊤( bΣh, D + λhI)−1 ϕh
+
+ r dH 4
+
+n , (25) where the vector ϕh is given by ϕh : = Eπ⋆
+
+ϕ(Sh, A h), the covariance matrix 
+
+bΣh, D : = 1
+
+|D h|
+
+X
+
+> (sh,i ,a h,i ,s ′
+> h,i ,r h,i )∈D h
+
+ϕ(sh, i , a h, i )ϕ(sh, i , a h, i )⊤ .
+
+We now consider the explicit dependence of this upper bound on dimension d, horizon H and sample size n. The divergence term ϕh⊤( bΣh, D + λhI)−1 ϕh measures the conditioning of the regularized covariance matrix ( bΣh, D + λhI) along a specific direction of ϕh. When the feature mapping ϕ
+
+operates within a d-dimensional space, it is reasonable to assume that 
+
+ϕh⊤( bΣh, D + λhI)−1 ϕh ≤ c′ d . 
+
+The bound (25) then reduces to J(π⋆) − J(bπ) ≤ c dH 2/√n . Regarding the dependence on horizon H, we conjecture that by incorporating the law of total variance in a more refined manner, it may be possible to further reduce the dependence by a factor of √H. Under these conditions, the bound takes the form J(π⋆) − J(bπ) ≤ c d pH3/n .18 D Details of the mountain car experiment 
+
+In this experiment, a car is situated in a valley between two hills. The car’s objective is to overcome the gravitational pull and reach the top of the right hill by efficiently controlling its acceleration. 
+
+D.1 Structure of the Markov decision process 
+
+The Markov decision process underlying the mountain car problem has a state space S ⊂ R2 and an action space A ⊂ R. The state s = ( p, v ) consists of the current position p and velocity v, whereas the scalar action a = f corresponds to the applied input force. The state variables (p, v ) and action f
+
+are restricted as 
+
+p ∈ [pmin , p max ] = [ −1.2, 0.6] ,v ∈ [vmin , v max ] = [ −0.07 , 0.07] and 
+
+f ∈ [fmin , f max ] = [ −1, 1] .
+
+The mountain is described by the function 
+
+m(p) = 13 sin(3 p) + 0.025 (pmax − p)( p − pmin ) ,
+
+over the interval p ∈ [pmin , p max ].Let m′ be the derivative of the mountain shape function m, which represents the instantaneous slope, and let (σv , σ p) = (0 .01 , 0.0025) be a pair of standard deviations that dictate the amount of randomness in the updates. For an interval [a, b ], we define the truncation function 
+
+Ψ[a,b ](u) : = 
+
+
+
+u if u ∈ [a, b ],b if u > b, a if u < a. 
+
+With this notation, at each discrete time step h = 0 , 1, 2, . . . , the position and velocity of the car evolve as 
+
+vh+1 = Ψ [vmin ,v max ]
+
+  vh + 0 .0015 fh − 0.0025 m′(ph) + σv Zh
+
+
+
+ph+1 = Ψ [pmin ,p max ]
+
+  ph + vh+1 + σpZ′
+
+> h
+
+
+
+where (Zh, Z ′
+
+> h
+
+) are a pair of independent standard normal variables. Note that the system dynamics are non-linear due to both the presence of the derivative m′ and the truncation function Ψ.The objective of the car is to reach the peak of the mountain, designated by the position pgoal = 0 .45 .The reward at state-action pair (s, a ) is given by 
+
+r(s, a ) : = − 110 f 2 + 100  max {0, p − pgoal }2.
+
+For any policy π, we define the γ-discounted value function 
+
+J(π) : = Eπ
+
+h ∞X
+
+> h=0
+
+γh r(Sh, A h)
+
+i
+
+,
+
+using γ = 0 .97 . The initial state s0 = ( p0, v 0) is generated with p0 following a uniform distribution over the interval [−0.6, −0.4] , and we initialize with velocity v0 = 0 .
+
+D.2 Fitted Q-iteration (FQI) with linear function approximation 
+
+Here we describe the use of fitted Q-iteration (FQI) with linear function approximation to estimate the optimal Q-function, along with the corresponding greedy policy bπ.
+
+Linear function approximation We approximate the the optimal Q-function (s, a ) 7 → Q⋆(s, a )
+
+using a d-dimensional linear function class with d = 3000 features. We begin by defining the base 
+
+19 feature maps ϕp : [ pmin , p max ] → R50 for position, and ϕv : [ vmin , v max ] → R15 for velocity, with components given by 
+
+ϕp, 2j+1 (p) : = cos( jp ), for j = 0 , 1, . . . , 24 , and 
+
+ϕp, 2j (p) : = sin( jp ), for j = 1 , 2, . . . , 25 ; 
+
+ϕv, 2j+1 (v) : = cos( jv ), for j = 0 , 1, . . . , 7, and 
+
+ϕv, 2j (v) : = sin( jv ), for j = 1 , 2, . . . , 7.To represent the action a ≡ f , we define the base action feature map 
+
+ϕf (f ) : =  1, f, f 2, f 3 ∈ R4.
+
+The overall feature map ϕ : S × A → R3000 is constructed by taking the outer product of the three base feature maps ϕp, ϕv , and ϕf as follows: 
+
+ϕ(s, a ) : = vec ϕp(p) ⊗ ϕv (v) ⊗ ϕf (f ) ∈ R3000 . (26) Taking all possible triples of the three base features in the outer product leads to the overall di-mension d = 3000 = 50 × 15 × 4. Given a weight vector w ∈ R3000 , we define the function 
+
+fw(s, a ) : = ⟨w, ϕ(s, a )⟩, and we approximate the optimal Q-function using the function class 
+
+F : = fw | w ∈ R3000 .
+
+Fitted Q-iteration (FQI) We employed fitted Q-iteration with the linear feature ϕ : S ×A → R3000 
+
+to estimate an optimal policy bπ. The FQI process begins by initializing the weight vector as w0 : = 
+
+0 ∈ R3000 . In each iteration, we first use the dataset D = (si, a i, r i, s ′
+
+> i
+
+) ni=1 ⊂ S × A × R × S to construct the pseudo-responses 
+
+yi : = ri + γ max  
+
+> a∈A
+
+⟨wt, ϕ(s′
+
+> i
+
+, a )⟩
+
+| {z } 
+
+> fwt(s′
+> i,a )
+
+for i = 1 , . . . , n , (27) corresponding to a stochastic estimate of the Bellman update applied to our current Q-function estimate fwt . The polynomial form of the force feature ϕf allows for a closed-form solution to the maximum operation required in equation (27) . Given these pseudo-responses, we then update the weight vector wt → wt+1 via the ridge regression 
+
+wt+1 : = arg min 
+
+> w∈R3000
+
+n 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+yi − ⟨ w, ϕ(si, a i)⟩ 2 + λn∥w∥22
+
+o
+
+, (28) where λn = 0.01  
+
+> n
+
+in all experiments reported here. We terminate the procedure after at most 500 iterations, or when there have been 5 consecutive iterations with insignificant improvements in weights, where insignificant means that ∥wt+1 −
+
+wt∥2 /√3000 < 0.005 . Letting bw represent the weight vector obtained from this procedure, the resulting policy bπ is given by selecting the greedy action based on the Q-function estimate 
+
+bf(s, a ) : = ⟨ bw, ϕ(s, a )⟩.
+
+D.3 Experimental configurations 
+
+Our experiments were based on an off-line dataset consisting of n i.i.d. tuples 
+
+D = (si, a i, r i, s ′
+
+> i
+
+) ni=1 ⊂ S × A × R × S ,
+
+where the state-action pairs (si, a i) = ( pi, v i, f i) ni=1 were generated from a uniform distribution over the cube [pmin , p max ] × [vmin , v max ] × [fmin , f max ]. We performed independent experiments with the sample size n varying over the range 
+
+n ∈ ⌊ek⌋ k = 10 .5, 10 .75 , 11 , . . . , 13 
+
+= {36315 , 46630 , 59874 , 76879 , 98715 , 126753 , 162754 , 208981 , 268337 , 344551 , 442413 } .
+
+In each experiment, we generated a dataset D, estimated an optimal policy bπ based on the data, and evaluated the return J(bπ). For each sample size, we conducted 80 independent trials. 20 In order to evaluate the return J(bπ), for each initial position p0 = −0.5 + 0 .2 j/ 1000 with j =
+
+−500 , −499 , −498 , . . . , 499 , we simulated 30 independent 1000 -step trajectories by executing the estimated policy bπ. The average return over the 30 × 1000 trajectories is used as the estimate of J(bπ).In order to approximate the policy 7 π† that represents “ground truth”, we conducted a single experi-ment with sample size n = 6 .4 × 10 6 to obtain π†. We simulated 1000 trajectories for each initial position p0 and calculated the average return, which serves as the reference value J(π†). The value sub-optimality is then computed as the difference J(π†) − J(bπ).
+
+# E Verification of auxiliary claims 
+
+In this appendix, we collect the verification of various auxiliary claims made in the main text. 
+
+E.1 Properties of occupation measures 
+
+In this appendix, we prove a useful inequality 
+
+P⋆h,h ′ f h ≤ ∥ f ∥h′ , (29) which holds for the state-action occupation measures (3) . This bound is used in the proof of bound (20) in Appendix B.2. By definition, we have 
+
+∥P ⋆h f ∥2 
+
+> h
+
+= Eπ⋆
+
+(P⋆h f )2(Sh, A h) = Eπ⋆
+
+h
+
+Eh
+
+f(Sh+1 , π ⋆h+1 (Sh+1 )) Sh, A h
+
+2i
+
+.
+
+According to the property of variance, we can deduce 
+
+Eπ⋆
+
+h
+
+Eh
+
+f Sh+1 , π ⋆h+1 (Sh+1 ) Sh, A h
+
+2i
+
+≤ Eπ⋆
+
+h
+
+f 2 Sh+1 , π ⋆h+1 (Sh+1 )i
+
+= ∥f ∥2 
+
+> h+1
+
+.
+
+As a consequence, we find that ∥P ⋆h f ∥h ≤ ∥ f ∥h+1 . Applying this inequality recursively leads to the conclusion that for any indices 1 ≤ h ≤ h′ ≤ H, we have 
+
+P⋆h,h ′ f h = P⋆h P⋆h+1 ,h ′ f h ≤ P⋆h+1 ,h ′ f h+1 ≤ P⋆h+2 ,h ′ f h+2 ≤ · · · ≤ ∥ f ∥h′ .
+
+This establishes the bound (29). 
+
+E.2 Proof of the telescope inequality (6) For completeness of this paper, 8 let us prove the telescope relation (6) stated in Section 2.3. For any policy π = ( π1, . . . , π H ) and sequence of functions f = ( f1, . . . , f H ) with fH = rH , we have the “telescope” relation 
+
+V π 
+
+> 1
+
+(s) = f1(s, π 1(s)) + 
+
+> H−1
+
+X
+
+> h=1
+
+Eπ
+
+  T π 
+
+> h
+
+fh+1 − fh
+
+(Sh, A h) S1 = s  for any state s ∈ S . (30) Here the value function V π 
+
+> 1
+
+is given by V π 
+
+> 1
+
+(s) : = Qπ 
+
+> 1
+
+(s, π 1(s)) . Taking f = bf in equation (30) yields 
+
+V π 
+
+> 1
+
+(s) = bf1(s, π 1(s)) + 
+
+> H−1
+
+X
+
+> h=1
+
+Eπ
+
+  T π 
+
+> h
+
+bfh+1 − bfh
+
+(Sh, A h) S1 = s  . (31a) Letting π = bπ in equation (31a) yields 
+
+V bπ 
+
+> 1
+
+(s) = bf1(s, bπ1(s)) + 
+
+> H−1
+
+X
+
+> h=1
+
+Ebπ
+
+  T bπ 
+
+> h
+
+bfh+1 − bfh
+
+(Sh, A h) S1 = s  . (31b) 
+
+> 7
+
+In general, it is not guaranteed that π† is equal to the optimal policy π⋆, due to approximation error that might arise from using the linear function class defined here. 
+
+> 8
+
+We are not claiming novelty here; see Theorem 2 of the paper [ 34 ]; or Lemma 3.2 in the paper [ 7] for analogous results. 
+
+21 Since bπ is a greedy policy with respect to function bf , we have 
+
+bf1(s, bπ1(s)) ≥ bf1(s, π 1(s)) , and T bπ 
+
+> h
+
+bfh+1 = T ⋆h bfh+1 ≥ T π 
+
+> h
+
+bfh+1 for any policy π.Using this fact and subtracting equations (31a) and (31b), we obtain 
+
+V π 
+
+> 1
+
+(s) − V bπ 
+
+> 1
+
+(s) ≤
+
+> H−1
+
+X
+
+> h=1
+
+ Eπ − Ebπ
+
+  T ⋆h bfh+1 − bfh
+
+(Sh, A h) S1 = s  .
+
+Finally, taking the expectation over the initial distribution ξ1 yields the claimed inequality (6). 22 NeurIPS Paper Checklist 
+
+1. Claims 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the paper’s contributions and scope? Answer: [Yes] Justification: The paper thoroughly discusses each point made in the abstract, including fast-rate convergence of RL in continuous state-action spaces, key stability properties, and the pessimism and optimism principles. Guidelines: • The answer NA means that the abstract and introduction do not include the claims made in the paper. • The abstract and/or introduction should clearly state the claims made, including the contributions made in the paper and important assumptions and limitations. A No or NA answer to this question will not be perceived well by the reviewers. • The claims made should match theoretical and experimental results, and reflect how much the results can be expected to generalize to other settings. • It is fine to include aspirational goals as motivation as long as it is clear that these goals are not attained by the paper. 2. Limitations 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? Answer: [Yes] Justification: Section 4 discusses the work’s limitations and future directions, such as adapting the framework to linear quadratic control, extending beyond i.i.d. data and finite-dimensional linear function spaces, proving a lower bound to demonstrate sharpness, and examining model mis-specification. Guidelines: • The answer NA means that the paper has no limitation while the answer No means that the paper has limitations, but those are not discussed in the paper. • The authors are encouraged to create a separate "Limitations" section in their paper. • The paper should point out any strong assumptions and how robust the results are to violations of these assumptions (e.g., independence assumptions, noiseless settings, model well-specification, asymptotic approximations only holding locally). The authors should reflect on how these assumptions might be violated in practice and what the implications would be. • The authors should reflect on the scope of the claims made, e.g., if the approach was only tested on a few datasets or with a few runs. In general, empirical results often depend on implicit assumptions, which should be articulated. • The authors should reflect on the factors that influence the performance of the approach. For example, a facial recognition algorithm may perform poorly when image resolution is low or images are taken in low lighting. Or a speech-to-text system might not be used reliably to provide closed captions for online lectures because it fails to handle technical jargon. • The authors should discuss the computational efficiency of the proposed algorithms and how they scale with dataset size. • If applicable, the authors should discuss possible limitations of their approach to address problems of privacy and fairness. • While the authors might fear that complete honesty about limitations might be used by reviewers as grounds for rejection, a worse outcome might be that reviewers discover limitations that aren’t acknowledged in the paper. The authors should use their best judgment and recognize that individual actions in favor of transparency play an impor-tant role in developing norms that preserve the integrity of the community. Reviewers will be specifically instructed to not penalize honesty concerning limitations. 3. Theory Assumptions and Proofs 
+
+23 Question: For each theoretical result, does the paper provide the full set of assumptions and a complete (and correct) proof? Answer: [Yes] Justification: The theoretical results in this paper are mathematically rigorous, with intuitions in the main body and detailed justifications and proofs in the appendix. Guidelines: • The answer NA means that the paper does not include theoretical results. • All the theorems, formulas, and proofs in the paper should be numbered and cross-referenced. • All assumptions should be clearly stated or referenced in the statement of any theorems. • The proofs can either appear in the main paper or the supplemental material, but if they appear in the supplemental material, the authors are encouraged to provide a short proof sketch to provide intuition. • Inversely, any informal proof provided in the core of the paper should be complemented by formal proofs provided in appendix or supplemental material. • Theorems and Lemmas that the proof relies upon should be properly referenced. 4. Experimental Result Reproducibility 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-perimental results of the paper to the extent that it affects the main claims and/or conclusions of the paper (regardless of whether the code and data are provided or not)? Answer: [Yes] Justification: Appendix D explains how to reproduce the synthetic Mountain Car experi-ment from Section 1.1, including MDP structure, linear function space construction, FQI implementation, and experimental setups. No data is required. Guidelines: • The answer NA means that the paper does not include experiments. • If the paper includes experiments, a No answer to this question will not be perceived well by the reviewers: Making the paper reproducible is important, regardless of whether the code and data are provided or not. • If the contribution is a dataset and/or model, the authors should describe the steps taken to make their results reproducible or verifiable. • Depending on the contribution, reproducibility can be accomplished in various ways. For example, if the contribution is a novel architecture, describing the architecture fully might suffice, or if the contribution is a specific model and empirical evaluation, it may be necessary to either make it possible for others to replicate the model with the same dataset, or provide access to the model. In general. releasing code and data is often one good way to accomplish this, but reproducibility can also be provided via detailed instructions for how to replicate the results, access to a hosted model (e.g., in the case of a large language model), releasing of a model checkpoint, or other means that are appropriate to the research performed. • While NeurIPS does not require releasing code, the conference does require all submis-sions to provide some reasonable avenue for reproducibility, which may depend on the nature of the contribution. For example (a) If the contribution is primarily a new algorithm, the paper should make it clear how to reproduce that algorithm. (b) If the contribution is primarily a new model architecture, the paper should describe the architecture clearly and fully. (c) If the contribution is a new model (e.g., a large language model), then there should either be a way to access this model for reproducing the results or a way to reproduce the model (e.g., with an open-source dataset or instructions for how to construct the dataset). (d) We recognize that reproducibility may be tricky in some cases, in which case authors are welcome to describe the particular way they provide for reproducibility. In the case of closed-source models, it may be that access to the model is limited in 24 some way (e.g., to registered users), but it should be possible for other researchers to have some path to reproducing or verifying the results. 5. Open access to data and code 
+
+Question: Does the paper provide open access to the data and code, with sufficient instruc-tions to faithfully reproduce the main experimental results, as described in supplemental material? Answer: [Yes] Justification: The submission provides a supplementary code document to reproduce the Mountain Car experiment. Guidelines: • The answer NA means that paper does not include experiments requiring code. • Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ public/guides/CodeSubmissionPolicy ) for more details. • While we encourage the release of code and data, we understand that this might not be possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not including code, unless this is central to the contribution (e.g., for a new open-source benchmark). • The instructions should contain the exact command and environment needed to run to reproduce the results. See the NeurIPS code and data submission guidelines ( https: //nips.cc/public/guides/CodeSubmissionPolicy ) for more details. • The authors should provide instructions on data access and preparation, including how to access the raw data, preprocessed data, intermediate data, and generated data, etc. • The authors should provide scripts to reproduce all experimental results for the new proposed method and baselines. If only a subset of experiments are reproducible, they should state which ones are omitted from the script and why. • At submission time, to preserve anonymity, the authors should release anonymized versions (if applicable). • Providing as much information as possible in supplemental material (appended to the paper) is recommended, but including URLs to data and code is permitted. 6. Experimental Setting/Details 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-parameters, how they were chosen, type of optimizer, etc.) necessary to understand the results? Answer: [Yes] Justification: Appendix D explains how to reproduce the synthetic Mountain Car experi-ment from Section 1.1, including MDP structure, linear function space construction, FQI implementation, and experimental setups. Guidelines: • The answer NA means that the paper does not include experiments. • The experimental setting should be presented in the core of the paper to a level of detail that is necessary to appreciate the results and make sense of them. • The full details can be provided either with the code, in appendix, or as supplemental material. 7. Experiment Statistical Significance 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate information about the statistical significance of the experiments? Answer: [Yes] Justification: Figure 1(b) in the paper includes error bars for the standard errors, and the estimated slope in Figure 1(b) uses a bootstrap confidence interval to confirm observation validity. Guidelines: 25 • The answer NA means that the paper does not include experiments. • The authors should answer "Yes" if the results are accompanied by error bars, confi-dence intervals, or statistical significance tests, at least for the experiments that support the main claims of the paper. • The factors of variability that the error bars are capturing should be clearly stated (for example, train/test split, initialization, random drawing of some parameter, or overall run with given experimental conditions). • The method for calculating the error bars should be explained (closed form formula, call to a library function, bootstrap, etc.) • The assumptions made should be given (e.g., Normally distributed errors). • It should be clear whether the error bar is the standard deviation or the standard error of the mean. • It is OK to report 1-sigma error bars, but one should state it. The authors should preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis of Normality of errors is not verified. • For asymmetric distributions, the authors should be careful not to show in tables or figures symmetric error bars that would yield results that are out of range (e.g. negative error rates). • If error bars are reported in tables or plots, The authors should explain in the text how they were calculated and reference the corresponding figures or tables in the text. 8. Experiments Compute Resources 
+
+Question: For each experiment, does the paper provide sufficient information on the com-puter resources (type of compute workers, memory, time of execution) needed to reproduce the experiments? Answer: [Yes] Justification: Section 1.1 details the computer setup: “The experiment ran for 3 days on two laptops, each equipped with an Apple M2 Pro CPU and 16 GB RAM.” Guidelines: • The answer NA means that the paper does not include experiments. • The paper should indicate the type of compute workers CPU or GPU, internal cluster, or cloud provider, including relevant memory and storage. • The paper should provide the amount of compute required for each of the individual experimental runs as well as estimate the total compute. • The paper should disclose whether the full research project required more compute than the experiments reported in the paper (e.g., preliminary or failed experiments that didn’t make it into the paper). 9. Code Of Ethics 
+
+Question: Does the research conducted in the paper conform, in every respect, with the NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?Answer: [Yes] Justification: Yes, the research in the paper fully conforms with the NeurIPS Code of Ethics. Guidelines: • The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. • If the authors answer No, they should explain the special circumstances that require a deviation from the Code of Ethics. • The authors should make sure to preserve anonymity (e.g., if there is a special consid-eration due to laws or regulations in their jurisdiction). 10. Broader Impacts 
+
+Question: Does the paper discuss both potential positive societal impacts and negative societal impacts of the work performed? Answer: [NA] 26 Justification: The paper focuses on purely theoretical aspects of reinforcement learning and does not discuss direct societal impacts, given its theoretical nature. Guidelines: • The answer NA means that there is no societal impact of the work performed. • If the authors answer NA or No, they should explain why their work has no societal impact or why the paper does not address societal impact. • Examples of negative societal impacts include potential malicious or unintended uses (e.g., disinformation, generating fake profiles, surveillance), fairness considerations (e.g., deployment of technologies that could make decisions that unfairly impact specific groups), privacy considerations, and security considerations. • The conference expects that many papers will be foundational research and not tied to particular applications, let alone deployments. However, if there is a direct path to any negative applications, the authors should point it out. For example, it is legitimate to point out that an improvement in the quality of generative models could be used to generate deepfakes for disinformation. On the other hand, it is not needed to point out that a generic algorithm for optimizing neural networks could enable people to train models that generate Deepfakes faster. • The authors should consider possible harms that could arise when the technology is being used as intended and functioning correctly, harms that could arise when the technology is being used as intended but gives incorrect results, and harms following from (intentional or unintentional) misuse of the technology. • If there are negative societal impacts, the authors could also discuss possible mitigation strategies (e.g., gated release of models, providing defenses in addition to attacks, mechanisms for monitoring misuse, mechanisms to monitor how a system learns from feedback over time, improving the efficiency and accessibility of ML). 11. Safeguards 
+
+Question: Does the paper describe safeguards that have been put in place for responsible release of data or models that have a high risk for misuse (e.g., pretrained language models, image generators, or scraped datasets)? Answer: [NA] Justification: The paper poses no such risks. Guidelines: • The answer NA means that the paper poses no such risks. • Released models that have a high risk for misuse or dual-use should be released with necessary safeguards to allow for controlled use of the model, for example by requiring that users adhere to usage guidelines or restrictions to access the model or implementing safety filters. • Datasets that have been scraped from the Internet could pose safety risks. The authors should describe how they avoided releasing unsafe images. • We recognize that providing effective safeguards is challenging, and many papers do not require this, but we encourage authors to take this into account and make a best faith effort. 12. Licenses for existing assets 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in the paper, properly credited and are the license and terms of use explicitly mentioned and properly respected? Answer: [NA] Justification: The paper does not use existing assets. Guidelines: • The answer NA means that the paper does not use existing assets. • The authors should cite the original paper that produced the code package or dataset. • The authors should state which version of the asset is used and, if possible, include a URL. 27 • The name of the license (e.g., CC-BY 4.0) should be included for each asset. • For scraped data from a particular source (e.g., website), the copyright and terms of service of that source should be provided. • If assets are released, the license, copyright information, and terms of use in the package should be provided. For popular datasets, paperswithcode.com/datasets 
+
+has curated licenses for some datasets. Their licensing guide can help determine the license of a dataset. • For existing datasets that are re-packaged, both the original license and the license of the derived asset (if it has changed) should be provided. • If this information is not available online, the authors are encouraged to reach out to the asset’s creators. 13. New Assets 
+
+Question: Are new assets introduced in the paper well documented and is the documentation provided alongside the assets? Answer: [NA] Justification: The paper does not release new assets. Guidelines: • The answer NA means that the paper does not release new assets. • Researchers should communicate the details of the dataset/code/model as part of their submissions via structured templates. This includes details about training, license, limitations, etc. • The paper should discuss whether and how consent was obtained from people whose asset is used. • At submission time, remember to anonymize your assets (if applicable). You can either create an anonymized URL or include an anonymized zip file. 14. Crowdsourcing and Research with Human Subjects 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper include the full text of instructions given to participants and screenshots, if applicable, as well as details about compensation (if any)? Answer: [NA] Justification: The paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. • Including this information in the supplemental material is fine, but if the main contribu-tion of the paper involves human subjects, then as much detail as possible should be included in the main paper. • According to the NeurIPS Code of Ethics, workers involved in data collection, curation, or other labor should be paid at least the minimum wage in the country of the data collector. 15. Institutional Review Board (IRB) Approvals or Equivalent for Research with Human Subjects 
+
+Question: Does the paper describe potential risks incurred by study participants, whether such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) approvals (or an equivalent approval/review based on the requirements of your country or institution) were obtained? Answer: [NA] Justification: The paper does not involve crowdsourcing nor research with human subjects. Guidelines: • The answer NA means that the paper does not involve crowdsourcing nor research with human subjects. 28 • Depending on the country in which research is conducted, IRB approval (or equivalent) may be required for any human subjects research. If you obtained IRB approval, you should clearly state this in the paper. • We recognize that the procedures for this may vary significantly between institutions and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the guidelines for their institution. • For initial submissions, do not include any information that would break anonymity (if applicable), such as the institution conducting the review. 29

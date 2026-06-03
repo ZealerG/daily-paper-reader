@@ -1,0 +1,2430 @@
+Title: 6055_Learning_Variational_Temp.pdf
+
+URL Source: https://openreview.net/pdf?id=eM3Wzs6Unt
+
+Number of Pages: 22
+
+Markdown Content:
+# Learning Variational Temporal Abstraction Embeddings in Option-Induced MDPs 
+
+Anonymous Author(s) 
+
+Affiliation Address 
+
+email 
+
+## Abstract 
+
+The option framework in hierarchical reinforcement learning has notably advanced 1
+
+the automatic discovery of temporally-extended actions from long-horizon tasks. 2
+
+However, existing methods often struggle with ineffective exploration and unstable 3
+
+updates when learning action and option policies simultaneously. Addressing these 4
+
+challenges, we introduce the Variational Markovian Option Critic (VMOC), an 5
+
+off-policy algorithm with provable convergence that employs variational inference 6
+
+to stabilize updates. VMOC naturally integrates maximum entropy as intrinsic re-7
+
+wards to promote the exploration of diverse and effective options. Furthermore, we 8
+
+adopt low-cost option embeddings instead of traditional, computationally expensive 9
+
+option triples, enhancing scalability and expressiveness. Extensive experiments in 10 
+
+challenging Mujoco environments validate VMOC’s superior performance over ex-11 
+
+isting on-policy and off-policy methods, demonstrating its effectiveness in learning 12 
+
+coherent and diverse option sets suitable for complex tasks. 13 
+
+## 1 Introduction 14 
+
+Recent advancements in deep reinforcement learning (DRL) have demonstrated significant successes 15 
+
+across a variety of complex domains, such as mastering the human level of atari [ 36 ] and Go [ 44 ]16 
+
+games. These achievements underscore the potential of combining reinforcement learning (RL) 17 
+
+with powerful function approximators like neural networks [ 5] to tackle intricate tasks that require 18 
+
+nuanced control over extended periods. Despite these breakthroughs, Deep RL still faces substantial 19 
+
+challenges, such as insufficient exploration in dynamic environments [ 18 , 13 , 42 ], inefficient learning 20 
+
+associated with temporally extended actions [ 6 , 9 ] and long horizon tasks [ 30 , 4], and vast amounts 21 
+
+of samples required for training proficient behaviors [16, 40, 15]. 22 
+
+One promising area for addressing these challenges is the utilization of hierarchical reinforcement 23 
+
+learning (HRL) [ 11 , 2, 12 ], a diverse set of strategies that decompose complex tasks into simpler, hier-24 
+
+archical structures for more manageable learning. Among these strategies, the option framework [ 47 ], 25 
+
+developed on the Semi-Markov Decision Process (SMDP), is particularly effective at segmenting 26 
+
+non-stationary task stages into temporally-extended actions known as options. Options are typically 27 
+
+learned through a maximum likelihood approach that aims to maximize the expected rewards across 28 
+
+trajectories. In this framework, options act as temporally abstracted actions executed over variable 29 
+
+time steps, controlled by a master policy that decides when each option should execute and terminate. 30 
+
+This structuring not only simplifies the management of complex environments but also enables the 31 
+
+systematic discovery and execution of temporal abstractions over long-horizon tasks [24, 23]. 32 
+
+However, the underlying SMDP framework is frequently undermined by three key challenges: 33 
+
+1) Insufficient exploration and degradation [ 20 , 37 , 23 ]. As options are unevenly updated using 34 
+
+conventional maximum likelihood methods [ 4 , 10 , 45 , 25 , 26 ], the policy is quickly saturated with 35 
+
+early rewarding observations. This typically results in focusing on only low-entropy options that lead 36 
+
+Submitted to 38th Conference on Neural Information Processing Systems (NeurIPS 2024). Do not distribute. to local optima rewards, causing a single option to either dominate the entire policy or switch every 37 
+
+timestep. Such premature convergence limits option diversity significantly. 2) Sample Inefficiency. 38 
+
+The semi-Markovian nature inherently leads to sample inefficiency [ 47 , 29 ]: each policy update 39 
+
+at the master level extends over multiple time steps, thus consuming a considerable volume of 40 
+
+experience samples with relatively low informational gain. This inefficiency is further exacerbated 41 
+
+by the prevalence of on-policy option learning algorithms [ 4, 52 ], which require new samples to be 42 
+
+collected simultaneously from both high-level master policies and low-level action policies at each 43 
+
+gradient step, and thus sample expensive. 3) Computationally expensive. Options are conventionally 44 
+
+defined as triples [ 4] with intra-option policies and termination functions, often modeled using neural 45 
+
+networks which are expensive to optimize. These challenges collectively limit the broader adoption 46 
+
+and effectiveness of the option framework in real-world scenarios, particularly in complex continuous 47 
+
+environments where scalability and stability are critical [14, 34, 26]. 48 
+
+To address these challenges, we introduce the Variational Markovian Option Critic (VMOC), a 49 
+
+novel off-policy algorithm that integrates the variational inference framework on option-induced 50 
+
+MDPs [ 35 ]. We first formulate the optimal option-induced SMDP trajectory as a probabilistic 51 
+
+inference problem, presenting a theoretical convergence proof of the variational distribution under 52 
+
+the soft policy iteration framework [ 19 ]. Similar to prior variational methods [ 31 ], policy entropy 53 
+
+terms naturally arise as intrinsic rewards during the inference procedure. As a result, VMOC not 54 
+
+only seeks high-reward options but also maximizes entropy across the space, promoting extensive 55 
+
+exploration and maintaining high diversity. We implements this inference procedure as an off-policy 56 
+
+soft actor critic [ 19 ] algorithm, which allows reusing samples from replay buffer and enhances sample 57 
+
+efficiency. Furthermore, to address the computational inefficiencies associated with conventional 58 
+
+option triples, we follow [ 35 ] and employ low-cost option embeddings rather than complex neural 59 
+
+network models. This not only simplifies the training process but also enhances the expressiveness of 60 
+
+the model by allowing the agent to capture a more diverse set of environmental dynamics. 61 
+
+Our contributions can be summarized as follows: 62 
+
+• We propose a variational inference approach within the maximum entropy framework to 63 
+
+enhance diverse and robust exploration of options. 64 
+
+• We implement an off-policy algorithm that improves sample efficiency. 65 
+
+• We introduce option embeddings into latent variable policies and enhance expressiveness 66 
+
+and computational cost-effectiveness of option representations. 67 
+
+• We conduct extensive experiments in OpenAI Gym Mujoco [ 49 ] environments, demonstrat-68 
+
+ing that VMOC significantly outperforms other option-based variants in terms of exploration 69 
+
+capabilities, sample efficiency, and computational efficiency. 70 
+
+## 2 Preliminary 71 
+
+2.1 Control as Structured Variational Inference 72 
+
+Conventionally, the control as inference framework [ 19 , 31 , 19 , 53 ] is derived using the maximum 73 
+
+entropy objective. In this section, we present an alternative derivation from the perspective of 74 
+
+structured variational inference. We demonstrate that this approach provides a more concise and 75 
+
+intuitive pathway to the same theoretical results, where the maximum entropy principle naturally 76 
+
+emerges through the direct application of variational inference techniques. 77 
+
+Traditional control methods focus on directly maximizing rewards, often resulting in suboptimal trade-78 
+
+offs between exploration and exploitation. By reinterpreting the control problem as a probabilistic 79 
+
+inference problem, the control as inference framework incorporates both the reward structure and 80 
+
+environmental uncertainty into decision-making, providing a more robust and flexible approach 81 
+
+to policy optimization. In this framework, optimality is represented by a binary random variable 82 
+
+E ∈ { 0, 1}1. The probability of optimality given a state-action pair (s, a) is denoted as P (E =83 
+
+1 | s, a) = exp( r(s, a)) , which is an exponential function of the conventional reward function 84 
+
+r(s, a) that measures the desirability of an action in a specific state. Focusing on E = 1 captures the 85 
+
+occurrence of optimal events. For simplicity, we will use E instead of E = 1 in the following text 86    
+
+> 1Conventionally, the optimality variable is denoted by O. However, in this context, we use Eto avoid conflict with notation used in the option framework.
+
+2to avoid cluttered notations. The joint distribution over trajectories τ = ( s1, a1, . . . , sT , aT ) given 87 
+
+optimality is expressed as: 88 
+
+P (τ |E 1: T ) ∝ P (τ, E1: T ) = P (s1) 
+
+> T−1
+
+Y
+
+> t=1
+
+P (st+1 |st, at)P (Et|st, at)
+
+where P (s1) is the initial state distribution, P (st+1 |st, at) is the dynamics model. As explained 89 
+
+in [ 19 , 31 ], direct optimization of P (τ | E 1: T ) can result in an optimistic policy that assumes a degree 90 
+
+of control over the dynamics. One way to correct this risk-seeking behavior [ 31 ] is through structured 91 
+
+variational inference. In our case, the goal is to approximate the optimal trajectory P (τ ) with the 92 
+
+variational distribution: 93 
+
+q(τ ) = P (s1) 
+
+> T−1
+
+Y
+
+> t=1
+
+P (st+1 | st, at)q(at | st)
+
+where the initial distribution P (s1) and transition distribution P (st+1 | st, at) is set to be the true 94 
+
+environment dynamics from P (τ ). The only variational term is the variational policy q(at | st),95 
+
+which is used to approximate the optimal policy P (at | st, E1: T ). Under this setting, the environment 96 
+
+dynamics will be canceled out from the optimization objective between P (τ | E ) and q(τ ), thus 97 
+
+explicitly disallowing the agent to influence its dynamics and correcting the risk-seeking behavior. 98 
+
+With the variational distribution at hand, the conventional maximum entropy framework can be 99 
+
+recovered through a direct application of standard structural variational inference [28]: 100 
+
+log P (E1: T ) = L(q(τ ), P (τ, E1: T )) + DKL (q(τ ) ∥ P (τ |E 1: T )) = Eτ ∼q(τ )[
+
+> T
+
+X
+
+> t
+
+r(st, at) + H(q(·| st))] 
+
+| {z }
+
+> maximum entropy objective
+
++DKL (q(at|st) ∥ P (at|st, E1: T )) 
+
+where L(q, P ) = Eq [log Pq ] is the Evidence Lower Bound (ELBO) [ 28 ]. The maximum entropy 101 
+
+objective arises naturally as the environment dynamics in P (τ, E) and q(τ ) cancel out. Under this 102 
+
+formulation, the soft policy iteration theorem [ 19 ] has an elegant Expectation-Maximization (EM) 103 
+
+algorithm [ 28 ] interpretation: the E-step corresponds to the policy evaluation of the maximum 104 
+
+entropy objective L(q[k], P ); while the M-step corresponds to the policy improvement of the DKL 105 
+
+term q[k+1] = arg max q DKL (q[k](τ ) ∥ P (τ | E )) . Thus, soft policy iteration is an exact inference if 106 
+
+both EM steps can be performed exactly. 107 
+
+Theorem 1 (Convergence Theorem for Soft Policy Iteration) . Let τ be the latent variable and E108 
+
+be the observed variable. Define the variational distribution q(τ ) and the log-likelihood log P (E).109 
+
+Let M : q[k] → q[k+1] represent the mapping defined by the EM steps inference update, so that 110 
+
+q[k+1] = M (q[k]). The likelihood function increases at each iteration of the variational inference 111 
+
+algorithm until convergence conditions are satisfied. 112 
+
+Proof. See Appendix A.1. 113 
+
+2.2 The Option Framework 114 
+
+In conventional SMDP-based Option Framework [ 47 ], an option is a triple (Io, π o, β o) ∈ O , where O115 
+
+denotes the option set; o ∈ O = {1, 2, . . . , K } is a positive integer index which denotes the o-th triple 116 
+
+where K is the number of options; Io is an initiation set indicating where the option can be initiated; 117 
+
+πo = Po(a|s) : A × S → [0 , 1] is the action policy of the oth option; βo = Po(b = 1 |s) : S → [0 , 1] 118 
+
+where b ∈ { 0, 1} is a termination function . For clarity, we use Po(b = 1 |s) instead of βo which is 119 
+
+widely used in previous option literatures (e.g., Sutton et al. [47] , Bacon et al. [4] ). A master policy 120 
+
+π(o|s) = P (o|s) where o ∈ O is used to sample which option will be executed. Therefore, the 121 
+
+dynamics (stochastic process) of the option framework is written as: 122 
+
+P (τ ) = P (s0, o0)
+
+> ∞
+
+Y
+
+> t=1
+
+P (st|st−1, at−1)Pot (at|st)[Pot−1 (bt = 0 |st)1ot=ot−1 + Pot−1 (bt = 1 |st)P (ot|st)] , (1) 3where τ = {s0, o0, a0, s1, o1, a1, . . . } denotes the trajectory of the option framework. 1 is an 123 
+
+indicator function and is only true when ot = ot−1 (notice that ot−1 is the realization at ot−1). 124 
+
+Therefore, under this formulation the option framework is defined as a Semi-Markov process since 125 
+
+the dependency on an activated option o can cross a variable amount of time [ 47 ]. Due to the nature 126 
+
+of SMDP assumption, conventional option framework is unstable and computationally expensive to 127 
+
+optimize. Li et al. [ 34 , 35 ] proposed the Hidden Temporal Markovian Decision Process (HiT-MDP): 128 
+
+P (τ ) = P (s0, o0)
+
+> ∞
+
+Y
+
+> t=1
+
+P (st|st−1, at−1)P (at|st, ot)P (ot|st, ot−1) (2) and theoretically proved that the option-induced HiT-MDP is homomorphically equivalent to the 129 
+
+conventional SMDP-based option framework. Following RL conventions, we use πA = P (at|st, ot)130 
+
+to denote the action policy and πO = P (ot|st, ot−1) to denote the option policy respectively. In 131 
+
+HiT-MDPs, options can be viewed as latent variables with a temporal structure P (ot|st, ot−1),132 
+
+enabling options to be represented as dense latent embeddings rather than traditional option triples. 133 
+
+They demonstrated that learning options as embeddings on HiT-MDPs offers significant advantages 134 
+
+in performance, scalability, and stability by reducing variance. However, their work only derived an 135 
+
+on-policy policy gradient algorithm for learning options on HiT-MDPs. In this work, we extend their 136 
+
+approach to an off-policy algorithm under the variational inference framework, enhancing exploration 137 
+
+and sample efficiency. 138 
+
+## 3 Methodology 139 
+
+In this section, we introduce the Variational Markovian Option Critic (VMOC) algorithm by extending 140 
+
+the variational policy iteration (Theorem 1) to the option framework. In Section 3.1, we reformulate 141 
+
+the optimal option trajectory and the variational distribution as probabilistic graphical models (PGMs), 142 
+
+propose the corresponding variational objective, and present a provable exact inference procedure for 143 
+
+these objectives in tabular settings. Section 3.2 extends this result by introducing VMOC, a practical 144 
+
+off-policy option learning algorithm that uses neural networks as function approximators and proves 145 
+
+the convergence of VMOC under approximate inference settings. Our approach differs from previous 146 
+
+works [ 19 , 33 , 34 ] by leveraging structured variational inference directly, providing a more concise 147 
+
+pathway to both theoretical results and practical algorithms. 148 
+
+3.1 PGM Formulations of The Option Framework 149 
+
+Formulating complex problems as probabilistic graphical models (PGMs) offers a consistent and 150 
+
+flexible framework for deriving principled objectives, analyzing convergence, and devising practical 151 
+
+algorithms. In this section, we first formulate the optimal trajectory of the conventional SMDP-based 152 
+
+option framework (Eq. 1) as a PGM. We then use the HiT-MDPs as the variational distribution to 153 
+
+approximate this optimal trajectory. With these PGMs, we can straightforwardly derive the variational 154 
+
+objective, where maximum entropy terms arise naturally. This approach allows us to develop a stable 155 
+
+algorithm for learning diversified options and preventing degeneracy. Specifically, we follow [ 31 , 28 ] 
+
+> Figure 1: PGMs of the option framework.
+> 156
+
+by introducing the concept of "Optimality" [ 48 ] into the conventional SMDP-based option framework 157 
+
+(Equation equation 1). This allows us to define the probability of an option trajectory being optimal 158 
+
+4as a probabilistic graphical model (PGM), as illustrated in Figure 1 (a): 159 
+
+P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) = P (s0, o0)
+
+> T
+
+Y
+
+> t=1
+
+P (st+1 |st, at)P (EAt = 1 |st, at)P (EOt = 1 |st, at, ot, ot−1)P (ot)P (at)
+
+∝ P (s0)
+
+> T
+
+Y
+
+> t=1
+
+P (st+1 |st, at)
+
+| {z }
+
+> Environment Dynamics
+> T
+
+Y
+
+> t=1
+
+P (EAt = 1 |st, at)P (EOt = 1 |st, at, ot, ot−1)
+
+| {z }
+
+> Optimality Likelihood
+
+, (3) where E ∈ { 0, 1} are observable binary “optimal random variables” [ 31 ], τ = {s0, o0, a0, s1 . . . }160 
+
+denotes the trajectory of the option framework. The agent is optimal at time step t when P (EAt =161 
+
+1|st, at) and P (EOt = 1 |st, at, ot, ot−1). We will use E instead of E = 1 in the following text to 162 
+
+avoid cluttered notations. To simplify the derivation, priors P (o) and P (a) can be assumed to be 163 
+
+uniform distributions without loss of generality [ 31 ]. Note that Eq. 3 shares the same environment 164 
+
+dynamics with Eq. 1 and Eq. 2. With the optimal random variables EO and EA, the likelihood of a 165 
+
+state-action {st, at} pair that is optimal is defined as: 166 
+
+P (EAt |st, at) = exp( r(st, at)) , (4) as this specific design facilitates recovering the value function at the latter structural variational infer-167 
+
+ence stage. Based on the same motivation, the likelihood of an option-state-action {ot, st, at, ot−1}168 
+
+pair that is optimal is defined as, 169 
+
+P (EOt |st, at, ot, ot−1) = exp( f (ot, st, at, ot−1)) , (5) where f (·) is an arbitrary non-positive function which measures the preferable of selecting an option 170 
+
+given state-action pair [st, at] and the previous executed option ot−1. In this work, we choose f to 171 
+
+be the mutual-information f = I[ot|st, at, ot−1] as a fact that when the uniform prior assumption of 172 
+
+P (o) is relaxed the optimization introduces a mutual-information as a regularizer [35]. 173 
+
+As explained in Section 2.1, direct optimization of Eq. 3 results in optimistic policies that assumes a 174 
+
+degree of control over the dynamics. We correct this risk-seeking behavior [ 31 ] through approximating 175 
+
+the optimal trajectory P (τ ) with the variational distribution: 176 
+
+q(τ ) = P (s0, o0) 
+
+> T−1
+
+Y
+
+> t=1
+
+P (st+1 |st, at)q(at|st, ot)q(ot|st, ot−1) (6) where the initial distribution P (s0, o0) and transition distribution P (st+1 | st, at) is set to be the true 177 
+
+environment dynamics from P (τ ). The variational distribution turns out to be the HiT-MDP, where 178 
+
+the action policy q(at | st) and the option policy q(ot|st, ot−1) are used to approximate the optimal 179 
+
+policy P (at|st, ot, EA 
+
+> 1: T
+
+) and P (ot|st, ot−1, EO 
+
+> 1: T
+
+). The Evidence Lower Bound (ELBO) [ 28 ] of the 180 
+
+log-likelihood optimal trajectory (Eq. 3) can be derived as (see Appendix A.3): 181 
+
+L(q(τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) = Eq(τ )[log P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) − log q(τ )] = Eq(τ )[r(st, at) + f (·) − log q(at|st, ot) − log q(ot|st, ot−1)] = Eq(τ )
+
+r(st, at) + f (·) + H[πA] + H[πO ] (7) where line 2 is substituting Eq. 3 and Eq. 6 into the ELBO. As a result, the maximum entropy 182 
+
+objective naturally arises in Eq. 7. Optimizing the ELBO not only seeks high-reward options but also 183 
+
+maximizes entropy across the space, promoting extensive exploration and maintaining high diversity. 184 
+
+Given the ELBO, we now define soft value functions of the option framework following the Bellman 185 
+
+Backup Functions along the trajectory q(τ ) as bellow: 186 
+
+Qsof t O [st, ot] = f (·) + Eat∼πA
+
+h
+
+Qsof t A [st, ot, at]
+
+i
+
++ H[πA], (8) 
+
+Qsof t A [st, ot, at] = r(s, a ) + Est+1 ∼P (st+1 |st,at)
+
+h
+
+Eot+1 ∼πO
+
+h
+
+Qsof t O [st+1 , ot+1 ]
+
+i
+
++ H[πO ]
+
+i
+
+(9) Assuming policies πA, π O ∈ Π where Π is an arbitrary feasible set, under a tabular setting where the 187 
+
+inference on L can be done exactly, we have the following theorem holds: 188 
+
+5Theorem 2 (Soft Option Policy Iteration Theorem) . Repeated optimizing L and DKL defined in 189 
+
+Eq. 10 from any πA 
+
+> 0
+
+, π O 
+
+> 0
+
+∈ Π converges to optimal policies πA∗, π O∗ such that Qsof t ∗ 
+
+> O
+
+[st, ot] ≥190 
+
+Qsof t O [st, ot] and Qsof t ∗ 
+
+> A
+
+[st, ot, at] ≥ Qsof t A [st, ot, at], for all πA 
+
+> 0
+
+, π O 
+
+> 0
+
+∈ Π and (st, at, ot) ∈191 
+
+S × A × O , assuming under tabular settings where |S| < ∞, |O| < ∞, |A| < ∞.192 
+
+Proof. See Appendix A.2. 193 
+
+Theorem 2 guarantees finding the optimal solution only when the inference can be done exactly 194 
+
+under tabular settings. However, real-world applications often involve large continuous domains and 195 
+
+employ neural networks as function approximators. In these cases, inference procedures can only be 196 
+
+done approximately. This necessitate a practical approximation algorithm which we present below. 197 
+
+3.2 Variational Markovian Option Critic Algorithm 198 
+
+Formulating complex problems as probabilistic graphical models (PGMs) allowing us to leverage 199 
+
+established methods from PGM literature to address the associated inference and learning challenges 200 
+
+in real-world applications. To this end, we utilizes the structured variational inference treatment for 201 
+
+optimizing the log-likelihood of optimal trajectory and prove its convergence under approximate 202 
+
+inference settings. Specifically, using the variational distribution q(τ ) (Eq. 6) as an approximator, the 203 
+
+ELBO can be derived as (see Appendix A.3): 204 
+
+L(q(τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) = −DKL (q(τ )|| P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) + log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) (10) where DKL is the KL-Divergence between the trajectory following variational policies q(τ ) and 205 
+
+optimal policies P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+). Under the structural variational inference [ 28 ] perspective, con-206 
+
+vergence to the optimal policy can be achieved by optimizing the ELBO with respect to the the 207 
+
+variational policy repeatedly: 208 
+
+Theorem 3 (Convergence Theorem for Variational Markovian Option Policy Iteration) . Let τ be 209 
+
+the latent variable and EA, EO be the ground-truth optimality variables. Define the variational 210 
+
+distribution q(τ ) and the true log-likelihood of optimality log P (EA, EO ). iterates according to the 211 
+
+update rule qk+1 = arg max q L(q(τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) converges to the maximum value bounded 212 
+
+by the true log-likelihood of optimality. 213 
+
+Proof. See Appendix A.4. 214 
+
+We further implements a practical algorithm, the Variational Markovian Option Critic (VMOC) 215 
+
+algorithm, which is suitable for complex continuous domains. Specifically, we employ parameterized 216 
+
+neural networks as function approximators for both the Q-functions ( Qsof t ψA , Qsof t ψO ) and the policies 217 
+
+(πθA , πθO ). Instead of running evaluation and improvement to full convergence using Theorem 2, we 218 
+
+can optimize the variational distribution by taking stochastic gradient descent following Theorem 3 219 
+
+with respect to the ELBO (Eq. 7) directly. Share the same motivation with Haarnoja et al. [19] 220 
+
+of reducing the variance during the optimization procedure, we derive an option critic framework 221 
+
+by optimizing the maximum entropy objectives between the action Eq. 9 and the option Eq. 8 222 
+
+alternatively. The Bellman residual for the action critic is: 223 
+
+JQA (ψAi ) = E(st,ot,at,st+1 )∼D
+
+ 
+
+min  
+
+> i=1 ,2
+
+QψAi (st, ot, at)−
+
+ r(st, at) + Eot+1 ∼πO
+
+h
+
+Qsof t O [st+1 , ot+1 ]
+
+i
+
++ αO H[πO ]2
+
+where αO is the temperature hyper-parameter and the expectation over option random variable 224 
+
+Eot+1 ∼πO can be evaluated exactly since πO is a discrete distribution. The Bellman residual for the 225 
+
+option critic is: 226 
+
+JQO (ψOi ) = E(st,ot)∼D
+
+ 
+
+min  
+
+> i=1 ,2
+
+QOψOi
+
+(st, ot)−
+
+ f (·) + Eat∼πA
+
+h
+
+Qsof t A [st, ot, at] − αA log q(at|st, ot)
+
+i 2
+
+6αA is the temperature hyper-parameter. Unlike Eot+1 ∼πO can be trivially evaluated, evaluating 227 
+
+Eat∼πA is typically intractable. Therefore, in implementation we use at sampled from the replay 228 
+
+buffer to estimate the expectation over πA.229 
+
+Following Theorem 3, the policy gradients can be derived by directly taking gradient with respect to 230 
+
+the ELBOs defined for the action Eq. 9 and the option Eq. 8 policies respectively. The action policy 231 
+
+objective is given by: 232 
+
+JπA (θA) = −E(st,ot)∼D
+
+
+
+min  
+
+> i=1 ,2
+
+QψAi (st, ot, ˜at) − αA log q(˜ at|st, ot)
+
+
+
+, ˜at ∼ q(·| st, ot)
+
+where in practice the action policy is often sampled by using the re-parameterization trick introduced 233 
+
+in [19]. The option objective is given by: 234 
+
+JπO (θO ) = −E(st,ot−1)∼D
+
+
+
+min  
+
+> i=1 ,2
+
+QψOi (st, ot) + αO H[πO ]
+
+
+
+The variational distribution q(τ ) defined in Eq. 6 allows us to learn options as embeddings [ 34 , 35 ]235 
+
+with a learnable embedding matrix W ∈ Rnum_options ×embedding_dim . Under this setting, the embedding 236 
+
+matrix W can be absorbed into the parameter vector θO . This integration into VMOC ensures that 237 
+
+options are represented as embeddings without any additional complications, thereby enhancing the 238 
+
+expressiveness and scalability of the model. 239 
+
+The temperature hyper-parameters can also be adjusted by minimizing the following objective: 240 
+
+J(αA) = −E˜at∼πA
+
+αA(log πA(˜ at | st, ot) + H)
+
+for the action policy temperature αA, where H is a target entropy. Similarly, the option policy 241 
+
+temperature αO can be adjusted by: 242 
+
+J(αO ) = −Eot∼πO
+
+αO (log πO (ot | st, ot−1) + H)
+
+where H is also a target entropy for the option policy. In both cases, the temperatures αA and αO
+
+> 243
+
+are updated using gradient descent, ensuring that the entropy regularization terms dynamically adapt 244 
+
+to maintain a desired level of exploration. This approach aligns with the methodology proposed 245 
+
+in SAC [ 19 ]. By adjusting the temperature parameters, the VMOC algorithm ensures a balanced 246 
+
+trade-off between exploration and exploitation, which is crucial for achieving optimal performance in 247 
+
+complex continuous control tasks. We summarize the VMOC algorithm in Appendix B. 248 
+
+## 4 Experiments 249 
+
+In this section, we design experiments on the challenging single task OpenAI Gym MuJoCo [ 7]250 
+
+environments (10 environments) to test Variational Markovian Option Critic (VMOC)’s performance 251 
+
+over other option variants and non-option baselines. 252 
+
+For VMOC in all environments, we fix the temperature rate for both αO and αA to 0.05 ; we add an 253 
+
+exploration noise N (μ = 0 , σ = 0 .2) during exploration. For all baselines, we follow DAC [ 52 ]’s 254 
+
+open source implementations and compare our algorithm with six baselines, five of which are option 255 
+
+variants, i.e. , MOPG [ 35 ], DAC+PPO, AHP+PPO [ 32 ], IOPG [ 45 ], PPOC [ 27 ], OC [ 4] and PPO 256 
+
+[ 41 ]. All baselines’ parameters used by DAC remain unchanged over 1 million environment steps 257 
+
+to converge. Figures are plotted following DAC’s style: curves are averaged over 10 independent 258 
+
+runs and smoothed by a sliding window of size 20. Shaded regions indicate standard deviations. 259 
+
+All experiments are run on an Intel® Core™ i9-9900X CPU @ 3.50GHz with a single thread and 260 
+
+process. Our implementation details are summarized in Appendix C. For a fair comparison, we follow 261 
+
+option literature conventions and use four options in all implementations. Our code is available in 262 
+
+supplemental materials. 263 
+
+## 5 Experiments 264 
+
+We evaluate the performance of VMOC against six option-based baselines (MOPG [ 35 ], 265 
+
+DAC+PPO [ 52 ], AHP+PPO [ 32 ], IOPG [ 45 ], PPOC [ 27 ], and OC [ 4]) as well as the hierarchy-free 266 
+
+7PPO algorithm [ 41 ]. Previous studies [ 27 , 45 , 20 , 52 ] have suggested that option-based algorithms 267 
+
+do not exhibit significant advantages over hierarchy-free algorithms in single-task environments. 268 
+
+Nonetheless, our results demonstrate that VMOC significantly outperforms all baselines in terms 269 
+
+of episodic return, convergence speed, step variance, and variance across 10 runs, as illustrated in 270 
+
+Figure 2. The only exception is the relatively simple InvertedDoublePendulum environment, which 271 
+
+we suspect is due to hyper-parameter tuning issues and will be addressed in future work. 272  
+
+> Figure 2: Experiments on Mujoco Environments. Curves are averaged over 10 independent runs with different random seeds and smoothed by a sliding window of size 20. Shaded regions indicate standard deviations.
+
+Notably, VMOC exhibits superior performance on the Humanoid-v2 and HumanoidStandup-v2 273 
+
+environments. These environments are characterized by a large state space ( S ∈ R376 ) and action 274 
+
+space ( A ∈ R17 ), whereas other environments typically have state dimensions less than 20 and 275 
+
+action dimensions less than 5. The enhanced performance of VMOC in these environments can be 276 
+
+attributed to its maximum entropy capability: in large state-action spaces, the agent must maximize 277 
+
+rewards while exploring a diverse set of state-action pairs. Maximum likelihood methods tend to 278 
+
+quickly saturate with early rewarding observations, leading to the selection of low-entropy options 279 
+
+that converge to local optima. 280 
+
+A particularly relevant comparison is with the Markovian Option Policy Gradient (MOPG) [ 35 ], 281 
+
+as both VMOC and MOPG are developed based on HiT-MDPs and employ option embeddings. 282 
+
+Despite being derived under the maximum entropy framework, MOPG utilizes an on-policy gradient 283 
+
+descent approach. Our experimental results show that VMOC’s performance surpasses that of MOPG, 284 
+
+highlighting the limitations of on-policy methods, which suffer from shortsighted rollout lengths 285 
+
+and quickly saturate to early high-reward observations. In contrast, VMOC’s variational off-policy 286 
+
+approach effectively utilizes the maximum entropy framework by ensuring better exploration and 287 
+
+stability across the learning process. Additionally, the off-policy nature of VMOC allows it to reuse 288 
+
+samples from a replay buffer, enhancing sample efficiency and promoting greater diversity in the 289 
+
+learned policies. This capability leads to more robust learning, as the algorithm can leverage a broader 290 
+
+range of experiences to improve policy optimization. 291 
+
+## 6 Related Work 292 
+
+The VMOC incorporates three key ingredients: the option framework, a structural variational in-293 
+
+ference based off-policy algorithm and latent variable policies. We review prior works that draw 294 
+
+8on some of these ideas in this section. The options framework [ 47 ] offers a promising approach 295 
+
+for discovering and reusing temporal abstractions, with options representing temporally abstract 296 
+
+skills. Conventional option frameworks [ 39 ], typically developed under the maximum likelihood 297 
+
+(MLE) framework with few constraints on options behavior, often suffer from the option degra-298 
+
+dation problem [ 32 , 4]. This problem occurs when options quickly saturate with early rewarding 299 
+
+observations, causing a single option to dominate the entire policy, or when options switch every 300 
+
+timestep, maximizing policy at the expense of skill reuse across tasks. On-policy option learning 301 
+
+algorithms [ 4, 3, 52 , 34 , 35 ] aim to maximize expected return by adjusting policy parameters to in-302 
+
+crease the likelihood of high-reward option trajectories, which often leads to focusing on low-entropy 303 
+
+options. Several techniques [ 20 , 21 , 23 ] have been proposed to enhance on-policy algorithms with 304 
+
+entropy-like extrinsic rewards as regularizers, but these often result in biased optimal trajectories. In 305 
+
+contrast, the maximum entropy term in VMOC arises naturally within the variational framework and 306 
+
+provably converges to the optimal trajectory. 307 
+
+Although several off-policy option learning algorithms have been proposed [ 10 , 43 , 45 , 50 ], these 308 
+
+typically focus on improving sample efficiency by leveraging the control as inference framework. 309 
+
+Recent works [ 45 ] aim to enhance sample efficiency by inferring and marginalizing over options, 310 
+
+allowing all options to be learned simultaneously. Wulfmeier et al. [50] propose off-policy learning of 311 
+
+all options across every experience in hindsight, further boosting sample efficiency. However, these 312 
+
+approaches generally lack constraints on options behavior. A closely related work [ 33 ] also derives 313 
+
+a variational approach under the option framework; however, it is based on probabilistic graphical 314 
+
+model that we believe are incorrect, potentially leading to convergence issues. Additionally, our 315 
+
+algorithm enables learning options as latent embeddings, a feature not present in their approach. 316 
+
+Recently, several studies have extended the maximum entropy reinforcement learning framework to 317 
+
+discover skills by incorporating additional latent variables. One class of methods [ 22 , 17 ] maintains 318 
+
+latent variables constant over the duration of an episode, providing a time-correlated exploration 319 
+
+signal. Other works [ 19 , 51 ] focus on discovering multi-level action abstractions that are suitable for 320 
+
+repurposing by promoting skill distinguishability, but they do not incorporate temporal abstractions. 321 
+
+Studies such as [ 38 , 1, 8 ] aim to discover temporally abstract skills essential for exploration, but they 322 
+
+predefine their temporal resolution. In contrast, VMOC learns temporal abstractions as embeddings 323 
+
+in an end-to-end data-driven approach with minimal prior knowledge encoded in the framework. 324 
+
+## 7 Conclusion 325 
+
+In this paper, we have introduced the Variational Markovian Option Critic (VMOC), a novel off-policy 326 
+
+algorithm designed to address the challenges of ineffective exploration, sample inefficiency, and com-327 
+
+putational complexity inherent in the conventional option framework for hierarchical reinforcement 328 
+
+learning. By integrating a variational inference framework, VMOC leverages maximum entropy 329 
+
+as intrinsic rewards to promote the discovery of diverse and effective options. Additionally, by 330 
+
+employing low-cost option embeddings instead of traditional, computationally expensive option 331 
+
+triples, VMOC enhances both scalability and expressiveness. Extensive experiments in challenging 332 
+
+Mujoco environments demonstrate that VMOC significantly outperforms existing on-policy and 333 
+
+off-policy option variants, validating its effectiveness in learning coherent and diverse option sets 334 
+
+suitable for complex tasks. This work advances the field of hierarchical reinforcement learning by 335 
+
+providing a robust, scalable, and efficient method for learning temporally extended actions. 336 
+
+## 8 Limitations 337 
+
+Due to limited computing resources, we did not conduct an ablation study of VMOC. Additionally, 338 
+
+the temperature parameter was fixed in our experiments, whereas an automatically tuned parameter 339 
+
+could potentially enhance performance (see SAC [ 19 ]). While our baselines focus on option variants, 340 
+
+a thorough comparison to other off-policy algorithms is also worth investigating. It is particularly 341 
+
+important to explore whether VMOC exhibits performance improvements in scalability when the 342 
+
+number of option embeddings is significantly increased. These investigations are left for future work. 343 
+
+9References 344 
+
+[1] Ajay, A., Kumar, A., Agrawal, P., Levine, S., and Nachum, O. Opal: Offline primitive discovery 345 
+
+for accelerating offline reinforcement learning. arXiv preprint arXiv:2010.13611 , 2020. 346 
+
+[2] Araujo, E. G. and Grupen, R. A. Learning control composition in a complex environment. In 347 
+
+Proceedings of the Fourth International Conference on Simulation of Adaptive Behavior , pp. 348 
+
+333–342, 1996. 349 
+
+[3] Bacon, P.-L. Temporal Representation Learning . PhD thesis, McGill University Libraries, 2018. 350 
+
+[4] Bacon, P.-L., Harb, J., and Precup, D. The option-critic architecture. In Thirty-First AAAI 351 
+
+Conference on Artificial Intelligence , 2017. 352 
+
+[5] Bertsekas, D. and Tsitsiklis, J. N. Neuro-dynamic programming . Athena Scientific, 1996. 353 
+
+[6] Brockett, R. W. Hybrid models for motion control systems. In Essays on Control: Perspectives 354 
+
+in the Theory and its Applications , pp. 29–53. Springer, 1993. 355 
+
+[7] Brockman, G., Cheung, V., Pettersson, L., Schneider, J., Schulman, J., Tang, J., and Zaremba, 356 
+
+W. Openai gym. arXiv preprint arXiv:1606.01540 , 2016. 357 
+
+[8] Co-Reyes, J., Liu, Y., Gupta, A., Eysenbach, B., Abbeel, P., and Levine, S. Self-consistent 358 
+
+trajectory autoencoder: Hierarchical reinforcement learning with trajectory embeddings. In 359 
+
+International conference on machine learning , pp. 1009–1018. PMLR, 2018. 360 
+
+[9] Colombetti, M., Dorigo, M., and Borghi, G. Behavior analysis and training-a methodology 361 
+
+for behavior engineering. IEEE Transactions on Systems, Man, and Cybernetics, Part B 362 
+
+(Cybernetics) , 26(3):365–380, 1996. 363 
+
+[10] Daniel, C., Van Hoof, H., Peters, J., and Neumann, G. Probabilistic inference for determining 364 
+
+options in reinforcement learning. Machine Learning , 104(2-3):337–357, 2016. 365 
+
+[11] Dayan, P. and Hinton, G. E. Feudal reinforcement learning. Advances in Neural Information 366 
+
+Processing Systems , pp. 271–278, 1993. 367 
+
+[12] Dietterich, T. G. Hierarchical reinforcement learning with the maxq value function decomposi-368 
+
+tion. Journal of Artificial Intelligence Research , 13:227–303, 2000. 369 
+
+[13] Eysenbach, B., Gupta, A., Ibarz, J., and Levine, S. Diversity is all you need: Learning skills 370 
+
+without a reward function. arXiv preprint arXiv:1802.06070 , 2018. 371 
+
+[14] Fujimoto, S., Van Hoof, H., and Meger, D. Addressing function approximation error in 372 
+
+actor-critic methods. arXiv preprint arXiv:1802.09477 , 2018. 373 
+
+[15] Goyal, A., Islam, R., Strouse, D., Ahmed, Z., Botvinick, M., Larochelle, H., Bengio, Y., and 374 
+
+Levine, S. Infobot: Transfer and exploration via the information bottleneck. arXiv preprint 375 
+
+arXiv:1901.10902 , 2019. 376 
+
+[16] Guo, Z., Thomas, P. S., and Brunskill, E. Using options and covariance testing for long 377 
+
+horizon off-policy policy evaluation. In Advances in Neural Information Processing Systems ,378 
+
+pp. 2492–2501, 2017. 379 
+
+[17] Gupta, A., Kumar, V., Lynch, C., Levine, S., and Hausman, K. Relay policy learning: Solving 380 
+
+long-horizon tasks via imitation and reinforcement learning. arXiv preprint arXiv:1910.11956 ,381 
+
+2019. 382 
+
+[18] Haarnoja, T., Tang, H., Abbeel, P., and Levine, S. Reinforcement learning with deep energy-383 
+
+based policies. In International Conference on Machine Learning , pp. 1352–1361. PMLR, 384 
+
+2017. 385 
+
+[19] Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. Soft actor-critic: Off-policy maximum 386 
+
+entropy deep reinforcement learning with a stochastic actor. arXiv preprint arXiv:1801.01290 ,387 
+
+2018. 388 
+
+10 [20] Harb, J., Bacon, P.-L., Klissarov, M., and Precup, D. When waiting is not an option: Learning 389 
+
+options with a deliberation cost. In Thirty-Second AAAI Conference on Artificial Intelligence ,390 
+
+2018. 391 
+
+[21] Harutyunyan, A., Dabney, W., Borsa, D., Heess, N., Munos, R., and Precup, D. The termination 392 
+
+critic. arXiv preprint arXiv:1902.09996 , 2019. 393 
+
+[22] Hausman, K., Springenberg, J. T., Wang, Z., Heess, N., and Riedmiller, M. Learning an 394 
+
+embedding space for transferable robot skills. In International Conference on Learning Repre-395 
+
+sentations , 2018. 396 
+
+[23] Kamat, A. and Precup, D. Diversity-enriched option-critic. arXiv , 2020. 397 
+
+[24] Khetarpal, K. and Precup, D. Learning options with interest functions. In Proceedings of the 398 
+
+32nd AAAI Conference on Artificial Intelligence , pp. 1–2, 2019. 399 
+
+[25] Khetarpal, K., Klissarov, M., Chevalier-Boisvert, M., Bacon, P.-L., and Precup, D. Options of 400 
+
+interest: Temporal abstraction with interest functions. In Proceedings of the AAAI Conference 401 
+
+on Artificial Intelligence , volume 34, pp. 4,444–4,451, 2020. 402 
+
+[26] Klissarov, M. and Precup, D. Flexible option learning. In Ranzato, M., Beygelzimer, A., 403 
+
+Dauphin, Y., Liang, P., and Vaughan, J. W. (eds.), Advances in Neural Information Processing 404 
+
+Systems , volume 34, pp. 4632–4646. Curran Associates, 2021. 405 
+
+[27] Klissarov, M., Bacon, P.-L., Harb, J., and Precup, D. Learnings options end-to-end for continu-406 
+
+ous action tasks. arXiv preprint arXiv:1712.00004 , 2017. 407 
+
+[28] Koller, D. and Friedman, N. Probabilistic graphical models: principles and techniques . MIT 408 
+
+press, 2009. 409 
+
+[29] Kolobov, A., Weld, D. S., et al. Discovering hidden structure in factored mdps. Artificial 410 
+
+Intelligence , 189:19–47, 2012. 411 
+
+[30] Konidaris, G. and Barto, A. G. Skill discovery in continuous reinforcement learning domains 412 
+
+using skill chaining. In Advances in neural information processing systems , pp. 1015–1023, 413 
+
+2009. 414 
+
+[31] Levine, S. Reinforcement learning and control as probabilistic inference: Tutorial and review. 415 
+
+arXiv preprint arXiv:1805.00909 , 2018. 416 
+
+[32] Levy, K. Y. and Shimkin, N. Unified inter and intra options learning using policy gradient 417 
+
+methods. In European Workshop on Reinforcement Learning , pp. 153–164. Springer, 2011. 418 
+
+[33] Li, C., Ma, X., Zhang, C., Yang, J., Xia, L., and Zhao, Q. Soac: The soft option actor-critic 419 
+
+architecture. arXiv preprint arXiv:2006.14363 , 2020. 420 
+
+[34] Li, C., Song, D., and Tao, D. The skill-action architecture: Learning abstract action embeddings 421 
+
+for reinforcement learning. 2020. 422 
+
+[35] Li, C., Song, D., and Tao, D. Hit-mdp: learning the smdp option framework on mdps with hidden 423 
+
+temporal embeddings. In The Eleventh International Conference on Learning Representations ,424 
+
+2022. 425 
+
+[36] Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., Graves, 426 
+
+A., Riedmiller, M., Fidjeland, A. K., Ostrovski, G., et al. Human-level control through deep 427 
+
+reinforcement learning. Nature , 518(7540):529–533, 2015. 428 
+
+[37] Osa, T., Tangkaratt, V., and Sugiyama, M. Hierarchical reinforcement learning via advantage-429 
+
+weighted information maximization. arXiv preprint arXiv:1901.01365 , 2019. 430 
+
+[38] Pertsch, K., Rybkin, O., Ebert, F., Finn, C., Jayaraman, D., and Levine, S. Long-horizon visual 431 
+
+planning with goal-conditioned hierarchical predictors. NeurIPS , 2020. 432 
+
+[39] Precup, D. Temporal abstraction in reinforcement learning . University of Massachusetts 433 
+
+Amherst, 2000. 434 
+
+11 [40] Schulman, J., Chen, X., and Abbeel, P. Equivalence between policy gradients and soft q-learning. 435 
+
+arXiv preprint arXiv:1704.06440 , 2017. 436 
+
+[41] Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimiza-437 
+
+tion algorithms. arXiv preprint arXiv:1707.06347 , 2017. 438 
+
+[42] Sharma, A., Gu, S., Levine, S., Kumar, V., and Hausman, K. Dynamics-aware unsupervised 439 
+
+discovery of skills. arXiv preprint arXiv:1907.01657 , 2019. 440 
+
+[43] Shiarlis, K., Wulfmeier, M., Salter, S., Whiteson, S., and Posner, I. Taco: Learning task 441 
+
+decomposition via temporal alignment for control. In International Conference on Machine 442 
+
+Learning , pp. 4654–4663. PMLR, 2018. 443 
+
+[44] Silver, D., Huang, A., Maddison, C. J., Guez, A., Sifre, L., Van Den Driessche, G., Schrittwieser, 444 
+
+J., Antonoglou, I., Panneershelvam, V., Lanctot, M., et al. Mastering the game of go with deep 445 
+
+neural networks and tree search. Nature , 529(7587):484–489, 2016. 446 
+
+[45] Smith, M., Hoof, H., and Pineau, J. An inference-based policy gradient method for learning 447 
+
+options. In International Conference on Machine Learning , pp. 4,703–4,712, 2018. 448 
+
+[46] Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, 2018. 449 
+
+[47] Sutton, R. S., Precup, D., and Singh, S. Between mdps and semi-mdps: A framework for 450 
+
+temporal abstraction in reinforcement learning. Artificial Intelligence , 112(1-2):181–211, 1999. 451 
+
+[48] Todorov, E. Linearly-solvable markov decision problems. Advances in neural information 452 
+
+processing systems , 19, 2006. 453 
+
+[49] Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics engine for model-based control. In 2012 454 
+
+IEEE/RSJ International Conference on Intelligent Robots and Systems , pp. 5026–5033. IEEE, 455 
+
+2012. 456 
+
+[50] Wulfmeier, M., Rao, D., Hafner, R., Lampe, T., Abdolmaleki, A., Hertweck, T., Neunert, M., 457 
+
+Tirumala, D., Siegel, N., Heess, N., et al. Data-efficient hindsight off-policy option learning. 458 
+
+arXiv preprint arXiv:2007.15588 , 2020. 459 
+
+[51] Zhang, D., Courville, A., Bengio, Y., Zheng, Q., Zhang, A., and Chen, R. T. Latent 460 
+
+state marginalization as a low-cost approach for improving exploration. arXiv preprint 461 
+
+arXiv:2210.00999 , 2022. 462 
+
+[52] Zhang, S. and Whiteson, S. DAC: The double actor-critic architecture for learning options. In 463 
+
+Advances in Neural Information Processing Systems , pp. 2,012–2,022, 2019. 464 
+
+[53] Ziebart, B. D., Bagnell, J. A., and Dey, A. K. Modeling interaction via the principle of maximum 465 
+
+causal entropy. In ICML , 2010. 466 
+
+## A Proofs 467 
+
+A.1 Theorem 1 468 
+
+Theorem 1 (Convergence Theorem for Structured Variational Policy Iteration). Let τ be the 469 
+
+latent variable and E be the observed variable. Define the variational distribution q(τ ) and the 470 
+
+log-likelihood log P (E). Let M : q[k] → q[k+1] represent the mapping defined by the EM steps 471 
+
+inference update, so that q[k+1] = M (q[k]). The likelihood function increases at each iteration of the 472 
+
+variational inference algorithm until the conditions for equality are satisfied and a fixed point of the 473 
+
+iteration is reached: 474 
+
+log P (E | q[k+1] ) ≥ log P (E | q[k]), with equality if and only if 
+
+> 475
+
+L(q[k+1] , P ) = L(q[k], P )
+
+and 476 
+
+DKL (q[k+1] (τ ) ∥ P (τ | E )) = DKL (q[k](τ ) ∥ P (τ | E )) .
+
+12 Proof. Let τ be the latent variable and E be the observed variable. Define the evidence lower bound 477 
+
+(ELBO) as L(q, P ) and the Kullback-Leibler divergence as DKL (q ∥ P ), where q(τ ) approximates 478 
+
+the posterior distribution and P (E | τ ) is the likelihood. 479 
+
+The log-likelihood function log P (E) can be decomposed as: 480 
+
+log P (E) = L(q, P ) + DKL (q(τ ) ∥ P (τ | E )) ,
+
+where 481 
+
+L(q, P ) = Eq(τ ) [log P (E, τ ) − log q(τ )] 
+
+and 482 
+
+DKL (q(τ ) ∥ P (τ | E )) = Eq(τ )
+
+
+
+log q(τ )
+
+P (τ | E )
+
+
+
+.
+
+Let M : q[k] → q[k+1] represent the mapping defined by the variational inference update, so that 483 
+
+q[k+1] = M (q[k]). If q∗ is a variational distribution that maximizes the ELBO, so that log P (E | 484 
+
+q∗) ≥ log P (E | q) for all q, then log P (E | M (q∗)) = log P (E | q∗). In other words, the 485 
+
+maximizing distributions are fixed points of the variational inference algorithm. Since the likelihood 486 
+
+function is bounded (for distributions of practical interest), the sequence of variational distributions 487 
+
+q[0] , q [1] , . . . , q [k] yields a bounded nondecreasing sequence log P (E | q[0] ) ≤ log P (E | q[1] ) ≤488 
+
+· · · ≤ log P (E | q[k]) ≤ log P (E | q[k]) which must converge as k → ∞ .489 490 
+
+A.2 Theorem 2 491 
+
+Theorem 2 (Soft Option Policy Iteration Theorem). Repeated optimizing L and DKL defined in 492 
+
+Eq. 10 from any πA 
+
+> 0
+
+, π O 
+
+> 0
+
+∈ Π converges to optimal policies πA∗, π O∗ such that Qsof t ∗ 
+
+> O
+
+[st, ot] ≥493 
+
+Qsof t O [st, ot] and Qsof t ∗ 
+
+> A
+
+[st, ot, at] ≥ Qsof t A [st, ot, at], for all πA 
+
+> 0
+
+, π O 
+
+> 0
+
+∈ Π and (st, at, ot) ∈494 
+
+S × A × O , assuming |S| < ∞, |O| < ∞, |A| < ∞.495 
+
+Proof. Define the entropy augmented reward as rsof t (st, at) = r(st, at) + H[πA] and 496 
+
+f sof t (ot, st, at, ot−1) = f (ot, st, at, ot−1) + H[πO ] and rewrite Bellman Backup functions as, 497 
+
+QO [st, ot] = f sof t (·) + Eat∼πA [QA[st, ot, at]] ,QA[st, ot, at] = rsof t (s, a ) + Est+1 ∼P (st+1 |st,at)
+
+Eot+1 ∼πO [QO [st+1 , ot+1 ]] 
+
+We start with proving the convergence of soft option policy evaluation. As with the standard Q-498 
+
+function and value function, we can relate the Q-function at a future state via a Bellman Operator 499 
+
+T sof t . The option-action value function satisfies the Bellman Operator T sof t 
+
+> 500
+
+T sof t QA[st, ot, at] = E[Gt|st, ot, at]= rsof t (s, a ) + γ X
+
+> st+1
+
+P (st+1 |st, at)QO [st+1 , ot],
+
+As with the standard convergence results for policy evaluation [ 46 ], by the definition of T sof t (Eq. 11) 501 
+
+the option-action value function QπA 
+
+> A
+
+is a fixed point. 502 
+
+To prove the T sof t is a contraction, define a norm on V -values functions V and U503 
+
+∥V − U ∥∞ ≜ max  
+
+> ¯s∈¯S
+
+|V (¯ s) − U (¯ s)|. (11) where ¯s = {s, o }.504 
+
+By recurssively apply the Hidden Temporal Bellman Operator T sof t , we have: 505 
+
+13 QO [st, ot−1] = E[Gt|st, ot−1] = X
+
+> ot
+
+P (ot|st, ot−1)QO [st, ot]= X
+
+> ot
+
+P (ot|st, ot−1) X
+
+> at
+
+P (at|st, ot)
+
+
+
+r(s, a ) + γ X
+
+> st+1
+
+P (st+1 |st, at)QO [st+1 , ot]
+
+
+
+= r(s, a ) + γ X
+
+> ot
+
+P (ot|st, ot−1) X
+
+> at
+
+P (at|st, ot) X
+
+> st+1
+
+P (st+1 |st, at)QO [st+1 , ot]= r(s, a ) + γ X
+
+> ot,st+1
+
+P (st+1 , ot|st, ot−1)QO [st+1 , ot]= r(s, a ) + γE st+1 ,ot
+
+
+
+QO [st+1 , ot]
+
+
+
+(12) Therefore, by applying Eq. 12 to V and U we have: 506 
+
+∥T π V − T π U ∥∞
+
+= max  
+
+> ¯s∈¯S
+
+γE st+1 ,ot
+
+
+
+QO [st+1 , ot]
+
+
+
+− γE st+1 ,ot
+
+
+
+U [st+1 , ot]
+
+
+
+= γ max  
+
+> ¯s∈¯S
+
+Est+1 ,ot
+
+
+
+QO [st+1 , ot] − U [st+1 , ot]
+
+
+
+≤ γ max  
+
+> ¯s∈¯S
+
+Est+1 ,ot
+
+
+
+γ max  
+
+> ¯s∈¯S
+
+QO [st+1 , ot] − U [st+1 , ot]
+
+
+
+≤ γ max  
+
+> ¯s∈¯S
+
+|V [¯ s] − U [¯ s]|
+
+= γ∥V − U ∥∞ (13) Therefore, T sof t is a contraction. By the fixed point theorem, assuming that throughout our computa-507 
+
+tion the QA[·, ·] and QO [·] are bounded and A < ∞, the sequence QkA defined by Qk+1  
+
+> A
+
+= T sof t QkA508 
+
+will converge to the option-action value function QπA 
+
+> A
+
+as k → ∞ .509 
+
+The convergence results of and the Soft Option Policy Improvement Theorem then follows conven-510 
+
+tional Soft Policy Improvement Theorem Theorem 1. Consequently, the Soft Option Policy Iteration 511 
+
+Theorem follows directly from these results. 512 513 
+
+A.3 Derivation of Eq. 10 514 
+
+L(q(τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) = Eq(τ )[log P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) − log q(τ )] = Eq(τ )[log P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) + log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) − log q(τ )] = Eq(τ )[log P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+) − log q(τ )] + Eq(τ ) log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)= Eq(τ )[ log P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)log q(τ ) ] + log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)= −DKL (log q(τ ) ∥ log P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) + log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)
+
+A.4 Theorem 3 515 
+
+Theorem 3 (Convergence Theorem for Variational Markovian Option Policy Iteration). Let τ be 516 
+
+the latent variable and EA, EO be the ground-truth optimality variables. Define the variational 517 
+
+distribution q(τ ) and the true log-likelihood of optimality log P (EA, EO ). iterates according to the 518 
+
+update rule qk+1 = arg max q L(q(τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) converges to the maximum value bounded 519 
+
+by the data log-likelihood. 520 
+
+14 Proof. The objective is to maximize the ELBO with respect to the policy q. Formally, this can be 521 
+
+written as: 522 
+
+qk+1 = arg max  
+
+> q
+
+L(q, P ).
+
+Suppose we q is a neural network function approximator, assuming the continuity and differentiability 523 
+
+of q with respect to its parameters. Using stochastic gradient descent (SGD) to optimize the parameters 524 
+
+guarantees that the ELBO increases, such that L(qk+1 , P ) ≥ L (qk, P ).525 
+
+Rearranging Eq. 10 we get: 526 
+
+DKL (qk+1 (τ )|| P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) = −L(qk+1 (τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) + log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)
+
+≤ − L(qk(τ ), P (τ, EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) + log P (EA 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)= DKL (qk(τ )|| P (τ |E A 
+
+> 1: T
+
+, EO 
+
+> 1: T
+
+)) 
+
+Thus, each SGD update not only potentially increases the ELBO but also decreases the KL divergence, 527 
+
+moving q closer to P . Given the properties of SGD and assuming appropriate learning rates and 528 
+
+sufficiently expressive neural network architectures, the sequence {qk} converges to a policy q∗ that 529 
+
+minimizes the KL divergence to the true posterior. 530 
+
+## B VMOC Algorithm 531 
+
+Algorithm 1 VMOC Algorithm 
+
+1: Initialize parameter vectors ψA, ψO , θO , θA
+
+2: for each epoch do 
+
+3: Collect trajectories {ot−1, st, at, ot} into the replay buffer 
+
+4: for each gradient step do 
+
+5: Update Qsof t ψAi
+
+: ψAi ← ψAi − ηQA ∇JQsof t ψAi
+
+for i ∈ { 1, 2}
+
+6: Update Qsof t ψOi
+
+: ψOi ← ψOi − ηQO ∇JQsof t ψOi
+
+for i ∈ { 1, 2}
+
+7: Update πOθO : θO ← θO − ηπO ∇JπO
+
+8: Update πAθA : θA ← θA − ηπA ∇JπA
+
+9: Update target networks: ¯ψA ← σψ A + (1 − σ) ¯ψA, ¯ψO ← σψ O + (1 − σ) ¯ψO
+
+10: Update temperature factors: αO ← αO − ηαO ∇JαO , αA ← αA − ηαA ∇JαA
+
+11: end for 
+
+12: end for 
+
+## C Implementation Details 532 
+
+C.1 Hyperparameters 533 
+
+In this section we summarize our implementation details. For a fair comparison, all baselines: 534 
+
+MOPG [ 35 ], DAC+PPO [ 52 ], AHP+PPO [ 32 ], PPOC [ 27 ], OC [ 4 ] and PPO [ 41 ] are from DAC’s 535 
+
+open source Github repo: https://github.com/ShangtongZhang/DeepRL/tree/DAC . Hyper-536 
+
+parameters used in DAC [52] for all these baselines are kept unchanged. 537 
+
+VMOC Network Architecture: We use Pytorch to build neural networks. Specifically, for option 538 
+
+embeddings, we use an embedding matrix WS ∈ R4×40 which has 4 options ( 4 rows) and an 539 
+
+embedding size of 40 (40 columns). For layer normalization we use Pytorch’s built-in function 540 
+
+LayerNorm 2. For Feed Forward Networks (FNN), we use a 2 layer FNN with ReLu function as 541 
+
+activation function with input size of state-size, hidden size of [256 , 256] , and output size of action-542 
+
+dim neurons. For Linear layer, we use built-in Linear function 3 to map FFN’s outputs to 4 dimension. 543 
+
+> 2
+
+https://pytorch.org/docs/stable/generated/torch.nn.LayerNorm.html 
+
+> 3
+
+https://pytorch.org/docs/stable/generated/torch.nn.Linear.html 
+
+15 Each dimension acts like a logit for each skill and is used as density in Categorical distribution 4. For 544 
+
+both action policy and critic module, FFNs are of the same size as the one used in the skill policy. 545 
+
+Preprocessing: States are normalized by a running estimation of mean and std. 546 
+
+Hyperparameters for all on-policy option variants: For a fair comparison, we use exactly the same 547 
+
+parameters of PPO as DAC . Specifically: 548 
+
+• Optimizer: Adam with ϵ = 10 −5 and an initial learning rate 3 × 10 −4
+
+> 549
+
+• Discount ratio γ: 0.99 550 
+
+• GAE coefficient: 0.95 551 
+
+• Gradient clip by norm: 0.5552 
+
+• Rollout length: 2048 environment steps 553 
+
+• Optimization epochs: 10 554 
+
+• Optimization batch size: 64 555 
+
+• Action probability ratio clip: 0.2556 
+
+Computing Infrastructure: We conducted our experiments on an Intel® Core™ i9-9900X CPU @ 557 
+
+3.50GHz with a single thread and process with PyTorch. 558 
+
+> 4
+
+https://github.com/pytorch/pytorch/blob/master/torch/distributions/categorical.py 
+
+16 NeurIPS Paper Checklist 559 
+
+1. Claims 560 
+
+Question: Do the main claims made in the abstract and introduction accurately reflect the 561 
+
+paper’s contributions and scope? 562 
+
+Answer: [Yes] 563 
+
+Justification: The abstract and introduction accurately reflect the claims and findings of the 564 
+
+paper. 565 
+
+Guidelines: 566 
+
+• The answer NA means that the abstract and introduction do not include the claims 567 
+
+made in the paper. 568 
+
+• The abstract and/or introduction should clearly state the claims made, including the 569 
+
+contributions made in the paper and important assumptions and limitations. A No or 570 
+
+NA answer to this question will not be perceived well by the reviewers. 571 
+
+• The claims made should match theoretical and experimental results, and reflect how 572 
+
+much the results can be expected to generalize to other settings. 573 
+
+• It is fine to include aspirational goals as motivation as long as it is clear that these goals 574 
+
+are not attained by the paper. 575 
+
+2. Limitations 576 
+
+Question: Does the paper discuss the limitations of the work performed by the authors? 577 
+
+Answer: [Yes] 578 
+
+Justification: Limitations of the study are discussed in the discussion section. 579 
+
+Guidelines: 580 
+
+• The answer NA means that the paper has no limitation while the answer No means that 581 
+
+the paper has limitations, but those are not discussed in the paper. 582 
+
+• The authors are encouraged to create a separate "Limitations" section in their paper. 583 
+
+• The paper should point out any strong assumptions and how robust the results are to 584 
+
+violations of these assumptions (e.g., independence assumptions, noiseless settings, 585 
+
+model well-specification, asymptotic approximations only holding locally). The authors 586 
+
+should reflect on how these assumptions might be violated in practice and what the 587 
+
+implications would be. 588 
+
+• The authors should reflect on the scope of the claims made, e.g., if the approach was 589 
+
+only tested on a few datasets or with a few runs. In general, empirical results often 590 
+
+depend on implicit assumptions, which should be articulated. 591 
+
+• The authors should reflect on the factors that influence the performance of the approach. 592 
+
+For example, a facial recognition algorithm may perform poorly when image resolution 593 
+
+is low or images are taken in low lighting. Or a speech-to-text system might not be 594 
+
+used reliably to provide closed captions for online lectures because it fails to handle 595 
+
+technical jargon. 596 
+
+• The authors should discuss the computational efficiency of the proposed algorithms 597 
+
+and how they scale with dataset size. 598 
+
+• If applicable, the authors should discuss possible limitations of their approach to 599 
+
+address problems of privacy and fairness. 600 
+
+• While the authors might fear that complete honesty about limitations might be used by 601 
+
+reviewers as grounds for rejection, a worse outcome might be that reviewers discover 602 
+
+limitations that aren’t acknowledged in the paper. The authors should use their best 603 
+
+judgment and recognize that individual actions in favor of transparency play an impor-604 
+
+tant role in developing norms that preserve the integrity of the community. Reviewers 605 
+
+will be specifically instructed to not penalize honesty concerning limitations. 606 
+
+3. Theory Assumptions and Proofs 607 
+
+Question: For each theoretical result, does the paper provide the full set of assumptions and 608 
+
+a complete (and correct) proof? 609 
+
+Answer: [Yes] 610 
+
+17 Justification: The paper provides a full derivation of assumptions and proofs of the theoretical 611 
+
+result (convergence of the evidence lower bound) 612 
+
+Guidelines: 613 
+
+• The answer NA means that the paper does not include theoretical results. 614 
+
+• All the theorems, formulas, and proofs in the paper should be numbered and cross-615 
+
+referenced. 616 
+
+• All assumptions should be clearly stated or referenced in the statement of any theorems. 617 
+
+• The proofs can either appear in the main paper or the supplemental material, but if 618 
+
+they appear in the supplemental material, the authors are encouraged to provide a short 619 
+
+proof sketch to provide intuition. 620 
+
+• Inversely, any informal proof provided in the core of the paper should be complemented 621 
+
+by formal proofs provided in appendix or supplemental material. 622 
+
+• Theorems and Lemmas that the proof relies upon should be properly referenced. 623 
+
+4. Experimental Result Reproducibility 624 
+
+Question: Does the paper fully disclose all the information needed to reproduce the main ex-625 
+
+perimental results of the paper to the extent that it affects the main claims and/or conclusions 626 
+
+of the paper (regardless of whether the code and data are provided or not)? 627 
+
+Answer: [Yes] 628 
+
+Justification: Yes. Our code is provided in supplementary materials. Full details of the 629 
+
+experimental setup, model architectures are provided. 630 
+
+Guidelines: 631 
+
+• The answer NA means that the paper does not include experiments. 632 
+
+• If the paper includes experiments, a No answer to this question will not be perceived 633 
+
+well by the reviewers: Making the paper reproducible is important, regardless of 634 
+
+whether the code and data are provided or not. 635 
+
+• If the contribution is a dataset and/or model, the authors should describe the steps taken 636 
+
+to make their results reproducible or verifiable. 637 
+
+• Depending on the contribution, reproducibility can be accomplished in various ways. 638 
+
+For example, if the contribution is a novel architecture, describing the architecture fully 639 
+
+might suffice, or if the contribution is a specific model and empirical evaluation, it may 640 
+
+be necessary to either make it possible for others to replicate the model with the same 641 
+
+dataset, or provide access to the model. In general. releasing code and data is often 642 
+
+one good way to accomplish this, but reproducibility can also be provided via detailed 643 
+
+instructions for how to replicate the results, access to a hosted model (e.g., in the case 644 
+
+of a large language model), releasing of a model checkpoint, or other means that are 645 
+
+appropriate to the research performed. 646 
+
+• While NeurIPS does not require releasing code, the conference does require all submis-647 
+
+sions to provide some reasonable avenue for reproducibility, which may depend on the 648 
+
+nature of the contribution. For example 649 
+
+(a) If the contribution is primarily a new algorithm, the paper should make it clear how 650 
+
+to reproduce that algorithm. 651 
+
+(b) If the contribution is primarily a new model architecture, the paper should describe 652 
+
+the architecture clearly and fully. 653 
+
+(c) If the contribution is a new model (e.g., a large language model), then there should 654 
+
+either be a way to access this model for reproducing the results or a way to reproduce 655 
+
+the model (e.g., with an open-source dataset or instructions for how to construct 656 
+
+the dataset). 657 
+
+(d) We recognize that reproducibility may be tricky in some cases, in which case 658 
+
+authors are welcome to describe the particular way they provide for reproducibility. 659 
+
+In the case of closed-source models, it may be that access to the model is limited in 660 
+
+some way (e.g., to registered users), but it should be possible for other researchers 661 
+
+to have some path to reproducing or verifying the results. 662 
+
+5. Open access to data and code 663 
+
+18 Question: Does the paper provide open access to the data and code, with sufficient instruc-664 
+
+tions to faithfully reproduce the main experimental results, as described in supplemental 665 
+
+material? 666 
+
+Answer: [Yes] 667 
+
+Justification: The paper provides open access to the code and data. 668 
+
+Guidelines: 669 
+
+• The answer NA means that paper does not include experiments requiring code. 670 
+
+• Please see the NeurIPS code and data submission guidelines ( https://nips.cc/ 671 
+
+public/guides/CodeSubmissionPolicy ) for more details. 672 
+
+• While we encourage the release of code and data, we understand that this might not be 673 
+
+possible, so “No” is an acceptable answer. Papers cannot be rejected simply for not 674 
+
+including code, unless this is central to the contribution (e.g., for a new open-source 675 
+
+benchmark). 676 
+
+• The instructions should contain the exact command and environment needed to run to 677 
+
+reproduce the results. See the NeurIPS code and data submission guidelines ( https: 678 
+
+//nips.cc/public/guides/CodeSubmissionPolicy ) for more details. 679 
+
+• The authors should provide instructions on data access and preparation, including how 680 
+
+to access the raw data, preprocessed data, intermediate data, and generated data, etc. 681 
+
+• The authors should provide scripts to reproduce all experimental results for the new 682 
+
+proposed method and baselines. If only a subset of experiments are reproducible, they 683 
+
+should state which ones are omitted from the script and why. 684 
+
+• At submission time, to preserve anonymity, the authors should release anonymized 685 
+
+versions (if applicable). 686 
+
+• Providing as much information as possible in supplemental material (appended to the 687 
+
+paper) is recommended, but including URLs to data and code is permitted. 688 
+
+6. Experimental Setting/Details 689 
+
+Question: Does the paper specify all the training and test details (e.g., data splits, hyper-690 
+
+parameters, how they were chosen, type of optimizer, etc.) necessary to understand the 691 
+
+results? 692 
+
+Answer: [Yes] 693 
+
+Justification: Justification: All details are provided in the main content and the appendix. 694 
+
+Guidelines: 695 
+
+• The answer NA means that the paper does not include experiments. 696 
+
+• The experimental setting should be presented in the core of the paper to a level of detail 697 
+
+that is necessary to appreciate the results and make sense of them. 698 
+
+• The full details can be provided either with the code, in appendix, or as supplemental 699 
+
+material. 700 
+
+7. Experiment Statistical Significance 701 
+
+Question: Does the paper report error bars suitably and correctly defined or other appropriate 702 
+
+information about the statistical significance of the experiments? 703 
+
+Answer: [Yes] 704 
+
+Justification: All gym env experiments are run with 10 different random seeds. Performance 705 
+
+are reported by 1 sigma shaded area over all 10 runs. 706 
+
+Guidelines: 707 
+
+• The answer NA means that the paper does not include experiments. 708 
+
+• The authors should answer "Yes" if the results are accompanied by error bars, confi-709 
+
+dence intervals, or statistical significance tests, at least for the experiments that support 710 
+
+the main claims of the paper. 711 
+
+• The factors of variability that the error bars are capturing should be clearly stated (for 712 
+
+example, train/test split, initialization, random drawing of some parameter, or overall 713 
+
+run with given experimental conditions). 714 
+
+19 • The method for calculating the error bars should be explained (closed form formula, 715 
+
+call to a library function, bootstrap, etc.) 716 
+
+• The assumptions made should be given (e.g., Normally distributed errors). 717 
+
+• It should be clear whether the error bar is the standard deviation or the standard error 718 
+
+of the mean. 719 
+
+• It is OK to report 1-sigma error bars, but one should state it. The authors should 720 
+
+preferably report a 2-sigma error bar than state that they have a 96% CI, if the hypothesis 721 
+
+of Normality of errors is not verified. 722 
+
+• For asymmetric distributions, the authors should be careful not to show in tables or 723 
+
+figures symmetric error bars that would yield results that are out of range (e.g. negative 724 
+
+error rates). 725 
+
+• If error bars are reported in tables or plots, The authors should explain in the text how 726 
+
+they were calculated and reference the corresponding figures or tables in the text. 727 
+
+8. Experiments Compute Resources 728 
+
+Question: For each experiment, does the paper provide sufficient information on the com-729 
+
+puter resources (type of compute workers, memory, time of execution) needed to reproduce 730 
+
+the experiments? 731 
+
+Answer: [Yes] 732 
+
+Justification: Computational details are provided in the Appendix. 733 
+
+Guidelines: 734 
+
+• The answer NA means that the paper does not include experiments. 735 
+
+• The paper should indicate the type of compute workers CPU or GPU, internal cluster, 736 
+
+or cloud provider, including relevant memory and storage. 737 
+
+• The paper should provide the amount of compute required for each of the individual 738 
+
+experimental runs as well as estimate the total compute. 739 
+
+• The paper should disclose whether the full research project required more compute 740 
+
+than the experiments reported in the paper (e.g., preliminary or failed experiments that 741 
+
+didn’t make it into the paper). 742 
+
+9. Code Of Ethics 743 
+
+Question: Does the research conducted in the paper conform, in every respect, with the 744 
+
+NeurIPS Code of Ethics https://neurips.cc/public/EthicsGuidelines ?745 
+
+Answer: [Yes] 746 
+
+Justification: The research was conducted in accordance with the NeurIPs Code of Ethics. 747 
+
+Guidelines: 748 
+
+• The answer NA means that the authors have not reviewed the NeurIPS Code of Ethics. 749 
+
+• If the authors answer No, they should explain the special circumstances that require a 750 
+
+deviation from the Code of Ethics. 751 
+
+• The authors should make sure to preserve anonymity (e.g., if there is a special consid-752 
+
+eration due to laws or regulations in their jurisdiction). 753 
+
+10. Broader Impacts 754 
+
+Question: Does the paper discuss both potential positive societal impacts and negative 755 
+
+societal impacts of the work performed? 756 
+
+Answer: [NA] 757 
+
+Justification: The work in the paper has no potential for societal impacts. 758 
+
+Guidelines: 759 
+
+• The answer NA means that there is no societal impact of the work performed. 760 
+
+• If the authors answer NA or No, they should explain why their work has no societal 761 
+
+impact or why the paper does not address societal impact. 762 
+
+• Examples of negative societal impacts include potential malicious or unintended uses 763 
+
+(e.g., disinformation, generating fake profiles, surveillance), fairness considerations 764 
+
+(e.g., deployment of technologies that could make decisions that unfairly impact specific 765 
+
+groups), privacy considerations, and security considerations. 766 
+
+20 • The conference expects that many papers will be foundational research and not tied 767 
+
+to particular applications, let alone deployments. However, if there is a direct path to 768 
+
+any negative applications, the authors should point it out. For example, it is legitimate 769 
+
+to point out that an improvement in the quality of generative models could be used to 770 
+
+generate deepfakes for disinformation. On the other hand, it is not needed to point out 771 
+
+that a generic algorithm for optimizing neural networks could enable people to train 772 
+
+models that generate Deepfakes faster. 773 
+
+• The authors should consider possible harms that could arise when the technology is 774 
+
+being used as intended and functioning correctly, harms that could arise when the 775 
+
+technology is being used as intended but gives incorrect results, and harms following 776 
+
+from (intentional or unintentional) misuse of the technology. 777 
+
+• If there are negative societal impacts, the authors could also discuss possible mitigation 778 
+
+strategies (e.g., gated release of models, providing defenses in addition to attacks, 779 
+
+mechanisms for monitoring misuse, mechanisms to monitor how a system learns from 780 
+
+feedback over time, improving the efficiency and accessibility of ML). 781 
+
+11. Safeguards 782 
+
+Question: Does the paper describe safeguards that have been put in place for responsible 783 
+
+release of data or models that have a high risk for misuse (e.g., pretrained language models, 784 
+
+image generators, or scraped datasets)? 785 
+
+Answer: [NA] 786 
+
+Justification: The paper poses no such risks. 787 
+
+Guidelines: 788 
+
+• The answer NA means that the paper poses no such risks. 789 
+
+• Released models that have a high risk for misuse or dual-use should be released with 790 
+
+necessary safeguards to allow for controlled use of the model, for example by requiring 791 
+
+that users adhere to usage guidelines or restrictions to access the model or implementing 792 
+
+safety filters. 793 
+
+• Datasets that have been scraped from the Internet could pose safety risks. The authors 794 
+
+should describe how they avoided releasing unsafe images. 795 
+
+• We recognize that providing effective safeguards is challenging, and many papers do 796 
+
+not require this, but we encourage authors to take this into account and make a best 797 
+
+faith effort. 798 
+
+12. Licenses for existing assets 799 
+
+Question: Are the creators or original owners of assets (e.g., code, data, models), used in 800 
+
+the paper, properly credited and are the license and terms of use explicitly mentioned and 801 
+
+properly respected? 802 
+
+Answer: [Yes] 803 
+
+Justification: The only applicable assets are the code which are credited and distributed 804 
+
+under a Creative Commons Attribution License. 805 
+
+Guidelines: 806 
+
+• The answer NA means that the paper does not use existing assets. 807 
+
+• The authors should cite the original paper that produced the code package or dataset. 808 
+
+• The authors should state which version of the asset is used and, if possible, include a 809 
+
+URL. 810 
+
+• The name of the license (e.g., CC-BY 4.0) should be included for each asset. 811 
+
+• For scraped data from a particular source (e.g., website), the copyright and terms of 812 
+
+service of that source should be provided. 813 
+
+• If assets are released, the license, copyright information, and terms of use in the 814 
+
+package should be provided. For popular datasets, paperswithcode.com/datasets 815 
+
+has curated licenses for some datasets. Their licensing guide can help determine the 816 
+
+license of a dataset. 817 
+
+• For existing datasets that are re-packaged, both the original license and the license of 818 
+
+the derived asset (if it has changed) should be provided. 819 
+
+21 • If this information is not available online, the authors are encouraged to reach out to 820 
+
+the asset’s creators. 821 
+
+13. New Assets 822 
+
+Question: Are new assets introduced in the paper well documented and is the documentation 823 
+
+provided alongside the assets? 824 
+
+Answer: [Yes] 825 
+
+Justification: New assets include the code required to run the experiments described in the 826 
+
+paper. Documentation is provided along with the code. 827 
+
+Guidelines: 828 
+
+• The answer NA means that the paper does not release new assets. 829 
+
+• Researchers should communicate the details of the dataset/code/model as part of their 830 
+
+submissions via structured templates. This includes details about training, license, 831 
+
+limitations, etc. 832 
+
+• The paper should discuss whether and how consent was obtained from people whose 833 
+
+asset is used. 834 
+
+• At submission time, remember to anonymize your assets (if applicable). You can either 835 
+
+create an anonymized URL or include an anonymized zip file. 836 
+
+14. Crowdsourcing and Research with Human Subjects 837 
+
+Question: For crowdsourcing experiments and research with human subjects, does the paper 838 
+
+include the full text of instructions given to participants and screenshots, if applicable, as 839 
+
+well as details about compensation (if any)? 840 
+
+Answer: [NA] 841 
+
+Justification: The paper does not involve crowdsourcing nor research with human subjects. 842 
+
+Guidelines: 843 
+
+• The answer NA means that the paper does not involve crowdsourcing nor research with 844 
+
+human subjects. 845 
+
+• Including this information in the supplemental material is fine, but if the main contribu-846 
+
+tion of the paper involves human subjects, then as much detail as possible should be 847 
+
+included in the main paper. 848 
+
+• According to the NeurIPS Code of Ethics, workers involved in data collection, curation, 849 
+
+or other labor should be paid at least the minimum wage in the country of the data 850 
+
+collector. 851 
+
+15. Institutional Review Board (IRB) Approvals or Equivalent for Research with Human 852 
+
+Subjects 853 
+
+Question: Does the paper describe potential risks incurred by study participants, whether 854 
+
+such risks were disclosed to the subjects, and whether Institutional Review Board (IRB) 855 
+
+approvals (or an equivalent approval/review based on the requirements of your country or 856 
+
+institution) were obtained? 857 
+
+Answer: [NA] 858 
+
+Justification: The paper does not involve crowdsourcing nor research with human subjects. 859 
+
+Guidelines: 860 
+
+• The answer NA means that the paper does not involve crowdsourcing nor research with 861 
+
+human subjects. 862 
+
+• Depending on the country in which research is conducted, IRB approval (or equivalent) 863 
+
+may be required for any human subjects research. If you obtained IRB approval, you 864 
+
+should clearly state this in the paper. 865 
+
+• We recognize that the procedures for this may vary significantly between institutions 866 
+
+and locations, and we expect authors to adhere to the NeurIPS Code of Ethics and the 867 
+
+guidelines for their institution. 868 
+
+• For initial submissions, do not include any information that would break anonymity (if 869 
+
+applicable), such as the institution conducting the review. 870 
+
+22
