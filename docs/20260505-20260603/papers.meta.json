@@ -1,0 +1,69 @@
+{
+  "label": "2026-05-05 ~ 2026-06-03",
+  "date": "2026-05-05 ~ 2026-06-03",
+  "generated_at": "2026-06-03T02:41:56",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "20260505-20260603/2605.17266v1-leveraging-deep-reinforcement-learning-for-clustered-cell-free-networking-over-user-mobility",
+      "section": "quick",
+      "title_en": "Leveraging Deep Reinforcement Learning for Clustered Cell-Free Networking Over User Mobility",
+      "authors": "Ouyang Zhou, Junyuan Wang, Bo Qian, Antonio Pérez Yuste, Yusheng Ji",
+      "date": "2026-05-17",
+      "pdf": "https://arxiv.org/pdf/2605.17266v1",
+      "score": "9.0",
+      "evidence": "深度强化学习用于网络划分",
+      "tldr": "针对用户移动导致网络分区频繁变化的问题，提出基于深度确定性策略梯度的聚类无蜂窝组网框架（DDPG-C²F）。该框架仅需每个接入点估计单个信道作为输入，大幅降低测量与训练成本。仿真表明，该方法在所有场景下优于现有基线，能减少切换开销，并对用户随机加入或离开具有鲁棒性。",
+      "tags": "query:graph-rl",
+      "abstract_en": "Clustered cell-free networking paves a new way for enabling scalable joint transmission among access points (APs) by partitioning the whole network into non-overlapping subnetworks. Previous works adopted clustering algorithms, graph partitioning methods or conventional continuous optimization theories to partition a network based on the channels between all users and all APs, resulting in huge channel measurement and computational costs. This makes these methods difficult to be implemented in practical systems since the optimal network partition could vary frequently due to user mobility. In addition, existing methods were usually designed for specific clustered cell-free networking problems with different optimization algorithms employed. In this paper, we leverage deep reinforcement learning (DRL) for clustered cell-free networking so as to rapidly adapt to user movements in dynamic environments, and propose a deep deterministic policy gradient based clustered cell-free networking (DDPG-C$^{2}$F) framework that can be adapted in various application scenarios. Moreover, in our framework, only one single channel needs to be estimated at each AP as the input of the neural network, which greatly reduces the channel measurement costs for clustered cell-free networking, and the training and inference costs of our framework. The proposed DDPG-C$^{2}$F framework is then applied to various clustered cell-free networking problems with different objectives and constraints to demonstrate its performance. Simulation results show that our framework outperforms existing baselines in all scenarios. Moreover, we show that the proposed framework can reduce the handover cost over user mobility, and is robust to dynamic scenarios with random user joining or leaving.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20260505-20260603/2605.17362v1-learning-fill-in-reduction-ordering-via-graph-policy-optimization-for-sparse-matrices",
+      "section": "quick",
+      "title_en": "Learning Fill-in Reduction Ordering via Graph Policy Optimization for Sparse Matrices",
+      "authors": "Ziwei Li, Shuzi Niu, Huiyuan Li, Tao Yuan, Wenjia Wu",
+      "date": "2026-05-17",
+      "pdf": "https://arxiv.org/pdf/2605.17362v1",
+      "score": "9.0",
+      "evidence": "图策略优化用于填充减少排序，等价于基于强化学习的图分区",
+      "tldr": "针对稀疏矩阵分解中最小化填充量的NP难问题，现有强化学习方法未能有效建模全局稀疏模式或缺乏局部填充反馈。本文提出图策略优化方法，通过多跳图神经网络捕获全局填充信息，并结合符号分解提取每个步骤的局部填充，利用自适应饱和函数对齐局部反馈与全局值网络。在SuiteSparse数据集上，填充量平均减少29.3%，峰值内存降低31.3%，显著优于现有启发式算法。",
+      "tags": "query:graph-rl",
+      "abstract_en": "Matrix reordering in large sparse solvers seeks a permutation that minimizes factorization fill-in to reduce memory and computation. Because the minimum fill-in ordering problem is NP-complete and fill-in is implicit in the sparsity pattern, graph-theoretic heuristics are used. Existing reinforcement learning methods either ignore sparsity patterns--missing the global fill-in--or lack local exact fill-in feedback. We propose a graph policy optimization method, modeling fill-ins from global and local views: both the policy and value networks use a multi-hop graph neural backbone to embed global fill-in; the policy further interacts with symbolic factorization over graphs to extract local, step-level fill-ins, and the resulting feedback is aligned with the value network via an adaptive saturation function to improve convergence. On the SuiteSparse Matrix Collection, our method achieves mean reductions of 29.3 in fill-ins and 31.3 in peak memory usage over state-of-the-art baselines.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20260505-20260603/2605.13072v1-neural-qaoa2-differentiable-joint-graph-partitioning-and-parameter-initialization-for-quantum-combinatorial-optimization",
+      "section": "quick",
+      "title_en": "Neural QAOA$^{2}$: Differentiable Joint Graph Partitioning and Parameter Initialization for Quantum Combinatorial Optimization",
+      "authors": "Zubin Zheng, Jiahao Wu, Shengcai Liu",
+      "date": "2026-05-13",
+      "pdf": "https://arxiv.org/pdf/2605.13072v1",
+      "score": "8.0",
+      "evidence": "直接使用可微分生成评估网络处理图分区问题，与复合需求高度相关",
+      "tldr": "量子近似优化算法（QAOA）因量子比特有限难以处理大规模问题，分治框架QAOA$^{2}$通过图划分提升可扩展性，但现有方法存在划分指标与量子优化目标脱节、参数初始化忽视图拓扑的冷启动问题。本文提出Neural QAOA$^{2}$，一个端到端可微的联合生成框架，利用可微量子评估器作为性能代理，直接梯度引导生成图划分和初始参数，学习拓扑到配置的映射。在涵盖21至1000变量的183个QUBO、Ising和MaxCut实例上，该方法在101个实例中排名第一，较启发式基线全面领先。此外，模型展现出零样本泛化能力，能适应不同分布的图拓扑，为量子组合优化提供了可扩展的端到端方案。",
+      "tags": "query:graph-rl",
+      "abstract_en": "The quantum approximate optimization algorithm (QAOA) holds promise for combinatorial optimization but is constrained by limited qubits. While divide-and-conquer frameworks like QAOA$^{2}$ address scalability by partitioning graphs into subgraphs, existing methods suffer from two fundamental limitations: i) misalignment between heuristic partitioning metrics and quantum optimization goals, and ii) topology-blind parameter initialization that leads to optimization cold starts. To bridge these gaps, we propose Neural QAOA$^{2}$, an end-to-end differentiable framework that jointly generates graph partitions and initial parameters. By integrating a generative evaluative network (GEN), our method utilizes a differentiable quantum evaluator as a high-fidelity performance surrogate to provide direct gradient guidance, enabling the joint generator to learn the intrinsic mapping from graph topology to high-quality partition and parameter configurations. Extensive experiments on 183 QUBO, Ising, and MaxCut instances (21 to 1000 variables) demonstrate that our gradient-driven approach broadly outperforms heuristic baselines, ranking first on 101 instances. It exhibits zero-shot generalization across out-of-distribution graph topologies and scales.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "20260505-20260603/2605.19721v1-projecting-latent-rl-actions-towards-generalizable-and-scalable-graph-combinatorial-optimization",
+      "section": "quick",
+      "title_en": "Projecting Latent RL Actions: Towards Generalizable and Scalable Graph Combinatorial Optimization",
+      "authors": "Franco Terranova, Guillermo Bernardez, Albert Cabellos-Aparicio, Nina Miolane, Abdelkader Lahmadi",
+      "date": "2026-05-19",
+      "pdf": "https://arxiv.org/pdf/2605.19721v1",
+      "score": "8.0",
+      "evidence": "强化学习用于图组合优化，包含图分区",
+      "tldr": "图组合优化问题因NP难而难以精确求解，现有RL+GNN方法在泛化性和可扩展性上存在局限。本文提出投影智能体，在连续GNN嵌入空间中单次前向预测潜在动作，再解码为离散动作，实现16.2倍推理加速和40%泛化提升。该方法支持超线性决策空间，并发布LaGCO-RL库促进复现与应用。",
+      "tags": "query:graph-rl",
+      "abstract_en": "Graph combinatorial optimization (GCO) has attracted growing interest, as many NP-hard problems naturally admit graph formulations, yet their combinatorial explosion renders exact methods computationally intractable. Recent advances in Reinforcement Learning (RL) combined with Graph Neural Networks (GNNs) have significantly improved learning-based GCO solvers. However, existing approaches face limitations in both generalization across diverse graph instances and computational scalability as action spaces grow. To address both challenges, we introduce projection agents, a novel RL-GCO approach that operates directly in a continuous GNN-based action embedding space, predicting a desired latent action in a single forward pass and subsequently decoding it into a valid discrete action. Additionally, we enable fair comparison across RL methods through a shared embedding space for both observations and actions. Across diverse benchmarks, our approach achieves up to 16.2x faster inference and up to 40% better generalization than existing solutions using only simple nearest-neighbor decoding, while opening the door to strong RL performance in super-linear decision spaces with multiple interdependent variables. Finally, we release LaGCO-RL, a Python library that automates latent action-space construction and supports existing RL-GCO solutions, promoting reproducibility and adaptation to new GCO benchmarks.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
