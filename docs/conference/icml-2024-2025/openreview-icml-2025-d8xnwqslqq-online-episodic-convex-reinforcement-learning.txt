@@ -1,0 +1,8349 @@
+Title: Online Episodic Convex Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=d8xnwqslqq
+
+Number of Pages: 50
+
+Markdown Content:
+# Online Episodic Convex Reinforcement Learning 
+
+Bianca Marin Moreno * 1 2 3 Khaled Eldowa * 4 5 Pierre Gaillard 1 Margaux Br´ eg` ere 2 6 Nadia Oudjane 2 3 
+
+## Abstract 
+
+We study online learning in episodic finite-horizon Markov decision processes (MDPs) with convex objective functions, known as the concave utility reinforcement learning (CURL) problem. This setting generalizes RL from linear to convex losses on the state-action distribution induced by the agent’s policy. The non-linearity of CURL invalidates classical Bellman equations and re-quires new algorithmic approaches. We introduce the first algorithm achieving near-optimal regret bounds for online CURL without any prior knowl-edge on the transition function. To achieve this, we use an online mirror descent algorithm with varying constraint sets and a carefully designed exploration bonus. We then address for the first time a bandit version of CURL, where the only feedback is the value of the objective function on the state-action distribution induced by the agent’s policy. We achieve a sub-linear regret bound for this more challenging problem by adapting tech-niques from bandit convex optimization to the MDP setting. 
+
+## 1. Introduction 
+
+Reinforcement learning (RL) studies the problem where an agent interacts with an environment over time, adhering to a probabilistic policy that maps states to actions and aiming to minimize the cumulative expected losses. The environ-ment’s dynamics are represented by a Markov decision pro-cess (MDP), assumed here to be episodic, with episodes of length N , a finite state space X , a finite action space A, and                 
+
+> *Equal contribution 1Univ. Grenoble Alpes, Inria, CNRS, Grenoble INP, LJK, 38000 Grenoble, France. 2EDF Lab, 7 bd Gaspard Monge, 91120 Palaiseau, France 3FiME (Laboratoire de Finance des March ´es de l’Energie - Dauphine, CREST, EDF R&D) 4Universit `a degli Studi di Milano, Milan, Italy 5Politecnico di Milano, Milan, Italy 6Sorbonne Universit ´e LPSM, Paris, France. Correspondence to: Bianca Marin Moreno <bianca.marin-moreno@inria.fr >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+a sequence of probability transition kernels p :“ p pnqnPr N s,such that for each px, a q P X ˆA, pnp¨| x, a q P ∆X , the sim-plex over the state space. Formally, the RL problem involves finding a policy π that, under a transition kernel p, induces a state-action distribution sequence μπ,p P p ∆X ˆAqN mini-mizing the inner product with a loss vector ℓ :“ p ℓnqnPr N s,with ℓn P RX ˆA, i.e.: min πPp ∆AqX ˆN xℓ, μ π,p y. A large body of literature is devoted to solving the RL problem effi-ciently and with theoretical guarantees in many challenging environments (Bertsekas, 2019; Sutton & Barto, 2018). However, numerous practical problems entail more intricate objectives, such as those encountered within the Concave Utility Reinforcement Learning (CURL) framework (Hazan et al., 2019; Zahavy et al., 2021) (also known as convex RL). The CURL problem consists in minimizing a convex function (or maximizing a concave function) on the state-action distributions induced by an agent’s policy: 
+
+min πPp ∆AqX ˆN F pμπ,p q. (1) In addition to RL, other examples of machine learning problems that can be written as CURL are pure explo-ration (Hazan et al., 2019; Mutti et al., 2021; 2022b), where F pμπ,p q “ xμπ,p , log pμπ,p qy ; imitation learning (Ghasemipour et al., 2020; Lavington et al., 2022) and apprenticeship learning (Zahavy et al., 2019; Abbeel & Ng, 2004), where F pμπ,p q “ Dg pμπ,p , μ ˚q, with Dg rep-resenting a Bregman divergence induced by a function g
+
+and μ˚ being a behavior to be imitated; certain instances of mean-field control (Bensoussan et al., 2013), where 
+
+F pμπ,p q “ x ℓpμπ,p q, μ π,p y; mean-field games with poten-tial rewards (Lavigne & Pfeiffer, 2023); risk-averse RL (Garcıa & Fern ´andez, 2015; Pan et al., 2019; Greenberg et al., 2022), among others. The non-linearity of CURL al-ters the additive structure inherent in standard RL, invalidat-ing the classical Bellman equations. Consequently, dynamic programming approaches become infeasible, necessitating the development of novel methodologies. A natural extension of CURL is the online scenario, wherein a sequence of policies pπtqtPr T s is computed over T
+
+episodes, aimed at minimizing a cumulative loss LT :“řTt“1 F tpμπt,p q, where the objective F t can change arbi-trarily (known as the adversarial scenario (Even-Dar et al., 2009)), and the MDP probability kernel p is unknown. Most existing approaches to CURL fail to address the challenges 1Online Episodic Convex Reinforcement Learning 
+
+of the online setting (adversarial losses and unknown dynam-ics). The few methods that attempt to tackle this problem rely on strong assumptions about the probability transition kernel (Moreno et al., 2024), which can be overly restric-tive in real-world scenarios. To overcome this, we need an approach capable of optimizing the objective function while simultaneously learning the environment, effectively balancing the exploration-exploitation dilemma. 
+
+Motivations. The CURL framework presented in this paper is motivated by a variety of application scenarios, some of which we outline below. Energy grid optimization : To bal-ance the energy production with the consumption, an energy provider may want to control the average consumption of electrical appliances (electric vehicles, water heaters, etc) to better match a target consumption. The task involves daily control, with the target consumption varying daily due to fluctuations in energy production. To protect user privacy, the energy provider has limited access to individual trajectories, but receives the average consumption of the whole population at the end of each day. The loss is usu-ally quadratic on the state-action distribution. This problem can be framed as our CURL formulation. See (Coffman et al., 2023; Moreno et al., 2025). Mean-field games (MFG) with potential reward : As shown by (Barakat et al., 2023), a MFG with potential reward can be framed as a CURL problem. Therefore, any sequential decision problem with a large population of anonymous agents with symmetric interests and potential rewards, such as epidemic spreading, crowd motion control, etc, can be cast as CURL. 
+
+Contribution 1. In the full-information feedback setting, where the objective function F t is fully revealed to the learner at the end of episode t, we propose the first method achieving sub-linear regret for online CURL with adversar-ial losses and unknown transition kernels, without relying on additional model assumptions. Our algorithm uses an Online Mirror Descent (OMD) variant incorporating well-designed exploration bonuses into the sub-gradient of the objective function to handle the exploration-exploitation trade-off. It achieves a regret of ˜Op?T q, matching the state-of-the-art (SoTA) in more restricted settings (Moreno et al., 2024), while obtaining a closed-form solution. 
+
+Contribution 2. We extend our approach to incorporate bandit feedback on the objective function. We first consider the RL case where F tpμq :“ x ℓt, μ y. Bandit feedback in this setting means that the agent only observes the loss func-tion in the state-action pairs they visit during each episode, i.e. pℓtnpxtn, a tnqq nPr N s where pxtn, a tnqnPr N s is the agent’s trajectory. We obtain the optimal regret of ˜Op?T q in this setting. We then address for the first time the general CURL problem under more strict bandit feedback. In this setting, the learner only has access to the value of the objective function evaluated on the state-action distribution sequence induced by the agent’s policy, i.e., F tpμπt,p q. We propose two algorithms for this setting and show that they achieve sub-linear regret. One algorithm requires that the MDP is known, while the other, under the assumption that the probability transition kernel is lower bounded by a positive constant, operates in the setting where the MDP is esti-mated progressively from observed trajectories. We rely on gradient estimation techniques from the bandit convex optimization literature, even as the peculiar structure of our constraint set and uncertainty regarding the true transition kernel present some unique challenges. 
+
+1.1. Related Work Offline CURL. An extensive line of work focus on the of-fline version of CURL (Problem (1) ), where the objective function is known and fixed. The methodologies proposed by (Zhang et al., 2020; 2021; Barakat et al., 2023) rely on policy gradient techniques, requiring the estimation of 
+
+F ’s gradient concerning the policy π, a task often complex. Taking a different approach, Zahavy et al. (2021) cast the CURL problem as a min-max game using Fenchel dual-ity, demonstrating that conventional RL algorithms can be tailored to fit the CURL framework. Recently, Geist et al. (2022) established that CURL is a specific instance of mean-field games. Moreover, Moreno et al. (2024) undertake a convexification of Problem (1) and propose a mirror de-scent algorithm with a non-standard Bregman divergence. Mutti et al. (2022a; 2023) study the gap between evaluating agent performance over infinite realizations versus finite trials and question the classic CURL formulation in Eq. (1) .However, they show that non-Markovian policies can be necessary to optimize the finite trials objective, which en-tails an increased computational burden. On the other hand, the occupancy-measure-based formulation that we study can be solved efficiently, and allows direct comparison with methods from the CURL literature such as (Moreno et al., 2024). Moreover, in application scenarios with many ho-mogeneous agents, a mean-field approach can justify this choice, as we discuss in Sec. 1. 
+
+Online CURL. To the best of our knowledge, Greedy MD-CURL from (Moreno et al., 2024) is the only regret min-imization algorithm designed for online CURL. However, it only achieves sublinear regret when the system dynam-ics follow the form xn`1 “ gnpxn, a n, ε nq, where gn
+
+is a known deterministic function, and εn is an external noise with an unknown distribution independent of pxn, a nq,which significantly limits its applicability, as we empirically show in Sec. 5. This assumption simplifies the problem, as the algorithm only needs to learn the noise distribution, which can be done independently of the policy, eliminating the need for exploration. In contrast, our approach does not assume any specific form for the dynamics, which intro-duces the challenge of developing a policy that minimizes 2Online Episodic Convex Reinforcement Learning         
+
+> Table 1. Comparisons of SoTA finite-horizon tabular MDPs methods. MD stands for Mirror Descent, KL for Kullback-Leibler divergence and Γis defined in Eq. (4) . MD + p¨q indicates the regularization added to the MD iteration. MD on πindicates a policy optimization approach in which MD iterations are performed on policies instead of state-action distributions (occupancy-measures).
+
+Algorithm Optimal regret in T CURL Closed-form Explo-ration No model assumption Adversarial Losses Bandit feedback 
+
+(Jin et al., 2020) MD + KL ✓ ✗ ✗ UCRL ✓ ✓ ✓
+
+(Moreno et al., 2024) MD + Γ ✓ ✓ ✓ None ✗ ✓ ✗
+
+(ours) MD + Γ ✓ ✓ ✓ Bonus ✓ ✓ ✓
+
+(Luo et al., 2021) MD on π ✓ ✗ ✓ Bonus ✓ ✓ ✓
+
+total loss while simultaneously enabling sufficient explo-ration to improve estimates of the transition kernels. The technical novelty we introduce to overcome this challenge are well-designed exploration bonuses detailed in Sec. 3. The work of (Rosenberg & Mansour, 2019b) also studies convex performance criteria in adversarial MDPs, but under a different setup. They use fixed , known convex functions applied to linear losses, i.e., F px μ, ℓ tyq . In contrast, our setting generalizes this by allowing the convex function F
+
+itself to be adversarial and applied directly to the occupancy measure, i.e., F tpμq.
+
+RL approaches. Model-optimistic methods construct a set of plausible MDPs by forming confidence bounds around the empirical transition kernels, then select the policy that maximizes the expected reward in the best feasible MDP. A key example of this approach is UCRL (Upper Confidence RL) methods (Jaksch et al., 2008; Zimin & Neu, 2013; Rosenberg & Mansour, 2019b; Jin et al., 2020). While these methods offer strong theoretical guarantees, they are often difficult to implement due to the complexity of optimizing over all plausible MDPs. While we believe these approaches could be generalized to CURL, their computational com-plexity has led us to propose an alternative method. Value-optimistic methods are value-based approaches that compute optimistic value functions, rather than optimistic models, using dynamic programming. An example is UCB-VI (Azar et al., 2017). However, these methods are limited to stochas-tic losses. Policy-optimization (PO) methods directly op-timize the policy and are widely used in RL due to their faster performance and closed-form solutions. Recently, Luo et al. (2021) achieved SoTA regret for PO methods with adversarial losses and bandit feedback by introducing 
+
+dilated bonuses , which satisfy a dilated Bellman equation and are added to the Q-function. However, their approach cannot be applied here due to CURL’s non-linearity (the expectation of the trajectory appears inside the objective function) which invalidates the Bellman’s equations. We achieve our results by computing local bonuses and adding them to the (sub-)gradient of the objective func-tion in each OMD instance as exploration bonuses. This is more computationally efficient than model-optimistic ap-proaches and addresses the exploration issues in previous online CURL methods. We believe our analysis is of in-dependent interest, as it also offers a new way to study RL approaches over occupancy measures, while providing closed-form solutions. See Table 1 for comparisons. 
+
+## 2. Problem Formulation 
+
+2.1. Setting 
+
+For a finite set S, |S| represents its cardinality, while ∆S
+
+denotes the |S|-dimensional simplex. For all d P N we denote rds :“ t 1, . . . , d u. We let } ¨ } 1 be the L1 norm, and for all v :“ p vnqnPr N s, such that vn P RX ˆA we de-fine }v}8,1 :“ sup 1ďnďN }vn}1. We denote by } ¨ } 1,8 its dual. Let Π : “ p ∆AqX ˆN denote the set of policies. We consider an episodic MDP as introduced in Sec. 1. We assume that the initial state-action pair of an agent is sam-pled from a fixed distribution μ0 P ∆X ˆA at the beginning of each episode. At time step n P r N s, the agent moves to a state xn „ pnp¨| xn´1, a n´1q, and chooses an action 
+
+an „ πnp¨| xnq by means of a policy πn : X Ñ ∆A. When the agent follows a policy π :“ p πnqnPr N s for an episode in an environment described by the MDP with a transition kernel p, this induces a state-action distribution, which we denote by μπ,p :“ p μπ,p n qnPr N s, that can be calculated re-cursively for all pn, x, a q P r N s ˆ X ˆ A, by 
+
+μπ,p  
+
+> 0
+
+px, a q “ μ0px, a q
+
+μπ,p n px, a q “ ÿ
+
+> px1,a 1q
+
+μπ,p n´1px1, a 1qpnpx|x1, a 1qπnpa|xq. (2) We define the set of all state-action distribution sequences satisfying the dynamics of the MDP as 
+
+Mpμ0 :“
+
+"
+
+μ P p ∆X ˆAqN ˇˇ ÿ
+
+> a1PA
+
+μnpx1, a 1q “ (3) 
+
+ÿ 
+
+> xPX,a PA
+
+pnpx1|x, a qμn´1px, a q , @x1 P X , @n P r N s
+
+*
+
+.
+
+For any μ P Mpμ0 , there is a strategy π such that μπ,p “ μ.It suffices to take πnpa|xq9 μnpx, a q when the normal-3Online Episodic Convex Reinforcement Learning 
+
+ization factor is non-zero, and arbitrarily defined other-wise. Let Mp, ˚ 
+
+> μ0
+
+be the subset of Mpμ0 where the cor-responding policies π satisfy πnpa|xq ‰ 0 for all px, a q.For any two probability transition kernels p, q , we define 
+
+Γ : Mpμ0 ˆ Mq, ˚ 
+
+> μ0
+
+Ñ R such that, for all μ, μ 1 P Mpμ0 ˆ
+
+Mq, ˚ 
+
+> μ0
+
+with policies π, π1,
+
+Γpμ, μ 1q :“ řNn“1 Epx,a q„ μnp¨q 
+
+”
+
+log 
+
+´ πnpa|xq
+
+> π1
+> npa|xq
+
+¯ı 
+
+. (4) In the online extension of CURL, the objective func-tion for episode t is denoted as F t :“ řNn“1 f tn, where 
+
+f tn : ∆ X ˆA Ñ R is convex and L-Lipschitz with respect to the } ¨ } 1 norm (hence F t is LF -Lipschitz with respect to the norm } ¨ } 8,1 with LF :“ LN ). The objective function 
+
+F t is unknown to the learner in the start of episode t. In this paper, we examine three types of objective function feedback: Full-information : In this case, F t is fully dis-closed to the learner at the end of episode t, and is treated in Sec. 3.2. Bandit in RL : Here, F tpμq :“ x ℓt, μ y, and the learner observes the loss function only for the state-action pairs visited, i.e., pℓtnpxtn, a tnqq nPr N s, which is covered in Sec. 4.1. Bandit in CURL : In this scenario, the learner only has access to the objective function evaluated on the state-action distribution sequence induced by the agent’s policy, i.e., F tpμπt,p q, and is treated in Sec. 4.2. The learner’s goal is to compute a sequence of strategies 
+
+pπtqtPr T s, where T represents the total number of episodes, that minimizes their total loss LT :“ řTt“1 F tpμπt,p q. The learner’s performance is evaluated by comparing it to any policy π P p ∆AqX ˆN using the static regret: 
+
+RT pπq :“ řTt“1 F tpμπt,p q ´ F tpμπ,p q. (5) We assume the probability transition kernel p is unknown to the learner. Hence, to minimize its total loss, the learner must optimize the objective function while simultaneously learn the environment dynamics, facing an exploration-exploitation dilemma. The interaction between the learner and the environment proceeds in episodes. At each episode 
+
+t, the learner selects a policy πt, sends it to the agent, and observes its trajectory ot :“ p xt
+
+> 0
+
+, a t
+
+> 0
+
+, . . . , x tN , a tN q. The learner uses this observation to compute an estimation of the probability transition kernel ppt`1. At the end of episode 
+
+t, the learner receives one of the three feedbacks described above for the objective function F t, and then calculates the policy for the next episode, πt`1, based on πt, ppt`1, and the feedback on F t.
+
+2.2. Preliminary Results 
+
+The results in this section are either known or extensions of existing results needed for the analysis. Since the probability transition kernel is unknown, we pro-pose an online mirror descent (OMD) instance that opti-mizes over the state-action distributions induced by the esti-mated MDP as if it was the true model. This approach dif-fers from the model-optimistic methods for RL discussed in Sec. 1.1 where each iteration is performed over the union of all state-action distribution sets induced by MDPs within a confidence set around the estimated model, which results in a computationally expensive optimization problem per itera-tion. Lemma 2.1 presents an auxiliary result concerning the quality of the state-action distribution sequence pμtqtPr T s
+
+when μt is the solution of Eq. (6) , an OMD instance on the set of state-action distributions induced by a transition kernel qt. It extends the upper bound result from (Moreno et al., 2024) for OMD with smoothly varying constraint sets to any sequence of bounded vectors pztqtPr T s and any sequence of smootlhy varying transitions pqtqtPr T s.
+
+Lemma 2.1. Let pqtqtPr T s be a sequence of probability transition kernels and pztqtPr T s a sequence of vectors in 
+
+RN ˆ| X |ˆ| A|, such that max tPr T s }zt}1,8 ď ζ. Initialize 
+
+π1
+
+> n
+
+pa|xq :“ 1{| A|. For t P r T s, let ˜πt :“ tt`1 πt` 1 
+
+> t`1
+
+|A|´1
+
+be a smoothed version of the policy and compute iteratively 
+
+μt`1 P arg min 
+
+> μPMqt`1
+> μ0
+
+τ xzt, μ y ` Γpμ, μ ˜πt,q t
+
+q. (6) 
+
+Then, there is a τ ą 0 such that, for any sequence pνtqtPr T s,with νt :“ νπ,q t
+
+for a common policy π,
+
+řTt“1xzt, μ t ´ νty ď O`ζN aVT |X | log p| A|q T log pT q˘,
+
+where VT ě 1 ` max  
+
+> pn,x,a q
+> T´1
+
+ÿ
+
+> t“1
+
+}qtnp¨| x, a q ´ qt`1 
+
+> n
+
+p¨| x, a q} 1.
+
+This lemma is proved in App. C. It is known (Moreno et al., 2024) that for the divergence Γ defined in Eq. (4) , Eq. (6) has a closed-form solution for the policy (see App. A.2). 
+
+Learning the model. Since the learner does not know the probability transition kernel, it must estimate p from the agents’ trajectories. Below we present the empirical way for estimating the transition and a well-known re-sult (Lem. 2.2) on its quality using Hoeffding’s inequal-ity. Let N tnpx, a q “ řt´1 
+
+> s“1
+
+1txsn“x,a sn“au, M tnpx1|x, a q “ 
+
+řt´1 
+
+> s“1
+
+1txsn`1“x1,x sn“x,a sn“au. The learner’s estimate for the transition kernel at the end of episode t ´ 1, to be used in episode t, is as follows 
+
+pptn`1px1|x, a q :“ M tnpx1|x, a q
+
+max t1, N tnpx, a qu . (7) 
+
+Lemma 2.2 (Lem. 17 of Jaksch et al., 2008) . For any 
+
+0 ă δ ă 1, with a probability of at least 1 ´ δ,
+
+}pnp¨| x, a q ´ pptnp¨| x, a q} 1 ď
+
+gffe 2|X | log 
+
+´ |X || A|N T δ
+
+¯
+
+max t1, N tn´1px, a qu 
+
+holds simultaneously for all pt, n, x, a q P r T sˆr N sˆ X ˆA.
+
+4Online Episodic Convex Reinforcement Learning 
+
+These results suffice for analyzing CURL with full-information feedback (Sec. 3). For bandit feedback, more refined tools are needed. In bandit RL, we need Bernstein’s inequality to bound the L1 distance (Lem. D.2). In bandit CURL, we also need a bound on the Kullback-Leibler (KL) divergence (Lem. E.3), which requires the Laplace (add-one) estimator (Eq. (51) ), as the KL of the empirical one can be unbounded. 
+
+## 3. Exploration Bonus in CURL 
+
+We now present our novel approach for online CURL with adversarial losses and unknown dynamics. 
+
+3.1. Limitations of previous approaches 
+
+The performance measure of a learner playing a sequence of strategies pπtqtPr T s is given by the static regret defined in Eq. (5) . Using the estimate of the probability transition kernel ppt computed by the learner, the static regret can be further decomposed as follows 
+
+RT pπq “ 
+
+> T
+
+ÿ
+
+> t“1
+
+F tpμπt,p q ´ F tpμπt, ppt
+
+q`
+
+> T
+
+ÿ
+
+> t“1
+
+F tpμπt, ppt
+
+q ´ F tpμπ,p qď
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt,p q, μ πt,p ´ μπt, ppt
+
+y
+
+looooooooooooooooooomooooooooooooooooooon 
+
+> RMDP
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ πt, ppt
+
+´ μπ,p y
+
+looooooooooooooooooomooooooooooooooooooon 
+
+> Rpolicy
+> T
+
+,
+
+(8) where the inequality comes from the convexity of F t. Let 
+
+ξtnpx, a q :“ } pnp¨| x, a q ´ pptnp¨| x, a q} 1. The term RMDP  
+
+> T
+
+,accounts for the error in estimating the MDP, and satisfies 
+
+RMDP  
+
+> T
+
+“ ˜Op?T q with high probability. This is a classic result (see Neu et al., 2012). We first show that 
+
+RMDP  
+
+> T
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a qξti`1px, a q. (9) Then, using Lem. 2.2 and that N tnpx, a q increases with the empirical version of the state-action distribution μπt,p n px, a q
+
+we achieve the final bound (see App. B.2). The second term, 
+
+Rpolicy  
+
+> T
+
+, depends on the algorithm used to derive the poli-cies. As mentioned in Sec. 1.1, model-optimistic approaches could be adapted to CURL, but they are computationally expensive. To achieve low complexity, we explore poten-tial problems that might arise from the absence of explicit exploration. We decompose this regret term as follows: 
+
+Rpolicy  
+
+> T
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ πt, ppt
+
+´ μπ, ppt
+
+y
+
+loooooooooooooooooooomoooooooooooooooooooon 
+
+> Rpolicy/MD
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ π, ppt
+
+´ μπ,p y
+
+looooooooooooooooooomooooooooooooooooooon 
+
+> Rpolicy/MDP
+> T
+
+.
+
+Assume the learner computes its policy sequence 
+
+pπtqtPr T s by solving Eq. (6) with qt`1 :“ ppt`1 and 
+
+zt :“ ∇F tpμπt, ppt
+
+q. Hence, from Lem. 2.1, Rpolicy/MD  
+
+> T
+
+“
+
+˜Op?T q (Lemmas A.3 and A.4 in the Appendix demonstrate that řTt“1 }ppt`1p¨| x, a q ´ pptp¨| x, a q} 1 ď e log pT q. By hy-pothesis, }∇F tpμπt, ppt
+
+q} 1,8 ď LF . Hence, we meet all the assumptions from Lem. 2.1). But the term Rpolicy/MDP  
+
+> T
+
+poses a challenge. It can be decomposed as RMDP  
+
+> T
+
+in Eq. (9) . How-ever, the state-action distribution multiplying ξti`1px, a q
+
+would either be μπ,p i px, a q or μπ, ppt`1 
+
+> i
+
+px, a q, and neither is related to N ti px, a q. Consequently, we do not have the same convergence effect as RMDP  
+
+> T
+
+. In fact, this term can become prohibitively large. Without exploration, previous work us-ing similar analysis (Moreno et al., 2024) only achieved optimal regret under strong model assumptions, limiting its applicability in realistic scenarios. 
+
+3.2. CURL with full-information feedback 
+
+We outline our idea to overcome previous limitations pre-sented in Subsec. 3.1. Let bt :“ p btnqnPr N s be a sequence of vectors, to be properly defined later, such that btn P RX ˆA.We assume that πt is the policy inducing μt computed as in Eq. (6) with qt :“ ppt, but instead of considering 
+
+zt “ ∇F tpμπt, ppt
+
+q as the (sub-)gradient of MD to be used in episode t ` 1, we let zt :“ ∇F tpμπt, ppt
+
+q ´ bt, i.e., 
+
+μt`1 :“ arg min  
+
+> μPMppt`1
+> μ0
+
+!
+
+τ x∇F tpμπt, ppt
+
+q ´ bt, μ y ` Γpμ, ˜μtq
+
+)
+
+.
+
+If we assume that bt is such that, for all t P r T s and for some ζ ą 0, }∇F tpμπt, ppt
+
+q ´ bt}1,8 ď ζ, then by Lem. 2.1 and by adding and subtracting the bonus vector, we would have that Rpolicy  
+
+> T
+
+is bounded by 
+
+˜Op?T q ` řTt“1xbt, μ πt, ppt
+
+´ μπ, ppt
+
+y ` Rpolicy/MDP  
+
+> T
+
+. (10) Let Cδ :“ a2|X | log p| X || A|N T {δq, and for all 
+
+n P t 0, rN su , px, a q P X ˆ A, let 
+
+btnpx, a q :“ LpN ´ nq Cδ
+
+amax t1, N tnpx, a qu . (11) Note that }btn}8 ď LN C δ , ensuring that the hypothesis of Lem. 2.1 remains valid for this sequence. Decomposing 5Online Episodic Convex Reinforcement Learning 
+
+Rpolicy/MDP  
+
+> T
+
+as we do for RMDP  
+
+> T
+
+in Eq. (9) , and then applying Lem. 2.2, we get that for any δ P p 0, 1q, with probability at least 1 ´ δ, Rpolicy/MDP  
+
+> T
+
+is bounded by 
+
+LC δTÿ 
+
+> t“1
+> N´1
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπ, ppt 
+
+> n
+
+px, a q
+
+amax t1, N tnpx, a qu “
+
+> T
+
+ÿ
+
+> t“1
+
+xμπ, ppt
+
+, b ty.
+
+(12) By replacing Eq. (12) in Eq. (10) , the additive prop-erty in the decomposition allows us to cancel out the problematic regret term Rpolicy/MDP  
+
+> T
+
+. As a result, we ob-tain that Rpolicy  
+
+> T
+
+ď ˜Op?T q ` řTt“1xbt, μ πt, ppt
+
+y. All that re-mains is to analyze the new term due to the added bonus, řTt“1xbt, μ πt, ppt
+
+y, which we do in Prop. 3.1. 
+
+Proposition 3.1. Let pbtqtPr T s be the bonus vector in Eq. (11) . For any δ1 P p 0, 1q, with probability 1 ´ 3δ1,
+
+řTt“1xbt, μ πt, ppt
+
+y “ ˜O`LN 3|X |3{2a|A|T ˘.
+
+With all the ingredients in place, we introduce our new method, Bonus O-MD-CURL , in Alg. 1. The main result is in Thm. 3.2 and its proof is in App. B.2. In terms of T
+
+and |A|, our result matches the optimal one in RL from (Jin et al., 2020), but we have additional factors of N and a|X |
+
+that are due to using bonuses and to our approach to deal with adversarial convex RL. 
+
+Theorem 3.2. Running Alg. 1 for online CURL with un-known transition kernel, full-information feedback, where 
+
+F t :“ řNn“1 f tn is convex and each f tn is L-Lipschitz under 
+
+} ¨ } 1, ensures that, with probability at least 1 ´ 6δ for any 
+
+δ P p 0, 1q, the optimal choice of τ achieves, for any π P Π,
+
+RT pπq “ ˜O`LN 3|X |3{2a|A|T ˘.
+
+## 4. Bandit Feedback 
+
+4.1. Bandit feedback with bonus in RL 
+
+We generalize Alg. 1 to handle the RL case with bandit feedback. Our aim is not to improve the existing algorithms for bandit RL; rather, we show that our new methodology and analysis for CURL achieves comparable results to the SoTA in bandit RL. In this case, an adversary selects a sequence of loss functions pℓtqtPr T s, with ℓt :“ p ℓtnqnPr N s,where ℓtn : X ˆ A Ñ r 0, 1s, and the objective function is given by F tpμq :“ x ℓt, μ y “ řNn“1xℓtn, μ ny. Note that now the gradient of F t with respect to μ is always equal to ℓt due to the linearity of the objective function. Bandit feedback in this setting implies that the learner observes the loss function only for the state-action pairs visited by the agent during each episode, i.e., pℓtnpxtn, a tnqq nPr N s where 
+
+pxtn, a tnqnPr N s is the agent’s trajectory. 
+
+Algorithm 1 Bonus O-MD-CURL (Full-information) 
+
+1: Input: number of episodes T , initial policy π1 P Π,initial state-action distribution μ0 and state-action distri-bution sequence μ1 “ ˜μ1 “ μπ1, pp1
+
+with pp1
+
+> n
+
+p¨| x, a q “ 
+
+1{| X |, learning rate τ ą 0.
+
+2: Init.: @p n, x, a, x 1q, N 1
+
+> n
+
+px, a q “ M 1
+
+> n
+
+px1|x, a q “ 0
+
+3: for t “ 1, . . . , T do 
+
+4: agent starts at pxt
+
+> 0
+
+, a t
+
+> 0
+
+q „ μ0p¨q 
+
+5: for n “ 1, . . . , N do 
+
+6: Env. draws new state xtn „ pnp¨| xtn´1, a tn´1q
+
+7: Update counts 
+
+N t`1
+
+> n´1
+
+pxtn´1, a tn´1q “ N tn´1pxtn´1, a tn´1q ` 1
+
+M t`1
+
+> n´1
+
+pxtn|xtn´1, a tn´1q “ M tn´1pxtn|xtn´1, a tn´1q ` 1
+
+8: Agent chooses an action atn „ πtnp¨| xtnq
+
+9: end for 
+
+10: Compute bonus sequence as in Eq. (11) 
+
+11: Observe objective function F t
+
+12: Compute μπt, ppt
+
+as in Eq. (2) 
+
+13: Update transition estimate as in Eq. (7) 
+
+14: Compute the πt`1 associated to the solution of Eq. 6 with zt :“ ´ ∇F tpμπt, ppt
+
+q ` bt and qt`1 “ ppt`1
+
+15: Compute ˜πt`1 (Lem. 2.1), and ˜μt`1 :“ μ˜πt`1, ppt`1
+
+16: end for 
+
+We define Alg. 2 in App. D, a version of Bonus O-MD-CURL where for each OMD update we take zt :“ pℓt ´ bt,with pℓt an importance-weighted estimator of ℓt defined in Eq. (40) and bt the bonus vector defined in Eq. (11) .Thm. 4.1 states that Alg. 2 achieves the regret bound of 
+
+˜Op?T q known to be the optimal for RL with bandit feed-back (Jin et al., 2020). For the proof and for an overview of approaches for bandit RL see App. D. 
+
+Theorem 4.1. Playing Alg. 2 for RL with adversarial losses 
+
+pℓtqtPr T s, unknown transition kernel, and bandit feedback, obtains with high probability for any policy π P Π,
+
+RT pπq “ ˜O`N 3|X |3{2a|A|T ` N 3{2|X |5{4|A|?T ˘.
+
+4.2. CURL with bandit feedback 
+
+Returning back to the CURL framework, we now assume that F t : ∆ X ˆA Ñ r 0, N s can be any convex, L-Lipschitz function with respect to } ¨ } 1. In contrast to Sec. 3, we assume here that after executing a policy πt we observe 
+
+F tpμπt,p q instead of ∇F tpμπt,p q. We will consider both the case when the MDP is known in advance and when it needs (as in previous sections) to be estimated progressively from observed trajectories. 
+
+Main challenges. This problem can be broadly catego-rized as a bandit convex optimization (BCO) problem. This places us in a more challenging domain compared to the 6Online Episodic Convex Reinforcement Learning 
+
+bandit feedback setting in the standard RL problem, where the gradient of the loss function is identical for any point in p∆X ˆAqN and is easier to estimate. Moreover, as a BCO problem, the present setting still exhibits distinctive challenges. One being the peculiar nature of our decision set Mpμ0 and how it impedes the efficacy of some stan-dard gradient estimation techniques as we explain below. Another issue arises when the MDP is not known as that in-duces uncertainty over the true set of permissible occupancy measures. This incomplete knowledge of the decision set is atypical in the BCO literature and introduces multiple sources of bias for any adopted method. 4.2.1. E NTROPIC REGULARIZATION METHOD 
+
+Our first approach is to extend our MD-based algorithm from Sec. 3, supposing still that the MDP is not known. Since the algorithm required knowledge of the gradient 
+
+∇F tpμπt,p q, we propose to estimate it by querying F t
+
+at a random perturbation of μπt,p , a standard approach in the convex bandit literature popularized by Flaxman et al. (2005). This method yields T 3{4 regret under con-vex and Lipschitz conditions, and is incapable of doing better (Hu et al., 2016). Although more advanced algo-rithms and analyses achieve ?T regret (Hazan & Li, 2016; Bubeck et al., 2021; Fokkema et al., 2024), they are ar-guably less practical, more complicated, and have worse dimension dependence. For d P Z`, we denote by Bd
+
+and Sd the unit ball and sphere respectively in Rd, and by 1d P Rd the vector with all entries equal to one. Let 
+
+k : S Ñ R be a convex function, where S Ď Rd is a con-vex set satisfying Bd Ď S. Fix some δ P p 0, 1q. The approach of Flaxman et al. (2005) relies on the observation that p1´δqdδ EuPSd rkpp 1 ´ δqx ` δuqus « ∇kpxq. Hence,  
+
+> p1´δqdδ
+
+kpp 1 ´ δqx ` δuqu (for some u uniformly sampled from Sd) can be used as a one-point stochastic surrogate for the gradient. Applying this idea to our problem presents several challenges. Mainly, Mpμ0 has an empty interior in 
+
+RN |X || A|. This can be addressed, assuming for the mo-ment that the kernel p is known, by defining a bijection 
+
+Λp : pMpμ0 q´ Ñ Mpμ0 , where pMpμ0 q´ Ď RN |X |p| A|´ 1q is a representation of the constraint set in a lower-dimensional space where it is possible for its interior to be non-empty, see App. E.1 for more details. Next, we need to specify a (hyper)sphere that is contained in pMpμ0 q´, which would allow us to use the aforementioned spherical estimation tech-nique while remaining inside the feasible set of occupancy measures. To guarantee the existence of such an object, we rely on the following assumption (discussed further below). 
+
+Assumption 4.2. There exists a value ε ą 0 such that 
+
+pnpx1|x, a q ě ε for all x, x 1 P X 2, a P A, and n P r N s.Under this assumption, we show in App. E.2.1 that for 
+
+κ :“ ε{p| A|´ 1`a|A| ´ 1q, it holds that κ1N |X |p| A|´ 1q `
+
+κBN |X |p| A|´ 1q Ď p Mpμ0 q´. For any v P BN |X |p| A|´ 1q,define ζv,p :“ Λppκ1N |X |p| A|´ 1q ` κvq. Motivated by the preceding discussion, we use (a simple transformation of)  
+
+> 1´δδκ
+
+N |X |p| A| ´ 1qF t`p1 ´ δqμt ` δζ ut,p ˘ut
+
+as a surrogate for ∇F tpμtq, where ut is sampled uniformly from SN |X |p| A|´ 1q. What remains is to address the issue that the true kernel p is unknown. Similarly to the full infor-mation case, we compute an estimate ppt at each round to be used in place of the true kernel, and we employ bonuses to explore. One difference is that we rely on a slightly altered transition kernel estimator (see App. E.2.2) to ensure that ppt
+
+too satisfies the condition of Asm. 4.2. Another discrepancy to be accounted for in the analysis is that although we com-pute πt relying on ppt (in particular, πt is the policy induced by p1 ´ δqμt ` δζ ut, ppt
+
+P Mppt 
+
+> μ0
+
+), we observe F tpμπt,p q, the evaluation of πt in the true environment. This induces an extra source of bias in the gradient estimator. We summa-rize our approach in Alg. 3 in App. E.2.3, and prove the following result in App. E.2.5: 
+
+Theorem 4.3. Under Asm. 4.2, Alg. 3 with a suitable tuning of τ , δ, and pαtqtPr T s satisfies for any policy π P Π that 
+
+E rRT pπqs “ ˜O`a LpL ` 1q{ ε|X |5{4|A|5{4N 3T 3{4˘ .
+
+The main shortcoming of this method is its reliance on the restrictive Asm. 4.2, which also affects the regret guarantee through its dependence on ε. This assumption is not neces-sary to guarantee that pMpμ0 q´ has a non-empty interior; it suffices instead to assume that every state is reachable at ev-ery step, as we do later. Enforcing Asm. 4.2 only serves as a simple way to enable the construction of a sampling sphere with a certain radius. One can construct a different sampling sphere (or ellipsoid) without this assumption; nevertheless, the magnitude of the gradient estimator (which is featured in the current regret bound) would still scale with the re-ciprocal of the radius of that sphere, the permissible values for which depend on the structure of the MDP and can be arbitrarily small. It seems then that the current approach leads to an inevitable degradation of the bound subject to the structure of the MDP. 4.2.2. S ELF -CONCORDANT REGULARIZATION METHOD 
+
+Fortunately, we can adopt a more principled approach via the use of self-concordant regularization, which is a com-mon technique in bandit convex (and linear) optimization (see, e.g., Abernethy et al., 2008; Saha & Tewari, 2011; Hazan & Levy, 2014), and has been used for online learn-ing in MDPs in different (linear) settings (Lee et al., 2020; Cohen et al., 2021; Van der Hoeven et al., 2023). We show in App. E.3 that pMpμ0 q´ is a convex polytope speci-fied as the intersection of N |X || A| half-spaces. We define 
+
+ψlb : pMpμ0 q´ Ñ R as the standard logarithmic barrier for 7Online Episodic Convex Reinforcement Learning 
+
+pMpμ0 q´ (see Nemirovski, 2004, Cor. 3.1.1) which is a ϑ-self-concordant barrier (see Nemirovski, 2004, Def. 3.1.1) for pMpμ0 q´ with ϑ “ N |X || A|. The second approach we adopt here is to run mirror descent directly on pMpμ0 q´
+
+as the decision set and take ψlb as the regularizer in place of the entropic regularizer that induces Γ. Let ξ belong to the interior of pMpμ0 q´, which we assume is not empty. Property I in (Nemirovski, 2004, Sec. 2.2) implies that 
+
+ξ ` p ∇2ψlb pξqq ´1{2BN S pA´1q Ď p Mpμ0 q´ . Hence, we can construct an ellipsoid—entirely contained in pMpμ0 q´—around any point in int pMpμ0 q´. Let ξt be the output of mirror descent at round t and Ut :“ p ∇2ψlb pξtqq ´1{2. We can then use the following as a surrogate for the gradient of 
+
+F t ˝ Λp at ξt (see also Saha & Tewari, 2011):  
+
+> p1´δq
+> δ
+
+N |X |p| A| ´ 1qF t`Λp
+
+`ξt ` δU tut˘˘ U ´1 
+
+> t
+
+ut
+
+with ut again sampled uniformly from SN |X |p| A|´ 1q. The eigenvalues of Ut correspond to the lengths of the semi-axes of the ellipsoid used at round t, which could be arbitrarily small and lead again to the gradient surrogate having large magnitude. However, thanks to the relationship between ξt
+
+and Ut, a local norm analysis of mirror descent (see, e.g., Lem. 6.16 in Orabona, 2019) absolves the regret of any dependence on the properties of Ut. Unfortunately, due to technical barriers, this log-barrier-based approach is not readily extendable to the setting where the decision set can change over time (in particular, it is not clear whether an analogue for Lem. 2.1 can hold in this case). Hence, we restrict its application only to the case when the MDP is known , see Alg. 4 in App. E.3. We state next a regret bound for this algorithm (proved in App. E.3.2), which requires the following less restrictive assumption in place of Asm. 4.2. 
+
+Assumption 4.4. For every state x P X and step n P r N s,there exists a policy π such that ř 
+
+> aPA
+
+μπ,p n px, a q ą 0.Note that this can be imposed without loss of generality since the MDP is known; defining Xn Ď X as the subset of states reachable at step n, one can represent occupancy measures as sequences of distributions in p∆XnˆAqnPr N s.
+
+Theorem 4.5. Under Asm. 4.4, Alg. 4 with a suitable tuning of τ and δ satisfies for any policy π P Π that 
+
+E rRT pπqs “ ˜O`?LN 7{4 p| X || A|T q3{4˘ .
+
+Though holding only for the known MDP case, this bound maintains the T 3{4 rate of Thm. 4.3 while eliminating its reliance on Asm. 4.2 and its undesirable dependence on the MDP’s structure. We leave extending this result to un-known MDPs and designing practical approaches enjoying the optimal ?T rate for future work.     
+
+> Figure 1. [left] Initial agent distribution; [middle] The three targets from multi-objectives ; [right] The constrained MDP (reward in yellow, constraints in blue).
+
+## 5. Experiments 
+
+We evaluate Bonus O-MD-CURL on the multi-objective 
+
+and constrained MDP tasks from (Geist et al., 2022), which use fixed objective functions and fixed probability kernels across time steps. Adversarial and bandit MDPs are harder to implement due to challenges in finding optimal stationary policies, and there is a a lack of experimental validation in the literature. We focus on evaluating how well the additive bonus helps the algorithm to learn the environment. We also compare it to Greedy MD-CURL from (Moreno et al., 2024). The state space is an 11 ˆ 11 four-room grid world, with a single door connecting adjacent rooms. The agent can choose to stay still or move right, left, up, or down, as long as there are no walls blocking the path: xn`1 “ xn ` an ` εn.The external noise εn is a perturbation that can move the agent to a neighboring state with some probability. The initial distribution is a Dirac delta at the upper left corner of the grid, as in Fig. 1 [left]. We take N “ 40 , τ “ 0.01 , and 
+
+5 repetitions per experiment. 1
+
+Multi-objectives: The goal is to concentrate the distribu-tion on three targets by the final step N , as in Fig. 1 [mid-dle]. The objective function is defined as fnpμπ,p n q :“´ ř3
+
+> k“1
+
+p1 ´ x μπ,p n , e kyq 2, where ek P R|X | is a vec-tor with a 1 at the target state and 0 elsewhere. Con-strained MDPs: The goal is to concentrate the state dis-tribution on the yellow target in Fig. 1 [right] while avoid-ing the constraint states in blue. The objective function is defined as fnpμπ,p n q :“ ´x r, μ π,p n y ` px μπ,p n , c yq 2, where 
+
+r, c P R|X |ˆ| A|` . Here, r and c are zero everywhere except at the target and constraint states respectively. To compute the regret, we compare against the oracle op-timal policy, which can be closely approximated when the dynamics are known. For the Multi-objective task, Fig. 2 displays the state distribution at the final time step after 50 
+
+iterations for Bonus O-MD-CURL [up, left], and Greedy MD-CURL [up,right], and plot the log-loss [down,left] and regret [down,right] after 1000 iterations. We see that Bonus O-MD-CURL reaches the targets much faster than Greedy MD-CURL. As for the Constrained MDP task, Fig. 3 dis-
+
+> 1The code to reproduce the empirical results are available at:
+> https://github.com/biancammoreno/Convex_RL
+
+8Online Episodic Convex Reinforcement Learning         
+
+> 10 010 110 210 3
+> 10 0.2
+> 10 0.3
+> 10 0.4
+> Iteration
+> Greedy MD-CURL
+> Bonus O-MD-CURL
+> 0200 400 600 800 1,000
+> 0
+> 100
+> 200
+> 300
+> Iteration
+> Greedy MD-CURL
+> Bonus O-MD-CURL
+
+Figure 2. Multi-objective: distribution at N “ 40 after 50 iters. for Bonus O-MD-CURL [up,left], Greedy MD-CURL [up,right]; log-loss [down,left] and regret [down,right] for 10 3 iters.         
+
+> 10 010 110 210 3
+> 10 0.6
+> 10 0.8
+> 10 1
+> 10 1.2
+> 10 1.4
+> Iteration
+> Greedy MD-CURL
+> Bonus O-MD-CURL
+> 0200 400 600 800 1,000
+> 0
+> 2,000
+> 4,000
+> 6,000
+> Iteration
+> Greedy MD-CURL
+> Bonus O-MD-CURL
+
+Figure 3. Constrained MDP after 10 3 iters.: sum distributions over all time steps n P r 40 s at [up,left]; distribution at the last time step 
+
+N “ 40 for Bonus O-MD-CURL [up,center], and Greedy MD-CURL [up,right]; the log-loss [down, left] and regret [down,right]. 
+
+plays the log-sum of all state distributions for all time steps 
+
+n P r 40 s at iteration 1000 for Bonus O-MD-CURL [up,left]; the state distribution at the last time step n “ 40 after 1000 
+
+iterations for Bonus O-MD-CURL [up,center], and Greedy MD-CURL [up,right]; and the log-loss [down,left] and re-gret [down,right]. In this case, Greedy MD-CURL fails to reach the target state even after 1000 iterations, while Bonus O-MD-CURL successfully reaches the target state avoiding constrained states to minimize cost thanks to the additive bonuses. These examples empirically demonstrate the value of the additive bonus in tasks requiring exploration. 
+
+## Impact Statement 
+
+This work is of a theoretical nature, we do not foresee any notable societal consequences. 
+
+## References 
+
+Abbeel, P. and Ng, A. Y. Apprenticeship learning via inverse reinforcement learning. In Proceedings of the Twenty-First International Conference on Machine Learning , pp. 1, 2004. Abernethy, J., Hazan, E., and Rakhlin, A. Competing in the dark: An efficient algorithm for bandit linear optimization. In 21st Annual Conference on Learning Theory , volume 3, pp. 263–274, 2008. Azar, M. G., Osband, I., and Munos, R. Minimax regret bounds for reinforcement learning. In Proceedings of the 34th International Conference on Machine Learning , pp. 263–272, 2017. Barakat, A., Fatkhullin, I., and He, N. Reinforcement learn-ing with general utilities: simpler variance reduction and large state-action space. In Proceedings of the 40th In-ternational Conference on Machine Learning , pp. 1753– 1800, 2023. Beck, A. and Teboulle, M. Mirror descent and nonlinear projected subgradient methods for convex optimization. 
+
+Oper. Res. Lett. , 31(3):167–175, 2003. Bensoussan, A., Yam, P., and Frehse, J. Mean Field Games and Mean Field Type Control Theory . Springer, 2013. Bertsekas, D. Reinforcement learning and optimal control ,volume 1. Athena Scientific, 2019. Bubeck, S. Convex optimization: Algorithms and complex-ity. Foundations and Trends in Machine Learning , 8(3-4): 231–357, 2015. Bubeck, S., Eldan, R., and Lee, Y. T. Kernel-based methods for bandit convex optimization. Journal of the ACM (JACM) , 68(4):1–35, 2021. Cammardella, N., Bu ˇsi ´c, A., and Meyn, S. P. Kullback– leibler-quadratic optimal control. SIAM Journal on Con-trol and Optimization , 61(5):3234–3258, 2023. Canonne, C. L., Sun, Z., and Suresh, A. T. Concentration bounds for discrete distribution estimation in kl diver-gence, 2023. Coffman, A., Bu ˇsi ´c, A., and Barooah, P. A unified frame-work for coordination of thermostatically controlled loads. 
+
+Automatica , 152:111002, 2023. Cohen, A., Kaplan, H., Koren, T., and Mansour, Y. Online Markov decision processes with aggregate bandit feed-back. In Conference on Learning Theory , pp. 1301–1329. PMLR, 2021. Cover, T. and Thomas, J. Elements of Information Theory .Wiley, 2012. 9Online Episodic Convex Reinforcement Learning 
+
+Even-Dar, E., Kakade, S. M., and Mansour, Y. Online Markov decision processes. Mathematics of Opera-tions Research , 34(3):726–736, 2009. ISSN 0364765X, 15265471. Flaxman, A. D., Kalai, A. T., and McMahan, H. B. Online convex optimization in the bandit setting: gradient de-scent without a gradient. In Proceedings of the Sixteenth Annual ACM-SIAM Symposium on Discrete Algorithms ,pp. 385–394, 2005. Fokkema, H., Van der Hoeven, D., Lattimore, T., and Mayo, J. J. Online newton method for bandit convex optimisa-tion extended abstract, 2024. Garcıa, J. and Fern ´andez, F. A comprehensive survey on safe reinforcement learning. Journal of Machine Learning Research , 16(1):1437–1480, 2015. Geist, M., P ´erolat, J., Lauri `ere, M., Elie, R., Perrin, S., Bachem, O., Munos, R., and Pietquin, O. Concave utility reinforcement learning: The mean-field game viewpoint. In Proceedings of the 21st International Conference on Autonomous Agents and Multiagent Systems , pp. 489–497. International Foundation for Autonomous Agents and Multiagent Systems, 2022. Ghasemipour, S. K. S., Zemel, R., and Gu, S. A divergence minimization perspective on imitation learning methods. In Conference on robot learning , pp. 1259–1277, 2020. Greenberg, I., Chow, Y., Ghavamzadeh, M., and Mannor, S. Efficient risk-averse reinforcement learning. In Advances in Neural Information Processing Systems , volume 35, pp. 32639–32652, 2022. Hazan, E. and Levy, K. Bandit convex optimization: To-wards tight bounds. In Advances in Neural Information Processing Systems , volume 27, 2014. Hazan, E. and Li, Y. An optimal algorithm for bandit convex optimization. arXiv preprint arXiv:1603.04350 , 2016. Hazan, E., Kakade, S., Singh, K., and Van Soest, A. Prov-ably efficient maximum entropy exploration. In Interna-tional Conference on Machine Learning , pp. 2681–2691, 2019. Hazan, E. et al. Introduction to online convex optimization. 
+
+Foundations and Trends in Optimization , 2(3-4):157–325, 2016. Hu, X., Prashanth, L., Gy ¨orgy, A., and Szepesvari, C. (ban-dit) convex optimization with biased noisy gradient ora-cles. In Artificial Intelligence and Statistics , pp. 819–828, 2016. Jaksch, T., Ortner, R., and Auer, P. Near-optimal regret bounds for reinforcement learning. J. Mach. Learn. Res. ,11:1563–1600, 2008. J ´ez ´equel, R., Ostrovskii, D. M., and Gaillard, P. Effi-cient and near-optimal online portfolio selection. arXiv preprint arXiv:2209.13932 , 2022. Jin, C., Jin, T., Luo, H., Sra, S., and Yu, T. Learning adversar-ial Markov decision processes with bandit feedback and unknown transition. In Proceedings of the 37th Interna-tional Conference on Machine Learning , pp. 4860–4869, 2020. Lavigne, P. and Pfeiffer, L. Generalized conditional gradi-ent and learning in potential mean field games. Applied Mathematics & Optimization , 88(3):89, 2023. Lavington, J. W., Vaswani, S., and Schmidt, M. Improved policy optimization for online imitation learning. In Pro-ceedings of The 1st Conference on Lifelong Learning Agents , pp. 1146–1173, 2022. Lee, C.-W., Luo, H., Wei, C.-Y., and Zhang, M. Bias no more: high-probability data-dependent regret bounds for adversarial bandits and mdps. In Advances in Neural Information Processing Systems , pp. 15522–15533, 2020. Luo, H., Wei, C.-Y., and Lee, C.-W. Policy optimization in adversarial mdps: Improved exploration via dilated bonuses. In Advances in Neural Information Processing Systems , volume 34, pp. 22931–22942, 2021. Maurer, A. and Pontil, M. Empirical bernstein bounds and sample variance penalization. arXiv preprint arXiv:0907.3740 , 2009. Moreno, B. M., Br ´eg `ere, M., Gaillard, P., and Oudjane, N. Efficient model-based concave utility reinforcement learning through greedy mirror descent. In International Conference on Artificial Intelligence and Statistics , pp. 2206–2214, 2024. Moreno, B. M., Br ´eg `ere, M., Gaillard, P., and Oudjane, N. (Online) convex optimization for demand-side manage-ment: Application to thermostatically controlled loads. 
+
+Journal of Optimization Theory and Applications , 205(3): 43, 2025. Mourtada, J. and Ga ¨ıffas, S. An improper estimator with optimal excess risk in misspecified density estimation and logistic regression. Journal of Machine Learning Research , 23:1–49, 2022. Mutti, M., Pratissoli, L., and Restelli, M. Task-agnostic exploration via policy gradient of a non-parametric state entropy estimate. Proceedings of the AAAI Conference on Artificial Intelligence , 35(10):9028–9036, 2021. 10 Online Episodic Convex Reinforcement Learning 
+
+Mutti, M., De Santi, R., De Bartolomeis, P., and Restelli, M. Challenging common assumptions in convex rein-forcement learning. In Advances in Neural Information Processing Systems , pp. 4489–4502, 2022a. Mutti, M., De Santi, R., and Restelli, M. The importance of non-Markovianity in maximum state entropy exploration. In Proceedings of the 39th International Conference on Machine Learning , pp. 16223–16239, 2022b. Mutti, M., Santi, R. D., Bartolomeis, P. D., and Restelli, M. Convex reinforcement learning in finite trials. Journal of Machine Learning Research , 24(250):1–42, 2023. Nemirovski, A. Interior point polynomial time methods in convex programming. Lecture notes , 42(16):3215–3224, 2004. Neu, G. Explore no more: Improved high-probability regret bounds for non-stochastic bandits. Advances in Neural Information Processing Systems , 28, 2015. Neu, G., Gyorgy, A., and Szepesvari, C. The adversarial stochastic shortest path problem with unknown transition probabilities. In Proceedings of the Fifteenth Interna-tional Conference on Artificial Intelligence and Statistics ,pp. 805–813, 2012. Orabona, F. A modern introduction to online learning. arXiv preprint arXiv:1912.13213 , 2019. Pan, X., Seita, D., Gao, Y., and Canny, J. Risk averse robust adversarial reinforcement learning. In Interna-tional Conference on Robotics and Automation (ICRA) ,pp. 8522–8528, 2019. Rosenberg, A. and Mansour, Y. Online stochastic short-est path with bandit feedback and unknown transition function. Advances in Neural Information Processing Systems , 32, 2019a. Rosenberg, A. and Mansour, Y. Online convex optimization in adversarial Markov decision processes. In Proceed-ings of the 36th International Conference on Machine Learning , pp. 5478–5486, 2019b. Saha, A. and Tewari, A. Improved regret guarantees for online smooth convex optimization with bandit feedback. In Proceedings of the Fourteenth International Confer-ence on Artificial Intelligence and Statistics , pp. 636–642, 2011. Shalev-Shwartz, S. Online learning and online convex op-timization. Found. Trends Mach. Learn. , pp. 107–194, 2012. Sutton, R. S. and Barto, A. G. Reinforcement Learning: An Introduction . A Bradford Book, 2018. van der Hoeven, D., Zierahn, L., Lancewicki, T., Rosen-berg, A., and Cesa-Bianchi, N. A unified analysis of nonstochastic delayed feedback for combinatorial semi-bandits, linear bandits, and MDPs. In Proceedings of Thirty Sixth Conference on Learning Theory , pp. 1285– 1321, 2023. Wei, C.-Y. and Luo, H. More adaptive algorithms for ad-versarial bandits. In Conference On Learning Theory , pp. 1263–1291, 2018. Wolsey, L. and Nemhauser, G. Integer and Combinatorial Optimization . Wiley Series in Discrete Mathematics and Optimization. Wiley, 1999. Zahavy, T., Cohen, A., Kaplan, H., and Mansour, Y. Appren-ticeship learning via Frank-Wolfe. In AAAI Conference on Artificial Intelligence , 2019. Zahavy, T., O' Donoghue, B., Desjardins, G., and Singh, S. Reward is enough for convex MDPs. In Advances in Neural Information Processing Systems , pp. 25746– 25759, 2021. Zhang, J., Koppel, A., Bedi, A. S., Szepesvari, C., and Wang, M. Variational policy gradient method for reinforcement learning with general utilities. In Advances in Neural Information Processing Systems , pp. 4572–4583, 2020. Zhang, J., Ni, C., Yu, z., Szepesvari, C., and Wang, M. On the convergence and sample efficiency of variance-reduced policy gradient method. In Advances in Neural Information Processing Systems , pp. 2228–2240, 2021. Zimin, A. and Neu, G. Online learning in episodic Marko-vian decision processes by relative entropy policy search. In Advances in Neural Information Processing Systems ,pp. 1583–1591, 2013. 11 Online Episodic Convex Reinforcement Learning 
+
+## A. Auxiliary Results 
+
+A.1. Auxiliary lemmas Lemma A.1. For 0 ă δ ă 1,
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q} pi`1p¨| x, a q ´ ppti`1p¨| x, a q} 1
+
+ď 3|X |N 2
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+` 2|X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+with probability at least 1 ´ 2δ.Proof. Let ξtnpx, a q :“ } pnp¨| x, a q ´ pptnp¨| x, a q} 1. We denote by ot :“ p xtn, a tnqnPr N s the trajectory of the agent at episode 
+
+t when playing policy πt. Let pμπt,p n px, a q :“ 1tp xtn,a tnq“p x,a qu be the empirical state-action distribution computed from the agent’s trajectory. We consider the following decomposition: 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a qξti`1px, a q “ 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+pμπt,p i px, a qξti`1px, a q
+
+loooooooooooooooooooooomoooooooooooooooooooooon 
+
+> p1q
+
+`
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+`μπt,p n ´ pμπt,p i px, a q˘ξti`1px, a q
+
+looooooooooooooooooooooooooooomooooooooooooooooooooooooooooon 
+
+> p2q
+
+.
+
+Term p1q analysis. We start by analysing the first term. Using Lem. 2.2, we have that for δ P p 0, 1q, with probability 1 ´ δ,
+
+p1q “ 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+pμπt,p i px, a qξti`1px, a q ď 
+
+d
+
+2|X | log 
+
+ˆ |X || A|N T δ
+
+˙ Tÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q
+
+amax t1, N ti px, a qu .
+
+Using Lem. 19 from (Jaksch et al., 2008), we have that for all i P r N s and px, a q P X ˆ A,
+
+> T
+
+ÿ
+
+> t“1
+
+pμπt,p i px, a q
+
+amax t1, N ti px, a qu ď p ?2 ` 1q
+
+b
+
+N Ti px, a q.
+
+Therefore, using Jensen’s inequality and that ř 
+
+> px,a q
+
+N Ti px, a q “ T for all i P r N s, we have that 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+pμπt,p i px, a q
+
+amax t1, N ti px, a qu ď 3
+
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+b
+
+N Ti px, a qď 3
+
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+a|X || A|T
+
+ď 3N 2a|X || A|T . 
+
+(13) Substituting this inequality into the upper bound for term p1q yields 
+
+p1q ď 
+
+d
+
+2|X | log 
+
+ˆ |X || A|N T δ
+
+˙
+
+3N 2a|X || A|T
+
+“ 3|X |N 2
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+.
+
+(14) 12 Online Episodic Convex Reinforcement Learning 
+
+Term p2q analysis. We now analyse the second term. Let Ft :“ σpo1, . . . , o t´1q be the filtration generated by the trajectories of the agent from the first episode, up to the end of episode t ´ 1. Note that ξtn`1px, a q is Ft measurable, as it only depends on observations up to episode t ´ 1. Therefore, 
+
+Erξtn`1px, a qpμπt,p n px, a q| Ftns “ ξtn`1px, a qErpμπt,p n px, a q| Ftns “ ξtn`1px, a qμπt,p n px, a q.
+
+For all n P r N s, let M 0 
+
+> n
+
+“ 0 and for all t P r T s,
+
+M tn :“
+
+> t
+
+ÿ
+
+> s“1
+
+ÿ
+
+> x,a
+
+`μπs,p n px, a q ´ pμπs,p n px, a q˘ξsn`1px, a q.
+
+From the observation above, pM tnqtPr T s is a martingale sequence with respect to the filtration Ft. Furthermore, as by definition |ξtn`1px, a q| ď 2,
+
+|M tn ´ M t´1 
+
+> n
+
+| ď ÿ
+
+> xPX
+
+ˇˇˇˇÿ
+
+> aPA
+
+`μπt,p n px, a q ´ pμπt,p n px, a q˘ξtn`1px, a q
+
+ˇˇˇˇ ď 2|X |.
+
+Therefore, by Azuma-Hoeffding, we have that for any ε ą 0,
+
+P`M Tn ě ε˘ ď exp 
+
+ˆ ´ε2
+
+8|X |2T
+
+˙
+
+.
+
+Applying the union bound on all n P r N s, we then have that for any δ P p 0, 1q, with probability at least 1 ´ δ,
+
+M Tn ď 2|X |
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+holds simultaneously for all n P r N s.Substituting this inequality into term p2q and summing over n P r N s and i P r n ´ 1s, we obtain, with probability at least 
+
+1 ´ δ, that 
+
+p2q “ 
+
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+M Ti ď 2|X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+. (15) 
+
+Final step. Combining the upper bounds for term p1q from Eq. (14) and term p2q from Eq. (15) , we obtain, with probability at least 1 ´ 2δ, that 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a qξti`1px, a q ď 3|X |N 2
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+` 2|X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+,
+
+concluding the proof. 
+
+Lemma A.2. For any 0 ă δ ă 1,
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπt,p n px, a q
+
+amax t1, N tnpx, a qu ď 3N 2a|X || A|T ` | X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+,
+
+holds with probability at least 1 ´ δ.Proof. Recall that we denote by pxtn, a tnqnPt 0,rN su the trajectory of the agent during episode t, when playing policy πt, and that we define by pμπt,p px, a q :“ 1tp xtn,a tnq“p x,a qu as the empirical state-action distribution computed from the trajectory of 13 Online Episodic Convex Reinforcement Learning 
+
+the agent. We consider the following decomposition: 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπt,p n px, a q
+
+amax t1, N tnpx, a qu “
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+pμπt,p n px, a q
+
+amax t1, N tnpx, a qu 
+
+looooooooooooooooooooooooomooooooooooooooooooooooooon 
+
+> p1q
+
+`
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+`μπt,p n ´ pμπt,p n px, a q˘amax t1, N tnpx, a qu 
+
+looooooooooooooooooooooooomooooooooooooooooooooooooon 
+
+> p2q
+
+(16) 
+
+Term p1q analysis. Using the same decomposition of term p1q of Lem. A.1 in Eq. (13) we have that 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+pμπt,p n px, a q
+
+amax t1, N tnpx, a qu ď 3N 2a|X || A|T . (17) 
+
+Term p2q analysis. The analysis of term p2q follows a similar approach to the analysis of term p2q in Lem. A.1, with the key difference being that, instead of carrying the term related to the difference between the true probability transition and the estimated one, we now have the term 1{amax t1, N tnpx, a qu .Let Ft :“ σpo1, . . . , o t´1q be the filtration generated by the trajectories of the agent from the first episode, up to the end of episode t ´ 1. Note that 1{amax t1, N tnpx, a qu is Ft measurable, as it only depends from observations of time step n up to episode t ´ 1. Therefore, 
+
+Er1{amax t1, N tnpx, a qu pμπt,p n px, a q| Ftns “ 1{amax t1, N tnpx, a qu μπt,p n px, a q.
+
+For all n P r N s, let M 0 
+
+> n
+
+“ 0 and for all t P r T s,
+
+M tn :“
+
+> t
+
+ÿ
+
+> s“1
+
+pN ´ nq ÿ
+
+> x,a
+
+`μπs,p n px, a q ´ pμπs,p n px, a q˘1{amax t1, N tnpx, a qu .
+
+From the observation above, pM tnqtPr T s is a martingale sequence with respect to the filtration Ft. Furthermore, as by definition |1{amax t1, N tnpx, a qu| ď 1,
+
+|M tn ´ M t´1 
+
+> n
+
+| ď p N ´ nq ÿ
+
+> xPX
+
+ˇˇˇˇÿ
+
+> aPA
+
+`μπt,p n px, a q ´ pμπt,p n px, a q˘ξtnpx, a q
+
+ˇˇˇˇ ď p N ´ nq| X |.
+
+Therefore, by Azuma-Hoeffding, we have that for any ε ą 0,
+
+P`M Tn ě ε˘ ď exp 
+
+ˆ ´ε2
+
+2|X |2pN ´ nq2T
+
+˙
+
+.
+
+Applying the union bound on all n P r N s, we then have that for any δ P p 0, 1q, with probability at least 1 ´ δ,
+
+M Tn ď | X |N
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+.
+
+Summing over n P r N s, we have that with probability at least 1 ´ δ,
+
+p2q “ 
+
+> N
+
+ÿ
+
+> n“0
+
+M Tn ď | X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+. (18) 14 Online Episodic Convex Reinforcement Learning 
+
+Joining terms p1q and p2q. To conclude, we replace the final upper bounds of the terms p1q and p2q of Eq. (17) and (18) respectively in the decomposition of Eq. (16), and we obtain that, for any δ P p 0, 1q, with probability at least 1 ´ δ,
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπt,p n px, a q
+
+amax t1, N tnpx, a qu ď 3N 2a|X || A|T ` | X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+,
+
+concluding the proof. 
+
+Lemma A.3. For all n P r N s, px, a, x 1q P X ˆ A ˆ X , and t P r T s, let pptn`1px1|x, a q be defined as in Eq. (7) . Hence, 
+
+}ppt`1
+
+> n`1
+
+p¨| x, a q ´ pptn`1p¨| x, a q} 1 ď 1txtn“x,a tn“au
+
+max t1, N t`1 
+
+> n
+
+px, a qu .
+
+Proof. From the definition of the estimator ppt, we have that 
+
+ppt`1
+
+> n`1
+
+px1|x, a q “ 1max t1, N t`1 
+
+> n
+
+px, a qu 
+
+`N tnpx, a qpptn`1px1|x, a q ` 1txtn`1“x1,x tn“x,a tn“au
+
+˘.
+
+Therefore, 
+
+|ppt`1
+
+> n`1
+
+px1|x, a q ´ pptn`1px1|x, a q| “ 1max t1, N t`1 
+
+> n
+
+px, a qu 
+
+ˇˇˇ1txtn`1“x1,x tn“x,a tn“au ´ pptn`1px1|x, a q`N t`1 
+
+> n
+
+px, a q ´ N tnpx, a q˘ˇˇˇ
+
+“ 1max t1, N t`1 
+
+> n
+
+px, a qu 
+
+ˇˇˇ1txtn`1“x1,x tn“x,a tn“au ´ pptn`1px1|x, a q1txtn“x,a tn“au
+
+ˇˇˇ.
+
+Summing over x1 P X we then have that 
+
+}ppt`1
+
+> n`1
+
+p¨| x, a q ´ pptn`1p¨| x, a q} 1 ď 1txtn“x,a tn“au
+
+max t1, N t`1 
+
+> n
+
+px, a qu ,
+
+concluding the proof. 
+
+Lemma A.4. For pn, x, a q P r N sˆ X ˆA, let pqtqtPr T s be a sequence of probability transition kernels with qt :“ p qtnqnPr N s
+
+such that 
+
+}qt`1 
+
+> n
+
+p¨| x, a q ´ qtnp¨| x, a q} 1 ď c1txtn´1“x,a tn´1“au
+
+max t1, N t`1
+
+> n´1
+
+px, a qu 
+
+for some constant c ą 0. Then, Tÿ
+
+> t“1
+
+}qt`1 
+
+> n
+
+p¨| x, a q ´ qtnp¨| x, a q} 1 ď ec log pT q .
+
+Proof. We have that 
+
+> T
+
+ÿ
+
+> t“1
+
+}qt`1 
+
+> n
+
+p¨| x, a q ´ qtnp¨| x, a q} 1 ď c
+
+> T
+
+ÿ
+
+> t“1
+
+1txtn´1“x,a tn´1“au
+
+max t1, N t`1
+
+> n´1
+
+px, a qu “ c   
+
+> NT`1
+> n´1px,a q
+
+ÿ
+
+> t“1
+
+1
+
+t ď c
+
+> T
+
+ÿ
+
+> t“1
+
+1
+
+t ď c log peT q T ě2
+
+ď ec log pT q .
+
+Lemma A.5. Let pqtqtPr T s be a sequence of probability transition kernels, i.e., qt :“ p qtnqnPr N s such that for any state-action pair px, a q and any step n P r N s, řTt“1 }qt`1 
+
+> n
+
+p¨| x, a q ´ qtnp¨| x, a q} 1 ď c log pT q for some constant c ą 0. Then, for any sequence of policies pπtqtPr T s,
+
+> T
+
+ÿ
+
+> t“1
+
+}μπt,q t`1
+
+´ μπt,q t
+
+}8,1 ď c|X || A|N log pT q .
+
+While for a fixed policy π, Tÿ
+
+> t“1
+
+}μπ,q t`1
+
+´ μπ,q t
+
+}8,1 ď c|X |N log pT q .
+
+15 Online Episodic Convex Reinforcement Learning 
+
+Proof. Using Lem. B.1 we obtain that 
+
+> T
+
+ÿ
+
+> t“1
+
+}μπt,q t`1
+
+´ μπt,q t
+
+}8,1 ď
+
+> T
+
+ÿ
+
+> t“1
+
+sup  
+
+> nPr Ns
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,q t 
+
+> i
+
+px, a q} qt`1 
+
+> i`1
+
+p¨| x, a q ´ qti`1p¨| x, a q} 1
+
+“
+
+> T
+
+ÿ 
+
+> t“1
+> N´1
+
+ÿ
+
+> n“0
+
+ÿ
+
+> x,a
+
+μπt,q t 
+
+> n
+
+px, a q} qt`1
+
+> n`1
+
+p¨| x, a q ´ qtn`1p¨| x, a q} 1
+
+ď 
+
+> N´1
+
+ÿ
+
+> n“0
+
+ÿ
+
+> x,a T
+
+ÿ
+
+> t“1
+
+}qt`1
+
+> n`1
+
+p¨| x, a q ´ qtn`1p¨| x, a q} 1 ď c|X || A|N log pT q .
+
+While for a fixed policy π,
+
+> T
+
+ÿ
+
+> t“1
+
+}μπ,q t`1
+
+´ μπ,q t
+
+}8,1 ď
+
+> T
+
+ÿ 
+
+> t“1
+> N´1
+
+ÿ
+
+> n“0
+
+ÿ
+
+> x,a
+
+μπ,q t 
+
+> n
+
+px, a q} qt`1
+
+> n`1
+
+p¨| x, a q ´ qtn`1p¨| x, a q} 1
+
+ď
+
+> T
+
+ÿ 
+
+> t“1
+> N´1
+
+ÿ
+
+> n“0
+
+ÿ
+
+> x,a
+
+πnpa|xq} qt`1
+
+> n`1
+
+p¨| x, a q ´ qtn`1p¨| x, a q} 1
+
+ď c 
+
+> N´1
+
+ÿ
+
+> n“0
+
+ÿ
+
+> x,a
+
+πnpa|xq log pT q “ c|X |N log pT q .
+
+Lemma A.6. Consider a sequence of policies pπtqtPr T s, and define a smoothed version of each policy ˜πt for all t P r T s as 
+
+˜πt :“ p 1 ´ αtqπt ` αt 
+
+> |A|
+
+, where αt P p 0, 1q. Let p and q be two probability transition kernels, denoted as p :“ p pnqnPr N s
+
+and q :“ p qnqnPr N s, respectively. Therefore, for all t P r T s,
+
+}μπt,p ´ μ˜πt,q }8,1 ď 
+
+> N´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q} pi`1p¨| x, a q ´ qi`1p¨| x, a q} 1 ` 2N α t.
+
+Proof. See Lem. D.4 from (Moreno et al., 2024). 
+
+A.2. Building a closed-form solution for each OMD iteration 
+
+In this subsection we argue that the MD optimization problem solved at each iteration in Lem. 2.1 has a closed-form solution. Define the convex function Gtpμq :“ τ xzt, μ y ` Γpμ, ˜μtq, for τ ą 0.Optimizing a convex objective function over policies is equivalent to optimizing it over state-action distributions in Mpμ0 .Therefore, the optimization problem solved in Lem. 2.1 over the state-action distributions induced by qt`1 is equivalent to minimizing the same function over the space of policies: 
+
+min 
+
+> μPMqt`1
+> μ0
+
+Gtpμq
+
+looooooomooooooon 
+
+> piq: state-action problem
+
+” min  
+
+> πPp ∆AqXˆN
+
+Gtpμπ,q t`1
+
+q
+
+looooooooooooomooooooooooooon 
+
+> pii q: policy problem
+
+. (19) In Thm. 4.1 of (Moreno et al., 2024), it is shown that for each episode t P r T s, an optimal policy for the problem 
+
+min  
+
+> πPp ∆AqXˆN
+
+Gtpμπ,q t`1
+
+q :“ τ xzt, μ y ` Γpμ, ˜μtq, (20) defined in Eq. (19) , denoted by πt`1, can be computed using an auxiliary sequence of functions p ˜QtnqnPr N s, where 
+
+˜Qtn : X ˆ A Ñ R. The sequence starts with QtN px, a q “ ´ ztN px, a q, and for n P t N, . . . , 1u, the following recursion is 16 Online Episodic Convex Reinforcement Learning 
+
+used: 
+
+πt`1
+
+> n`1
+
+pa|xq “ ˜πtn`1pa|xq exp `τ ˜Qtn`1px, a q˘ř 
+
+> a1
+
+˜πtn`1pa1|xq exp `τ ˜Qtn`1px, a 1q˘ ,
+
+˜Qtnpx, a q “ ´ ztnpx, a q ` ÿ
+
+> x1
+
+qt`1
+
+> n`1
+
+px1|x, a q ÿ
+
+> a1
+
+πt`1
+
+> n`1
+
+pa1|x1q
+
+„
+
+´ 1
+
+τ log 
+
+´ πt`1
+
+> n`1
+
+pa1|x1q
+
+˜πtn`1pa1|x1q
+
+¯
+
+` ˜Qtn`1px1, a 1q
+
+ȷ
+
+.
+
+The core idea of the proof is to show that, due to the specific divergence used (defined in Eq. (4) ), Eq. (20) can be solved using dynamic programming. For further details, the reader is referred to Appendix B of (Moreno et al., 2024). A similar result was also obtained by (Cammardella et al., 2023), though they approached the optimization problem using Lagrangian multipliers instead of dynamic programming. Problem piq of Eq. (19) is convex, and the theoretical analysis are given in Lem. 2.1. Thanks to the equivalence between problems piq and pii q in Eq. (19) , we can use the analysis of problem piq to provide theoretical guarantees for the closed-form solution policy of problem pii q.
+
+## B. Missing Results and Proofs 
+
+Lemma B.1. For any strategy π P p ∆AqX ˆN , for any two probability kernels p “ p pnqnPr N s and q “ p qnqnPr N s such that 
+
+pn, q n : X ˆ A ˆ X Ñ r 0, 1s, and n P r N s,
+
+}μπ,p n ´ μπ,q n }1 ď
+
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπ,p i px, a q} pi`1p¨| x, a q ´ qi`1p¨| x, a q} 1.
+
+Proof. From the definition of a state-action distribution sequence induced by a policy π in a probability kernel p in Eq. (2) ,we have that for all px, a q P X ˆ A and n P r N s,
+
+μπ,p n px, a q “ ÿ
+
+> x1,a 1
+
+μπ,p n´1px1, a 1qpnpx|x1, a 1qπnpa|xq.
+
+Thus, 
+
+}μπ,p n ´ μπ,q n }1 “ ÿ
+
+> x,a
+
+ˇˇμπ,p n px, a q ´ μπ,q n px, a qˇˇ
+
+“ ÿ
+
+> x,a
+
+ÿ
+
+> x1,a 1
+
+ˇˇμπ,p n´1px1, a 1qpnpx|x1, a 1q ´ μπ,q n´1px1, a 1qqnpx|x1, a 1qˇˇπnpa|xq“ ÿ
+
+> x
+
+ÿ
+
+> x1,a 1
+
+ˇˇμπ,p n´1px1, a 1qpnpx|x1, a 1q ´ μπ,q n´1px1, a 1qqnpx|x1, a 1qˇˇ
+
+“ ÿ
+
+> x
+
+ÿ
+
+> x1,a 1
+
+ˇˇμπ,p n´1px1, a 1qpnpx|x1, a 1q ´ μπ,p n´1px1, a 1qqnpx|x1, a 1q` μπ,p n´1px1, a 1qqnpx|x1, a 1q ´ μπ,q n´1px1, a 1qqnpx|x1, a 1qˇˇ
+
+ď ÿ
+
+> x1,a 1
+
+μπ,p n´1px1, a 1q} pnp¨| x1, a 1q ´ qnp¨| x1, a 1q} 1 ` ÿ
+
+> x1,a 1
+
+ˇˇμπ,p n´1px1, a 1q ´ μπ,q n´1px1, a 1qˇˇ
+
+“ ÿ
+
+> x1,a 1
+
+μπ,p n´1px1, a 1q} pnp¨| x1, a 1q ´ qnp¨| x1, a 1q} 1 ` } μπ,p n´1 ´ μπ,q n´1}1.
+
+Since for n “ 0, }μπ,p  
+
+> 0
+
+´ μπ,q  
+
+> 0
+
+}1 “ 0, by induction we get that 
+
+}μπ,p n ´ μπ,q n }1 ď
+
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x1,a 1
+
+μπ,p i px1, a 1q} pi`1p¨| x1, a 1q ´ qi`1p¨| x1, a 1q} 1.
+
+17 Online Episodic Convex Reinforcement Learning 
+
+B.1. Proof of Prop. 3.1 
+
+Proof. In the analysis, we explicitly write the term n “ 0 separately from the other n P r N s. We begin with the following decomposition: 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0y “ 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+´ μπt,p y
+
+loooooooooooomoooooooooooon 
+
+> p1q
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt,p y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0y
+
+loooooooooooooooomoooooooooooooooon 
+
+> p2q
+
+.
+
+Term p1q analysis. Using Holder’s inequality, we have that 
+
+p1q ď 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+}btn}8}μπt, ppt 
+
+> n
+
+´ μπt,p n }1.
+
+From the definition of the bonus sequence, we have that for all n P r N s, }btn}8 ď LpN ´ nqCδ . Hence, 
+
+p1q ď LC δTÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+pN ´ nq
+
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q} pi`1p¨| x, a q ´ ppti`1p¨| x, a q} 1
+
+ď LC δ |X |N 3
+
+„
+
+3
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+` 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯ȷ
+
+where the first inequality comes from Lem. B.1, and the second inequality is achieved for any δ P p 0, 1q, with probability at least 1 ´ 2δ, using Lem. A.1. 
+
+Term p2q analysis. Using the definition of the bonus sequence in equation (11), and recalling that the initial state-action distribution μ0 is always the same, we have that, for any δ P p 0, 1q, with probability at least 1 ´ δ,
+
+p2q “ LC δTÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπt,p n px, a q
+
+amax t1, N tnpx, a qu ď LC δ N 2
+
+„
+
+3a|X || A|T ` | X |
+
+c
+
+2T log 
+
+´ Nδ
+
+¯ȷ
+
+,
+
+where the inequality comes from Lem. A.2. 
+
+Joining the upper bounds in term p1q and p2q. Putting both upper bounds together we get that for any δ P p 0, 1q, with probability at least 1 ´ 3δ, and from the definition of Cδ ,
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0y ď LC δ |X |N 3
+
+„
+
+3
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+` 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯ȷ
+
+` LC δ N 2
+
+„
+
+3a|X || A|T ` | X |
+
+c
+
+2T log 
+
+´ Nδ
+
+¯ȷ
+
+“ O
+
+ˆ
+
+LN 3|X |3{2a|A|T log 
+
+ˆ |X || A|N T δ
+
+˙˙ 
+
+.
+
+B.2. Proof of Thm. 3.2 (Main result) 
+
+For proving the main result we join together all the pieces we presented in the main paper and the appendix. 18 Online Episodic Convex Reinforcement Learning 
+
+Proof. We start by decomposing the regret and using the convexity of the objective function obtaining that 
+
+RT pπq “ 
+
+> T
+
+ÿ
+
+> t“1
+
+F tpμπt,p q ´ F tpμπt, ppt
+
+q ` 
+
+> T
+
+ÿ
+
+> t“1
+
+F tpμπt, ppt
+
+q ´ F tpμπ,p qď
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt,p q, μ πt,p ´ μπt, ppt
+
+y
+
+looooooooooooooooooomooooooooooooooooooon 
+
+> RMDP
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ πt, ppt
+
+´ μπ,p y
+
+looooooooooooooooooomooooooooooooooooooon 
+
+> Rpolicy
+> T
+
+.
+
+We analyse each term separately: 
+
+Analysis of RMDP  
+
+> T
+
+. We begin by analyzing the term RMDP  
+
+> T
+
+, which represents the cost incurred due to not knowing the true probability kernel. First, we apply Hoeffding’s inequality, and the fact that f tn is L-Lipschitz with respect to the norm } ¨ } 1.Following, we apply Lem. B.1, obtaining that 
+
+RMDP  
+
+> T
+
+ď
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+}∇f tnpμπt,p q} 8}μπt,p n ´ μπt, ppt 
+
+> n
+
+}1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q} pi`1p¨| x, a q ´ ppti`1p¨| x, a q} 1.
+
+We can now apply Lem. A.1 to obtain that for any δ P p 0, 1q, with probability at least 1 ´ 2δ,
+
+RMDP  
+
+> T
+
+ď L3|X |N 2
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+` L2|X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+. (21) 
+
+Analysis of Rpolicy  
+
+> T
+
+. To analyse Rpolicy  
+
+> T
+
+we further decompose it as 
+
+Rpolicy  
+
+> T
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q ´ bt, μ πt, ppt
+
+´ μπ, ppt
+
+y
+
+looooooooooooooooooooooomooooooooooooooooooooooon 
+
+> Rpolicy/MD
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+´ μπ, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ π, ppt
+
+´ μπ,p y
+
+loooooooooooooooooooooooooooooooooooomoooooooooooooooooooooooooooooooooooon 
+
+> Rpolicy/bonus
+> T
+
+,
+
+where recall that bt :“ p btnqnPr N s is the bonus vector defined in Eq. (11). 
+
+Analysis of Rpolicy/MD  
+
+> T
+
+. We begin by addressing the term that accounts for the regret incurred by using online Mirror Descent with changing constraint sets. From Lemmas A.3 and A.4, we know that the probability sequence ppptqtPr T s satisfies the condition that řTt“1 }ppt`1 
+
+> n
+
+´ pptn}1 ď
+
+c log pT q for c “ e. Additionally, at each time step t, since F t is LF -Lipschitz with respect to the norm } ¨ } 8,1, we have 
+
+}∇F tpμq} 1,8 ď LF “ LN for any state-action distribution μ. From the definition of the bonus vector, we also have that 
+
+}bt}1,8 ď LN 2Cδ . Consequently, }∇F tpμq ´ bt}1,8 ď 2LN 2Cδ . Therefore, as we compute μt`1 by solving 
+
+μt`1 :“ arg min  
+
+> μPMppt`1
+> μ0
+
+!
+
+τ x∇F tpμπt, ppt
+
+q ´ bt, μ y ` Γpμ, ˜μtq
+
+)
+
+,
+
+by applying Lem. 2.1 with νt :“ μπ, ppt
+
+, ζ “ 2LN 2Cδ , and the sequence of probability transition kernels ppptqtPr T s, we obtain that for the optimal parameter τ “
+
+b bζ2T , where 
+
+b :“ N
+
+ˆ
+
+log pT q
+
+´
+
+e|X || A| ` 4
+
+¯
+
+` log p| A|q ` 2N e |X | log pT q2 log p| A|q 
+
+˙
+
+,
+
+19 Online Episodic Convex Reinforcement Learning 
+
+and recalling that Cδ :“
+
+b
+
+2|X | log `|X || A|N T {δq,
+
+Rpolicy/MD  
+
+> T
+
+ď 2ζ?bT ` ζN e |X | log pT qď 2LN 2
+
+d
+
+2|X | log 
+
+ˆ |X || A|T N δ
+
+˙`2?bT ` N log pT qe|X |˘
+
+“ O
+
+ˆ
+
+LN 2|X |
+
+d
+
+T log 
+
+ˆ |X || A|N T δ
+
+˙´a N |A| log pT q ` N alog p| A|q log pT q
+
+¯˙
+
+.
+
+(22) 
+
+Analysis of Rpolicy/bonus  
+
+> T
+
+. We start by analysing the second term of the sum in Rpolicy/bonus  
+
+> T
+
+. For any δ P p 0, 1q, with probability at least 1 ´ δ, we have that 
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ π, ppt
+
+´ μπ,p y ď 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+}∇f tnpμπ,p q} 8}μπ,p n ´ μπ, ppt 
+
+> n
+
+}1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπ, ppt 
+
+> i
+
+px, a q} pi`1p¨| x, a q ´ ppti`1p¨| x, a q} 1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπ, ppt 
+
+> i
+
+px, a q Cδ
+
+amax t1, N ti px, a qu “ L
+
+> T
+
+ÿ 
+
+> t“1
+> N´1
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπ, ppt 
+
+> n
+
+px, a q Cδ
+
+amax t1, N tnpx, a qu “
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ π, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0y
+
+where the first inequality follows from Holder’s inequality, the second from the fact that f tn is L-Lipschitz with respect to the norm } ¨ } 1 and Lem. B.1, the third from the concentration bound in Lem. 2.2 where we define 
+
+Cδ :“
+
+b
+
+2|X | log `|X || A|N T {δq, and the last equality comes from the definition of the bonus vector in Eq. (11). Replacing it at the Rpolicy/bonus  
+
+> T
+
+term we have that 
+
+Rpolicy/bonus  
+
+> T
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+´ μπ, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+x∇F tpμπt, ppt
+
+q, μ π, ppt
+
+´ μπ,p yď
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+´ μπ, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ π, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0yď
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0y.
+
+Lastly, we apply Prop. 3.1 to achieve that, for any δ P p 0, 1q, with probability at least 1 ´ 4δ,
+
+Rpolicy/bonus  
+
+> T
+
+ď
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+y ` 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt
+
+> 0
+
+, μ 0y “ O
+
+ˆ
+
+LN 3|X |3{2a|A|T log 
+
+ˆ |X || A|N T δ
+
+˙˙ 
+
+. (23) 
+
+Final upper bound on Rpolicy  
+
+> T
+
+. Joining the upper bounds on Rpolicy/MD  
+
+> T
+
+and Rpolicy/bonus  
+
+> T
+
+from Eq.s (22) and (23) respectively, we achieve that for any δ P p 0, 1q, with probability at least 1 ´ 4δ, ignoring logarithmic terms, 
+
+Rpolicy  
+
+> T
+
+ď ˜O`LN 3|X |3{2a|A|T ˘. (24) 20 Online Episodic Convex Reinforcement Learning 
+
+Joining the upper bounds on RMDP  
+
+> T
+
+and on Rpolicy  
+
+> T
+
+. Note that the terms in the upper bound on Rpolicy  
+
+> T
+
+from Eq. (24) dominate those in the upper bound on RMDP  
+
+> T
+
+from Eq. (21) . Therefore, when combining both terms to complete the upper bound on the regret, we obtain that, with probability 1 ´ 6δ,
+
+RT pπq ď ˜O`LN 3|X |3{2a|A|T ˘,
+
+concluding the proof. 
+
+## C. Proof of Lem. 2.1: Online Mirror Descent with Varying Constraint Sets 
+
+Before stating the proof we recall a few results from Bregman divergences and in particular the divergence Γ defined in Eq. (4) that are used throughout the proof. To simplify notation, for any probability measure η P ∆E , where E is any finite space, we define the neg-entropy function, using the convention that 0 log p0q “ 0, as ϕpηq :“ ř 
+
+> xPE
+
+ηpxq log ηpxq. For any μ :“ p μnqnPr N s P p ∆X ˆAqN , we define 
+
+ρnpxq :“ ř 
+
+> aPA
+
+μnpx, a q for all n P r N s and x P X , representing the marginal distribution over the state space. The function inducing the divergence Γ, defined in Eq. (4), is given by 
+
+ψpμq :“
+
+> N
+
+ÿ
+
+> n“1
+
+ϕpμnq ´ 
+
+> N
+
+ÿ
+
+> n“1
+
+ϕpρnq. (25) By definition of a Bregman divergence, for any two probability transition kernels p, q , for all μ P Mpμ0 and μ1 P Mq, ˚ 
+
+> μ0
+
+,where Mq, ˚ 
+
+> μ0
+
+is the subset of Mqμ0 where the corresponding policies π satisfy πnpa|xq ‰ 0, we then have that 
+
+Γpμ, μ 1q :“ ψpμq ´ ψpμ1q ´ x ∇ψpμ1q, μ ´ μ1y. (26) Additionally, for any probability transition kernel p, the function ψ is 1-strongly convex with respect to } ¨ } 8,1 within Mpμ0
+
+(see Thm. 4.1 from (Moreno et al., 2024)). Consequently, a consequence from a known property of Bregman divergences (Shalev-Shwartz, 2012) is that, for any μ P Mpμ0 and μ1 P Mp, ˚ 
+
+> μ0
+
+,
+
+Γpμ, μ 1q ě 12 }μ ´ μ1}2
+
+> 8,1
+
+. (27) 
+
+Lemma. Let pqtqtPr T s be a sequence of probability transition kernels, and pztqtPr T s a sequence of vectors in RN ˆ| X |ˆ| A|,such that }zt}1,8 ď ζ for all t P r T s. Initialize π1
+
+> n
+
+pa|xq :“ 1{| A| as the uniform policy. For every t P r T s, let 
+
+˜πt :“ p 1 ´ αtqπt ` αt|A|´1 be a smoothed version of the policy with αt :“ 1{p t ` 1q and ˜μt :“ μ˜πt,q t
+
+. For each t P r T s,compute iteratively 
+
+μt`1 P arg min 
+
+> μPMqt`1
+> μ0
+
+τ xzt, μ y ` Γpμ, ˜μtq. (28) Hence, there is a τ ą 0 such that, for any sequence pνtqtPr T s, with νt :“ νπ,q t
+
+for a common policy π,
+
+řTt“1xzt, μ t ´ νty ď O`ζN aVT |X | log p| A|q T log pT q˘,
+
+where VT ě 1 ` max pn,x,a q
+
+řT ´1 
+
+> t“1
+
+}qtnp¨| x, a q ´ qt`1 
+
+> n
+
+p¨| x, a q} 1.
+
+Proof. Throughout this proof, for all t P r T s we denote by πt the policy inducing μt, meaning that μt :“ μπt,q t
+
+and 
+
+˜μt :“ μ˜πt,q t
+
+. We assume here that max pn,x,a q
+
+řT ´1 
+
+> t“1
+
+}qtnp¨| x, a q ´ qt`1 
+
+> n
+
+p¨| x, a q} 1 ď c log pT q for c a constant, as this is the case for all the transition estimators we use to obtain the main results of the article. As Mqt`1 
+
+> μ0
+
+is a convex set (only linear constraints), the optimality conditions and the definition of a Bregman divergence in Eq. (26) imply that for all νt`1 P Mqt`1 
+
+> μ0
+
+,
+
+xτ z t ` ∇ψpμt`1q ´ ∇ψp˜μtq, ν t`1 ´ μt`1y ě 0.
+
+21 Online Episodic Convex Reinforcement Learning 
+
+Re-arranging the terms and using the three points inequality for Bregman divergences (Bubeck, 2015) we get that, 
+
+τ xzt, μ t`1 ´ νt`1y ď x ∇ψpμt`1q ´ ∇ψp˜μtq, ν t`1 ´ μt`1y “ Γpνt`1, ˜μtq ´ Γpνt`1, μ t`1q ´ Γpμt`1, ˜μtq.
+
+Therefore, by adding and subtracting τ xzt, μ t ´ νty on the left-hand side, 
+
+τ xzt, μ t`1 ´ νt`1y ` τ xzt, μ t ´ νty ´ τ xzt, μ t ´ νty ď Γpνt`1, ˜μtq ´ Γpνt`1, μ t`1q ´ Γpμt`1, ˜μtqñ τ xzt, μ t ´ νty ď τ xzt, ν t`1 ´ νty ` τ xzt, μ t ´ μt`1y ` Γpνt`1, ˜μtq ´ Γpνt`1, μ t`1q ´ Γpμt`1, ˜μtq.
+
+Then, by summing over t P r T s, we obtain that 
+
+> T
+
+ÿ
+
+> t“1
+
+xzt, μ t ´ νty ď 1
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+
+“τ xzt, μ t ´ μt`1y ´ Γpμt`1, ˜μtq‰loooooooooooooooooooooooomoooooooooooooooooooooooon 
+
+> A
+
+` 1
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+
+“Γpνt`1, ˜μtq ´ Γpνt`1, μ t`1q‰loooooooooooooooooooooomoooooooooooooooooooooon 
+
+> B
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xzt, ν t`1 ´ νty
+
+loooooooooomoooooooooon 
+
+> C
+
+.
+
+(29) The term A arises due to our lack of knowledge of zt at the beginning of episode t for all episodes (adversarial losses hypothesis). To address this, we employ Young’s inequality and the strong convexity of Γ. For the term B, in the classic Online Mirror Descent proof (Shalev-Shwartz, 2012), where the set of constraints is fixed, the sum of the differences between the Bregman divergences telescopes (as would be the case with a fixed ν). However, because we are dealing with time-varying constraint sets, this telescoping effect does not occur in our situation. We will now proceed to derive an upper bound for each term, starting with term C that is straightforward. 
+
+Step 0: upper bound on C. Applying Holder’s inequality, Lem. A.5 with a fixed policy π, and the hypothesis that 
+
+}zt}1,8 ď ζ,
+
+C “
+
+> T
+
+ÿ
+
+> t“1
+
+xzt, ν t`1 ´ νty ď 
+
+> T
+
+ÿ
+
+> t“1
+
+}zt}1,8}νt`1 ´ νt}8,1 ď ζc |X |N log pT q. (30) 
+
+Step 1: upper bound on B. We now analyse the second term of the sum in Eq. (29) . To make the Bregman divergence terms telescope we add and subtract Γpνt, μ tq ´ Γpνt, ˜μtq, obtaining 
+
+> T
+
+ÿ
+
+> t“1
+
+Γpνt`1, ˜μtq ´ Γpνt`1, μ t`1q “ 
+
+> T
+
+ÿ
+
+> t“1
+
+Γpνt`1, ˜μtq ´ Γpνt, ˜μtq
+
+loooooooooooooooomoooooooooooooooon 
+
+> piq
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+Γpνt, ˜μtq ´ Γpνt, μ tq
+
+loooooooooooooomoooooooooooooon 
+
+> pii q
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+Γpνt, μ tq ´ Γpνt`1, μ t`1q
+
+looooooooooooooooomooooooooooooooooon 
+
+> piii q
+
+.
+
+(31) We analyze each term. Using the definition of a Bregman divergence induced by ψ in Eq. (26) we get that 
+
+piq “ 
+
+> T
+
+ÿ
+
+> t“1
+
+ψpνt`1q ´ ψp˜μtq ´ x ∇ψp˜μtq, ν t`1 ´ ˜μty ´ ψpνtq ` ψp˜μtq ` x ∇ψp˜μtq, ν t ´ ˜μty“
+
+> T
+
+ÿ
+
+> t“1
+
+ψpνt`1q ´ ψpνtq ` 
+
+> T
+
+ÿ
+
+> t“1
+
+x∇ψp˜μtq, ν t ´ νt`1yď ´ ψpν1q ` 
+
+> T
+
+ÿ
+
+> t“1
+
+}∇ψp˜μtq} 1,8}νt ´ νt`1}8,1,
+
+22 Online Episodic Convex Reinforcement Learning 
+
+where in the last inequality we use the telescoping nature of the first term and applied H ¨older’s inequality to the second term. Recall that for v :“ p vnqnPr N s such that vn P RX ˆA, we defined }v}8,1 :“ sup nPr N s }vn}1. We now also define 
+
+}ω}1,8 :“ sup v t|x ω, v y| , }v}8,1 ď 1u “ řNn“1 sup x,a |ωnpx, a q| as the respective dual norm. With our choice of Bregman divergence, and given that 
+
+˜πt :“ p 1 ´ αtqπt ` αt
+
+1
+
+|A| ,
+
+for each n P r N s, px, a q P X ˆ A, |∇ψp˜μtqp n, x, a q| “ | log p˜πtnpa|xqq| ď log p| A|{ αtq.From the Lemma hypothesis, there is a common policy π such that for all t P r T s, νt :“ νπ,q t
+
+. Hence, from the result above, 
+
+piq ď ´ ψpν1q ` 
+
+> T
+
+ÿ
+
+> t“1
+
+N log 
+
+ˆ |A|
+
+αt
+
+˙
+
+}νπ,q t
+
+´ νπ,q t`1
+
+}8,1
+
+ď ´ ψpν1q ` N log 
+
+ˆ |A|
+
+min tPr T s αt
+
+˙
+
+c|X |N log pT q,
+
+where the last inequality comes from Lem. A.5 with a fixed π.As for the second term, using our definition of Γ, we obtain that 
+
+pii q “ 
+
+> T
+
+ÿ
+
+> t“1
+
+ÿ
+
+> n,x,a
+
+νπ,q t 
+
+> n
+
+px, a q log 
+
+ˆ πnpa|xq
+
+˜πtnpa|xq
+
+˙
+
+´ ÿ
+
+> n,x,a
+
+νπ,q t 
+
+> n
+
+px, a q log 
+
+ˆ πnpa|xq
+
+πtnpa|xq
+
+˙
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+ÿ
+
+> n,x,a
+
+νπ,q t 
+
+> n
+
+px, a q log 
+
+ˆ πtnpa|xq
+
+˜πtnpa|xq
+
+˙
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+ÿ
+
+> n,x,a
+
+νπ,q t 
+
+> n
+
+px, a q log 
+
+ˆ πtnpa|xqp1 ´ αtqπtnpa|xq ` αt{| A|
+
+˙
+
+ď N
+
+> T
+
+ÿ
+
+> t“1
+
+p´ log p1 ´ αtqq ď 2N
+
+> T
+
+ÿ
+
+> t“1
+
+αt,
+
+where the last inequality is valid if 0 ď αt ď 0.5.The third term telescopes, hence, since ´ΓpνT `1, μ T `1q ď 0 because a Bregman divergence is always non-negative, 
+
+piii q ď Γpν1, μ 1q.
+
+Before adding back the three terms, note that, for π1
+
+> n
+
+pa|xq “ 1{| A|, we have Γpν1, μ 1q ´ ψpν1q “ ´ ψpμ1q. Furthermore, 
+
+´ψpμ1q ď N log p| A|q . Therefore, 
+
+Γpν1, μ 1q ´ ψpν1q ď N log p| A|q . (32) Summing over our bounds and using the Inequality (32), we get that B is upper bounded as 
+
+1
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+
+“Γpνt`1, ˜μtq ´ Γpνt`1, μ t`1q‰ ď 1
+
+τ
+
+“piq ` p ii q ` p iii q‰
+
+ď Nτ log p| A|q ` N 2c|X |
+
+τ log 
+
+ˆ |A|
+
+min tPr T s αt
+
+˙
+
+log pT q ` 2Nτ
+
+> T
+
+ÿ
+
+> t“1
+
+αt.
+
+(33) 
+
+Step 2: Upper bound on A. It remains to upper bound term A from Eq. (29), 
+
+A “ 1
+
+τ
+
+„ Tÿ
+
+> t“1
+
+τ xzt, μ t ´ μt`1y ´ Γpμt`1, ˜μtq
+
+ȷ
+
+, (34) 23 Online Episodic Convex Reinforcement Learning 
+
+representing what we pay for not knowing the loss function in advance. For that we use Young’s inequality (Beck & Teboulle, 2003): for any σ ą 0 to be optimized later, and for each episode t P r T s,
+
+τ xzt, μ t ´ μt`1y ´ Γpμt`1, ˜μtq ď τ 2}zt}21,8
+
+2σ ` σ
+
+2 }μt ´ μt`1}2 
+
+> 8,1
+
+´ Γpμt`1, ˜μtq. (35) From the definition of Γ in Eq. (4), we have that 
+
+Γpμt`1, ˜μtq “ 
+
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> px,a q
+
+μt`1 
+
+> n
+
+px, a q log 
+
+ˆ πt`1 
+
+> n
+
+pa|xq
+
+˜πtpa|xq
+
+˙
+
+“ Γpμt`1, μ ˜πt,q t`1
+
+q.
+
+From the strong convexity of ψ, as μt`1 P Mqt`1 
+
+> μ0
+
+and μ˜πt,q t`1
+
+P Mqt`1,˚ 
+
+> μ0
+
+, we then have from Eq. (27) that 
+
+Γpμt`1, ˜μtq “ Γpμt`1, μ ˜πt,q t`1
+
+q ě 12 }μt`1 ´ μ˜πt,q t`1
+
+}2
+
+> 8,1
+
+. (36) Using the fact that for any vectors a, b, c P Rd and for any norm } ¨ } , the inequality }a ´ b}2 ď 2p} a ´ c}2 ` } b ´ c}2q
+
+holds, we then have by Eq. (36) 
+
+14 }μt ´ μt`1}2 
+
+> 8,1
+
+´ Γpμt`1, ˜μtq ď 14 }μt ´ μt`1}2 
+
+> 8,1
+
+´ 12 }μ˜πt,q t`1
+
+´ μt`1}2
+
+> 8,1
+
+ď 12
+
+`}μt ´ μ˜πt,q t`1
+
+}2 
+
+> 8,1
+
+` } μ˜πt,q t`1
+
+´ μt`1}2
+
+> 8,1
+
+˘ ´ 12 }μ˜πt,q t`1
+
+´ μt`1}2
+
+> 8,1
+
+“ 12 }μt ´ μ˜πt,q t`1
+
+}2
+
+> 8,1
+
+.
+
+(37) For any n P r N s, we have }μtn ´ μ˜πt,q t`1 
+
+> n
+
+}1 ď 2. Using this result along with Lem. A.6 for p “ ppt and q “ ppt`1, we derive the first inequality below. To obtain the second inequality, we apply Lem. A.5 with the sequence of policies pπtqtPr T s.
+
+> T
+
+ÿ
+
+> t“1
+
+}μt ´ μ˜πt,q t`1
+
+}2 
+
+> 8,1
+
+ď 2
+
+> T
+
+ÿ
+
+> t“1
+
+sup  
+
+> nPr Ns
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μtipx, a q} qti`1p¨| x, a q ´ qt`1 
+
+> i`1
+
+p¨| x, a q} 1 ` 4N
+
+> T
+
+ÿ
+
+> t“1
+
+αt
+
+ď 2c|X || A|N log pT q ` 4N
+
+> T
+
+ÿ
+
+> t“1
+
+αt.
+
+(38) Therefore, summing Eq. (35) over t P r T s with σ “ 1{2, and plugging the inequality above, yields 
+
+> T
+
+ÿ
+
+> t“1
+
+τ xzt, μ t ´ μt`1y ´ Γpμt`1, ˜μtq ď τ 2
+
+> T
+
+ÿ
+
+> t“1
+
+}zt}21,8 ` c|X || A|N log pT q ` 2N
+
+> T
+
+ÿ
+
+> t“1
+
+αt.
+
+Using that }zt}1,8 ď ζ and dividing by τ entails: 
+
+A ď τ ζ 2T ` Nτ
+
+ˆ
+
+c|X || A| log pT q ` 2
+
+> T
+
+ÿ
+
+> t“1
+
+αt
+
+˙
+
+. (39) 
+
+Conclusion. Finally, by replacing the final bounds of Eqs. (33), (39), and (30), we obtain 
+
+> T
+
+ÿ
+
+> t“1
+
+xzt, μ t ´ νty ď A ` B ` C
+
+ď τ T ζ 2 ` Nτ
+
+ˆ
+
+c|X || A| log pT q ` 2
+
+> T
+
+ÿ
+
+> t“1
+
+αt
+
+˙
+
+` Nτ log p| A|q ` N 2c|X |
+
+τ log 
+
+ˆ |A|
+
+min tPr T s αt
+
+˙
+
+log pT q ` 2Nτ
+
+> T
+
+ÿ
+
+> t“1
+
+αt ` ζN c |X | log pT q.
+
+24 Online Episodic Convex Reinforcement Learning 
+
+In particular, for αt “ 1{p t ` 1q,
+
+> T
+
+ÿ
+
+> t“1
+
+xzt, μ t ´ νty ď τ T ζ 2 ` 1
+
+τ N
+
+„
+
+log pT q
+
+´
+
+c|X || A| ` 4
+
+¯
+
+` log p| A|q ` 2N c |X | log pT q2 log p| A|q 
+
+ȷloooooooooooooooooooooooooooooooooooooooooomoooooooooooooooooooooooooooooooooooooooooon 
+
+> “:b
+
+`ζN c |X | log pT q.
+
+Optimising over τ “
+
+b bζ2T ,
+
+> T
+
+ÿ
+
+> t“1
+
+xzt, μ t´νty ď 2ζ?bT `ζN c |X | log pT q “ O`ζacN |X || A|T log pT q` ζN ac|X | log p| A|q T log pT q` ζN c |X | log pT q˘,
+
+concluding the proof. 
+
+## D. Bandit Feedback with Bonus in RL 
+
+Notations. Throughout App. D, we define the trajectory observed by the learner in episode t as 
+
+ot :“ p xtn, a tn, ℓ tnpxtn, a tnqq nPr N s. Let Ft denote the σ-algebra generated by the observations up to episode t, i.e., 
+
+Ft :“ σpo1, . . . , o t´1q. We use Et to represent the conditional expectation with respect to the observations up to episode t,i.e., Etr¨s :“ Er¨| Fts.
+
+Overview of existing approaches. To adapt Alg. 1 to the bandit case, we need to estimate the loss function for each MD update. A classic choice using importance sampling is: 
+
+pℓtnpx, a q “ ℓtnpx, a q
+
+μπt,p n px, a q 1txtn“x,a tn“au.
+
+This update is unbiased, as Er1txtn“x,a tn“aus “ ErEr1txtn“x,a tn“au|Ftss “ μπt,p n px, a q. However, since we do not know the true transition probability p, we cannot use this estimate directly. In (Rosenberg & Mansour, 2019a), they use μπt, ppt
+
+with UC-O-REPS and achieve a regret of OpT 3{4q.Consider the following confidence set, that is further detailed in Eq. (41), 
+
+Ωt :“ t q | | qnpx1|x, a q ´ pptnpx1|x, a q| ď εtnpx1|x, a q, @p x, a, x 1q P X ˆ A ˆ X , n P r N su .
+
+In (Jin et al., 2020), the authors incorporate a parameter γ for implicit exploration, an idea from multi-armed bandits (Neu, 2015), and use the following estimate: 
+
+pℓtnpx, a q “ ℓtnpx, a q
+
+¯μtnpx, a q ` γ 1txtn“x,a tn“au, (40) where ¯μtnpx, a q :“ max qPΩt μπt,q . Although this is a biased estimate ( μπt,p n px, a q ď ¯μnpx, a q), Ωt is constructed to ensure that the bias introduced is reasonably small. They also argue that ¯μ can be computed efficiently through dynamic programming. They demonstrate that running UC-O-REPS from (Rosenberg & Mansour, 2019b) with this estimate achieves 
+
+˜Op?T q regret, improving upon previous results. In Alg. 2 we detail our method for solving the RL problem with adversarial losses, unknown probability transitions and bandit feedback. We proceed to the regret analysis. 
+
+D.1. Auxiliary lemmas Lemma D.1 (Lem. A.2 of (Luo et al., 2021), adapted from Lem. 1 of (Neu, 2015)) . Let pztnpx, a qq tPr T s be a sequence of functions Ft-measurable, such that ztnpx, a q P r 0, R s for each px, a q P X ˆ A, and n P r N s. Let Ztnpx, a q P r 0, R s be a random variable such that EtrZtnpx, a qs “ ztnpx, a q. Then with probability 1 ´ δ,
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+ˆ 1txtn“x,a tn“auZtnpx, a q
+
+¯μtnpx, a q ` γ ´ μπt,p n px, a qztnpx, a q
+
+¯μtnpx, a q
+
+˙
+
+ď RN 
+
+2γ log 
+
+ˆ Nδ
+
+˙
+
+.
+
+25 Online Episodic Convex Reinforcement Learning 
+
+Algorithm 2 MD-CURL with Additive Bonus for Bandit feedback RL 
+
+1: Input: number of episodes T , initial policy π1 P Π, initial state-action distribution μ0, initial state-action distribution sequence μ1 “ ˜μ1 “ μπ1, pp1
+
+with pp1
+
+> n
+
+p¨| x, a q “ 1{| X | for all pn, x, a q, learning rate τ ą 0, exploration parameter γ “ τ
+
+(tuned in the proof of Thm. 4.1), sequence of parameters pαtqtPr T s with αt “ 1{p t ` 1q.
+
+2: Init.: @p n, x, a, x 1q, N 1
+
+> n
+
+px, a q “ M 1
+
+> n
+
+px1|x, a q “ 0
+
+3: for t “ 1, . . . , T do 
+
+4: Agent starts at pxt
+
+> 0
+
+, a t
+
+> 0
+
+q „ μ0p¨q 
+
+5: for n “ 1, . . . , N do 
+
+6: Env. draws new state xtn „ pnp¨| xtn´1, a tn´1q
+
+7: Update counts 
+
+N t`1
+
+> n´1
+
+pxtn´1, a tn´1q Ð N tn´1pxtn´1, a tn´1q ` 1
+
+M t`1
+
+> n´1
+
+pxtn|xtn´1, a tn´1q Ð M tn´1pxtn|xtn´1, a tn´1q ` 1
+
+8: Agent chooses an action atn „ πtnp¨| xtnq
+
+9: Observe local loss ℓtnpxtn, a tnq
+
+10: end for 
+
+11: Update transition estimate for all pn, x, a, x 1q: ppt`1 
+
+> n
+
+px1|x, a q :“ M t`1  
+
+> npx1|x,a q
+> max t1,N tnpx,a qu
+
+12: Compute bonus sequence for all pn, x, a q: btnpx, a q :“ pN ´nqCδ?max t1,N t`1 
+
+> npx,a qu
+
+13: Compute optimistic state-action distribution for all pn, x, a q: ¯μtnpx, a q :“ max qPΩt μπt,q , where Ωt is defined as in Eq. (41) 
+
+14: Compute loss estimate for all pn, x, a q: pℓtnpx, a q “ ℓtnpx,a q 
+
+> ¯μtnpx,a q` γ
+
+1txtn“x,a tn“au
+
+15: Compute policy πt`1 
+
+> n
+
+px, a q by solving 
+
+μt`1 P arg min  
+
+> μPMppt`1
+> μ0
+
+␣τ xpℓt ´ bt, μ y ` Γpμ, ˜μtq(,
+
+which has a closed-form solution for πt`1 (see Sec. A.2) 
+
+16: Compute ˜πt`1, the smooth version of πt`1:
+
+˜πt`1 “ p 1 ´ αtqπt`1 ` αt{| A|
+
+and the associated state-action distribution ˜μt`1 :“ μ˜πt`1, ppt`1
+
+17: end for 
+
+26 Online Episodic Convex Reinforcement Learning 
+
+We define the confidence interval used in Alg. 2 as 
+
+Ωt :“ t qˇˇ|qnpx1|x, a q ´ pptnpx1|x, a q| ď εtnpx1|x, a q, for all px, a, x 1q P X ˆ A ˆ X , n P r N su , (41) with 
+
+εtnpx1|x, a q :“ 2
+
+gffe pptnpx1|x, a q log 
+
+´ T N |X || A|
+
+> δ
+
+¯
+
+max t1, N tn´1px, a qu `
+
+14 log 
+
+´ T N |X || A|
+
+> δ
+
+¯
+
+3 max t1, N tn´1px, a qu .
+
+We present two results regarding this confidence set. The first result, based on the empirical Bernstein inequality, shows that the true probability kernel p belongs to this confidence set with high probability. The second is a key lemma from (Jin et al., 2020), which explains how the confidence set shrinks over time. For the proofs, the reader is referred to the original references. 
+
+Lemma D.2 (Empirical Bernstein inequality, Thm. 4 (Maurer & Pontil, 2009)/Lem. 2 (Jin et al., 2020)) . With probability at least 1 ´ 4δ, we have that p P Ωt for all t P r T s.
+
+Lemma D.3 (Lem. 4 (Jin et al., 2020)) . With probability at least 1 ´ 6δ, for any collection of transition functions ppx,t qxPX
+
+such that px,t P Ωt for all x, we have 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+|μπt,p x,t  
+
+> n
+
+px, a q ´ μπt,p n px, a q| “ O
+
+ˆ
+
+N 2|X |
+
+c
+
+AT log 
+
+´ T N |X || A|
+
+δ
+
+¯˙
+
+.
+
+D.2. Proof of Thm. 4.1 
+
+Proof. We start by decomposing the static regret with respect to any policy π P p ∆AqX ˆN as follows 
+
+RT pπq “ 
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt, μ πt,p ´ μπt, ppt
+
+y
+
+loooooooooooomoooooooooooon 
+
+> 1,R MDP
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt ´ bt, μ πt, ppt
+
+´ μπ, ppt
+
+y
+
+loooooooooooooooomoooooooooooooooon 
+
+> 2,R policy/MD
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt, μ π, ppt
+
+´ μπ,p y ´ 
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ π, ppt
+
+y
+
+loooooooooooooooooooooomoooooooooooooooooooooon 
+
+> 3,R policy/MD
+> T
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+y
+
+looooooomooooooon  
+
+> 4,Bonus term
+
+.
+
+(42) D.2.1. T ERM 1: RMDP 
+
+> T
+
+The analysis of this term is already provided in App. B.2. Here, we can further leverage the fact that the objective function is linear and that, by definition, ℓtn P r 0, 1s. Therefore, with probability at least 1 ´ 2δ, we have: 
+
+RMDP  
+
+> T
+
+ď 3|X |N 2
+
+d
+
+2|A|T log 
+
+ˆ |X || A|N T δ
+
+˙
+
+` 2|X |N 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+. (43) D.2.2. T ERM 2: RPOLICY /MD 
+
+> T
+
+In practice, the learner plays using the estimated loss function minus the bonus. Hence, Rpolicy/MD  
+
+> T
+
+accounts for both the bias introduced by the loss estimation and the standard mirror descent regret bound. We start with the following decomposition: 
+
+Rpolicy/MD  
+
+> T
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt ´ bt, μ πt, ppt
+
+´ μπ, ppt
+
+y“
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt ´ pℓt, μ πt, ppt
+
+´ μπ, ppt
+
+y
+
+loooooooooooooooomoooooooooooooooon 
+
+> Bias terms
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xpℓt ´ bt, μ πt, ppt
+
+´ μπ, ppt
+
+y
+
+loooooooooooooooomoooooooooooooooon 
+
+> MD term
+
+27 Online Episodic Convex Reinforcement Learning 
+
+Mirror Descent term in Rpolicy/MD  
+
+> T
+
+. We begin by analyzing the error term from applying Mirror Descent with varying constraint sets, which is similar to that of Lem. 2.1 with zt “ pℓt ´ bt, and ppptqtPr T s as the probability kernel sequence defining the varying constraint sets. However, special attention is needed for the sup norm of the subgradient term since it now involves an estimate of the loss function. Additionally, the optimal learning rate τ now also depends on both the exploration parameter γ and the analysis of the bias terms, we provide a detailed explanation of how the entire analysis is affected below. In proving Lem. 2.1 in App. C, the regret term for Mirror Descent is split into three terms: term A in Eq. (34) , term B in Eq. (31) , and term C in Eq. (30) . The analysis of term B remains unchanged since this term is independent of the chosen loss function. We focus on what changes for terms A and C.As in the proof of Lem. 2.1, we use again the notation μt :“ μπt, ppt
+
+for all t P r T s. From Eq. (34) term A is defined as 
+
+A “ 1
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+
+“τ xpℓt ´ bt, μ t ´ μt`1y ´ Γpμt`1, ˜μtq‰.
+
+For a fixed t, from Young’s inequality we have that 
+
+> N
+
+ÿ
+
+> n“1
+
+τ xpℓtn ´ btn, μ tn ´ μt`1 
+
+> n
+
+y ď 
+
+> N
+
+ÿ
+
+> n“1
+
+τ 2 }pℓtn ´ btn}2
+
+> 8
+
+2σ ` σ
+
+2 }μtn ´ μt`1 
+
+> n
+
+}21.
+
+Following the analysis of term A in App. C, in special Eqs. (36), (37), and (38), we obtain that for σ “ 1{2,
+
+A ď
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+τ }pℓtn ´ btn}2 
+
+> 8
+
+` eN |X || A| log pT q
+
+τ ` 2Nτ
+
+> T
+
+ÿ
+
+> t“1
+
+αt. (44) From Eq. (30) , with the notation νt :“ νπ, ppt
+
+, term C is defined as C “ 1
+
+> τ
+
+řTt“1 τ xpℓt ´ bt, ν t`1 ´ νty. From Young’s inequality with σ “ 1{2 we obtain that 
+
+C ď 1
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+
+τ 2}pℓt ´ bt}21,8
+
+2σ ` 1
+
+τσ
+
+2
+
+> T
+
+ÿ
+
+> t“1
+
+}νt`1 ´ νt}2
+
+> 8,1
+
+ď
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+τ }pℓtn ´ btn}2 
+
+> 8
+
+` eN |X | log pT q
+
+2τ .
+
+(45) 
+
+Bounding the sup norm of the estimated loss function. Recall from the definition of the bonus function in Eq. (11) ,with L “ 1, that }btn}8 ď N C δ “: b for all n P r N s and t P r T s. As }pℓtn ´ btn}2 
+
+> 8
+
+ď } pℓtn}2 
+
+> 8
+
+` } btn}2
+
+> 8
+
+, we can focus on the term involving the sup norm of the estimated loss function. We apply Lem. D.1 with Ztnpx, a q “ 1txtn“x,a tn“auℓtnpx,a q2 
+
+> ¯μtnpx,a q` γ
+
+and ztnpx, a q “ μπt,p n px,a qℓtnpx,a q2 
+
+> ¯μtnpx,a q` γ
+
+. Note that Ztnpx, a q, z tnpx, a q ď  
+
+> 1
+> γ
+
+, that ztnpx, a q is Ft-measurable, and that EtrZtnpx, a qs “ ztnpx, a q. Therefore, with probability 1 ´ δ,
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+}pℓtn}2 
+
+> 8
+
+ď τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+pℓtnpx, a q2
+
+“ τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+1txtn“x,a tn“auℓtnpx, a q
+
+¯μtnpx, a q ` γ
+
+1txtn“x,a tn“auℓtnpx, a q
+
+¯μtnpx, a q ` γ
+
+“ τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+1txtn“x,a tn“auZtnpx, a q
+
+¯μtnpx, a q ` γ
+
+ďlo omo on 
+
+> Lem. D.1
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+μπt,p n px, a q
+
+¯μtnpx, a q
+
+μπt,p n px, a qℓtnpx, a q2
+
+¯μtnpx, a q ` γ ` τ 1
+
+γN
+
+2γ log 
+
+ˆ Nδ
+
+˙
+
+.
+
+28 Online Episodic Convex Reinforcement Learning 
+
+Lem. D.2 states that the true probability transition p P Ωt with probability 1 ´ 4δ for all t P r T s. Hence, with probability 
+
+1 ´ 4δ, ¯μtnpx, a q ě μπt,p n px, a q. Consequently, by replacing it in the previous inequality, we obtain that with probability 
+
+1 ´ 5δ,
+
+τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+}pℓtn}2 
+
+> 8
+
+ď τ
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+ℓtnpx, a q2 ` N τ 
+
+2γ2 log 
+
+ˆ Nδ
+
+˙
+
+ď τ T N |X || A| ` N τ 
+
+2γ2 log 
+
+ˆ Nδ
+
+˙
+
+,
+
+where for the last inequality we use that ℓtn P r 0, 1s.Therefore, by replacing it in the upper bound of the terms A and C in Eqs. (44) and (45) respectively, we obtain that 
+
+A ` C ď τ 4bT N |X || A| ` N τ γ2 log 
+
+ˆ Nδ
+
+˙
+
+` 3eN |X || A| log pT q
+
+2τ ` 2Nτ
+
+> T
+
+ÿ
+
+> t“1
+
+αt.
+
+The upper bound on term B from Eq. (33) in App. C remains the same: 
+
+B ď Nτ log p| A|q ` eN 2|X |
+
+τ log 
+
+ˆ |A|
+
+min tPr T s αt
+
+˙
+
+log pT q ` 2Nτ
+
+> T
+
+ÿ
+
+> t“1
+
+αt.
+
+Thus, setting αt “ 1{p t ` 1q, the final upper bound on the Mirror Descent term is, with high probability, given by 
+
+> T
+
+ÿ
+
+> t“1
+
+xpℓt ´ bt, μ πt, ppt
+
+´ μπ, ppt
+
+y ď A ` B ` C
+
+ď τ 4bT N |X || A| ` N τ γ2 log 
+
+ˆ Nδ
+
+˙
+
+` 6 eN |X || A| log pT q
+
+τ ` Nτ log p| A|q ` eN 2|X |
+
+τ log p| A|T q log pT q.
+
+(46) Before tuning the optimal parameter τ , we must first analyze the bias terms. 
+
+Bias terms. We now proceed to analyze the bias terms. Our approach is similar to the one used in (Jin et al., 2020), with a key difference: they utilize confidence sets in their Mirror Descent iterations, whereas we perform iterations over the set induced by ppt. We start by dividing the bias term in two: 
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt ´ pℓt, μ πt, ppt
+
+´ μπ, ppt
+
+y “ 
+
+> T
+
+ÿ
+
+> t“1
+
+xℓt ´ pℓt, μ πt, ppt
+
+y
+
+loooooooooomoooooooooon 
+
+> Bias 1
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+xpℓt ´ ℓt, μ π, ppt
+
+y
+
+loooooooooomoooooooooon 
+
+> Bias 2
+
+.
+
+Bias 1. Since μπt, ppt
+
+is Ft-measurable, we have that Etrx ℓt ´ pℓt, μ πt, ppt
+
+ys “ x Etrℓt ´ pℓts, μ πt, ppt
+
+y. For any couple px, a q,and for any time step n P r N s,
+
+Etrℓtnpx, a q ´ pℓtnpx, a qs “ ℓtnpx, a q ´ ℓtnpx, a qμπt,p n px, a q
+
+¯μtnpx, a q ` γ “ ℓtnpx, a q
+
+ˆ ¯μtnpx, a q ` γ ´ μπt,p n px, a q
+
+¯μtnpx, a q ` γ
+
+˙
+
+.
+
+Hence, 
+
+EtrBias 1 s “ 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+μπt, ppt 
+
+> n
+
+px, a qℓtnpx, a q
+
+ˆ ¯μtnpx, a q ` γ ´ μπt,p n px, a q
+
+¯μtnpx, a q ` γ
+
+˙
+
+.
+
+From Lem. D.2, and from the definition of ¯μ, we have that with high probability, ¯μtnpx, a q ě μπt, ppt 
+
+> n
+
+px, a q, therefore, 
+
+EtrBias 1 s ď 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+|¯μtnpx, a q ` γ ´ μπt,p n px, a q| ď 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+|¯μtnpx, a q ´ μπt,p n px, a q| ` γ|X || A|N T. 
+
+29 Online Episodic Convex Reinforcement Learning 
+
+Note that ¯μtnpx, a q “ max pPΩt μπt,p n px, a q “ πtnpa|xq max pPΩt ρπt,p n pxq, where ρπt,p n pxq :“ ř 
+
+> aPA
+
+μπt,p n px, a q. Therefore, for each x P X , there is a px,t P Ωt such that ¯μtnpx, a q “ μπt,p x,t  
+
+> n
+
+px, a q.From Lem. D.3 we obtain that 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+|μπt,p x,t  
+
+> n
+
+px, a q ´ μπt,p n px, a q| “ O
+
+ˆ
+
+N 2|X |
+
+c
+
+|A|T log 
+
+´ |X || A|N T δ
+
+¯˙
+
+.
+
+Therefore, 
+
+EtrBias 1 s “ O
+
+ˆ
+
+N 2|X |
+
+c
+
+|A|T log 
+
+´ |X || A|N T δ
+
+¯˙
+
+` γ|X || A|N T. 
+
+As we have that Bias 1 “ EtrBias 1 s ` řTt“1xEtrpℓts ´ pℓt, μ πt, ppt
+
+y, all that remains is to treat the second term of the sum. With high probability, ¯μtnpx, a q ě μπt, ppt 
+
+> n
+
+px, a q, therefore 
+
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+pℓtnpx, a qμπt, ppt 
+
+> n
+
+px, a q ď 
+
+> N
+
+ÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+ℓtnpx, a q1txtn“x,a tn“au ď N. 
+
+Thus, Azuma’s inequality gives us that 
+
+> T
+
+ÿ
+
+> t“1
+
+xEtrpℓts ´ pℓt, μ πt, ppt
+
+y ď N
+
+c
+
+2T log 
+
+´ 1
+
+δ
+
+¯
+
+,
+
+which is of a smaller order than the terms previously appearing in the bias bound. Hence, Bias 1 “ O
+
+ˆ
+
+N 2|X |
+
+c
+
+|A|T log 
+
+´ |X || A|N T δ
+
+¯˙
+
+` γ|X || A|N T. 
+
+Bias 2. The result follows directly from Lem. 14 of (Jin et al., 2020) using μπ, ppt
+
+instead of μπ,p :Bias 2 “
+
+> T
+
+ÿ
+
+> t“1
+
+xpℓt ´ ℓt, μ π, ppt
+
+y “ O
+
+ˆ N log p |X || A|Nδ q
+
+γ
+
+˙
+
+.
+
+Optimizing the learning and exploration parameters τ and γ. By joinning the Mirror Descent term from Eq. (46) along with the bounds on Bias 1 and Bias 2 terms, and setting γ “ τ , we obtain that 
+
+Rpolicy/MD  
+
+> T
+
+“ O
+
+ˆ
+
+τ bN |X || A|T ` Nτ
+
+”
+
+log 
+
+´ Nδ
+
+¯
+
+` | X || A| log pT q ` log p| A|q ` N |X | log p| A|T q log pT q
+
+ı
+
+` N 2|X |
+
+c
+
+|A|T log 
+
+´ |X || A|N T δ
+
+¯
+
+` τ |X || A|N T ` N log p |X || A|Nδ q
+
+τ
+
+˙
+
+.
+
+Let φ1 :“ p b ` 1qN |X || A|, and 
+
+φ2 :“ N
+
+„
+
+log 
+
+´ Nδ
+
+¯
+
+` | X || A| log pT q ` log p| A|q ` N |X | log p| A|T q log pT q ` log 
+
+ˆ |X || A|Nδ
+
+˙ȷ 
+
+.
+
+For τ 9aφ2{φ1T , recalling that b :“ N C δ , and that Cδ :“ a2|X | log p| X || A|N T {δq, we obtain that, with high probability, 
+
+Rpolicy/MD  
+
+> T
+
+“ 2aφ1φ2T “ ˜O`N 3{2|X |5{4|A|?T ` N 2|X |5{4a|A|T ˘. (47) D.2.3. T ERM 3: RPOLICY /MDP 
+
+> T
+
+The upper bound for this term directly follows from the analysis of adding the bonus term to compensate for insufficient exploration, as discussed in Subsec. 3.2 of the main paper, and is detailed in App. B.2. Thus, we have that with high probability, Rpolicy/MDP  
+
+> T
+
+ď 0.30 Online Episodic Convex Reinforcement Learning 
+
+D.2.4. T ERM 4: B ONUS TERM 
+
+The analysis of this term follows directly from Prop. 3.1 from the main paper: for any δ P p 0, 1q, with probability at least 
+
+1 ´ 3δ, we have that Tÿ
+
+> t“1
+
+xbt, μ πt, ppt
+
+y “ ˜O`N 3|X |3{2a|A|T ˘. (48) 
+
+D.3. Final bound 
+
+Replacing the upper bound on all four terms from Eq.s (43) , (47) , (48) , and that Rpolicy/MDP  
+
+> T
+
+ď 0 into the regret decomposition in Eq. (42) , we obtain that playing Alg. 2 for the RL problem with bandit feedback on adversarial loss functions has, with high probability, a static regret of order 
+
+RT pπq “ ˜O`N 3|X |3{2a|A|T ` N 3{2|X |5{4|A|?T ˘.
+
+## E. Curl with Bandit Feedback 
+
+Notation Let S and A be two positive integers. For convenience and brevity, we suppose in what follows that X “ r Ss
+
+and A “ r As. Accordingly, we will often use S and A in place of |X | and |A| respectively. Let 9A P t A, A ´ 1u. For a vector ξ P RN S 9A and pn, x, a q P r N s ˆ r Ss ˆ r 9As, we use ξnpx, a q as a shorthand for ξpp n ´ 1qS 9A ` p x ´ 1q 9A ` aq.Similarly, let :A P t A, A ´ 1u. Then, for an N S 9A ˆ N S :A matrix M , we use M pn, x, a, n 1, x 1, a 1q to denote the item in row 
+
+pn ´ 1qS 9A ` p x ´ 1q 9A ` a and column pn1 ´ 1qS :A ` p x1 ´ 1q :A ` a1 of M . For any d P Z`, let 1d P Rd be the vector with all entries equal to one and Id the d ˆ d identity matrix. 
+
+E.1. An alternative representation for the decision sets 
+
+In the following, we will fix an arbitrary transition kernel p :“ p pnqnPr N s. We recall the notation that for ζ P Mpμ0 ,
+
+ρζnpxq :“ ř 
+
+> aPA
+
+ζnpx, a q for pn, x q P r N s ˆ X , which satisfies ρζnpxq “ ř  
+
+> x1,a 1PXˆA
+
+ζn´1px1, a 1qpnpx|x1, a 1q for n ě 2.At the first step, we define ρp
+
+> 1
+
+pxq :“ ř  
+
+> x1,a 1PXˆA
+
+μ0px1, a 1qp1px|x1, a 1q, which satisfies ρp
+
+> 1
+
+pxq “ ρζ
+
+> 1
+
+pxq for every ζ P Mpμ0
+
+and x P X since the initial state distribution is the same for all occupancy measures in Mpμ0 .We describe here the mapping alluded to in Sec. 4.2.1 of Mpμ0 to a lower-dimensional space where it could have a non-empty interior. This is analogous to how one can define a bijective map between the simplex ∆d and the set 
+
+tx P Rd´1 : 1⊺
+
+> d´1
+
+x ď 1 and xi ě 0 @i P r d ´ 1su , which is the intersection of the positive orthant of Rd´1 with the L1 unit ball, see (J´ ez´ equel et al., 2022, Section 2). This can be done since any coordinate xi˚ of a vector x P ∆d can be recovered from the rest of the coordinates: xi˚ “ 1 ´ ř 
+
+> i‰i˚
+
+xi. In our case, denoting by a˚ the last action in A (i.e., a˚ “ A, recalling that A “ r As), we will represent the occupancy measures as vectors in RN S pA´1q by omitting all coordinates that correspond to this action. We can afford to do so, since for any μ P Mpμ0 , we have that μnpx, a ˚q “ ρμnpxq ´ ř 
+
+> a‰a˚
+
+μnpx, a q where 
+
+ρμn is recoverable from μn´1 and given in the first step by the initial state distribution ρp
+
+> 1
+
+pxq, which does not depend on μ. In the following, we use this idea to define the sought mapping. Define the A ˆ p A ´ 1q matrix 
+
+G :“
+
+„ IA´1
+
+´1⊺
+
+> A´1
+
+ȷ
+
+and let H be the N SA ˆ N S pA ´ 1q matrix obtained via taking the direct sum of N S copies of G: H :“ ÀN S i“1 G.2 Define 
+
+wp, 1 P RN SA such that 
+
+wp, 1 
+
+> n
+
+px, a q :“ ρp
+
+> 1
+
+pxqItn “ 1, a “ a˚u .
+
+Next, for every 2 ď m ď N , we define W p,m as the N SA ˆ N SA matrix where 
+
+W p,m pn, x, a, n 1, x 1, a 1q :“ Itn “ m, n 1 “ m ´ 1, a “ a˚upmpx|x1, a 1q .
+
+> 2
+
+For an n ˆ m matrix M and an n1 ˆ m1 matrix M 1, M À M 1 is the pn ` n1q ˆ p m ` m1q block matrix 
+
+„M 00 M 1
+
+ȷ
+
+.
+
+31 Online Episodic Convex Reinforcement Learning 
+
+Then, we define the N SA ˆ N S pA ´ 1q matrix 
+
+Bp :“ p IN SA ` W p,N q . . . pIN SA ` W p, 3qp IN SA ` W p, 2qH
+
+and the vector 
+
+βp :“ p IN SA ` W p,N q . . . pIN SA ` W p, 3qp IN SA ` W p, 2qwp, 1 .
+
+Finally, define the function Ξp : RN S pA´1q Ñ RN SA where 
+
+Ξppξq :“ Bpξ ` βp
+
+for ξ P RN S pA´1q.To explain the semantics of Ξp, let μ P Mpμ0 and ˜μ P RN S pA´1q be such that ˜μnpx, a q :“ μnpx, a q for all pn, x, a q P r N s ˆ 
+
+X ˆ Aza˚. It then holds that Ξpp˜μq “ μ. To see this, note that H ˜μ expands ˜μ setting pH ˜μqnpx, a ˚q “ ´ ř 
+
+> a‰a˚
+
+μnpx, a q.To fully recover μnpx, a ˚q, what remains is to add ρμnpxq. This is achieved at n “ 1 by adding wp, 1 to H ˜μ since 
+
+wp, 1 
+
+> n
+
+px, a ˚q “ ρp
+
+> 1
+
+pxq “ ρμ 
+
+> 1
+
+pxq and wp, 1 
+
+> n
+
+px, a q “ 0 for a ‰ a˚. Next, at n “ 2, the matrix W p, 2 extracts the values ρμ 
+
+> 2
+
+pxq
+
+when operated on H ˜μ ` wp, 1 such that μ2px, a ˚q is recovered at coordinate p2, x, a ˚q of pIN SA ` W p, 2qp H ˜μ ` wp, 1q.Iterating this procedure until step N allows us to fully recover μ from ˜μ. While for a generic ξ P RN S pA´1q, Ξppξq is the unique vector in RN SA satisfying pΞppξqq npx, a q “ ξnpx, a q for all n, x, and a ‰ a˚; pΞppξqq 1px, a ˚q “ ρp
+
+> 1
+
+pxq ´ ř 
+
+> a‰a˚
+
+pΞppξqq 1px, a q for all x; and pΞppξqq npx, a ˚q “ ř 
+
+> x1,a 1
+
+pΞppξqq n´1px1, a 1qpnpx|x1, a 1q ´ ř 
+
+> a‰a˚
+
+pΞppξqq npx, a q for all x and n ě 2.Note that Bp has full column rank since for any ξ P RN S pA´1q, Bpξ is only an expansion of ξ; hence, we can define its left pseudo-inverse pBpq` :“ pp Bpq⊺Bpq´1pBpq⊺, which satisfies pBpq`Bp “ IN S pA´1q. On the other hand, the matrix 
+
+BppBpq` projects vectors in RN SA onto the column space of Bp, which is given by 
+
+"
+
+μ P RN SA : ÿ
+
+> a
+
+μnpx, a q “ ÿ
+
+> x1,a 1
+
+μn´1px1, a 1qpnpx|x1, a 1q @ x P X , 2 ď n ď N and ÿ
+
+> a
+
+μ1px, a q “ 0 @x P X
+
+*
+
+. (49) It is easy to verify that for any μ, μ 1 P Mpμ0 , μ ´ μ1 lies in the column space of Bp (recall that ř 
+
+> a
+
+μ1px, a q “ ř 
+
+> a
+
+μ1
+
+> 1
+
+px, a q “ 
+
+ρp
+
+> 1
+
+pxq). Moreover, βp P Mpμ0 as it corresponds to a policy π where πnpa˚|xq “ 1 for all n and x. Therefore, for any 
+
+μ P Mpμ0 , μ ´ βp belongs to the column space of Bp, and we consequently have that 
+
+Ξp
+
+`pBpq`pμ ´ βpq˘ “ BppBpq`pμ ´ βpq ` βp “ μ . 
+
+Hence, by the definition of Ξp, pBpq`pμ ´ βpq coincides with μ on all coordinates pn, x, a q P r N s ˆ X ˆ Azt a˚u (since the map Ξp only expands the input vector adding the coordinates corresponding to action a˚), and is then the only point in 
+
+RN S pA´1q that Ξp maps to μ. In light of this, we define 
+
+pMpμ0 q´ :“ t ξ P RN S pA´1q | Ξppξq P Mpμ0 u ,
+
+the pre-image of Mpμ0 under Ξp. Accordingly, we define Λp : pMpμ0 q´ Ñ Mpμ0 as the restriction of Ξp to pMpμ0 q´; that is, 
+
+Λp :“ Ξp|pMpμ0 q´ .
+
+This then is a bijective function, with Λ´1 
+
+> p
+
+pμq “ p Bpq`pμ ´ βpq.Still, pMpμ0 q´ is not guaranteed to have a non-empty interior. Suppose that some state x˚ is not reachable at a certain step 
+
+n˚; that is, for every state x and action a, pn˚ px˚|x, a q “ 0 if n˚ ě 2, or just that ρp
+
+> 1
+
+px˚q “ 0 if n˚ “ 1. Then, for any 
+
+μ P Mpμ0 , μn˚ px˚, a q “ 0 for every action a. This implies that for every ξ P p Mpμ0 q´, ξn˚ px˚, a q “ 0 for all a ‰ a˚
+
+(since these coordinates are preserved under Λp), and hence, pMpμ0 q´ has an empty interior. To remedy this, we rely on Asm. 4.4, which is equivalent to imposing that for every state x, ρp
+
+> 1
+
+pxq ą 0 and there exists for every step n a state-action pair px1, a 1q such that pn`1px|x1, a 1q ą 0. We show next that this condition is sufficient for pMpμ0 q´ to have a non-empty interior. We first present an alternative characterization of pMpμ0 q´.
+
+Lemma E.1. It holds that 
+
+pMpμ0 q´ “ ␣ξ P RN S pA´1q : Bpξ ě ´ βp( .
+
+32 Online Episodic Convex Reinforcement Learning 
+
+Hence, pMpμ0 q´ is a polyhedral set formed by N SA constraints; namely that for n, x, a P rN s ˆ X ˆ A,
+
+Bppn, x, a, ¨, ¨, ¨q ⊺ξ ` βpnpx, a q ě 0.
+
+Proof. Any ξ P p Mpμ0 q´ clearly satisfies Bpξ ě ´ βp since Bpξ ` βp “ Λppξq P Mpμ0 , whose coordinates are non-negative. Conversely, assume that Bpξ ě ´ βp for some ξ P RN S pA´1q, and let μ :“ Ξppξq “ Bpξ ` βp. Showing that 
+
+ξ P p Mpμ0 q´ is equivalent, by definition, to showing that Ξppξq P Mpμ0 . Since βp P Mpμ0 and Bpξ belongs to the column space of Bp specified in (49), it holds that 
+
+ÿ
+
+> a
+
+μnpx, a q “ ÿ
+
+> x1,a 1
+
+μn´1px1, a 1qpnpx|x1, a 1q
+
+for every n ě 2, and that ř 
+
+> a
+
+μ1px, a q “ ř 
+
+> a
+
+βp 
+
+> 1
+
+px, a q “ ρβp 
+
+> 1
+
+pxq “ ρp
+
+> 1
+
+pxq. Then, to show that μ P Mpμ0 , it remains to show that μ P p ∆X ˆAqN . By assumption, μ only has non-negative coordinates; therefore, we only have to show that ř 
+
+> x,a
+
+μnpx, a q “ 1 at every n. This easily done via induction: ř 
+
+> x,a
+
+μ1px, a q “ ř 
+
+> x
+
+ρp
+
+> 1
+
+pxq “ 1, and for n ě 2,
+
+ÿ
+
+> x,a
+
+μnpx, a q “ ÿ
+
+> x
+
+ÿ
+
+> x1,a 1
+
+μn´1px1, a 1qpnpx|x1, a 1q “ ÿ
+
+> x1,a 1
+
+μn´1px1, a 1q .
+
+Lemma E.2. pMpμ0 q´ has a non-empty interior if and only if Asm. 4.4 holds. Proof. Necessity is immediate as argued before. We prove sufficiency utilizing an argument from the proof of Proposition 2.3 in (Wolsey & Nemhauser, 1999). For every step-state-action triple pn, x, a q, it is easy to verify that Asm. 4.4 implies the existence of some μ P Mpμ0 such that μnpx, a q ą 0. Taking a convex combination with full support of one such occupancy measure for every pn, x, a q results, via the convexity of Mpμ0 , in an occupancy measure μ˚ P Mpμ0 whose entries are all strictly positive. Hence, ξ˚ :“ Λ´1 
+
+> p
+
+pμ˚q is an interior point of the polyhedral set pMpμ0 q´ as it satisfies with strict inequality all the constraints defining it. 
+
+E.2. Entropic Regularization Approach 
+
+E.2.1. F ITTING A EUCLIDEAN BALL IN THE CONSTRAINT SET 
+
+For the following, fix ε P p 0, 1{Sq. From Sec. 4.2.1, recall the definition κ :“ ε{p A ´ 1 ` ?A ´ 1q. We now show that 
+
+κ1N S pA´1q ` κv P p Mpμ0 q´ for any v P BN S pA´1q assuming the transition kernel p :“ p pnqnPr N s satisfies the condition of Asm. 4.2; that is, pnpx1|x, a q ě ε for all pn, x, x 1, a q P r N s ˆ X 2 ˆ A. Take ζv,p :“ Ξppκ1N S pA´1q ` κvq. Note that showing that κ1N S pA´1q ` κv P p Mpμ0 q´ is equivalent to showing that ζv,p P Mpμ0 . In the following, we proceed with the latter. Note that via Lem. E.1, it suffices to show that ζv,p is non-negative. We use induction in the following to show more particularly that ζv,p P p ∆X ˆAqN . By the definition of ζv,p n , we have that for pn, x q P r N s ˆ X ,
+
+ζv,p n px, a q “ εA ´ 1 ` ?A ´ 1 p1 ` vnpx, a qq @ a P Aza˚ and ζv,p n px, a ˚q “ ρζv,p  
+
+> n
+
+pxq ´ ÿ
+
+> a‰a˚
+
+ζv,p n px, a q , (50) where ρζv,p  
+
+> n
+
+pxq “ ř 
+
+> a1,x 1PAˆX
+
+ζv,p n´1px1, a 1qpnpx|x1, a 1q for n ě 2 and ρζv,p  
+
+> 1
+
+pxq “ ř 
+
+> a1,x 1PAˆX
+
+μ0px1, a 1qp1px|x1, a 1q “ 
+
+ρp
+
+> 1
+
+pxq. For a ‰ a˚, clearly ζv,p n px, a q ě 0 as vnpx, a q ě ´ 1. Note that at any step n and state x, the Cauchy-Schwarz inequality and the fact that v P BN S pA´1q yield that 
+
+ÿ
+
+> a‰a˚
+
+vnpx, a q ď ?A ´ 1
+
+d ÿ
+
+> a‰a˚
+
+|vnpx, a q| 2 ď ?A ´ 1 .
+
+Hence, 
+
+ÿ
+
+> a‰a˚
+
+ζv,p n px, a q “ ÿ
+
+> a‰a˚
+
+εA ´ 1 ` ?A ´ 1 p1 ` vnpx, a qq ď ε . 
+
+33 Online Episodic Convex Reinforcement Learning 
+
+On the other hand, Asm. 4.2 implies that ρζv,p  
+
+> 1
+
+pxq ě ε for every x. Hence, (50) gives that ζv,p  
+
+> 1
+
+px, a ˚q ě 0 at every x.Moreover, (50) also implies that ř 
+
+> x,a
+
+ζv,p  
+
+> 1
+
+px, a q “ ř 
+
+> x
+
+ρp
+
+> 1
+
+pxq “ 1, yielding that ζv,p  
+
+> 1
+
+P ∆X ˆA. For n ě 2, assuming that ζv,p n´1 P ∆X ˆA, Asm. 4.2 implies again that ρζv,p  
+
+> n
+
+pxq ě ε for every x. We then get via (50) that ζv,p n px, a ˚q ě 0
+
+and that ζv,p n P ∆X ˆA since ř 
+
+> x,a
+
+ζv,p n px, a q “ ř 
+
+> x
+
+ρζv,p  
+
+> n
+
+pxq “ 1, which holds again via (50) and the assumption that 
+
+ζv,p n´1 P ∆X ˆA. Induction then establishes that ζv,p P p ∆X ˆAqN as sought. As mentioned above, this implies via Lem. E.1 that ζv,p P Mpμ0 , or equivalently, that κ1N S pA´1q ` κv P p Mpμ0 q´ and ζv,p “ Λppκ1N S pA´1q ` κvq.E.2.2. E STIMATING THE TRANSITION KERNEL 
+
+In this section, we define and analyze an alternative transition kernel estimator to the one given in Eq. (7). What we seek in this new estimator is (1) that it estimates well the true transition kernel, with a guarantee similar to that of Lem. 2.2; (2) that it drifts across rounds in a controlled manner, satisfying the bound of Lem. A.3 up to a constant; and (3) that, at the same time, it satisfies the condition of Asm. 4.2 almost surely, supposing, naturally, that it is satisfied by the true kernel. To recall the notation, for each round t P r T s, ot denotes a random trajectory obtained by executing the policy πt in the environment; that is, ot :“ p xt
+
+> 1
+
+, a t
+
+> 1
+
+, . . . , x tN , a tN q where atn „ πtp¨| xtnq and xtn „ pnp¨| xtn´1, a tn´1q.3 We also recall the definitions 
+
+N tnpx, a q :“
+
+> t´1
+
+ÿ
+
+> s“1
+
+1txsn“x,a sn“au and M tnpx1|x, a q :“
+
+> t´1
+
+ÿ
+
+> s“1
+
+1txsn`1“x1,x sn“x,a sn“au .
+
+Fix n, x, a P r N s ˆ X ˆ A. As an intermediate step, we compute at the beginning of each round t the Laplace (add-one) estimator for ptnp¨| x, a q; that is, for x1 P X ,
+
+˜ptnpx1|x, a q :“ M tn´1px1|x, a q ` 1
+
+N tn´1px, a q ` S . (51) To obtain a guarantee on the accuracy of this estimator, we firstly describe a slightly different setting. Let p 9xsnqTs“1 be an i.i.d. sequence of states such that 9xsn „ pnp¨| x, a q. Then, for k P r T s, we define the Laplace estimator 
+
+9pknpx1|x, a q :“ 1 ` řks“1 1t 9xsn“x1u
+
+k ` S .
+
+Notice that in our setting, the distribution ˜ptnp¨| x, a q is equivalent to 9pN tn´1px,a q 
+
+> n
+
+p¨| x, a q, keeping in mind that the number of samples N tn´1px, a q is random and dependent on the observed samples. Let DKL pp } qq denote the KL-divergence between distributions (probability mass functions) p and q. We derive the following result concerning the divergence between ˜pt and 
+
+p using known properties of the Laplace estimator and a union bound argument. 
+
+Lemma E.3. For fixed t, n, x, a P r T s ˆ r N s ˆ X ˆ A, it holds with probability at least 1 ´ δ that 
+
+DKL 
+
+`pnp¨| x, a q ›› ˜ptnp¨| x, a q˘ ď 161 S ` 6?S log 5{2 ST  
+
+> 4δ
+
+` 310 max t1, N tn´1px, a qu .
+
+Proof. For a fixed k P r T s, Thm. 2 in (Canonne et al., 2023) and Prop. 1 in (Mourtada & Ga¨ ıffas, 2022) imply that 
+
+P
+
+ˆ
+
+DKL 
+
+`pnp¨| x, a q ›› 9pknp¨| x, a q˘ ą 161 S ` 6?S log 5{2 S 
+
+> 4δ
+
+` 310 
+
+k
+
+˙
+
+ď δ . 
+
+Via a union bound, we obtain that 4
+
+P
+
+ˆ
+
+DKL 
+
+`pnp¨| x, a q ›› ˜ptnp¨| x, a q˘ ą 161 S ` 6?S log 5{2 S 
+
+> 4δ
+
+` 310 max t1, N tn´1px, a qu 
+
+˙
+
+> 3
+
+Recall that pxt
+
+> 0
+
+, a t
+
+> 0
+
+q „ μ0p¨ , ¨q .
+
+> 4
+
+Note that if N tn´1px, a q “ 0, then ˜ptnp¨| x, a q is the uniform distribution and DKL 
+
+`pnp¨| x, a q ›› ˜ptnp¨| x, a q˘ ď log S; hence, the bound trivially holds. 
+
+34 Online Episodic Convex Reinforcement Learning 
+
+ď P
+
+ˆ
+
+Dk P r T s : DKL 
+
+`pnp¨| x, a q ›› 9pknp¨| x, a q˘ ą 161 S ` 6?S log 5{2 S 
+
+> 4δ
+
+` 310 
+
+k
+
+˙
+
+ď δT . 
+
+The lemma then follows after rescaling δ.Note that the distribution ˜ptnp¨| x, a q does not necessarily satisfy the conditions of Asm. 4.2 uniformly. Next, we define for a given ε P r 0, 1{Ss the set 
+
+∆ε 
+
+> X
+
+:“ t x P Rd : 1⊺ 
+
+> d
+
+x “ 1 and xi ě ε @i P r dsu Ď ∆X ,
+
+which is the set of state distribution assigning probability at least ε to every state. We then define pptnp¨| x, a q as the information projection of ˜ptnp¨| x, a q onto ∆ε 
+
+> X
+
+; that is, 
+
+pptnp¨| x, a q :“ arg min 
+
+> qP∆ε
+> X
+
+DKL 
+
+`q ›› ˜ptnp¨| x, a q˘ , (52) which exists and is unique since ∆ε 
+
+> X
+
+is compact and DKL 
+
+`¨ ›› ˜ptnp¨| x, a q˘ is continuous and strictly convex where it is finite (note that ˜ptnp¨| x, a q never assigns zero probability to any state; hence, DKL 
+
+`q ›› ˜ptnp¨| x, a q˘ is finite for any q P ∆ε 
+
+> X
+
+). If 
+
+˜ptnp¨| x, a q is not already in ∆ε 
+
+> X
+
+, this projection can only bring us closer to pnp¨| x, a q in the KL -divergence sense as the following inequality (Cover & Thomas, 2012, Thm. 11.6.1) states: 
+
+DKL ppnp¨| x, a q } pptnp¨| x, a qq ď DKL ppnp¨| x, a q } ˜ptnp¨| x, a qq ´ DKL ppptnp¨| x, a q } ˜ptnp¨| x, a qq . (53) With this fact in mind, we can arrive at the following result, a parallel of Lem. 2.2. 
+
+Lemma E.4. With probability at least 1 ´ δ, it holds for all t, n, x, a P r T s ˆ r N s ˆ X ˆ A simultaneously that 
+
+}pnp¨| x, a q ´ pptnp¨| x, a q} 1 ď
+
+d
+
+322 S ` 12 ?S log 5{2 S2AN T 2 
+
+> 4δ
+
+` 620 max t1, N tn´1px, a qu .
+
+Proof. The statement is a consequence of (53) , Lem. E.3, and Pinsker’s inequality; followed by an application of a union bound over all rounds, steps, and state-action pairs. What remains now is to show that there exists a constant c ą 0 such that 
+
+}ppt`1
+
+> n`1
+
+p¨| x, a q ´ pptn`1p¨| x, a q} 1 ď c 1txtn“x,a st “au
+
+max t1, N t`1 
+
+> n
+
+px, a qu .
+
+This can be easily shown to hold for ˜pt, i.e., before the projection step, as states the following lemma. 
+
+Lemma E.5. For all n P r N ´ 1s, px, a, x 1q P X ˆ A ˆ X , and t P r T s; ˜ptn`1px1|x, a q as defined in (51) satisfies 
+
+}˜pt`1
+
+> n`1
+
+p¨| x, a q ´ ˜ptn`1p¨| x, a q} 1 ď 21txtn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S .
+
+Proof. The derivation follows along the same lines as the proof of Lem. A.3. We have that 
+
+˜pt`1
+
+> n`1
+
+px1|x, a q “ 1txtn`1“x1,x tn“x,a tn“au ` M tnpx1|x, a q ` 1
+
+N t`1 
+
+> n
+
+px, a q ` S
+
+“ 1txtn`1“x1,x tn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S ` N tnpx, a q ` SN t`1 
+
+> n
+
+px, a q ` S ˜ptn`1px1|x, a q .
+
+Hence, 
+
+˜pt`1
+
+> n`1
+
+px1|x, a q ´ ˜ptn`1px1|x, a q “ 1txtn`1“x1,x tn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S ` ˜ptn`1px1|x, a q N tnpx, a q ´ N t`1 
+
+> n
+
+px, a q
+
+N t`1 
+
+> n
+
+px, a q ` S
+
+“ 1txtn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S
+
+`1txtn`1“x1u ´ ˜ptn`1px1|x, a q˘ .
+
+35 Online Episodic Convex Reinforcement Learning 
+
+Finally, we conclude that 
+
+}˜pt`1
+
+> n`1
+
+p¨| x, a q ´ ˜ptn`1p¨| x, a q} 1 “ 2 ÿ
+
+> x1: ˜ pt`1
+> n`1px1|x,a qě ˜ptn`1px1|x,a q
+
+`˜pt`1
+
+> n`1
+
+px1|x, a q ´ ˜ptn`1px1|x, a q˘
+
+“ 21txtn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S
+
+`1 ´ ˜ptn`1pxtn`1|x, a q˘ ď 21txtn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S .
+
+To derive a similar bound for the projected estimator ppt, we firstly derive a more explicit characterization of the information projection onto ∆ε 
+
+> X
+
+. For a fixed ε P p 0, 1{Sq, define the function gε : R ˆ ∆X Ñ R as 
+
+gεpr; pq :“ ÿ
+
+> xPX
+
+max trε, p pxqu .
+
+Lemma E.6. For any given p P ∆X , the map r Þ Ñ gεpr; pq is εS -Lipschitz and has a unique fixed point. Moreover, denoting this fixed point by r˚, it holds that r˚ P r 1, max x ppxq{ εq, and that gεpr; pq ą r for r ă r˚ and gεpr; pq ă r for r ą r˚.Proof. We firstly note that gεp¨ ; pq can be easily verified to be convex. For any r P R and any subgradient h of gεp¨ ; pq at r,it holds that |h| ď εS . Hence, the convexity of gεp¨ ; pq implies that |gεpr; pq ´ gεpr1; pq| ď εS |r ´ r1| for any r, r 1 P R, or that gεp¨ ; pq is εS -Lipschitz. This implies, since εS ă 1 by assumption, that gεp¨ ; pq is a contraction mapping; hence, via Banach’s fixed point theorem, it admits a unique fixed point r˚ P R. For r ă 1, it holds that gεpr; pq ě ř 
+
+> x
+
+ppxq “ 1 ą r.While for r ě max x ppxq{ ε, gεpr; pq “ rεS ă r. Therefore, r˚ P r 1, max x ppxq{ εq. Moreover, for any r ă r˚ (r ą r˚), it must hold that gεpr; pq ą r (gεpr; pq ă r); as otherwise, the intermediate value theorem, applied to gεpr; pq ´ r, would imply the existence of another fixed point, a contradiction. Next, we define rε : ∆ X Ñ R as the function that maps a distribution p P ∆X to the fixed point of gεp¨ ; pq. This function is well-defined as implied by Lem. E.6. We now show that the solution of the information projection problem onto ∆ε 
+
+> X
+
+can be expressed in terms of the function rε. For p P ∆X , we define pε P ∆ε 
+
+> X
+
+as 
+
+pεpxq :“ max trεppqε, p pxqu 
+
+ř 
+
+> x1PX
+
+max trεppqε, p px1qu “ max tε, p pxq{ rεppqu .
+
+Lemma E.7. For p P ∆X , it holds that pε “ arg min qP∆ε 
+
+> X
+
+DKL pq } pq.Proof. We assume without loss of generality that ppxq ą 0 for all x P X ; as otherwise, we can cast the problem into a lower dimensional one considering only the elements x P X for which ppxq ą 0. Since the constraint set is compact and the objective is continuous and strictly convex, this minimization problem admits a unique optimal solution. We start by rewriting the problem as 
+
+min 
+
+> qPRS
+
+ÿ
+
+> xPX
+
+qpxq log qpxq
+
+ppxq
+
+subject to ε ´ qpxq ď 0 @x P X
+
+ÿ
+
+> xPX
+
+qpxq ´ 1 “ 0
+
+Define the Lagrangian 
+
+Lpq, u, v q :“ ÿ
+
+> xPX
+
+qpxq log qpxq
+
+ppxq ` ÿ
+
+> xPX
+
+upxqp ε ´ qpxqq ` v
+
+˜ ÿ
+
+> xPX
+
+qpxq ´ 1
+
+¸
+
+for v P R and u P RS
+
+> ě0
+
+. We have that 
+
+BL
+
+Bqpxq pq, u, v q “ log qpxq
+
+ppxq ` 1 ´ upxq ` v . 
+
+36 Online Episodic Convex Reinforcement Learning 
+
+We now show that we can satisfy the KKT conditions by choosing a solution pair q˚ and u˚, v ˚ where 
+
+q˚pxq :“ pεpxq “ max tε, p pxq{ rεppqu , u˚pxq :“ log max tε, p pxq{ rεppqu 
+
+ppxq{ rεppq , and v˚ :“ ´ 1 ` log rεppq .
+
+Firstly, q˚ indeed belongs to ∆ε 
+
+> X
+
+by the definition of pε, and u˚ is non-negative. Moreover, whenever q˚pxq ą ε, we get that u˚pxq “ 0; hence, complementary slackness holds. Finally, 
+
+BL
+
+Bqpxq pq˚, u ˚, v ˚q “ log max tε, p pxq{ rεppqu 
+
+ppxq ` 1 ´ log max tε, p pxq{ rεppqu 
+
+ppxq{ rεppq ´ 1 ` log rεppq “ 0 .
+
+Therefore, we conclude that pε is the optimal solution. Computing pε, or the information projection of p onto ∆ε 
+
+> X
+
+, can be performed efficiently. In particular, the following characterization implies that rεppq can be computed exactly in a finite number of steps by iterating over the set of states. 
+
+Lemma E.8. Let X ` 
+
+> p
+
+:“ t x P X : gεpppxq{ ε; pq ă ppxq{ εu and X ´ 
+
+> p
+
+:“ X zX ` 
+
+> p
+
+. Then, 
+
+rεppq “ 
+
+ř  
+
+> xPX`
+
+ppxq
+
+1 ´ ε|X ´ 
+
+> p
+
+| .
+
+Proof. As stated in the proof of Lem. E.6, for r ě max xPX ppxq{ ε, gεpr; pq “ rεS ă r; hence X ` 
+
+> p
+
+is non-empty as it at least includes arg max xPX ppxq. Moreover, from the same lemma, we have that rεppq ă min xPX ` 
+
+> p
+
+ppxq{ ε and 
+
+rεppq ě max xPX ´ 
+
+> p
+
+ppxq{ ε (if X ´ 
+
+> p
+
+is non-empty). Therefore, 
+
+rεppq “ gεprεppq; pq “ ÿ
+
+> xPX
+
+max trεppqε, p pxqu “ rεppqε|X ´ 
+
+> p
+
+| ` ÿ 
+
+> xPX`
+
+ppxq .
+
+The previous lemma also implies that rεppq ď p 1 ´ εS q´1. Returning back to our original objective, we show next that 
+
+}pε ´ qε}1 is no larger than a constant multiple of }p ´ q}1 for any two distributions p and q. Towards that end, we first show that rε is Lipschitz continuous. 
+
+Lemma E.9. For ε ď 12S , the function rε is 1-Lipschitz with respect to the } ¨ } 1 norm; that is, 
+
+|rεppq ´ rεpqq| ď } p ´ q}1
+
+for any p, q P ∆X .Proof. Note that, for any fixed r P R, gεpr; ¨q is convex; and that for any p P ∆X and subgradient k of gεpr; ¨q at p, it holds that k is non-negative and satisfies }k}8 ď 1. Hence, for any p, q P ∆X ,
+
+|gεpr; pq ´ gεpr; qq| ď ÿ  
+
+> x:ppxqą qpxq
+
+pppxq ´ qpxqq “ ÿ  
+
+> x:qpxqą ppxq
+
+pqpxq ´ ppxqq “ 12 }p ´ q}1 . (54) Then, we obtain that 
+
+|rεppq ´ rεpqq| “ | gεprεppq; pq ´ gεprεpqq; qq| ď | gεprεppq; pq ´ gεprεpqq; pq| ` | gεprεpqq; pq ´ gεprεpqq; qq| ď εS |rεppq ´ rεpqq| ` 12 }p ´ q}1 ď 12 |rεppq ´ rεpqq| ` 12 }p ´ q}1 ,
+
+where the second inequality follows from (54) and Lem. E.6, and the last inequality holds since ε ď 12S . The lemma then follows after rearranging the last result. 
+
+Lemma E.10. Assuming ε ď 12S , it holds for any p, q P ∆X that }pε ´ qε}1 ď 52 }p ´ q}1.
+
+37 Online Episodic Convex Reinforcement Learning 
+
+Proof. We have that 
+
+qεpxq “ max trεpqqε, q pxqu 
+
+rεpqq“ max trεpqqε, q pxqu ´ max trεppqε, p pxqu ` max trεppqε, p pxqu 
+
+rεpqq“ max trεpqqε, q pxqu ´ max trεppqε, p pxqu 
+
+rεpqq ` rεppq
+
+rεpqq pεpxq .
+
+Then, 
+
+qεpxq ´ pεpxq “ 1
+
+rεpqq
+
+`max trεpqqε, q pxqu ´ max trεppqε, p pxqu ` `rεppq ´ rεpqq˘pεpxq˘ .
+
+Using Lem. E.9 and the fact that 
+
+| max trεpqqε, q pxqu ´ max trεppqε, p pxqu| ď max ␣ε|rεpqq ´ rεppq| , |qpxq ´ ppxq| (
+
+ď ε|rεpqq ´ rεppq| ` | qpxq ´ ppxq| ,
+
+we obtain that 
+
+}pε ´ qε}1 “ ÿ
+
+> x
+
+|qεpxq ´ pεpxq| ď 1
+
+rεpqq
+
+ÿ
+
+> x
+
+`ε|rεpqq ´ rεppq| ` | qpxq ´ ppxq| ` pεpxq| rεppq ´ rεpqq| ˘
+
+ď }p ´ q}1
+
+rεpqq
+
+`2 ` εS ˘ ď 52 }p ´ q}1 ,
+
+where the last step uses that εS ď 1{2 and rεpqq ě 1.Finally, we arrive at the sought result, a parallel of Lem. A.3. 
+
+Lemma E.11. For all n P r N ´ 1s, px, a, x 1q P X ˆ A ˆ X , and t P r T s; pptn`1px1|x, a q as defined in (52) with ε ď 12S
+
+satisfies 
+
+}ppt`1
+
+> n`1
+
+p¨| x, a q ´ pptn`1p¨| x, a q} 1 ď 51txtn“x,a tn“au
+
+N t`1 
+
+> n
+
+px, a q ` S .
+
+Proof. This is a direct consequence of the definition in (52) and Lems. E.5, E.7 and E.10. E.2.3. T HE ALGORITHM 
+
+For δ P p 0, 1q, define 
+
+C1 
+
+> δ
+
+:“
+
+c
+
+322 S ` 12 ?S log 5{2 S2AN T 2
+
+4δ ` 620 , (55) which is the leading factor in the confidence bound of Lem. E.4. For the purpose of exploration, much like the full information case, we will utilize at each round t a bonus reward vector bt P RN SA to be subtracted from the estimated gradient, where 
+
+btnpx, a q :“ LpN ´ nq C1
+
+> 1{T
+
+amax t1, N tnpx, a qu (56) for pt, n, x, a q P r T s ˆ pt 0u ŤrN sq ˆ X ˆ A.Finally, with all its components detailed, we present Alg. 3, our first approach for CURL with bandit feedback. As mentioned in Sec. 4.2.1, the main changes compared to Alg. 1 are the use of spherical estimation to obtain a surrogate for the gradient and the use of a suitably altered transition kernel estimator. 38 Online Episodic Convex Reinforcement Learning 
+
+Algorithm 3 Bonus O-MD-CURL (bandit feedback) 
+
+input: learning rate τ ą 0, perturbation rate δ P p 0, 1s, sequence of exploration parameters pαtqtPr T s P p 0, 1qT
+
+initialization: pp1
+
+> n
+
+px1|x, a q Ð 1{S @p n, x, x 1, a q, μ1 P arg min μPM pp1
+
+> μ0
+
+ψpμq
+
+for t “ 1, . . . , T do 
+
+draw ut P SN S pA´1q uniformly at random 
+
+ζt Ð ζut, ppt
+
+“ Λppt pκ1N S pA´1q ` κutq
+
+pμt Ð p 1 ´ δqμt ` δζ t
+
+πtnpa|xq Ð pμtpx, a q{ ř 
+
+> aPA
+
+pμtpx, a q
+
+execute πt and observe F tpμπt,p q and a sampled trajectory ot :“ p xt
+
+> 1
+
+, a t
+
+> 1
+
+, . . . , x tN , a tN q
+
+gt Ð 1´δδκ N S pA ´ 1qF tpμπt,p qut
+
+construct ˚gt P RN SA as ˚gtnpx, a q Ð gtnpx, a q for a ‰ a˚ and ˚gtnpx, a ˚q Ð 0
+
+construct bonus vector bt as in (56) 
+
+˜πtnpa|xq Ð p 1 ´ αtqμtpx, a q{ ř 
+
+> aPA
+
+μtpx, a q ` αt{A
+
+construct the new estimated kernel ppt`1 via (51) and (52) set μt`1 P arg min μPM ppt`1
+
+> μ0
+
+τ x˚gt ´ bt, μ y ` Γpμ, μ ˜πt, ppt
+
+q
+
+end for 
+
+E.2.4. A UXILIARY LEMMAS 
+
+Lemma E.12. For 0 ă δ ă 1 and ppt as defined in (52) , it holds that 
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q} pi`1p¨| x, a q ´ ppti`1p¨| x, a q} 1 ď 3C1 
+
+> δ
+
+N 2?SAT ` 2SN 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+with probability at least 1 ´ 2δ.Proof. This lemma can be proved in the same manner as its full information version Lem. A.1 with only two small changes; we use the bound of Lem. E.4 instead of Lem. B.1 and we modify the definition of the filtration to be Ft :“
+
+σpu1, o 1, . . . , ut´1, o t´1, utq.
+
+Lemma E.13. For any 0 ă δ ă 1,
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπt,p n px, a q
+
+amax t1, N tnpx, a qu ď 3N 2?SAT ` SN 2
+
+c
+
+2T log 
+
+´ Nδ
+
+¯
+
+,
+
+holds with probability at least 1 ´ δ.Proof. The proof is the same as for Lem. A.2 (the version proved in the full information case), except that, again, the filtration used in the proof would be defined as Ft :“ σpu1, o 1, . . . , ut´1, o t´1, utq.
+
+Proposition E.14. Let bt and ppt be as defined in (56) and (52) respectively. Then, for any δ P p 0, 1q, with probability at least 1 ´ 3δ,
+
+> T
+
+ÿ
+
+> t“1
+
+@μπt, ppt
+
+, b tD `
+
+> T
+
+ÿ
+
+> t“1
+
+@μ0, b t
+
+> 0
+
+D ď LC 1 
+
+> 1{T
+
+N 3
+
+ˆ
+
+3C1
+
+> δ
+
+?SAT ` 2S
+
+c
+
+2T log 
+
+´ Nδ
+
+¯˙
+
+` LC 1 
+
+> 1{T
+
+N 2
+
+ˆ
+
+3?SAT ` S
+
+c
+
+2T log 
+
+´ Nδ
+
+¯˙
+
+.
+
+Proof. The proof is the same as that of Prop. 3.1 except that we would rely on Lems. E.12 and E.13 in place of Lems. A.1 and A.2, and use the definition of bt in (56) instead of (11). 39 Online Episodic Convex Reinforcement Learning 
+
+Lemma E.15. Let X be a random variable taking values in R, z1, z 2 ě 0 be two constants, and δ1 P p 0, 1q. If X ď z2
+
+uniformly and P pX ą z1q ď δ1, then ErXs ď z1 ` δ1z2 .
+
+Proof. Simply, ErXs “ ErItX ď z1uXs ` ErItX ą z1uXs ď z1 ` z2P px ą z1q ď z1 ` δ1z2.E.2.5. R EGRET ANALYSIS 
+
+The following theorem, a restatement of Thm. 4.3, provides a regret bound for Alg. 3. Recall that we have adopted in this section the shorthand notation S “ | X | and A “ | A|.
+
+Theorem E.16. Under Asm. 4.2, Alg. 3 with a suitable tuning of τ , δ, and pαtqtPr T s satisfies for any policy π P p ∆AqX ˆN
+
+that 
+
+E rRT pπqs À 
+
+c LpL ` 1q
+
+ε S5{4A5{4N 3T 3{4 ` L ` 1
+
+ε S2A5{2N 4?T , 
+
+where À signifies that the inequality holds up to factors logarithmic in T , N , S, and A.Proof. Fixing π P p ∆AqX ˆN , we have that 
+
+E rRT pπqs “ E
+
+> T
+
+ÿ
+
+> t“1
+
+`F tpμπt,p q ´ F tpμπ,p q˘
+
+“ E
+
+> T
+
+ÿ
+
+> t“1
+
+`F tpμπt,p q ´ F tpμπt, ppt
+
+q˘looooooooooooooooomooooooooooooooooon 
+
+1
+
+`E
+
+> T
+
+ÿ
+
+> t“1
+
+`F tpμπt, ppt
+
+q ´ F tpμπ, ppt
+
+q˘looooooooooooooooomooooooooooooooooon 
+
+2
+
+`E
+
+> T
+
+ÿ
+
+> t“1
+
+`F tpμπ, ppt
+
+q ´ F tpμπ,p q˘loooooooooooooooomoooooooooooooooon 
+
+3
+
+.
+
+It holds with probability at least 1 ´ 2 
+
+> T
+
+that 1 ď L
+
+> T
+
+ÿ
+
+> t“1
+
+μπt,p ´ μπt, ppt 
+
+> 1
+
+“ L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+μπt,p n ´ μπt, ppt 
+
+> n1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπt,p i px, a q pi`1p¨| x, a q ´ ppti`1p¨| x, a q 1
+
+ď 3LN 2?SAT C 1 
+
+> 1{T
+
+` 2LSN 2a2T log pN T q ,
+
+where the first inequality uses the Lipschitz continuity of F t, the second inequality follows from Lem. B.1, and the last inequality follows from Lem. E.12. Hence, since L řTt“1 μπt,p ´ μπt, ppt 
+
+> 1
+
+ď 2N LT , it holds via Lem. E.15 (with δ1 “ 2 
+
+> T
+
+)that 
+
+E “ 1 ‰ ď 3LN 2?SAT C 1 
+
+> 1{T
+
+` 2LSN 2a2T log pN T q ` 4LN . (57) For the third sum, we use again the Lipschitz continuity of F t, Lem. B.1, and Lem. E.4 to get that with probability at least 
+
+1 ´ 1 
+
+> T
+
+,3 ď L
+
+> T
+
+ÿ
+
+> t“1
+
+μπ, ppt
+
+´ μπ,p  
+
+> 1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+
+μπ, ppt 
+
+> n
+
+´ μπ,p n 1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπ, ppt 
+
+> i
+
+px, a q pi`1p¨| x, a q ´ ppti`1p¨| x, a q 1
+
+ď L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“1
+> n´1
+
+ÿ
+
+> i“0
+
+ÿ
+
+> x,a
+
+μπ, ppt 
+
+> i
+
+px, a q C1
+
+> 1{T
+
+amax t1, N ti px, a qu “ L
+
+> T
+
+ÿ
+
+> t“1
+> N
+
+ÿ
+
+> n“0
+
+pN ´ nq ÿ
+
+> x,a
+
+μπ, ppt 
+
+> n
+
+px, a q C1
+
+> 1{T
+
+amax t1, N tnpx, a qu 
+
+40 Online Episodic Convex Reinforcement Learning 
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+@μπ, ppt
+
+, b tD `
+
+> T
+
+ÿ
+
+> t“1
+
+@μ0, b t
+
+> 0
+
+D
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+@μπt, ppt
+
+, b tD `
+
+> T
+
+ÿ
+
+> t“1
+
+@μ0, b t
+
+> 0
+
+D `
+
+> T
+
+ÿ
+
+> t“1
+
+@μπ, ppt
+
+´ μπt, ppt
+
+, b tD .
+
+Via Prop. E.14, it holds with probability 1 ´ 3 
+
+> T
+
+that 
+
+> T
+
+ÿ
+
+> t“1
+
+@μπt, ppt
+
+, b tD `
+
+> T
+
+ÿ
+
+> t“1
+
+@μ0, b t
+
+> 0
+
+D ď LC 1 
+
+> 1{T
+
+N 3“3C1
+
+> 1{T
+
+?SAT ` 2Sa2T log pN T q‰
+
+` LC 1 
+
+> 1{T
+
+N 2“3?SAT ` Sa2T log pN T q‰ .
+
+Hence, chaining these last two results and using a union bound, we get via Lem. E.15 (with δ1 “ 4 
+
+> T
+
+) that 
+
+E
+
+«
+
+3 ´
+
+> T
+
+ÿ
+
+> t“1
+
+@μπ, ppt
+
+´ μπt, ppt
+
+, b tDff 
+
+ď LC 1 
+
+> 1{T
+
+N 3“3C1
+
+> 1{T
+
+?SAT ` 2Sa2T log pN T q‰
+
+` LC 1 
+
+> 1{T
+
+N 2“3?SAT ` Sa2T log pN T q‰ ` 8LN p1 ` C1 
+
+> 1{T
+
+N q , (58) where we have used that 3 ´
+
+> T
+
+ÿ
+
+> t“1
+
+@μπ, ppt
+
+´ μπt, ppt
+
+, b tD ď L
+
+> T
+
+ÿ
+
+> t“1
+
+μπ, ppt
+
+´ μπ,p  
+
+> 1
+
+`
+
+> T
+
+ÿ
+
+> t“1
+
+}bt}8}μπ, ppt
+
+´ μπt, ppt
+
+}1 ď 2LN T p1 ` C1 
+
+> 1{T
+
+N q .
+
+Define pF t : p∆X ˆAqN Ñ R as 
+
+pF tpμq “ EvPBN S pA´1q
+
+”
+
+F t`p1 ´ δqμ ` δζ v, ppt ˘ı
+
+.
+
+As ppt satisfies the condition of Asm. 4.2 by design, ζv, ppt
+
+P Mppt 
+
+> μ0
+
+Ă p ∆X ˆAqN as argued in App. E.2.1; thus, pF t is well-defined. Similarly, since ut P SN S pA´1q Ă BN S pA´1q and ζt “ ζut, ppt
+
+, it holds that ζt P Mppt 
+
+> μ0
+
+. Via the convexity of 
+
+Mppt 
+
+> μ0
+
+, the fact that μt P Mppt 
+
+> μ0
+
+, and the definition of pμt; it holds that pμt P Mppt 
+
+> μ0
+
+. This yields that pμt “ μπt, ppt
+
+, recalling the definition of πt in Alg. 3. Using the Lipschitz smoothness of F t, we have that 
+
+F tpμπt, ppt
+
+q ´ pF tpμtq “ F tppμtq ´ pF tpμtq “ F tpp 1 ´ δqμt ` δζ tq ´ EvPBN S pA´1q
+
+”
+
+F t`p1 ´ δqμt ` δζ v, ppt ˘ı
+
+ď δL EvPBN S pA´1q }ζt ´ ζv, ppt
+
+}1 ď 2δLN 
+
+and that 
+
+pF tpμπ, ppt
+
+q ´ F tpμπ, ppt
+
+q “ EvPBN S pA´1q
+
+”
+
+F tpp 1 ´ δqμπ, ppt
+
+` δζ v, ppt
+
+q
+
+ı
+
+´ F tpμπ, ppt
+
+qď δL EvPBN S pA´1q }ζv, ppt
+
+´ μπ, ppt
+
+}1 ď 2δLN . 
+
+Hence, 2 “
+
+> T
+
+ÿ
+
+> t“1
+
+`F tpμπt, ppt
+
+q ´ pF tpμtq ` pF tpμtq ´ pF tpμπ, ppt
+
+q ` pF tpμπ, ppt
+
+q ´ F tpμπ, ppt
+
+q˘
+
+ď
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq, μ t ´ μπ, ppt D ` 4δLN T 
+
+“
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq ´ bt, μ t ´ μπ, ppt D ` 4δLN T `
+
+> T
+
+ÿ
+
+> t“1
+
+@bt, μ πt, ppt
+
+´ μπ, ppt D `
+
+> T
+
+ÿ
+
+> t“1
+
+@bt, μ t ´ μπt, ppt D .
+
+41 Online Episodic Convex Reinforcement Learning 
+
+The last term is easily bounded as follows: 
+
+> T
+
+ÿ
+
+> t“1
+
+@bt, μ t ´ μπt, ppt D “
+
+> T
+
+ÿ
+
+> t“1
+
+@bt, μ t ´ pμtD “ δ
+
+> T
+
+ÿ
+
+> t“1
+
+@bt, μ t ´ ζtD ď δ
+
+> T
+
+ÿ
+
+> t“1
+
+}bt}8}μt ´ ζt}1 ď 2δC 1 
+
+> 1{T
+
+LN 2T . 
+
+We then conclude that 
+
+E
+
+«
+
+2 `
+
+> T
+
+ÿ
+
+> t“1
+
+@bt, μ π, ppt
+
+´ μπt, ppt Dff 
+
+ď E
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq ´ bt, μ t ´ μπ, ppt D ` 4δLN T ` 2δC 1 
+
+> 1{T
+
+LN 2T . (59) Then, combining (57), (58), and (59) yields that 
+
+E rRT pπqs ď E
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq ´ bt, μ t ´ μπ, ppt D ` 2δL p2 ` C1 
+
+> 1{T
+
+N qN T 
+
+` 3LC 1 
+
+> 1{T
+
+N 3“3C1
+
+> 1{T
+
+?SAT ` 2Sa2T log pN T q‰ ` 4LN p3 ` 2C1 
+
+> 1{T
+
+N q . (60) Define Ft, pFt : `Mppt
+
+> μ0
+
+˘´ Ñ R as Ftpξq :“ F t`Λppt pξq˘ and pFtpξq :“ pF t`Λppt pξq˘. Then, recalling that κ :“ εA´1`?A´1 ,
+
+pFt`Λ´1 
+
+> ppt
+
+pμtq˘ “ pF tpμtq “ EvPBN S pA´1q
+
+”
+
+F t`p1 ´ δqμt ` δζ v, ppt ˘ı
+
+“ EvPBN S pA´1q
+
+”
+
+Ft`Λ´1
+
+> ppt
+
+`p1 ´ δqμt ` δζ v, ppt ˘˘ ı
+
+“ EvPBN S pA´1q
+
+”
+
+Ft`` B ppt ˘``p1 ´ δqμt ` δζ v, ppt
+
+´ β ppt ˘˘ ı
+
+“ EvPBN S pA´1q
+
+”
+
+Ft`p1 ´ δq`B ppt ˘``μt ´ β ppt ˘ ` δ`B ppt ˘``ζv, ppt
+
+´ β ppt ˘˘ ı
+
+“ EvPBN S pA´1q
+
+”
+
+Ft`p1 ´ δqΛ´1 
+
+> ppt
+
+pμtq ` δΛ´1 
+
+> ppt
+
+pζv, ppt
+
+q˘ı
+
+“ EvPBN S pA´1q
+
+”
+
+Ftpp 1 ´ δqΛ´1 
+
+> ppt
+
+pμtq ` δκ 1N S pA´1q ` δκ vq
+
+ı
+
+,
+
+where the fourth equality follows form the fact that Λ´1 
+
+> ppt
+
+pμq “ `B ppt ˘``μ ´ β ppt ˘, and the last equality follows since 
+
+ζv, ppt
+
+“ Λppt pκ1N S pA´1q ` κvq. Lem. 1 in (Flaxman et al., 2005) and the chain rule imply that 
+
+∇pFt`Λ´1 
+
+> ppt
+
+pμtq˘ “ 1 ´ δδκ N S pA ´ 1qEuPSN S pA´1q
+
+”
+
+Ftpp 1 ´ δqΛ´1 
+
+> ppt
+
+pμtq ` δκ 1N S pA´1q ` δκ uqu
+
+ı
+
+“ 1 ´ δδκ N S pA ´ 1qEuPSN S pA´1q
+
+”
+
+Ft`p1 ´ δqΛ´1 
+
+> ppt
+
+pμtq ` δΛ´1
+
+> ppt
+
+`ζu, ppt ˘˘ u
+
+ı
+
+“ 1 ´ δδκ N S pA ´ 1qEuPSN S pA´1q
+
+”
+
+F tpp 1 ´ δqμt ` δζ u, ppt
+
+qu
+
+ı
+
+“ 1 ´ δδκ N S pA ´ 1qEutPSN S pA´1q
+
+“F tpp 1 ´ δqμt ` δζ tqut‰ ,
+
+where the last equality uses that ζt “ ζut, ppt
+
+and that both μt and ppt are independent with respect to ut. And since 
+
+∇pFt`Λ´1 
+
+> ppt
+
+pμtq˘ “ `B ppt ˘⊺∇ pF tpμtq, we obtain that 
+
+`B ppt `B ppt ˘`˘⊺∇ pF tpμtq “ 1 ´ δδκ N S pA ´ 1qEutPSN S pA´1q
+
+”
+
+F tpp 1 ´ δqμt ` δζ tq`` B ppt ˘`˘⊺ut
+
+ı
+
+“ EutPSN S pA´1q
+
+“`` B ppt ˘`˘⊺pgt‰ , (61) where 
+
+pgt :“ 1 ´ δδκ N S pA ´ 1qF tpp 1 ´ δqμt ` δζ tqut “ 1 ´ δδκ N S pA ´ 1qF tppμtqut .
+
+42 Online Episodic Convex Reinforcement Learning 
+
+The vector pgt differs from gt (which is employed in Alg. 3) in that it is defined using F tppμtq instead of F tpμπt,p q. For round t P r T s, let Ft :“ σpu1, o 1, . . . , ut, o tq denote the σ-algebra generated by the random events up to the end of round 
+
+t; and let Etr¨s :“ Er¨ | Ft´1s with F0 being the trivial σ-algebra. We then have that 
+
+E
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq, μ t ´ μπ, ppt D “ E
+
+> T
+
+ÿ
+
+> t“1
+
+@` B ppt `B ppt ˘`˘⊺∇ pF tpμtq, μ t ´ μπ, ppt D
+
+“ E
+
+> T
+
+ÿ
+
+> t“1
+
+@Et
+
+“`` B ppt ˘`˘⊺pgt‰, μ t ´ μπ, ppt D
+
+“ E
+
+> T
+
+ÿ
+
+> t“1
+
+@`` B ppt ˘`˘⊺pgt, μ t ´ μπ, ppt D ,
+
+where the first equality holds via the fact that B ppt `B ppt ˘`pμt ´ μπ, ppt
+
+q “ μt ´ μπ, ppt
+
+since μt ´ μπ, ppt
+
+belongs to the column space of B ppt
+
+(see App. E.1), the second equality uses (61) and the fact that conditioned on Ft´1, the only source of randomness in `` B ppt ˘`˘⊺pgt is ut, which is sampled independently in each round; and the last equality uses the tower rule, linearity of expectation, and the fact that μt ´ μπ, ppt
+
+is measurable with respect to Ft´1. Since μt ´ μπ, ppt
+
+“
+
+B ppt `Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘˘ , we have that 
+
+ppgtqT `B ppt ˘``μt ´ μπ, ppt ˘ “ p pgtqT `B ppt ˘`B ppt `Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘˘ “ p pgtqT `Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘˘ 
+
+since `B ppt ˘`B ppt
+
+“ IN S pA´1q, see App. E.1. Therefore, 
+
+E
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq, μ t ´ μπ, ppt D “ E
+
+> T
+
+ÿ
+
+> t“1
+
+@pgt, Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘D 
+
+“ E
+
+> T
+
+ÿ
+
+> t“1
+
+@gt, Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘D ` E
+
+> T
+
+ÿ
+
+> t“1
+
+@pgt ´ gt, Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘D 
+
+“ E
+
+> T
+
+ÿ
+
+> t“1
+
+@˚gt, μ t ´ μπ, ppt D ` E
+
+> T
+
+ÿ
+
+> t“1
+
+@pgt ´ gt, Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘D ,
+
+where the last equality follows from the definition of ˚gt (see Alg. 3) and the fact that μt and μπ, ppt
+
+are expansions of Λ´1 
+
+> ppt
+
+pμtq
+
+and Λ´1
+
+> ppt
+
+`μπ, ppt ˘ respectively, augmented with the entries corresponding to action a˚. Focusing on the second sum, we have that 
+
+> T
+
+ÿ
+
+> t“1
+
+@pgt ´ gt, Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘D ď
+
+> T
+
+ÿ
+
+> t“1
+
+}pgt ´ gt}8 Λ´1 
+
+> ppt
+
+pμtq ´ Λ´1
+
+> ppt
+
+`μπ, ppt ˘
+
+> 1
+
+ď
+
+> T
+
+ÿ
+
+> t“1
+
+}pgt ´ gt}8 μt ´ μπ, ppt
+
+> 1
+
+ď 2N
+
+> T
+
+ÿ
+
+> t“1
+
+}pgt ´ gt}8
+
+“ 2 1 ´ δδκ N 2SpA ´ 1q
+
+> T
+
+ÿ
+
+> t“1
+
+}ut}8|F tppμtq ´ F tpμπt,p q| ď 4
+
+εδ N 2SA 2
+
+> T
+
+ÿ
+
+> t“1
+
+|F tppμtq ´ F tpμπt,p q| “ 4
+
+εδ N 2SA 2
+
+> T
+
+ÿ
+
+> t“1
+
+|F tpμπt, ppt
+
+q ´ F tpμπt,p q| ď 4
+
+εδ LN 2SA 2
+
+> T
+
+ÿ
+
+> t“1
+
+μπt, ppt
+
+´ μπt,p  
+
+> 1
+
+,
+
+43 Online Episodic Convex Reinforcement Learning 
+
+where the fourth inequality uses that κ ě ε 
+
+> 2A
+
+and that ut P SN S pA´1q, and the last inequality uses the Lipschitz continuity of F t. As shown in (57), we have that 
+
+E
+
+> T
+
+ÿ
+
+> t“1
+
+μπt, ppt
+
+´ μπt,p  
+
+> 1
+
+ď 3N 2?SAT C 1 
+
+> 1{T
+
+` 2SN 2a2T log pN T q ` 4N . 
+
+Hence, 
+
+E
+
+> T
+
+ÿ
+
+> t“1
+
+@∇ pF tpμtq, μ t ´ μπ, ppt D ď E
+
+> T
+
+ÿ
+
+> t“1
+
+@˚gt, μ t ´ μπ, ppt D ` 4
+
+εδ LN 3SA 2`3N ?SAT C 1 
+
+> 1{T
+
+` 2SN a2T log pN T q ` 4˘ .
+
+Combining this result with (60) yields that 
+
+E rRT pπqs ď E
+
+> T
+
+ÿ
+
+> t“1
+
+@˚gt ´ bt, μ t ´ μπ, ppt D ` 4
+
+εδ LN 3SA 2`3N ?SAT C 1 
+
+> 1{T
+
+` 2SN a2T log pN T q ` 4˘
+
+` 2δL p2 ` C1 
+
+> 1{T
+
+N qN T ` 3LC 1 
+
+> 1{T
+
+N 3“3C1
+
+> 1{T
+
+?SAT ` 2Sa2T log pN T q‰ ` 4LN p3 ` 2C1 
+
+> 1{T
+
+N qď E
+
+> T
+
+ÿ
+
+> t“1
+
+@˚gt ´ bt, μ t ´ μπ, ppt D ` δ 2Lp2 ` C1 
+
+> 1{T
+
+N qN T 
+
+looooooooooomooooooooooon 
+
+> “:Ξ 1
+
+`4LN p3 ` 2C1 
+
+> 1{T
+
+N q` 1
+
+δ
+
+7
+
+ε LC 1 
+
+> 1{T
+
+N 3SA 2`3N ?AT C 1 
+
+> 1{T
+
+` 2N a2ST log pN T q ` 4˘loooooooooooooooooooooooooooooooooooooomoooooooooooooooooooooooooooooooooooooon 
+
+> “:Ξ 2
+
+, (62) where the last inequality uses that C1 
+
+> 1{T
+
+ě ?S. Note that 
+
+}˚gt}1,8 “
+
+> N
+
+ÿ
+
+> n“1
+
+}gtn}8
+
+“ 1 ´ δεδ N S pA ´ 1qp A ´ 1 ` ?A ´ 1qF tpμπt,p q
+
+> N
+
+ÿ
+
+> n“1
+
+}utn}8
+
+ď 2
+
+εδ N 2SA 2
+
+> N
+
+ÿ
+
+> n“1
+
+}utn}8
+
+ď 2
+
+εδ N 2SA 2?N
+
+gffe Nÿ
+
+> n“1
+
+}utn}2 
+
+> 8
+
+ď 2
+
+εδ N 5{2SA 2
+
+gffe Nÿ
+
+> n“1
+
+ÿ
+
+> x,a
+
+|utnpx, a q| 2 ď 2
+
+εδ N 5{2SA 2 ,
+
+where the second inequality uses Cauchy-Schwarz and the last inequality uses that ut P SN S pA´1q. Moreover, we have that 
+
+}bt}1,8 “ řNn“1 }btn}8 ď řNn“1 LpN ´ nqC1 
+
+> 1{T
+
+ď LN 2C1 
+
+> 1{T
+
+. Hence, using that C1 
+
+> 1{T
+
+ě ?S,
+
+}˚gt ´ bt}1,8 ď 2
+
+εδ N 5{2SA 2 ` LN 2C1 
+
+> 1{T
+
+ď 2
+
+εδ pL ` 1qC1
+
+> 1{T
+
+?SA 2N 5{2 .
+
+Via Lems. A.4 and E.11, 5 we can invoke Lem. 2.1 with c “ 5e, ζ “ 2 
+
+> εδ
+
+pL ` 1qC1
+
+> 1{T
+
+?SA 2N 5{2, and αt “ 1{p t ` 1q to get that (from the proof of Lem. 2.1) 
+
+> T
+
+ÿ
+
+> t“1
+
+@˚gt ´ bt, μ t ´ μπ, ppt D ď τ
+
+´ 2
+
+εδ pL ` 1qC1
+
+> 1{T
+
+?SA 2N 5{2
+
+¯2
+
+T ` 20 e2SN log pAT q2pN ` Aq
+
+τ
+
+` 10 e2
+
+εδ pL ` 1qC1 
+
+> 1{T
+
+S3{2A2N 7{2 log pT q .
+
+> 5
+
+To invoke Lem. E.11, we assume without loss of generality that the constant ε specified in Asm. 4.2 satisfies ε ď 12S .
+
+44 Online Episodic Convex Reinforcement Learning 
+
+Tuning τ optimally yields that 
+
+> T
+
+ÿ
+
+> t“1
+
+@˚gt ´ bt, μ t ´ μπ, ppt D ď 4
+
+εδ pL ` 1qC1 
+
+> 1{T
+
+SA 2N 5{2a20 e2N pN ` AqT log pAT q2
+
+` 10 e2
+
+εδ pL ` 1qC1 
+
+> 1{T
+
+S3{2A2N 7{2 log pT qď 1
+
+δ
+
+10 e2
+
+ε pL ` 1qC1 
+
+> 1{T
+
+SA 2N 3 log pAT q`a pN ` AqT ` ?SN ˘loooooooooooooooooooooooooooooooooooooomoooooooooooooooooooooooooooooooooooooon 
+
+> “:Ξ 3
+
+.
+
+Hence, plugging back into (62) yields that 
+
+E rRT pπqs ď δΞ1 ` 1
+
+δ pΞ2 ` Ξ3q ` 4LN p3 ` 2C1 
+
+> 1{T
+
+N q .
+
+Setting δ :“ min 
+
+!
+
+1,
+
+b Ξ2`Ξ3
+
+> Ξ1
+
+)
+
+, we get that 
+
+E rRT pπqs ď max 
+
+!
+
+2aΞ1pΞ2 ` Ξ3q, 2pΞ2 ` Ξ3q
+
+)
+
+` 4LN p3 ` 2C1 
+
+> 1{T
+
+N q .
+
+Consequently, the theorem follows after using the definition of C1 
+
+> 1{T
+
+from Eq. (55) and ignoring log factors. 
+
+E.3. Self-Concordant Regularization Approach 
+
+We have used the set pMpμ0 q´, the preimage of Mpμ0 under the map Ξp (or Λp), to represent in RN S pA´1q the set of valid occupancy measures. A more concise characterization, given by Lem. E.1, is that 
+
+pMpμ0 q´ “ ␣ξ P RN S pA´1q : Bpξ ě ´ βp( ;
+
+in other words, pMpμ0 q´ is a convex polytope formed by the constraints Bppn, x, a, ¨, ¨, ¨q ⊺ξ ` βpnpx, a q ě 0 for n, x, a PrN s ˆ X ˆ A. Moreover, Lem. E.2 asserts that int pMpμ0 q´, the interior of pMpμ0 q´, is not empty under Asm. 4.4. We consider then the function ψlb : int pMpμ0 q´ Ñ R defined as 
+
+ψlb pξq :“ ´ ÿ
+
+> n,x,a
+
+log `Bpn, x, a, ¨, ¨, ¨q ⊺ξ ` βnpx, a q˘ .
+
+As mentioned in Sec. 4.2.2, Corollary 3.1.1 in (Nemirovski, 2004) yields that ψlb is a ϑ-self-concordant barrier (see Definition 3.1.1 in Nemirovski, 2004) for pMpμ0 q´ with ϑ “ N ¨ S ¨ A. The approach we analyze here is to perform OMD directly on the set pMpμ0 q´ with ψlb as the regularizer. For ξ P int pMpμ0 q´ and y P RN S pA´1q, define the local norm }y}ξ :“ ay⊺∇2ψlb pξqy. This is indeed a norm since the fact that pMpμ0 q´ is bounded implies via Property II in (Nemirovski, 2004, Section 2.2) that the Hessian of ψlb is non-singular everywhere. Its dual norm is denoted as }y}ξ, ˚ :“ ay⊺p∇2ψlb pξqq ´1y. The Dikin ellipsoid of radius r at ξ P int pMpμ0 q´
+
+is given by 
+
+Er pξq :“ t y P RN S pA´1q : }y ´ ξ}ξ ď ru “ ξ ` rp∇2ψlb pξqq ´1{2BN S pA´1q .
+
+Via Property I in (Nemirovski, 2004, Section 2.2), E1pξq Ď p Mpμ0 q´ for any ξ P int pMpμ0 q´.For ξ, y P int pMpμ0 q´, we denote by Dψlb py, ξ q :“ ψlb pyq ´ ψlb pξq ´ x y ´ ξ, ∇ψlb pξqy the Bregman divergence between y
+
+and ξ with respect to ψlb . From the proof of Thm. E.16, we recall the definition Ft :“ F t ˝ Λp. As alluded to above, our OMD updates will take the form 
+
+ξt`1 Ð arg min  
+
+> ξPp Mpμ0q´
+
+τ @gt, ξ D ` Dψlb pξ, ξ tq ,
+
+where gt will be chosen as a surrogate for ∇Ftpξtq. Differently from the proof of Thm. E.16, we redefine the smoothed approximation pFt : pMpμ0 q´ Ñ R such that 
+
+pFtpξq :“ EvPBN S pA´1q
+
+“Ft`p1 ´ δqξ ` δ`ξt ` p ∇2ψlb pξtqq ´1{2v˘˘‰ .
+
+45 Online Episodic Convex Reinforcement Learning 
+
+Figure 4. This figure provides a graphical comparison between the sampling approach used in Alg. 3, represented on the left, and that used in Alg. 4, represented on the right. The simplified domain here is tx P r 0, 1s2 : }x}1 ď 1u. Both approaches are illustrated at three points: a, b, and c. In the first approach, with some δ P p 0, 1q and ¯δ :“ 1 ´ δ, we sample from a circle of radius δ{p 2 ` ?2q centered at a convex combination between the point of interest and o :“ `1{p 2 ` ?2q, 1{p 2 ` ?2q˘. In the second approach, we consider the barrier 
+
+´ log p1 ´ x1 ´ x2q ´ ř 
+
+> i“1,2
+
+log pxiq and sample from the Dikin ellipsoid (of a certain common radius) induced by this function at each point. 
+
+This is well-defined since we are evaluating Ft on a convex combination of the argument ξ and a point inside the ellipsoid 
+
+E1pξtq, which is a subset of pMpμ0 q´ as cited before. Via Corollary 6.8 in (Hazan et al., 2016) and the chain rule, we have that 
+
+∇pFtpξq “ p1 ´ δq
+
+δ N S pA ´ 1qEuPSN S pA´1q
+
+“Ft`p1 ´ δqξ ` δ`ξt ` p ∇2ψlb pξtqq ´1{2u˘˘ p∇2ψlb pξtqq 1{2u‰. (63) Hence, with ut sampled uniformly from SN S pA´1q, we pick (as mentioned in Sec. 4.2.2) 
+
+gt :“ p1 ´ δq
+
+δ N S pA ´ 1qFt`ξt ` δp∇2ψlb pξtqq ´1{2ut˘p∇2ψlb pξtqq 1{2ut (64) such that Eut
+
+“gt‰ “ ∇pFtpξtq, see also (Saha & Tewari, 2011) for a similar estimator in another BCO setting. We summarize this approach in Alg. 4, and provide in Fig. 4 a graphical comparison with the sampling approach of Alg. 3 on a simple decision set. Before proving the regret bound of Thm. 4.5, we collect a few standard properties and auxiliary results concerning self-concordant barriers and their use as regularizers. E.3.1. A UXILIARY LEMMAS 
+
+For x, y P int pMpμ0 q´, it holds via Property I in (Nemirovski, 2004, Section 2.2) that 
+
+p1 ´ } y ´ x}xq2∇2ψlb pxq ď ∇2ψlb pyq ď 1
+
+p1 ´ } y ´ x}xq2 ∇2ψlb pxq (65) whenever }y ´ x}x ă 1. We state the following auxiliary lemma, which will be used to assert the proximity between ξt and 
+
+ξt`1 for our algorithm. Establishing this ‘stability’ is a crucial step in the local norm analysis. 
+
+Lemma E.17. Let x P int pMpμ0 q´ and ℓ P RN S pA´1q be such that }ℓ}x, ˚ ď 116 , and define 
+
+y :“ arg min   
+
+> ξPint pMpμ0q´
+
+xℓ, ξ y ` Dψlb pξ, x q .
+
+Then, y P E1{2pxq.
+
+46 Online Episodic Convex Reinforcement Learning 
+
+Algorithm 4 Bandit O-MD-CURL with logarithmic barrier regularization 
+
+input: domain pMpμ0 q´ with non-empty interior, learning rate τ ą 0, exploration parameter δ P p 0, 1s
+
+initialization: ξ1 Ð arg min ξPint pMpμ0 q´ ψlb pξq
+
+for t “ 1, . . . , T do 
+
+draw ut P SN S pA´1q uniformly at random 
+
+pξt Ð ξt ` δp∇2ψlb pξtqq ´1{2ut
+
+pμt Ð Λpppξtq
+
+πtnpa|xq Ð pμtpx, a q{ ř 
+
+> aPA
+
+pμtpx, a q
+
+output πt and observe F tppμtq
+
+gt Ð p1´δq 
+
+> δ
+
+N S pA ´ 1qF tppμtqp ∇2ψlb pξtqq 1{2ut
+
+ξt`1 Ð arg min ξPint pMpμ0 q´ τ xgt, ξ y ` Dψlb pξ, ξ tq
+
+end for 
+
+Proof. For ξ P int pMpμ0 q´, let 
+
+gpξq :“ x ℓ, ξ y ` Dψlb pξ, x q “ x ℓ, ξ y ` ψlb pξq ´ ψlb pxq ´ x ξ ´ x, ∇ψlb pxqy .
+
+Note that g is a self-concordant function on int pMpμ0 q´ (Item (ii) in Nemirovski, 2004, Proposition 2.1.1), whose Hessian (hence, local norms and Dikin ellipsoids) coincides with that of ψlb everywhere. Moreover, g is below bounded thanks to 
+
+pMpμ0 q´ being a bounded set, which implies that g attains its minimum on int pMpμ0 q´ (Property VI in Nemirovski, 2004, Section 2.2). This minimum is also unique via strict convexity. Hence, y is well-defined. The rest of the proof is similar to the proof of Lem. 13 in (Wei & Luo, 2018) and Lem. 9 in (Van der Hoeven et al., 2023). Thanks to the strict convexity of g, to show that y P E1{2pxq it suffices to show that for any ξ on the boundary of 
+
+E1{2pxq, gpxq ď gpξq; this is because x P E1{2pxq and y “ arg min ξPp Mpμ0 q´ gpξq. For any such ξ on the boundary of E1{2pxq,Taylor’s theorem implies that there exists some z on the line segment between x and ξ such that 
+
+gpξq ´ gpxq “ x ξ ´ x, ∇gpxqy ` 12 pξ ´ xq⊺∇2gpzqp ξ ´ xq“ x ξ ´ x, ℓ y ` 12 pξ ´ xq⊺∇2ψlb pzqp ξ ´ xqě x ξ ´ x, ℓ y ` 18 pξ ´ xq⊺∇2ψlb pxqp ξ ´ xq“ x ξ ´ x, ℓ y ` 18 }ξ ´ x}2
+
+> x
+
+ě ´} ξ ´ x}x}ℓ}x, ˚ ` 18 }ξ ´ x}2
+
+> x
+
+“ ´ 12 }ℓ}x, ˚ ` 132 ě 0 ,
+
+where the second equality holds since ∇2g “ ∇2ψlb and ∇gpxq “ ℓ ` ∇ψlb pxq ´ ∇ψlb pxq “ ℓ, the first inequality holds via (65) and the fact that z P E1{2pxq, the second inequality holds via the definition of a dual norm, the last equality holds since ξ is on the boundary of E1{2pxq, and the last inequality holds via the assumption that }ℓ}x, ˚ ď 116 .For x P int pMpμ0 q´, the Minkowski function of pMpμ0 q´ with the pole at x is defined as (Nemirovski, 2004, Section 3.2) 
+
+πxpyq :“ inf ␣t ą 0 : x ` t´1py ´ xq P p Mpμ0 q´(
+
+for y P p Mpμ0 q´. The following lemma readily follows from the properties of the Minkowski function. It is used in the analysis to handle the bias term of the standard OMD regret guarantee, which is slightly more involved in this case considering that the comparator need not belong to the interior of pMpμ0 q´, where ψlb is defined (and finite). 47 Online Episodic Convex Reinforcement Learning 
+
+Lemma E.18. Let x P int pMpμ0 q´, y P p Mpμ0 q´, δ P p 0, 1q, and z :“ p 1 ´ δqy ` δx . Then, 
+
+ψlb pzq ď ψlb pxq ` N SA log δ´1 .
+
+Further, let 9x :“ arg min xPint pMpμ0 q´ ψlb pxq and 9z :“ p 1 ´ δqy ` δ 9x. Then, 
+
+Dψlb p 9z, 9xq ď N SA log δ´1 .
+
+Proof. Since ψlb is an N SA -self-concordant barrier for Mpμ0 , Property II in (Nemirovski, 2004, Section 3.2) implies that 
+
+ψlb pzq ď ψlb pxq ` N SA log 11 ´ πxpzq .
+
+On the other hand, 
+
+x ` p 1 ´ δq´1pz ´ xq “ x ` p 1 ´ δq´1pp 1 ´ δqy ` δx ´ xq “ x ` y ´ x “ y P p Mpμ0 q´ ,
+
+implying that πxpzq ď 1 ´ δ. Hence, ψlb pzq ď ψlb pxq ` N SA log δ´1.Next, we note that the optimality of 9x implies that 
+
+Dψlb p 9z, 9xq “ ψlb p 9zq ´ ψlb p 9xq ´ x 9z ´ 9x, ∇ψlb p 9xqy ď ψlb p 9zq ´ ψlb p 9xq ,
+
+which concludes the proof when combined with the first part. E.3.2. R EGRET ANALYSIS 
+
+We are now ready to prove the regret bound of Thm. 4.5, which is stated more explicitly in the following theorem. 
+
+Theorem E.19. Under Asm. 4.4, Alg. 4 with τ “ δ
+
+> 16
+
+b log TN 3SAT and δ “ min 
+
+"b 17 4LN 3{4S3{4A3{4plog T q1{4  
+
+> T1{4
+
+, 1
+
+*
+
+satisfies for any policy π P Π that 
+
+E rRT pπqs ď max 
+
+!
+
+4?17 LN 7{4 pSAT q3{4 plog T q1{4, 34 aN 5S3A3T log T
+
+)
+
+` 2LN . 
+
+Proof. Firstly, we assert that the iterates ξt are well defined; similar to what was argued in the proof of Lem. E.17, the functions ψlb p¨q and τ xgt, ¨y ` Dψlb p¨ , ξ tq are self-concordant on int pMpμ0 q´ (Item (ii) in Nemirovski, 2004, Proposition 2.1.1) and bounded from below thanks to pMpμ0 q´ being a bounded set, implying via Property VI in (Nemirovski, 2004, Section 2.2) that each of these functions attains its minimum on int pMpμ0 q´, which is also unique via strict convexity. Also note that indeed pμt P Mpμ0 since pξt P p Mpμ0 q´ as we argued before presenting the algorithm. Let μ˚ P arg min μPMpμ0
+
+řTt“1 F tpμq and ¯RT :“ E řTt“1
+
+`F tpμπt,p q ´ F tpμ˚q˘, which satisfies ¯RT “ max πPΠ E rRT pπqs .Define ξ˚ :“ p 1 ´ 9δqΛ´1 
+
+> p
+
+pμ˚q ` 9δξ 1, where 9δ P p 0, 1q is a constant to be specified later. To start with, we have that 
+
+¯RT “ E
+
+> T
+
+ÿ
+
+> t“1
+
+`F tpμπt,p q ´ F tpμ˚q˘ “ E
+
+> T
+
+ÿ
+
+> t“1
+
+`F tppμtq ´ F tpμ˚q˘ “ E
+
+> T
+
+ÿ
+
+> t“1
+
+`Ftppξtq ´ Ft`Λ´1 
+
+> p
+
+pμ˚q˘˘ .
+
+Next, we derive that 
+
+Ftppξtq ´ pFtpξtq“ Ft`ξt ` δp∇2ψlb pξtqq ´1{2ut˘ ´ EvPBN S pA´1q
+
+”
+
+Ft`ξt ` δp∇2ψlb pξtqq ´1{2v˘ı
+
+ď LEvPBN S pA´1q Λp
+
+`ξt ` δp∇2ψlb pξtqq ´1{2ut˘ ´ Λp
+
+`ξt ` δp∇2ψlb pξtqq ´1{2v˘
+
+> 1
+
+“ δL EvPBN S pA´1q Λp
+
+`p∇2ψlb pξtqq ´1{2ut˘ ´ Λp
+
+`p∇2ψlb pξtqq ´1{2v˘
+
+> 1
+
+“ δL EvPBN S pA´1q Λp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2ut˘ ´ Λp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2v˘
+
+> 1
+
+48 Online Episodic Convex Reinforcement Learning 
+
+ď δL EvPBN S pA´1q
+
+”
+
+Λp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2ut˘ 
+
+> 1
+
+` Λp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2v˘
+
+> 1
+
+ı
+
+ď 2δLN , 
+
+where the first inequality uses the Lipschitz smoothness of F t and the fact that Ft “ F t ˝ Λp; the second and third equalities use the fact that Λp is an affine function; and the last inequality holds since both ξt ` p ∇2ψlb pξtqq ´1{2ut, ξ t `p∇2ψlb pξtqq ´1{2v P E1pξtq Ă p Mpμ0 q´, and that for any ξ P p Mpμ0 q´, Λppξq P Mpμ0 and therefore satisfies }Λppξq} 1 ď N .We similarly derive that 
+
+pFtpξ˚q ´ Ft`Λ´1 
+
+> p
+
+pμ˚q˘
+
+“ EvPBN S pA´1q
+
+“Ft`p1 ´ δqξ˚ ` δ`ξt ` p ∇2ψlb pξtqq ´1{2v˘˘‰ ´ Ft`Λ´1 
+
+> p
+
+pμ˚q˘
+
+“ EvPBN S pA´1q
+
+“Ft`p1 ´ δqp 1 ´ 9δqΛ´1 
+
+> p
+
+pμ˚q ` p 1 ´ δq 9δξ 1 ` δ`ξt ` p ∇2ψlb pξtqq ´1{2v˘˘‰ 
+
+´ Ft`Λ´1 
+
+> p
+
+pμ˚q˘
+
+ď LEvPBN S pA´1q p1 ´ δqp 1 ´ 9δqμ˚ ` p 1 ´ δq 9δΛppξ1q ` δΛp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2v˘ ´ μ˚
+
+> 1
+
+ď LEvPBN S pA´1q
+
+”
+
+|δ 9δ ´ δ ´ 9δ|} μ˚}1 ` p 1 ´ δq 9δ Λppξ1q 1 ` δ Λp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2v˘
+
+> 1
+
+ı
+
+ď LEvPBN S pA´1q
+
+”
+
+pδ ` 9δq} μ˚}1 ` 9δ Λppξ1q 1 ` δ Λp
+
+`ξt ` p ∇2ψlb pξtqq ´1{2v˘
+
+> 1
+
+ı
+
+ď 2δLN ` 2 9δLN . 
+
+Hence, using also the convexity of pFt, we obtain that 
+
+¯RT ď E
+
+> T
+
+ÿ
+
+> t“1
+
+`pFtpξtq ´ pFtpξ˚q˘ ` 4δLN T ` 2 9δLN T 
+
+ď E
+
+> T
+
+ÿ
+
+> t“1
+
+@∇pFtpξtq, ξ t ´ ξ˚D ` 4δLN T ` 2 9δLN T . (66) In this proof, let Ft :“ σpu1, . . . , u tq denote the σ-algebra generated by u1, . . . , u t; and let Etr¨s :“ Er¨ | Ft´1s with F0
+
+being the trivial σ-algebra. We then have that 
+
+pFtpξtq “ Eut
+
+“gt‰ “ Et
+
+“gt‰ ,
+
+where the first equality follows from (63) and the the second equality holds since conditioned on Ft´1, ut is the only source of randomness in gt and is sampled identically and independently in every round. Using that ξt ´ ξ˚ is measurable with respect to Ft´1, we then obtain that 
+
+¯RT ď E
+
+> T
+
+ÿ
+
+> t“1
+
+@Etgt, ξ t ´ ξ˚D ` 4δLN T ` 2 9δLN T “ E
+
+> T
+
+ÿ
+
+> t“1
+
+@gt, ξ t ´ ξ˚D ` 4δLN T ` 2 9δLN T . 
+
+Via the definition of ξt and the fact that ξ˚ P int pMpμ0 q´, Lem. 6.16 in (Orabona, 2019) implies that 
+
+> T
+
+ÿ
+
+> t“1
+
+@gt, ξ t ´ ξ˚D ď Dψlb pξ˚, ξ 1q
+
+τ `
+
+> T
+
+ÿ
+
+> t“1
+
+τ
+
+2 }gt}2 
+
+> ζt,˚
+
+,
+
+where ζt lies on the line segment between ξt and ξt`1. We firstly observe that 
+
+}gt}2 
+
+> ξt,˚
+
+“
+
+ˆ p1 ´ δq
+
+δ N S pA ´ 1qF tppμtq
+
+˙2
+
+¨ p utq⊺p∇2ψlb pξtqq 1{2`∇2ψlb pξtq˘´1p∇2ψlb pξtqq 1{2ut
+
+“
+
+ˆ p1 ´ δq
+
+δ N S pA ´ 1qF tppμtq
+
+˙2
+
+ď 1
+
+δ2 N 4S2A2 ,
+
+where we have used that F tppμtq ď N . Hence, if 
+
+τ ď δ
+
+16 N 2SA , (67) 49 Online Episodic Convex Reinforcement Learning 
+
+then τ }gt}ξt,˚ ď 1{16 . Consequently, Lem. E.17 (with x “ ξt, y “ ξt`1, and ℓ “ τ g t) would assert that ξt`1 P E1{2pξtq;and hence, ζt P E1{2pξtq. It would then hold via (65) that 
+
+}gt}2 
+
+> ζt,˚
+
+ď 1
+
+p1 ´ } ζt ´ ξt}ξt q2 }gt}2 
+
+> ξt,˚
+
+ď 4}gt}2 
+
+> ξt,˚
+
+,
+
+On the other hand, via Lem. E.18 and the definitions of ξ1 and ξ˚, we have that 
+
+Dψlb pξ˚, ξ 1q ď N SA log 9δ´1 .
+
+Hence, conditioned on (67), we obtain the following regret bound 
+
+¯RT ď N SA log 9δ´1
+
+τ ` 2τδ2 N 4S2A2T ` 4δLN T ` 2 9δLN T . (68) Setting 
+
+9δ “ 1
+
+T , τ “ δ
+
+16 
+
+c log TN 3SAT , and δ “ min 
+
+"c 17 4LN 3{4S3{4A3{4plog T q1{4
+
+T 1{4 , 1
+
+*
+
+;
+
+we obtain that 
+
+¯RT ď N SA log Tτ ` 2τδ2 N 4S2A2T ` 4δLN T ` 2LN 
+
+ď 17 
+
+δ
+
+aN 5S3A3T log T ` 4δLN T ` 2LN 
+
+ď max 
+
+!
+
+4?17 LN 7{4 pSAT q3{4 plog T q1{4, 34 aN 5S3A3T log T
+
+)
+
+` 2LN . (69) If T ě N SA log pT q, then our choice of τ indeed satisfies (67): 
+
+τ “ δ
+
+16 
+
+c log TN 3SAT ď δ
+
+16 N 2SA .
+
+Otherwise, we can fall back to the trivial regret bound 
+
+¯RT ď N T ď N 2SA log pT q ,
+
+which is dominated by the bound in (69); hence, the theorem follows. 50

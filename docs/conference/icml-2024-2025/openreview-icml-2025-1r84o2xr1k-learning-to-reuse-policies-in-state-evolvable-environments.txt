@@ -1,0 +1,2903 @@
+Title: Learning to Reuse Policies in State Evolvable Environments
+
+URL Source: https://openreview.net/pdf?id=1R84O2Xr1k
+
+Number of Pages: 26
+
+Markdown Content:
+# Learning to Reuse Policies in State Evolvable Environments 
+
+Ziqian Zhang * 1 2 Bohan Yang * 1 2 Lihe Li 1 2 Yuqi Bian 1 2 Ruiqi Xue 1 2 Feng Chen 1 2 Yi-Chen Li 1 2 
+
+Lei Yuan 1 2 3 Yang Yu 1 2 3 
+
+## Abstract 
+
+The policy trained via reinforcement learning (RL) makes decisions based on sensor-derived state features. It is common for state features to evolve for reasons such as periodic sensor main-tenance or the addition of new sensors for perfor-mance improvement. The deployed policy fails in new state space when state features are unseen dur-ing training. Previous work tackles this challenge by training a sensor-invariant policy or generat-ing multiple policies and selecting the appropriate one with limited samples. However, both direc-tions struggle to guarantee the performance when faced with unpredictable evolutions. In this pa-per, we formalize this problem as state evolvable reinforcement learning (SERL), where the agent is required to mitigate policy degradation after state evolutions without costly exploration. We propose Lapse by reusing policies learned from the old state space in two distinct aspects. On one hand, Lapse directly reuses the robust old policy by composing it with a learned state reconstruc-tion model to handle vanishing sensors. On the other hand, the behavioral experience from the old policy is reused by Lapse to train a newly adap-tive policy through offline learning, better utiliz-ing new sensors. To leverage advantages of both policies in different scenarios, we further propose 
+
+automatic ensemble weight adjustment to effec-tively aggregate them. Theoretically, we justify that robust policy reuse helps mitigate uncertainty and error from both evolution and reconstruction. Empirically, Lapse achieves a significant perfor-mance improvement, outperforming the strongest baseline by about 2× in benchmark environments.         
+
+> *Equal contribution 1National Key Laboratory for Novel Soft-ware Technology, Nanjing University 2School of Artificial In-telligence, Nanjing University 3Polixir Technologies. Corre-spondence to: Lei Yuan <yuanl@lamda.nju.edu.cn >, Yang Yu
+> <yuy@nju.edu.cn >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+## 1. Introduction 
+
+Deep reinforcement learning (RL) has shown tremendous potential in various applications (Wang et al., 2022), such as sequential recommendation systems (Lin et al., 2023) and robotic control (Singh et al., 2022). However, deploying RL agents in the real world faces a major challenge: policies trained under a fixed state feature space often fail to gen-eralize to new, unseen ones in open environments (Zhou, 2022; Yuan et al., 2023). For instance, autonomous driving agents utilize heterogeneous sensor sources for information gathering (Kiran et al., 2021). However, the sensors might wear out due to limited lifespan or require maintenance, and new sensors with different camera views may be deployed to improve performance from richer informatioin (Shukla et al., 2023). Such common scenarios lead to continuous changes (evolutions) in the state space during deployment, requiring agents to adapt to the state evolvale environments. This presents a critical challenge: adapting to new state spaces demands extensive interactions to learn a policy, which is costly in online deployment. Existing methods learn a sensor-invariant policy that is robust to changes in the state space (Chen et al., 2021; Li et al., 2022; Hansen et al., 2021), or generate multiple source policies beforehand and select the appropriate one using hierarchical high-level policies or value function estimation (Cheng et al., 2020; Yang et al., 2020; Zhang et al., 2022; Chen et al., 2023). However, learning a sensor-invariant policy requires deter-mining which aspects of state features are task-specific and which are shared. This is complex and previous methods of-ten assume prior knowledge about new state spaces (Laskin et al., 2020a; Zhou et al., 2023). Meanwhile, enumerating all possible state spaces is a daunting task, making it im-practical to generate sufficiently diverse source policies for reuse (Cheng et al., 2020; Barekatain et al., 2021). Conse-quently, both directions fail to guarantee the performance when faced with unpredictable state evolutions. To tackle the challenges posed by evolvable state features, we formalize the problem as state evolvable reinforcement learning (SERL), where unknown evolutions map the old state space to a new one, leading to changes in transition and reward functions as well. To mitigate performance degra-dation resulted from state space evolutions, we propose 1Learning to Reuse Policies for State Evolvable Environments 
+
+Learning to reuse policies in state evolvable environments (Lapse) by reusing the old policy in two different directions. On one hand, by assuming the prior knowledge of sensors designated for maintenance, agents can simultaneously ob-serve features from old and new state spaces for a short period. Using a state reconstruction model trained with Con-ditional Generative Adversarial Networks (GANs) (Isola et al., 2017), the old policy can be directly reused by recon-structing the old state features from the new ones, thereby handling issues like vanishing sensors. However, uncer-tainty in state evolution and reconstruction errors may cause unbounded performance gaps, we minimize discrepancies in action distributions under perturbations, thereby bound-ing performance degradation. From another perspective, an adaptive policy is trained using the behavioral knowledge carried out by its experience via offline RL, so as to better utilize new sensors. Finally, to benefit from the advantages of two policies in different scenarios, we aggregate them with automatic adjustment of ensemble weights, ensuring better performance as the state space evolves. Our theoretical study discloses the gap caused by the un-certainty of state evolution and justifies the use of policy robustness. Extensive experiments are performed both in MuJoCo control tasks (Todorov et al., 2012) with vec-torial state features and Atari games (Bellemare et al., 2013) with pixel-based images. To evaluate the adapta-tion capability, we test the policy in environments with multiple unknown state space evolutions. The empiri-cal results showcase a remarkable improvement in our method compared to existing adaptation and transfer ap-proaches, achieving about 2× performance enhancement for state evolvable environments. Our code is available at 
+
+https://github.com/zzq-bot/Lapse 
+
+## 2. Problem Formulation 
+
+The standard reinforcement learning (RL) problem (Sut-ton & Barto, 2018) is formally defined by a Markov deci-sion process (MDP), denoted as M = {S , A, P, R, γ }.Here S and A represent state and action space, respec-tively. P : S × A × S → [0 , 1] is the transition func-tion, R : S × A → [0 , R max ] is the reward function, and 
+
+γ ∈ [0 , 1) signifies the discount factor. At each time step 
+
+t, the agent perceives the state st and decides an action based on its policy at ∼ π(·| st). This leads to the next state 
+
+st+1 ∼ P (·| st, a t) and a reward R(st, a t). The primary objective is to find a policy that maximizes the expected discounted return J(π) = E[P∞ 
+
+> t=0
+
+γtR(st, a t)|s0, π, P].In this work, we consider an environment where the state space evolves over time. This scenario is formulated as a state evolvable reinforcement learning (SERL) problem: 
+
+{(Mn, f n, D n)}Nn=0 . Each evolving MDP is denoted by 
+
+Mn = {S n, A, Pn, R n, γ }, and the unknown multivalued mapping fn : Sn → ∆( Sn+1 ) governs how the state space evolves from Sn to Sn+1 , where ∆( ·) is the probability sim-plex. N ∈ Z+ ∪ { +∞} is the number of evolutions. The goal of SERL is to maximize the adaptation performance of policy πn during deployment, without the need for costly trial-and-error. Given that the evolution of the state space is driven by changes in sensors, we can collect limited experi-ences Dn = {(sn, s n+1 , a, r, s ′
+
+> n
+
+, s ′
+
+> n+1
+
+)} via the policy πn.We make a mild assumption that prior knowledge of which sensors will undergo maintenance and which new sensors will be deployed is available. This allows agents to perceive paired states (st, s t+1 ) in a short period by simply masking the corresponding state features. As our focus is on the evolution of the state space, the reward and transition functions remain consistent. However, due to unpredictable noise, fn may be stochastic, non-bijective, and multivalued. To manage this uncertainty, we define a Bayesian-style inverse f −1 
+
+> n
+
+: Sn+1 → ∆( Sn), where 
+
+f −1 
+
+> n
+
+(sn|sn+1 ) = fn(sn+1 |sn)P  
+
+> ˜sn fn(sn+1 |˜sn)
+
+and quantify the uncer-tainty by defining ϵR − ϵP consistency in Section 3.4. 
+
+Definition 2.1. Let Mn = {S n, A, Pn, R n, γ } be an evolving MDP, with evolution fn : Sn → ∆( Sn+1 )
+
+and inverse f −1 
+
+> n
+
+: Sn+1 → ∆( Sn). We define 
+
+Mn+1 = {S n+1 , A, Pn+1 , R n+1 , γ }, where Sn+1 =
+
+{sn+1 : sn+1 ∼ f (·| sn), s n ∈ S n}, Rn+1 (sn+1 , a ) = 
+
+Esn∼f −1 
+
+> n(·| sn+1 )
+
+[Rn(sn, a )] , and Pn+1 (s′
+
+> n+1
+
+|sn+1 , a ) =
+
+Esn,s ′    
+
+> n∼f−1
+> n(·| sn+1 ),f −1
+> n(·| s′
+> n+1 )
+
+[Pn(s′
+
+> n
+
+|sn, a )] .
+
+## 3. Method 
+
+In this section, we will describe our proposed Learning to reuse policies in state evolvable environments ( Lapse ). As shown in Figure 1, Lapse learns to reuse the old policy in two directions. On one hand, we learn a state reconstruction model and directly reuse the old robust policy. On the other hand, behavior knowledge contained in limited experience is reused to learn a new policy with robustness regulariza-tion. Moreover, we aggregate them with automatic adjusted ensemble weight. Finally, we give a theoretical analysis of how uncertainty of evolution brings about performance degradation and a bound of the performance gap. 
+
+3.1. Robust Policy Reuse with State Reconstruction 
+
+When a policy πn, effective in Mn, encounters Mn+1 , it fails due to the evolution of the state space. However, if old state features sn can be reconstructed from new sn+1 , we can reuse πn by composing it with the learned reconstruc-tion model. Leveraging paired state features (sn, s n+1 ), we can utilize supervised paired GANs (Isola et al., 2017) to learn a state reconstruction model gn : Sn+1 → ∆( Sn),alongside a discriminator dn : Sn+1 × S n → [0 , 1] . The 2Learning to Reuse Policies for State Evolvable Environments time 
+
+ℳ0
+
+> Sensor Set
+
+𝜋𝜋 𝑛𝑛  � | 𝑔𝑔 𝑛𝑛  𝑠𝑠 𝑛𝑛+1 → 𝝅𝝅 𝒏𝒏+𝟏𝟏 𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫  
+
+> 𝑠𝑠 𝑛𝑛
+> 𝑠𝑠 𝑛𝑛+1
+
+𝑔𝑔 𝑛𝑛  𝑑𝑑 𝑛𝑛 ̂𝑠𝑠 𝑛𝑛  F
+
+> T
+
+𝜋𝜋 0 𝓛𝓛 𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫 𝟎𝟎 
+
+ℳ𝑛𝑛+1 
+
+𝜋𝜋 𝑛𝑛 ℳ𝑛𝑛 
+
+𝜋𝜋 𝑛𝑛 
+
+> (a) Robust Policy Reuse
+> policy
+> network
+
+𝑠𝑠 𝑛𝑛+1 ̂ 𝑠𝑠 𝑛𝑛 
+
+> (b) Behavior Knowledge Reuse
+
+𝓛𝓛𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫 𝒏𝒏+𝟏𝟏 
+
+> collected
+> experience
+> (c) Automatic Adjustment of Policy Ensemble Weight
+> addition
+> maintenance
+> …
+
+𝑔𝑔 𝑛𝑛 
+
+> …
+
+Lapse 
+
+𝜋𝜋 𝑛𝑛+1 
+
+𝓛𝓛 𝐫𝐫 𝐨𝐨𝐨𝐨 𝒏𝒏+𝟏𝟏 ( TD3BC, CQL…) 
+
+𝑠𝑠 𝑛𝑛+1 
+
+> actions perturbations
+
+𝝅𝝅 𝒏𝒏+𝟏𝟏 
+
+> 𝐫𝐫 𝐨𝐨𝐨𝐨
+
+𝝅𝝅 𝒏𝒏+𝟏𝟏 
+
+> 𝐫𝐫 𝐨𝐨𝐨𝐨
+
+𝓛𝓛 𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫 𝒏𝒏+𝟏𝟏 
+
+𝜋𝜋 𝑛𝑛+1 𝜿𝜿 𝒏𝒏+𝟏𝟏 𝝅𝝅 𝒏𝒏+𝟏𝟏 𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫  𝟏𝟏 − 𝜿𝜿 𝒏𝒏+𝟏𝟏  𝝅𝝅 𝒏𝒏+𝟏𝟏 
+
+> 𝐫𝐫 𝐨𝐨𝐨𝐨
+
+𝝅𝝅 𝒏𝒏+𝟏𝟏 𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫𝐫 
+
+𝓛𝓛 𝐑𝐑𝐑𝐑 
+
+> divergence
+
+𝝅𝝅 𝒏𝒏+𝟏𝟏 
+
+> 𝐫𝐫 𝐨𝐨𝐨𝐨
+
+Figure 1. The overall framework of SERL and Lapse 
+
+objective of the conditional GAN can be expressed as: 
+
+Ln+1  
+
+> GAN
+
+= E[log dn(sn+1 , s n) + log(1 − dn(sn+1 , ˆsn))] ,
+
+(1) where ˆsn ∼ gn(sn+1 ). gn aims to minimize this objec-tive against dn which seeks to maximize it, i.e., g∗ 
+
+> n
+
+=arg min gn max dn Ln+1 
+
+> GAN
+
+. Additionally, we impose an lp-based reconstruction loss to ensure the generated ˆsn closely matches sn:
+
+Ln+1  
+
+> Lp
+
+= Esn,s n+1 ,ˆsn∼gn(·| sn+1 )[∥sn − ˆsn∥p], (2) where p is a predefined parameter. Concretely, we set p = 1 
+
+to encourage less blurring in pixel-based environment and 
+
+p = 2 in vectorial environments. The overall reconstruction objective is thus defined as follows: 
+
+Ln+1  
+
+> recon
+
+= Ln+1  
+
+> GAN
+
++ λLn+1  
+
+> Lp
+
+, (3) where λ is a tuneable hyper-parameter. It is also feasible to instantiate the reconstruction model by diffusion networks, but we here select GAN for its faster inference time consid-ering time-delay during deployment. By composing the reconstruction model with the old pol-icy, we obtain the policy with a ∼ πrecon  
+
+> n+1
+
+(·| sn+1 ) := (πn ◦gn)( ·| sn+1 ) = πn(·| ˆsn), where ˆsn ∼ g(·| sn+1 ). Since 
+
+g is trained to approximate f −1 
+
+> n
+
+, we show in Section 3.4 that this reconstruction-based policy can transfer effectively to Mn+1 . In practice, however, limited data coverage dur-ing the short period and reliance on a fixed behavior pol-icy can hinder gn’s ability to generalize to unseen states. Additionally, standard RL policies tend to be sensitive to perturbations of their inputs (Zhang et al., 2020a), so the re-construction error may lead to erroneous actions, that drive the agent into unobserved states, further compounding the reconstruction error. We mitigate these issues by learning a robust policy that reduces the impact of small input perturbations on action distributions. Concretely, we incorporate a robustness regu-larization when training πn under Mn:
+
+Ln 
+
+> robust
+
+= E
+
+
+
+max   
+
+> ˆsn∈Tϵn(sn)
+
+DTV (πn(·| sn), π n(·| ˆsn)) 
+
+
+
+, (4) where T ϵn(sn) = {s′
+
+> n
+
+|∥ s′ 
+
+> n
+
+− sn∥2 ≤ ϵ, s ′ 
+
+> n
+
+∈ S n} is a ϵ-neighborhood of sn. With the reconstruction model only, we could define πn = π0◦g0◦... ◦gn−1. Because π0 is trained in 
+
+M0 before deployment, when trial-and-error is acceptable, we can use any robust RL algorithm by optimizing: 
+
+L0 = LRL + αrobust L0
+
+> robust
+
+. (5) Here, LRL is the standard RL objective (e.g., TD-target for DQN (Mnih et al., 2013)), and αrobust weights the robust-ness term L0
+
+> robust
+
+. Any robust RL method (e.g., RADIAL-DQN (Oikarinen et al., 2021), Wocar-PPO (Liang et al., 2022)) can be employed for this step. We defer the theoreti-cal performance-gap analysis under robustness guarantees to Section 3.4. When extending Lapse to environments with different state or action spaces, we simply adapt the method to each environment’s standard RL backbone. Further im-plementation details can be found in Appendix B. 
+
+3.2. Offline Policy Learning with Knowledge Reuse 
+
+Despite the effectiveness of robust policy reuse when old sensors vanish for maintenance or power failure, it fails to take advantage of the information provided by newly added sensors. Meanwhile, the reconstruction error from the composite function ˆgn := g0 ◦ g1... ◦ gn will accumulate as the state evolution continues. Relying solely on direct policy reuse will lead to an increasing discrepancy in the action distribution E[DTV (π0(·| s0), π 0 ◦ ˆgn(·| sn+1 ))] , and the compounding error from the composition of policy and reconstruction function becomes problematic again. To mitigate the issues, we propose to complement policy reuse with the reuse of behavioral knowledge to further 3Learning to Reuse Policies for State Evolvable Environments 
+
+promote adaptation in the new MDP. Although the recon-struction policy may deteriorate over time, its performance is stable for the earlier stages, suggesting a decent qual-ity of offline dataset Dn = {(sn, s n+1 , a, r, s ′
+
+> n
+
+, s ′
+
+> n+1
+
+)}. A straightforward method is to apply behavior cloning which attempts to simply clone the actions observed in the dataset, but it also fails to leverage the additional information gained from the newly added sensors. Therefore, we turn to offline RL for policy learning, as suggested by Kumar et al. (2022). For environments with vectorial state features and con-tinuous action space such as Mujoco, we employ the TD3+BC (Fujimoto & Gu, 2021) to learn the offline policy 
+
+πoff 
+
+> n+1
+
+. The loss function is optimized as follows: 
+
+ˆLn+1  
+
+> off
+
+= −E(sn+1 ,a )∼Dn [ − (πoff 
+
+> n+1
+
+(sn+1 ) − a)2+
+
+βn+1 Qn+1 (sn+1 , π off 
+
+> n+1
+
+(sn+1 ))] , (6) where Qn+1 is learned via the TD3, and βn+1 is a coef-ficient controlling conservatism. We schedule the coef-ficient dynamically with state feature evolution, setting 
+
+βn+1 = βmax (1 − exp ( −τ · n)) , where τ is a decay co-efficient. Intuitively, when reconstruction error is small (in early stages), we rely more on imitating the behavior pol-icy. As uncertainty grows, we tilt toward more optimistic updates. To further enhance robustness, we incorporate a robust regularization term: 
+
+Ln+1  
+
+> off
+
+= ˆLn+1  
+
+> off
+
++ αn+1 
+
+> robust
+
+Ln+1 
+
+> robust
+
+, (7) where αn+1  
+
+> robust
+
+balances the regularization, and Ln+1  
+
+> robust
+
+is given in Equation (4) . Different from online training, we imple-ment the robust regularization via function smoothing based on robust offline RL proposed by RORL (Yang et al., 2022). For environments with pixel-based image inputs and dis-crete action space, we adopt suitable offline RL backbones tailored to such settings. Detailed architectural and algorith-mic choices are provided in Appendix C. 
+
+3.3. Policy Aggregation with Automatic Adjustment of the Ensemble Weight 
+
+The two distinct ways of policy reuse are proficient in dif-ferent scenarios. Finally, to leverage their advantages, we combine them via an ensemble whose weight is adjusted automatically (Lee et al., 2021). Specifically, for Mn+1 ,the policy πn+1 is recurrently defined as: 
+
+πn+1 = κn+1 πrecon  
+
+> n+1
+
++ (1 − κn+1 )πoff 
+
+> n+1
+
+, n ≥ 0, (8) where πrecon  
+
+> n+1
+
+= πn ◦ gn, π0, gn and πoff  
+
+> n+1
+
+are learned via Equations (5), (3), and (7), respectively. We set 
+
+κn+1 = Jn(πn)
+
+J0(π0) · D(πn, π off 
+
+> n+1
+
+)
+
+D(πn, π recon  
+
+> n+1
+
+) + D(πn, π off 
+
+> n+1
+
+) , (9) where Jn(πn) is the expected return of policy πn under Mn,and D(p, q ) is a divergence metric (e.g., KL divergence). If πn performs comparably to π0, then κn+1 emphasizes whichever policy is closest to πn. Otherwise, the newly adaptive policy, which is expected to exceed the behavior policy via offline RL, takes precedence. To summarize the overall training and testing processes un-der the SERL framework, Lapse first learns a robust initial policy π0 via Equation. (5) . During deployment, πn makes decisions in Mn. Prior to evolving into Mn+1 , πn could perceive both state feature from Sn and Sn+1 for a short period and collects limited amount of experience. The re-construction model and the offline adaptive policy are then trained to obtain πrecon  
+
+> n+1
+
+= πn ◦ gn and πoff 
+
+> n+1
+
+, respectively. Our aggregation method automatically adjusts the ensem-ble weight κn+1 of πn+1 , facilitating transfer to Mn+1 .For memory efficiency, one may also prune past policies with negligible performance loss. Detailed pseudocode is provided in Appendix C. 
+
+3.4. Theoretical Analysis 
+
+We now analyze how a robust policy, combined with a learned state reconstruction model, can limit performance degradation under evolvable state space. To characterize the uncertainty introduced by evolution fn, we first define 
+
+ϵR − ϵP consistency: 
+
+Definition 3.1. Given Mn and fn, we say fn is ϵR − ϵP
+
+consistent, if for any sn ∈ Sn, s n+1 ∈ Sn+1 , a ∈ A , with 
+
+fn(sn+1 |sn) > 0, the following holds: 
+
+|Rn(sn, a ) − X
+
+> ˜sn
+
+f −1 
+
+> n
+
+(˜ sn|sn+1 )Rn(˜ sn, a )| ≤ ϵR,
+
+||P n(sn, a ) − F −1 
+
+> n
+
+Pn+1 (sn+1 , a )|| 1 ≤ ϵP .
+
+Here, Pn(sn, a ) ∈ R|S n| is the transition distribu-tion for (sn, a ), and F−1 
+
+> n
+
+is a |S n| × |S n+1 | ma-trix with F−1 
+
+> n
+
+(sn, s n+1 ) = f −1 
+
+> n
+
+(sn|sn+1 ). Thus, 
+
+F−1 
+
+> n
+
+Pn+1 (sn+1 , a ) collapses the transition distribution over Sn+1 to one over Sn.Intuitively, ϵR − ϵP consistency controls the discrepancy of reward and transition functions in Mn and Mn+1 , thereby bounding the uncertainty of the evolution fn and f −1 
+
+> n
+
+.Our starting point is the theoretical effectiveness of the state reconstruction model. If we have direct access to the inverse 
+
+f −1 
+
+> n
+
+of the evolution fn, we can immediately reuse πn by composing it with the f −1 
+
+> n
+
+to get πn ◦ f −1 
+
+> n
+
+. The following proposition shows that the performance loss in this scenario only results from the ϵR − ϵP consistency of fn.
+
+Proposition 3.2. Let fn be ϵR − ϵP consistent, and f −1
+
+> n
+
+be its inverse. Suppose f −1 
+
+> n
+
+(sn, 0|sn+1 ,0) = 1 for the ini-tial state sn, 0 and sn+1 ,0 in Mn and Mn+1 , respectively. 
+
+4Learning to Reuse Policies for State Evolvable Environments 
+
+Jn(πn) := E[P∞ 
+
+> t=0
+
+γtrn,t |πn, s n, 0, Pn]. When applying 
+
+πn ◦ f −1 
+
+> n
+
+in Mn+1 , the performance gap is bounded by 
+
+|Jn+1 (πn ◦ f −1 
+
+> n
+
+) − Jn(πn)| ≤ ϵR
+
+1 − γ + γϵ P Rmax 
+
+2(1 − γ)2 .
+
+The full proof can be found in Appendix A. We disclose the policy performance gap when encapsulating πn with the oracle inverse of evolution f −1 
+
+> n
+
+. This quantifies how the uncertainty in the evolution, as captured by ϵR and ϵP ,affects the performance under a infinite-horizon setting. In practice, we only have access to a learned reconstruc-tion function gn that approximates f −1 
+
+> n
+
+. Because the data Dn come from trajectories with specific distributions, compounding errors may occur if gn is inaccurate in off-distribution states. The next proposition shows that a robust policy πn and help mitigate such errors. 
+
+Proposition 3.3. Let f −1 
+
+> n
+
+be the inverse of evolution fn
+
+that transforms Mn into Mn+1 . Suppose we have both the policy πn and the reconstruction model gn. If 
+
+E DTV (πn ◦ f −1 
+
+> n
+
+(·| sn+1 ), π n ◦ gn(·| sn+1 ))  ≤ η, (10) 
+
+where DTV (p, q ) = 12
+
+P 
+
+> x
+
+|p(x) − q(x)| ∈ [0 , 1] denotes to-tal variation divergence for discrete probability distribution 
+
+p, q , then: 
+
+|Jn+1 (πn ◦ f −1 
+
+> n
+
+) − Jn+1 (πn ◦ gn)| ≤ 2Rmax 
+
+(1 − γ)2 η. 
+
+Moreover, if fn is ϵR − ϵP consistent, it follows that 
+
+|Jn(πn) − Jn+1 (πn ◦ gn)| ≤ ϵR
+
+1 − γ + (γϵ P + 4 η)Rmax 
+
+2(1 − γ)2 .
+
+The intuition behind Proposition 3.3 is that if the old pol-icy πn is robust enough to restrict the differences in action distributions under perturbations, then composition with a slightly inaccurate gn causes limited performance degra-dation. The detailed proofs are available in Appendix A. We also validate theoretical results through experiments in Section 4.3. Accordingly, when learning πn using dataset Dn−1, or π0 under M0, we could focus on minimiz-ing E[DTV (πn(·| sn), π n(·| ˆsn))] , where ˆsn ∼ gn(·| sn+1 ).While we fail to obtain gn beforehand, we can assume that the reconstructed state ˆsn is bounded by T ϵn(sn) = 
+
+{s′
+
+> n
+
+|∥ s′ 
+
+> n
+
+− sn∥2 ≤ ϵ, s ′ 
+
+> n
+
+∈ S n}, as gn is optimized to minimize reconstruction errors. This motivates the robust regularization in Equation (4), as discussed in Section 3.1. 
+
+## 4. Experiments 
+
+In this section, we present our experimental analysis con-ducted across eight diverse tasks, including continuous con-trol tasks from Mujoco, featuring vectorial state features, and Atari games with pixel-based image inputs and discrete action spaces. Our experiments are designed to address three critical questions: (1) Whether Lapse achieves supe-rior adaptation capabilities in state evolvable environments compared to existing methods (Section 4.2)? (2) How does the learning process of Lapse proceed in evolving stages, assessing its adaptability (Section 4.3)? (3) What contribu-tions do the different components and hyper-parameters of Lapse make to its overall performance (Section 4.4)? For a comprehensive evaluation, Lapse is compared against multiple baselines. All results are averaged over five random seeds and are presented with their corresponding standard deviations. Detailed descriptions of the experimental setups, including environmental conditions and network architec-ture parameters, are provided in the Appendix C. 
+
+4.1. Baselines and Environments 
+
+To thoroughly assess the performance of Lapse, we com-pare it against the following adaptation baselines: (1) RL-GAN (Gamrian & Goldberg, 2019) simply employs a fea-ture reconstruction model to reuse the old policy, but with-out robust training. (2) LUSR (Xing et al., 2021) focuses on extracting disentangled state representations and trains agents in the latent space. (3) PAD (Hansen et al., 2021) optimizes RL and self-supervised objectives in the initial MDP ( M0) and adapts by fine-tuning the representation using self-supervised signals. (4) Offline learns a new pol-icy for each Mn+1 using data Dn, employing offline RL. (5) Few-shot Policy Transfer (FPT) (Shukla et al., 2023) reuses old policies to guide the transfer of policies under new environments. (6) CUP (Zhang et al., 2022) generates multiple source policies in the initial MDP (using random-ized domains) and selects the appropriate one based on critic value, which then guides the learning of the new policy. For evaluation, we select four tasks from the Gym Mu-JoCo suite (Todorov et al., 2012): Ant , HalfCheetah ,
+
+Hopper , and Walker . In these tasks, agents receive vecto-rial state features and output continuous actions. We utilize PPO (Schulman et al., 2017) as the backbone and train the initial policy ( π0) via Wocar (Liang et al., 2022). In the context of Atari games (Bellemare et al., 2013), which in-volve pixel-based image inputs and discrete action spaces, we employ DQN (Mnih et al., 2013) as the backbone to train the robust RADIAL agent (Oikarinen et al., 2021) π0
+
+for games including BankHeist , Freeway , Pong , and 
+
+RoadRunner , following the setup outlined in Oikarinen et al. (2021). The specifics of the state space evolution process in these environments are detailed and illustrated in Appendix B. To simulate the addition and removal of sensors, we split pixel-based images into multiple patches. The addition or reduction of patches or dimensions is then applied. Furthermore, we introduce more complex evolu-5Learning to Reuse Policies for State Evolvable Environments 
+
+tions including the replacement of physical units, rotation of view, introduction of distracting objects and arbitrary linear mapping. Noise is added to simulate the uncertainty of the evolution. We restrict the number of trajectories in the dataset Dn to 10 and 15 in Mujoco and Atari, respectively. 
+
+4.2. Competitive Results Overall Adaptation Performance For a fair evaluation of adaptation performance, we analyze all methods across five evolving stages with various orders of evolutions. The performance is normalized against the initial stage return: 
+
+100 · 15
+
+P5 
+
+> n=1
+> Jn(πn)
+> J0(π0)
+
+, with 10 episodes per stage to estimate 
+
+Jn(πn). This metric reflects how well each method retains performance relative to its initial stage, demostrating the agent’s adaptability. Table 1 reveals that all algorithms experience performance degradation as the state space evolves, underscoring the need for specialized strategies. Domain adaptation methods like RL-GAN and LUSR, which rely on substantial train-ing data to generalize or translate states, struggle because limited samples of Dn, exhibiting low adaptability. FPT shows only marginal gains compared to RL-GAN, indicat-ing that few-shot fine-tuning is not always sufficient. PAD, despite learning dynamic-informed intermediate representa-tions through self-supervision, fails to cope with state space evolution. It learns latent features from M0 alone and it will inevitably be affected by domain specificity, verifying the difficulty to learn a sensor-invariant policy. In addition, PAD fine-tunes the features via limited data with a shallow distribution collected during a short period, this leads to ineffective adaptation. Offline demonstrates decent adapt-ability in tasks like Ant and Hopper and is on par with Lapse in these scenarios. However, its capability diminishes in Atari games with high-dimensional inputs and complex evo-lution mappings. CUP shows promise by guiding source policy selection through critic value estimation. However, it is prone to performance degradation when the divergence in state space between the source and target environments becomes too large. This highlights the limitation of previ-ous policy reuse approaches: they are primarily suited for transfer learning and rely on costly trial-and-error to handle significant state space changes. In contrast, Lapse stands out, consistently delivering the best adaptation performance across all tasks. It nearly doubles the effectiveness com-pared to the strongest baseline in average, evidencing the superiority and efficiency of our proposed method. 
+
+Continuous Adaptation Capability Figure 2 illustrates the continuous adaptation of various methods to the evolv-able state space by comparing the performance over 5 differ-ent stages. Although all methods exhibit increased perfor-mance degradation over successive stages, Lapse maintains control over this decline. While RL-GAN’s performance de-teriorates gradually or breaks down at the first stage, Lapse effectively reuses the old policy, due to the application of the enhanced robustness. LUSR, PAD, and FPT are con-strained by the performance of the last stage’s policy, yet Lapse transcends these limitations, especially notable in the final stage of HalfCheetah, where it even gains perfor-mance improvement in the last stage. This is attributed to the potential of offline adaptive policy learning. Offline and CUP, despite observing similar trends, cannot match Lapse’s performance, largely due to their absence of a policy aggre-gation mechanism with dynamically adjustable ensemble weights. The complete result is provided in Appendix D 
+
+4.3. Analysis of Policy Reuse Validation of Theoretical Analysis Section 3.4 provides a theoretical discussion on the robustness of policy reuse through state reconstruction. To further validate the the-oretical results, we demonstrate the detailed learning pro-cess for a single evolving stage in Figure 3. We compare a robust policy and a vanilla policy, each coupled with a reconstruction model trained in the same way. Both the reconstruction models’ training losses, depicted by the dot-ted lines, decrease and stabilize rapidly, indicating mini-mal reconstruction errors of the old states. This allows the robust policy to be effectively reused in the new state space, delivering satisfactory performance as shown by the red solid line. In contrast, the vanilla policy without prior robust training breaks down, even with a well-trained state reconstruction model. To quantify the total variation divergence E[DTV (πn(·| f −1 
+
+> n
+
+(sn+1 )) , π n(·| gn(sn+1 )))] , we measure the action differences produced by the policy when perceiving real and reconstructed states under the testing environment. The blue dash-dotted line that represents the action difference of the vanilla policy has illustrated that the performance gap is mainly caused by the distribution shift and compounding errors. Conversely, a robust policy is capable of mitigating these issues by restricting action distribution discrepancies under perturbations beforehand, thus being reused effectively. 
+
+Analysis of the Learning Process We further analyze the learning process of Lapse in HalfCheetah, where the recon-struction model and the policy are updated for 10K steps in each evolving stage, as depicted in Figure 4. First, the reconstruction policy πrecon  
+
+> n+1
+
+exhibits high efficacy in early stages, but declines over repeated evolutions. The com-pounding reconstruction error inevitably accumulates and erodes the initial policy’s robustness with the increase of the evolving stages, widening the performance gap. Further-more, even with an optimal state reconstruction model, the reconstruction policy πrecon  
+
+> n+1
+
+fails to surpass the old policy 
+
+πn. The offline adaptive policy, πoff  
+
+> n+1
+
+shows better long-6Learning to Reuse Policies for State Evolvable Environments 
+
+Table 1. Average test return ± std across various tasks. The highest performance in each row is emphasized in bold. Results are averaged over 5 evolving stages, 10 episodes per stage, and 5 distinct seeds for robustness. Values are normalized against the initial stage return, indicating the performance retained relative to the initial stage. 
+
+Task RL-GAN LUSR PAD Offline FPT CUP Lapse Ant 28 .10 ± 3.29 39 .57 ± 1.90 24 .47 ± 1.45 82 .63 ± 4.95 38 .39 ± 5.31 69 .83 ± 9.57 84 .02 ± 2.69 
+
+HalfCheetah 12 .26 ± 3.06 14 .55 ± 3.35 28 .31 ± 1.07 15 .01 ± 2.71 13 .13 ± 4.36 12 .01 ± 2.02 82 .56 ± 4.48 
+
+Hopper 16 .43 ± 5.96 15 .42 ± 6.40 34 .02 ± 3.73 74 .16 ± 9.33 78 .94 ± 23 .18 66 .62 ± 20 .39 98 .89 ± 3.09 
+
+Walker 3.03 ± 1.29 4.38 ± 1.75 10 .58 ± 6.61 18 .91 ± 6.27 19 .94 ± 2.10 13 .42 ± 4.59 83 .85 ± 7.49 
+
+BankHeist 25 .38 ± 10 .58 0.00 ± 0.00 41 .05 ± 10 .43 61 .07 ± 37 .43 20 .79 ± 14 .78 0.00 ± 0.00 95 .34 ± 0.89 
+
+Freeway 43 .86 ± 16 .26 61 .64 ± 1.22 78 .86 ± 3.46 71 .85 ± 4.47 78 .10 ± 5.77 48 .82 ± 24 .74 98 .32 ± 1.34 
+
+Pong 37 .41 ± 9.68 0.06 ± 0.08 6.54 ± 4.55 33 .56 ± 18 .06 33 .56 ± 8.33 0.11 ± 0.23 100 .0 ± 0.00 
+
+RoadRunner 14 .66 ± 4.82 2.33 ± 0.08 28 .67 ± 11 .28 6.92 ± 4.3.0 24 .46 ± 9.00 1.25 ± 1.04 85 .65 ± 9.33 
+
+Overall 22 .64 17 .24 31 .56 45 .51 38 .41 26 .51 91 .09 0 2 4            
+
+> Evolving Stage
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Normalized Average Return  HalfCheetah
+> 024
+> Evolving Stage
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Hopper
+> 024
+> Evolving Stage
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Freeway
+> 024
+> Evolving Stage
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Pong
+> Lapse RL-GAN LUSR PAD Offline FPT CUP
+
+Figure 2. The adaptation performance of the learned policy as the state space evolves 0.0K 2.0K 4.0K 6.0K 8.0K 10.0K 
+
+> Training Steps
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Normalized Return / Loss  Robust
+> Vanilla
+> Test Performance
+> Training Loss
+> Test Action Difference
+
+Figure 3. Comparison of training loss, test return, and test action difference when reusing robust policies versus reusing vanilla poli-cies through state reconstruction. The type of policy (robust and vanilla) is indicated by color, and different metrics (performance, loss and action difference) are represented by line styles. 
+
+term stability and can potentially exceed the performance of a sub-optimal old policy and better utilize new sensors. To benefit from both policies, we aggregate them via an au-tomatically adjusting ensemble weight κn+1 , which reflects the dependency on the reconstruction policy. As is shown by the dash-dotted line, κn+1 initially favors the reconstruction policy due to its closeness to the well-performed old policy. As the state space evolves, κn+1 is reduced to harness the strengths of offline RL based on Equation (9) , even without prior knowledge of the individual test performances of the two policies. Incorporating these mechanisms, Lapse real-izes superior adaptation performance, outpacing standard approaches. Meanwhile, we illustrate how the two aspects of policy reuse contribute effectively in different scenarios. When the sensor on the backward shin of the HalfCheetah robot wears out, our method learns to reconstruct the miss-ing information from available features, enabling the reuse of the robust policy network. As the reconstruction loss converges, the robust policy can be effectively deployed. Moreover, we visualize the saliency map of offline adaptive policy πoff  
+
+> n
+
+’s state features via SmoothGrad (Smilkov et al., 2017). The added sensor on the forward shin provides ad-ditional state features. The offline policy not only reuses behavior knowledge from the old policy but also leverages the information for improved decision-making. 
+
+4.4. Ablation and Parameter Sensitivity Studies Ablation Study To dissect the impact of each component within Lapse, we execute ablation studies on the Pong task, as depicted in Figure 5(a). This analysis uncovers their con-tributions to Lapse in evolvable state space. First, W/o recon 
+
+7Learning to Reuse Policies for State Evolvable Environments bshin -sensor wears out   
+
+> learn to reconstruct
+> add new fshin -sensor
+> learn to leverage
+> bshin -
+> sensor
+> fshin -
+> sensor
+> bshin
+> fshin
+> bshin
+> Feature Saliency Map
+
+Figure 4. The learning process of Lapse in HalfCheetah environ-ment. Displayed are the test returns for the reconstruction policy, the offline adaptive policy, and the combined Lapse policy. Also plotted the ensemble weight ( κn+1 ), illustrating its dynamic adjust-ment throughout evolution. When sensor placed on the backward shin wears out, the model is optimized to reconstruct the missing feature. When a new sensor is added to the forward shin, the policy can utilize new feature, as shown in saliency map. 0 1 2 3 4 5
+
+> Evolving Stages
+> 0
+> 25
+> 50
+> 75
+> 100
+> Normalized Average Return
+> Lapse
+> W/o kappa
+> W/o offline
+> W/o recon
+> W/o robust
+
+(a) Ablation study 0.1 1 10 100 1000  
+
+> Parameter Value
+> 0
+> 20
+> 40
+> 60
+> 80
+> Normalized Return
+
+(b) Parameter sensitivity study 
+
+Figure 5. Ablation and parameter sensitivity studies on Pong and Ant, respectively. 
+
+and W/o offline relies solely on πoff  
+
+> n+1
+
+and πrecon  
+
+> n+1
+
+, respectively. Both of their adaptation performance declines in later stages, especially W/o offline , emphasizing the necessity of the pol-icy aggregation mechanism. Moreover, W/o robust learns policies without robustness regularization and this results in unbounded performance gap for the reconstruction policy. Its inferior performance compared to W/o recon also sug-gests that robust training aids in offline learning. W/o kappa 
+
+ensembles two policies with a static weight κn+1 = 0 .5. It suffers the least performance degradation among all abla-tions but still performs worse than Lapse, manifesting the robustness of the policy aggregation and the benefit of the automatic ensemble weight adjustment. 
+
+Parameter Sensitivity Study We probe the influence of hyperparameters on adaptation efficacy in the Ant. Here we examine variations in λ, which balances the GAN objective and the fidelity of state reconstruction. An excessively low 
+
+λ leads to a misalignment between state spaces, while an overly high λ could hinder the ability to fool the discrimi-nator. We find that λ = 10 is the best choice in Figure 5(b). Additional experimens are detailed in the Appendix D. 
+
+## 5. Related Work 
+
+Domain Randomization and Domain Adaptation Do-main randomization is a widely used technique for enhanc-ing policy generalization (Laskin et al., 2020a; Peng et al., 2018; Zhou et al., 2023). It generates diverse training scenar-ios by introducing visual or dynamic changes in simulators, with the hope that the unknown test environments can be covered. However, this approach has limitations: the train-ing complexity scales with the number of variations, and in-sufficient randomization may lead to inadequate coverage of target domains. In contrast, target domain data is assumed to be accessible in domain adaptation (Zhu et al., 2023). RL-GAN employs unaligned GANs to translate target do-mains into familiar states in the source domain (Gamrian & Goldberg, 2019). CURL extracts high-level features from raw pixels using contrastive learning (Laskin et al., 2020b), and LUSR adopts Cycle-Consistent VAEs for unified state representation learning (Xing et al., 2021). Unlike these approaches, Lapse does not presume access to unknown target domains during deployment. We focus on adapting to evolvable state space via policy reuse. 
+
+Policy Reuse Policy reuse learns multiple policies each specialised to their own subset of tasks so as to improve transfer to a new unseen task Fern ´andez & Veloso (2006); Rosman et al. (2016); Li et al. (2019). One branch of meth-ods train hierarchical high-level policies over source poli-cies. Another branch of works aggregate source policies with the guidance of value functions on the target task Bar-reto et al. (2018); Cheng et al. (2020); Barekatain et al. (2021). (Barreto et al., 2018) focus on the situation where source tasks and target tasks share the same dynamics, and aggregate source policies by choosing the policy that has the largest Q value at each state based on successor features. CUP (Zhang et al., 2022) chooses a guidance policy that has the largest one-step improvement by querying the critic, and guides learning by regularizing the target policy to imitate the guidance policy. Bossens & Sobey (2024) adaptively assigns policies to tasks based on ϵ-greedy bandit learning over lifetime reinforcement learning. Continual Reinforce-ment Learning (CRL) (Kessler et al., 2022; Li et al., 2024) focuses on adapting to new tasks quickly by reusing pol-icy knowledge learned from old tasks, but they still require costly trial-and-error. All these approaches focus on effi-ciency on transfer to tasks with dynamics or reward gaps. We emphasize the evolution of state space and do not allow costly trial-and-error. 
+
+Novelty Detection and Adaptation Focusing on the open-world decision making problem, a line of research works refer to abrupt changes in environments as novelty (Peng et al., 2021; Balloch et al., 2023). They propose to detect the novelty via knowledge graph or neuro-symbolic world model and achieve policy adaptation with imagination tra-jectories generated from the updated world model. These 8Learning to Reuse Policies for State Evolvable Environments 
+
+methods fail to be directly applied to high-dimensional, con-tinuous and complex environments, where dynamics and rewards are difficult to be depicted with simple rules. Zolli-coffer et al. (2023) addresses this problem by extending it to latent-based novelty detection via DreamerV2 (Hafner et al., 2020) but does not study how to achieve policy adaptation in complex environments, mainly because the accuracy of imagination trajectories cannot be guaranteed. Our method takes a further step for the high-dimensional, continuous and complex environments via a novel solution. 
+
+Learning with Evolvable Features The concept of Fea-ture Evolvable Streaming Learning (FESL) was introduced by Hou et al. (2017), focusing on an overlapping pe-riod where features from different stages are observable. OLVF (Beyazit et al., 2019) learns to classify the feature space and the instances simultaneously to handle arbitrarily varying spaces. FDESL (Zhang et al., 2020b) further ex-tends the setting by assuming that the data distribution also changes. Our work is related to FESL paradigm, but they focus on online learning with data streams. We first consider the problem in RL and formulate it into SERL problem. 
+
+## 6. Conclusion 
+
+In this work, we present the Learning to reuse policies in 
+
+state evolvable environments ( Lapse ) approach, address-ing the challenge of evolvable state space in reinforcement learning (RL) with the formulation of state evolvable re-inforcement learning (SERL). Lapse reuses policies from two aspects by combining a robust policy and an adaptive policy through state reconstruction and offline learning, thus avoiding the need for extensive and costly trial-and-error during deployment. Theoretical and empirical results on adaptation capability underscores Lapse ’s potential in ef-ficiently handling dynamic real-world scenarios. However, the requirement of Dn can restrict the application scenarios in real world, and Lapse may be less effective in environ-ments with drastic state space evolutions. Future work could focus on enhancing Lapse to handle more rapid state evolu-tions and exploring its applicability to more complex tasks. Another appealing direction is extending Lapse to multi-agent embodied intelligence settings (Feng et al., 2025), where multiple physically situated agents must coordinate and adapt in a jointly evolving state space. Furthermore, relaxing the need of behavioral experiences through Large Language Models (LLMs) (Kim et al., 2024) and human instructions is also a promising and valuable direction for future research. 
+
+## Acknowledgements 
+
+This work is supported by the National Science Founda-tion of China(62495093, U24A20324), the Natural Science Foundation of Jiangsu (BK2024119, BK20243039). We thank Tencent AI Arena for their support, and the anony-mous reviewers for their support and helpful discussions on improving the paper. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Reinforcement Learning (RL). Our method is intended to more effectively adapt RL policy to possible changes in state space during deployment. The work presented does not raise any additional ethical concerns, and thus no special discussion on ethical issues is required. 
+
+## References 
+
+Balloch, J. C., Lin, Z., Peng, X., Hussain, M., Srinivas, A., Wright, R., Kim, J. M., and Riedl, M. O. Neuro-symbolic world models for adapting to open world novelty. In 
+
+Proceedings of the 2023 International Conference on Autonomous Agents and Multiagent Systems , pp. 2848– 2850, 2023. Barekatain, M., Yonetani, R., and Hamaya, M. Multipolar: multi-source policy aggregation for transfer reinforce-ment learning between diverse environmental dynamics. In IJCAI , pp. 3108–3116, 2021. Barreto, A., Borsa, D., Quan, J., Schaul, T., Silver, D., Hessel, M., Mankowitz, D., Zidek, A., and Munos, R. Transfer in deep reinforcement learning using successor features and generalised policy improvement. In ICML ,pp. 501–510, 2018. Bellemare, M. G., Naddaf, Y., Veness, J., and Bowling, M. The arcade learning environment: An evaluation plat-form for general agents. Journal of Artificial Intelligence Research , 47:253–279, 2013. Bellemare, M. G., Dabney, W., and Munos, R. A distribu-tional perspective on reinforcement learning. In ICML ,pp. 449–458, 2017. Beyazit, E., Alagurajah, J., and Wu, X. Online learning from data streams with varying feature spaces. In AAAI ,pp. 3232–3239, 2019. Bossens, D. M. and Sobey, A. J. Lifetime policy reuse and the importance of task capacity. AI Communications , pp. 1–34, 2024. Chen, A. S., Chada, G., Smith, L., Sharma, A., Fu, Z., Levine, S., and Finn, C. Adapt on-the-go: Behavior mod-ulation for single-life robot deployment. arXiv preprint arXiv:2311.01059 , 2023. 9Learning to Reuse Policies for State Evolvable Environments 
+
+Chen, X.-H., Jiang, S., Xu, F., Zhang, Z., and Yu, Y. Cross-modal domain adaptation for cost-efficient visual rein-forcement learning. In NeurIPS , pp. 12520–12532, 2021. Cheng, C.-A., Kolobov, A., and Agarwal, A. Policy im-provement via imitation of multiple oracles. NeurIPS , 33: 5587–5598, 2020. Feng, Z., Xue, R., Yuan, L., Yu, Y., Ding, N., Liu, M., Gao, B., Sun, J., and Wang, G. Multi-agent embod-ied ai: Advances and future directions. arXiv preprint arXiv:2505.05108 , 2025. Fern ´andez, F. and Veloso, M. Probabilistic policy reuse in a reinforcement learning agent. In AAMAS , pp. 720–727, 2006. Fujimoto, S. and Gu, S. S. A minimalist approach to offline reinforcement learning. In NeurIPS , pp. 20132–20145, 2021. Gamrian, S. and Goldberg, Y. Transfer learning for related reinforcement learning tasks via image-to-image transla-tion. In ICML , pp. 2063–2072, 2019. Hafner, D., Lillicrap, T., Norouzi, M., and Ba, J. Mas-tering atari with discrete world models. arXiv preprint arXiv:2010.02193 , 2020. Hansen, N., Jangir, R., Aleny `a Ribas, G., Abbeel, P., Efros A, A., Pinto, L., and Wang, X. Self-supervised policy adaptation during deployment. In ICLR , 2021. Hou, B.-J., Zhang, L., and Zhou, Z.-H. Learning with feature evolvable streams. In NeurIPS , pp. 1417–1427, 2017. Isola, P., Zhu, J.-Y., Zhou, T., and Efros, A. A. Image-to-image translation with conditional adversarial networks. In CVPR , pp. 1125–1134, 2017. Jiang, N., Kulesza, A., and Singh, S. Abstraction selection in model-based reinforcement learning. In ICML , pp. 179–188, 2015. Kessler, S., Parker-Holder, J., Ball, P., Zohren, S., and Roberts, S. J. Same state, different task: Continual rein-forcement learning without interference. In Proceedings of the AAAI Conference on Artificial Intelligence , vol-ume 36, pp. 7143–7151, 2022. Kim, W. K., Lee, Y., Kim, J., and Woo, H. Llm-based skill diffusion for zero-shot policy adaptation. In NeurIPS ,2024. Kiran, B. R., Sobh, I., Talpaert, V., Mannion, P., Al Sal-lab, A. A., Yogamani, S., and P ´erez, P. Deep reinforce-ment learning for autonomous driving: A survey. IEEE Transactions on Intelligent Transportation Systems , 23 (6):4909–4926, 2021. Kumar, A., Hong, J., Singh, A., and Levine, S. When should we prefer offline reinforcement learning over behavioral cloning? In ICLR , 2022. Laskin, M., Lee, K., Stooke, A., Pinto, L., Abbeel, P., and Srinivas, A. Reinforcement learning with augmented data. In NeurIPS , pp. 19884–19895, 2020a. Laskin, M., Srinivas, A., and Abbeel, P. Curl: Contrastive unsupervised representations for reinforcement learning. In ICML , pp. 5639–5650, 2020b. Lee, K., Laskin, M., Srinivas, A., and Abbeel, P. Sunrise: A simple unified framework for ensemble learning in deep reinforcement learning. In ICML , pp. 6131–6141, 2021. Li, D., Meng, L., Li, J., Lu, K., and Yang, Y. Domain adaptive state representation alignment for reinforcement learning. Information Sciences , 609:1353–1368, 2022. Li, L., Chen, R., Zhang, Z., Wu, Z., Li, Y.-C., Guan, C., Yu, Y., and Yuan, L. Continual multi-objective reinforcement learning via reward model rehearsal. In Proceedings of the Thirty-Third International Joint Conference on Artificial Intelligence , pp. 4434–4442, 2024. Li, S., Gu, F., Zhu, G., and Zhang, C. Context-aware policy reuse. In AAMAS , pp. 989–997, 2019. Liang, Y., Sun, Y., Zheng, R., and Huang, F. Efficient adversarial training without attacking: Worst-case-aware robust reinforcement learning. In NeurIPS , pp. 22547– 22561, 2022. Lin, Y., Liu, Y., Lin, F., Zou, L., Wu, P., Zeng, W., Chen, H., and Miao, C. A survey on reinforcement learning for recommender systems. IEEE Transactions on Neural Networks and Learning Systems , 2023. Mnih, V., Kavukcuoglu, K., Silver, D., Graves, A., Antonoglou, I., Wierstra, D., and Riedmiller, M. Playing atari with deep reinforcement learning. arXiv preprint arXiv:1312.5602 , 2013. Oikarinen, T., Zhang, W., Megretski, A., Daniel, L., and Weng, T.-W. Robust deep reinforcement learning through adversarial loss. In NeurIPS , pp. 26156–26167, 2021. Peng, X., Balloch, J. C., and Riedl, M. O. Detect-ing and adapting to novelty in games. arXiv preprint arXiv:2106.02204 , 2021. Peng, X. B., Andrychowicz, M., Zaremba, W., and Abbeel, P. Sim-to-real transfer of robotic control with dynamics randomization. In ICRA , pp. 3803–3810, 2018. Puterman, M. L. Markov decision processes: discrete stochastic dynamic programming . John Wiley & Sons, 2014. 10 Learning to Reuse Policies for State Evolvable Environments 
+
+Rosman, B., Hawasly, M., and Ramamoorthy, S. Bayesian policy reuse. Machine Learning , 104:99–127, 2016. Schulman, J., Levine, S., Abbeel, P., Jordan, M., and Moritz, P. Trust region policy optimization. In ICML , pp. 1889– 1897, 2015. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 , 2017. Shukla, Y., Kesari, B., Goel, S., Wright, R., and Sinapov, J. A framework for few-shot policy transfer through observation mapping and behavior cloning. In IROS , pp. 7104–7110, 2023. Singh, B., Kumar, R., and Singh, V. P. Reinforcement learning in robotic applications: a comprehensive survey. 
+
+Artificial Intelligence Review , pp. 1–46, 2022. Smilkov, D., Thorat, N., Kim, B., Vi ´egas, F., and Watten-berg, M. Smoothgrad: removing noise by adding noise. 
+
+arXiv preprint arXiv:1706.03825 , 2017. Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, Cambridge, 2018. Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics engine for model-based control. In IROS , pp. 5026–5033, 2012. Wang, X., Wang, S., Liang, X., Zhao, D., Huang, J., Xu, X., Dai, B., and Miao, Q. Deep reinforcement learning: a survey. IEEE Transactions on Neural Networks and Learning Systems , 2022. Wong, E. and Kolter, Z. Provable defenses against adver-sarial examples via the convex outer adversarial polytope. In ICML , pp. 5286–5295, 2018. Xing, J., Nagata, T., Chen, K., Zou, X., Neftci, E., and Krichmar, J. L. Domain adaptation in reinforcement learning via latent unified state representation. In AAAI ,pp. 10452–10459, 2021. Xu, T., Li, Z., and Yu, Y. Error bounds of imitating policies and environments. In NeurIPS , pp. 15737–15749, 2020. Yang, R., Bai, C., Ma, X., Wang, Z., Zhang, C., and Han, L. Rorl: Robust offline reinforcement learning via conserva-tive smoothing. In NeurIPS , pp. 23851–23866, 2022. Yang, T., Hao, J., Meng, Z., Zhang, Z., Hu, Y., Chen, Y., Fan, C., Wang, W., Wang, Z., and Peng, J. Efficient deep reinforcement learning through policy transfer. In 
+
+AAMAS , pp. 2053–2055, 2020. Yuan, L., Zhang, Z., Li, L., Guan, C., and Yu, Y. A sur-vey of progress on cooperative multi-agent reinforce-ment learning in open environment. arXiv preprint arXiv:2312.01058 , 2023. Zhang, H., Chen, H., Xiao, C., Li, B., Liu, M., Boning, D., and Hsieh, C.-J. Robust deep reinforcement learning against adversarial perturbations on state observations. In 
+
+NeurIPS , pp. 21024–21037, 2020a. Zhang, J., Li, S., and Zhang, C. Cup: Critic-guided policy reuse. NeurIPS , 35:27537–27548, 2022. Zhang, Z.-Y., Zhao, P., Jiang, Y., and Zhou, Z.-H. Learning with feature and distribution evolvable streams. In ICML ,pp. 11317–11327, 2020b. Zhou, K., Liu, Z., Qiao, Y., Xiang, T., and Loy, C. C. Do-main generalization: A survey. IEEE Transactions on Pattern Analysis & Machine Intelligence , 45(04):4396– 4415, 2023. Zhou, Z.-H. Open-environment machine learning. National Science Review , 9(8):nwac123, 2022. Zhu, Z., Lin, K., Jain, A. K., and Zhou, J. Transfer learning in deep reinforcement learning: A survey. IEEE Trans-actions on Pattern Analysis and Machine Intelligence ,2023. Zollicoffer, G., Eaton, K., Balloch, J., Kim, J., Riedl, M. O., and Wright, R. Novelty detection in reinforcement learn-ing with world models. arXiv preprint arXiv:2310.08731 ,2023. 11 Learning to Reuse Policies for State Evolvable Environments 
+
+## A. Proofs for Theoretical Analysis 
+
+A.1. Proof for Proposition 3.2 
+
+We first introduce the following lemma for the proof of Proposition 3.2. 
+
+Lemma A.1. Let fn be an ϵR − ϵP evolution of Mn, which leads to Mn+1 . f −1 
+
+> n
+
+is the inverse of the evolu-tion. As is defined in Definition 2.1, Rn+1 (sn+1 , a ) = Esn∼f −1 
+
+> n(·| sn+1 )
+
+[Rn(sn, a )] , and Pn+1 (s′
+
+> n+1
+
+|sn+1 , a ) =
+
+Esn,s ′    
+
+> n∼f−1
+> n(·| sn+1 ),f −1
+> n(·| s′
+> n+1 )
+
+[Pn(s′
+
+> n
+
+|sn, a )] . Then for any sn+1 ∈ S n+1 , a ∈ A ,
+
+|Esn∼f −1 
+
+> n(·| sn+1 )
+
+[Rn(sn, a )] − Rn+1 (sn+1 , a )| ≤ ϵR.
+
+Proof. 
+
+|Esn∼f −1 
+
+> n(·| sn+1 )
+
+[Rn(sn, a )] − Rn+1 (sn+1 , a )| = | X
+
+> sn
+
+f −1 
+
+> n
+
+(sn|sn+1 )[ Rn(sn, a )] − Rn+1 (sn+1 , a )|≤ X
+
+> sn
+
+f −1 
+
+> n
+
+(sn|sn+1 )|Rn(sn, a ) − Rn+1 (sn+1 , a )|
+
+= X
+
+> sn
+
+f −1 
+
+> n
+
+(sn|sn+1 )|Rn(sn, a ) − X
+
+> ˜sn
+
+f −1 
+
+> n
+
+(˜ sn|sn+1 )Rn(˜ sn, a )|
+
+= X
+
+> sn
+
+I(fn(sn+1 |sn) > 0) f −1 
+
+> n
+
+(sn|sn+1 )|Rn(sn, a ) − X
+
+> ˜sn
+
+f −1 
+
+> n
+
+(˜ sn|sn+1 )Rn(˜ sn, a )|≤ X
+
+> sn
+
+I(fn(sn+1 |sn) > 0) f −1 
+
+> n
+
+(sn|sn+1 )ϵR
+
+= ϵR
+
+(11) According to the bayesian inverse f −1 
+
+> n
+
+(sn|sn+1 ) = fn(sn+1 |sn)P  
+
+> ˜sn fn(sn+1 |˜sn)
+
+, fn(sn+1 |sn) > 0 only if f −1 
+
+> n
+
+(sn|sn+1 ) > 0. This allows for the application of Definition 3.1, which bounds the discrepancy of reward function when fn(sn+1 |sn) > 0.It is also noticeable that we define f −1 
+
+> n
+
+(sn|sn+1 ) = fn(sn+1 |sn)P  
+
+> ˜sn fn(sn+1 |˜sn)
+
+by assuming a uniform prior distribution pn(·) over 
+
+Sn. We can also introduce occupancy measurement induced by uniform policy as prior, but it will not change the conclusion of the proposition. Based on the above conclusion, we show that the performance gap between πn and πn ◦ f −1 
+
+> n
+
+within Mn and Mn+1 can be bounded by ϵR and ϵP .
+
+Proof. First of all, state value function V π 
+
+> M
+
+: S → R is defined as V π
+
+> M
+
+(s) := E[P∞ 
+
+> t=0
+
+γtrt|π, s 0 = s]. Notice that, since 
+
+rt ∈ [0 , R max ], we have 
+
+0 ≤ V π
+
+> M
+
+(s) ≤
+
+> ∞
+
+X
+
+> t=0
+
+γtRmax = Rmax 
+
+1 − γ . (12) Furthermore, Bellman policy operator T π 
+
+> M
+
+is defined as follows, when applied to some vector f ∈ R|S| ,
+
+(T π
+
+> M
+
+f )( s) := Ea∼π(·| s)[R(s, a ) + γEs′∼P (·| s,a )[f (s′)]] =Ea∼π(·| s)[R(s, a ) + γ⟨P (s, a ), f ⟩]. (13) Here ⟨· , ·⟩ is dot product. The Bellman policy operator is a γ-contraction under l∞ norm (Puterman, 2014): for any 
+
+f, f ′ ∈ R|S| :
+
+||T π
+
+> M
+
+f − T π
+
+> M
+
+f ′|| ∞ ≤ γ|| f − f ′|| ∞. (14) 
+
+V π 
+
+> M
+
+is the fixed point of T π
+
+> M
+
+, meaning T π
+
+> M
+
+V π 
+
+> M
+
+= V π
+
+> M
+
+.12 Learning to Reuse Policies for State Evolvable Environments 
+
+Inspired by Jiang et al. (2015), we first prove that 
+
+|| V πn◦f −1
+
+> n
+
+Mn+1 − V πn
+
+Mn ◦ f −1
+
+n || ∞ ≤ ϵR
+
+1 − γ + γϵ P Rmax 
+
+2(1 − γ)2 . (15) Here, (V πn
+
+Mn ◦ f −1
+
+n )( sn+1 ) = Esn∼f −1 
+
+> n
+
+(·| sn+1 )[V πn
+
+Mn (sn)] is defined over Sn+1 . To prove this, we first apply γ-contraction and fixed-point property of Bellman policy operator. For simplicity, let T πn := T π
+
+Mn .
+
+|| V πn◦f −1
+
+> n
+
+Mn+1 − V πn
+
+Mn ◦ f −1
+
+n || ∞
+
+= || (T πn◦f −1
+
+> n
+
+n+1 )V πn◦f −1
+
+> n
+
+Mn+1 − (T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n ) + ( T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n ) − V πn
+
+Mn ◦ f −1
+
+n || ∞
+
+≤ || (T πn◦f −1
+
+> n
+
+n+1 )V πn◦f −1
+
+> n
+
+Mn+1 − (T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n )|| ∞ + || (T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n ) − V πn
+
+Mn ◦ f −1
+
+n || ∞
+
+≤ γ|| V πn◦f −1
+
+> n
+
+Mn+1 − V πn
+
+Mn ◦ f −1
+
+n || ∞ + || (T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n ) − V πn
+
+Mn ◦ f −1
+
+n || ∞.
+
+(16) This implies that 
+
+|| V πn◦f −1
+
+> n
+
+Mn+1 − V πn
+
+Mn ◦ f −1
+
+n || ∞ ≤ 11 − γ || (T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n ) − V πn
+
+Mn ◦ f −1
+
+n || ∞
+
+= 11 − γ || (T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n ) − (T πn
+
+n V πn
+
+Mn ) ◦ f −1
+
+n || ∞.
+
+(17) For notation simplicity, let Rπn(s) := Ea∼π(·| s)R(s, a ), Pπn (s) := Ea∼π(·| s)Pn(s, a ), a ∼ π and sn ∼ f −1
+
+n are abbreviation for a ∼ π(·| s) and sn ∼ f −1
+
+n (·| sn+1 ). Then, for any sn+1 ∈ S n+1 ,
+
+|(T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n )( sn+1 ) − (T πn
+
+n V πn
+
+Mn ) ◦ f −1
+
+n (sn+1 )|
+
+= |(T πn◦f −1
+
+> n
+
+n+1 )( V πn
+
+Mn ◦ f −1
+
+n )( sn+1 ) − (T πn
+
+n V πn
+
+Mn ) ◦ (f −1
+
+n )( sn+1 )|
+
+= |Rπn◦f −1
+
+> n
+
+n+1 (sn+1 ) + γ⟨P πn◦f −1
+
+> n
+
+n+1 (sn+1 ), V πn
+
+Mn ◦ f −1
+
+n ⟩ − Esn∼f −1 
+
+> n
+
+[Rπn
+
+n (sn)] − γ⟨Esn∼f −1 
+
+> n
+
+[Pπn
+
+n (sn)] , V πn
+
+Mn ⟩| ≤ Ea∼πn+1 |Rn+1 (sn+1 , a ) − Esn∼f −1 
+
+> n
+
+[Rn(sn, a )] | + γ|⟨P πn◦f −1
+
+> n
+
+n+1 (sn+1 ), (F−1
+
+n )⊺V πn
+
+Mn ⟩ − ⟨ Esn∼f −1 
+
+> n
+
+[Pπn
+
+n (sn)] , V πn
+
+Mn ⟩| ≤ ϵR + γ|⟨F −1
+
+n Pπn◦f −1
+
+> n
+
+n+1 (sn+1 ), V πn
+
+Mn ⟩ − ⟨ Esn∼f −1 
+
+> n
+
+[Pπn
+
+n (sn)] , V πn
+
+Mn ⟩| 
+
+= ϵR + γ|⟨F −1
+
+n Pπn◦f −1
+
+> n
+
+n+1 − ⟨ Esn∼f −1 
+
+> n
+
+[Pπn
+
+n (sn)] , V πn
+
+Mn ⟩| 
+
+= ϵR + γ|⟨F −1
+
+n Pπn◦f −1
+
+> n
+
+n+1 − ⟨ Esn∼f −1 
+
+> n
+
+[Pπn
+
+n (sn)] , V πn
+
+Mn − Rmax 
+
+2(1 − γ) 1⟩| ≤ ϵR + γEa,s n∼f −1 
+
+> n
+
+||F −1
+
+n Pn+1 (sn+1 , a ) − P n(sn, a )|| 1|| V πn
+
+Mn − Rmax 
+
+2(1 − γ) 1|| ∞
+
+≤ ϵR + γϵ P
+
+Rmax 
+
+2(1 − γ) .
+
+(18) In the steps above, we expand bellman update by definition and use cauchy-schwarz inequality to split dot-product with 
+
+∆P and value function. Lemma A.1 and ϵP consistency is applied to derive upper bound of the discrepancy of reward and transition functions. Finally, according to the definition of the policy performance Jn(πn) := E[P∞
+
+t=0 γtrn,t |πn, s n, 0, Pn], Jn(πn) =
+
+V πn
+
+Mn (sn, 0).
+
+|Jn+1 (πn ◦ f −1
+
+n ) − Jn(πn)| =|V πn◦f −1
+
+> n
+
+Mn+1 (sn+1 ,0) − V πn
+
+Mn (sn, 0)|
+
+=|V πn◦f −1
+
+> n
+
+Mn+1 (sn+1 ,0) − (V πn
+
+Mn ◦ f −1
+
+n )( sn+1 ,0)|≤|| V πn◦f −1
+
+> n
+
+Mn+1 − V πn
+
+Mn ◦ f −1
+
+n || ∞
+
+≤ ϵR
+
+1 − γ + γϵ P Rmax 
+
+2(1 − γ)2 .
+
+(19) 13 Learning to Reuse Policies for State Evolvable Environments 
+
+Proof for Proposition 3.3 We first introduce the following lemmas for the proof of Proposition 3.3 
+
+Lemma A.2. With the definition of state occupancy dπ (s) = (1 − γ) P∞ 
+
+> t=0
+
+γtPr (st = s|π), for any two different policies 
+
+πA, π B under the MDP M, we have: 
+
+DTV (dπA , d πB ) ≤ γ
+
+1 − γ Es∼dπA [DTV (πA(·| s), π B (·| s))] . (20) 
+
+Proof. We prove the lemma based on permutation theory presented in Schulman et al. (2015) and Xu et al. (2020). With 
+
+Pπ (s′|s) := P 
+
+> a∈A
+
+P(s′|s, a )π(a|s) and d0 specifies the initial state distribution, we have: 
+
+dπ =(1 − γ)
+
+> ∞
+
+X
+
+> t=0
+
+γtPr (st = s|π)=(1 − γ)( I − γPπ )−1d0.
+
+(21) Let GA = ( I − γPπA )−1, G B = ( I − γPπB )−1, then we obtain: 
+
+GA − GB =GA(G−1 
+
+> B
+
+− G−1 
+
+> A
+
+)GB
+
+=GA(γPπA − γPπB )GB
+
+=γG A(PπA − P πB )GB .
+
+(22) With the equation, we have: 
+
+DTV (dπA , d πB ) = 12 ∥dπA − dπB ∥1
+
+= 12 ∥(1 − γ)( GA − GB )d0∥1
+
+= 12 ∥(1 − γ)γG A(PπA − P πB )GB d0∥1
+
+= 12 ∥γG A(PπA − P πB )dπB ∥1
+
+≤ γ
+
+2 ∥GB ∥1∥P πA − P πB )dπA ∥1.
+
+(23) Here GB is bounded as: 
+
+∥GB ∥1 =∥(I − γPπB )−1∥1
+
+=
+
+> ∞
+
+X
+
+> t=0
+
+γtP tπB
+
+> 1
+
+≤
+
+> ∞
+
+X
+
+> t=0
+
+γt∥PπB ∥t
+
+> 1
+
+=
+
+> ∞
+
+X
+
+> t=0
+
+γt = 11 − γ .
+
+(24) We can also show that: 
+
+∥(PπA − P πB )dπA ∥1 ≤ X
+
+> s,s ′
+
+|P πA (s′|s) − P πB (s′|s)|dπA (s)= X
+
+> s,s ′
+
+X
+
+> a
+
+P(s′|s, a )( πA(a|s) − πB (a|s)) dπA (s)
+
+≤ X
+
+> s,a,s ′
+
+P(s′|s, a )|πA(a|s) − πB (a|s)|dπA (s)= X
+
+> s
+
+dπA(s)
+
+X
+
+> a
+
+|πA(a|s) − πB (a|s)|
+
+= 2 Es∼dπA [DTV (πA(·| s), π B (·| s))] .
+
+(25) We complete the proof by substituting Equation (24) and Equation (25) into Equation (23). 14 Learning to Reuse Policies for State Evolvable Environments 
+
+Lemma A.3. With the definition of state-action occupancy ρπ (s, a ) = π(a|s)dπ (s), for any two different policies πA, π B
+
+under the MDP M, we have: 
+
+DTV (ρπA , ρ πB ) ≤ 11 − γ Es∼dπA [DTV (πA(·| s), π B (·| s))] . (26) 
+
+Proof. 
+
+DTV (ρπA , ρ πB ) = 12
+
+X
+
+> (s,a )
+
+|ρπA (s, a ) − ρπB (s, a )|
+
+= 12
+
+X
+
+> s,a
+
+|πA(a|s)dπA (s) − πB (a|s)dπB (s)|
+
+= 12
+
+X
+
+> s,a
+
+|(πB (a|s) − πA(a|s)) dπA (s) + ( dπB (s) − dπA (s)) πB (a|s)|≤ 12
+
+X
+
+> s,a
+
+|πB (a|s) − πA(a|s)|dπA (s) + 12
+
+X
+
+> s
+
+|(dπB (s) − dπA (s)) | X
+
+> a
+
+πB (a|s)= Es∼dπA [DTV (πA(·| s), π B (·| s))] + DTV (dπA , d πB )
+
+≤ 11 − γ Es∼dπA [DTV (πA(·| s), π B (·| s))] .
+
+(27) We complete the proof with the last inequality following Lemma A.2. Based on the above conclusions, we show that the performance gap can be bounded by divergence of two policies. For simplicity, we assume f −1 
+
+> n
+
+and gn are deterministic and the conclusion holds by expanding it to the case of expectation. 
+
+Proof. Following Schulman et al. (2015), we can rewrite the expected return as: 
+
+J(π) = E
+
+" ∞X
+
+> t=0
+
+R(st, a t)
+
+#
+
+=
+
+> ∞
+
+X
+
+> t=0
+
+γt X
+
+> s
+
+Pr (st = s|π) X
+
+> a
+
+π(a|s)R(st, a t)=
+
+> ∞
+
+X
+
+> t=0
+
+X
+
+> s,a
+
+ρπ (s, a )R(st, a t)= 11 − γ Eρπ (s,a )[R(st, a t)] .
+
+(28) Combining Prop. 3.2, Lemma A.3 and the condition, we have that: 
+
+|Jn+1 (πn ◦ f −1 
+
+> n
+
+) − Jn+1 (πn ◦ gn)|≤ 11 − γ
+
+X
+
+> sn+1 ,a
+
+|(ρπn◦f −1 
+
+> n
+
+(sn+1 , a ) − ρπn◦gn (sn+1 , a )) Rn+1 (sn+1 , a )|≤ 2Rmax 
+
+1 − γ DTV (ρπn◦f −1 
+
+> n
+
+, ρ πn◦gn )
+
+≤ 2Rmax 
+
+(1 − γ)2 E[DTV (( πn ◦ f −1 
+
+> n
+
+)( ·| sn+1 ), (πn ◦ gn)( ·| sn+1 ))] = 2Rmax 
+
+(1 − γ)2 E[DTV (πn(·| f −1 
+
+> n
+
+(sn+1 )) , π n(·| gn(sn+1 )))] 
+
+≤ 2Rmax 
+
+(1 − γ)2 η. 
+
+(29) 15 Learning to Reuse Policies for State Evolvable Environments 
+
+Finally, combining Equation (29) and Proposition 3.2, we have 
+
+|Jn(πn) − Jn+1 (πn ◦ gn)| =|Jn(πn) − Jn+1 (πn ◦ f −1 
+
+> n
+
+) + Jn+1 (πn ◦ f −1 
+
+> n
+
+) − Jn+1 (πn ◦ gn)|≤| Jn(πn) − Jn+1 (πn ◦ f −1 
+
+> n
+
+)| + |Jn+1 (πn ◦ f −1 
+
+> n
+
+) − Jn+1 (πn ◦ gn)|≤ ϵR
+
+1 − γ + γϵ P Rmax 
+
+2(1 − γ)2 + 2Rmax 
+
+(1 − γ)2 η
+
+= ϵR
+
+1 − γ + (γϵ P + 4 η)Rmax 
+
+2(1 − γ)2 .
+
+(30) This completes the proof. 
+
+## B. Detailed Description of the Environments and Baselines 
+
+B.1. Environments Ant HalfCheetah Hopper Walker  
+
+> Figure 6. Mujoco environments used in this paper
+
+Gym Mujoco suite: MuJoCo (Todorov et al., 2012) (Figure 6) is a high-fidelity physics engine designed for detailed and efficient rigid body simulations with contacts. It is widely used for benchmarking RL algorithms. Agents in MuJoCo environments receive vectorial state inputs and output continuous actions. For a comprehensive evaluation in our study, we have selected four tasks from the Gym MuJoCo suite: • Ant : The Ant is a 3D robot consisting of one torso with four articulated legs, each with two links. The objective is to coordinate the movements of the legs to navigate towards a specified direction. • HalfCheetah : The HalfCheetah is a 2-dimensional robot consisting of 9 links forming a spine, with 8 joints allowing articulation. The challenge is to exert torques on the joints to propel the cheetah forward as swiftly as possible. • Hopper : The Hopper is a two-dimensional one-legged figure that consists of four main body parts - the torso at the top, the thigh in the middle, the leg in the bottom, and a single foot on which the entire body rests. The goal is to make hops that move in the forward direction. • Walker : The Walker is a two-dimensional two-legged figure that consists of four main body parts - a single torso at the top, two thighs in the middle, two legs in the bottom, and two feet attached to the legs. The goal is to coordinate both sets of feet, legs, and thighs to move in the forward direction. Ant HalfCheetah Hopper Walker 
+
+BankHeist Freeway Pong RoadRunner  
+
+> Figure 7. Atari environments used in this paper
+
+16 Learning to Reuse Policies for State Evolvable Environments proprioception 
+
+Axis 
+
+Rotation 
+
+…
+
+Addition 
+
+of Sensor 
+
+> Raw images
+
+Distracting 
+
+Objects 
+
+Removal 
+
+of Sensor 
+
+…    
+
+> 𝑟𝑜𝑜𝑡 !(𝑚 )
+> 𝜔 "#$%& !(𝑟𝑎𝑑 /𝑠 )
+> ⋮
+> 𝜔 "#$%& "(𝑟𝑎𝑑 /𝑠 )
+> 𝑟𝑜𝑜𝑡 !(𝑚 )
+> 𝜽 𝐭𝐨𝐩 (𝒓𝒂𝒅 )
+> 𝜔 %&'() !(𝑟𝑝𝑚 )
+> ⋮
+> 𝜔 %&'() "(𝑟𝑝𝑚 )
+
+Removal 
+
+of Sensor 
+
+Addition 
+
+of Sensor  
+
+> Figure 8. The state space evolution of experimental environments
+
+Atari games: The Atari 2600 emulator (Figure 7) was introduced as an RL platform by Bellemare et al. (2013), offering a high-dimensional, pixel-based image input across a varied and complex set of tasks originally designed to challenge human players. We have selected four Atari games for comprehensive evaluation: • BankHeist : A bank robber wants to rob as many banks as possible. The police chases him and will appear whenever he robs a bank. The robber controls a getaway car and must navigate maze-like cities while avoiding the caught of police. er the dynamite you have previously dropped. • Freeway : The agent’s objective is to guide the chicken across lane after lane of busy rush hour traffic. • Pong : The agent controls the right paddle, and competes against the left paddle controlled by the computer. The agent each tries to keep deflecting the ball away from the right goal and into the left goal. • RoadRunner : The road runner can walk in any direction and jump to outrun the opponent while avoiding the hazards of the desert. 
+
+B.2. Evolutions  
+
+> Table 2. Evolving functions applied in state space of Mujoco and Atari environments, respectively
+
+f0 f1 f2 f3 f4
+
+Mujoco remove sensors rotate (30 ± 5) ◦ add sensors rotate −(30 ± 5) ◦ linear mapping w/ noise Atari remove sensors add moving objects rotate (30 ± 5) ◦ add sensors linear mapping w/ noise We here present the detailed evolutions applied in our experiments. The process is illustrated in Figure B.2 and specific setting of the evolutions are presented in Table 2. We evaluate the continual adaptation performance of different methods under various orders of evolutions. 
+
+B.3. Baselines 
+
+• RL-GAN proposes the analogy-based zero-shot transfer via image-to-image translation. Specifically, it assumes access to unpaired data from the source and target domain beforehand, and achieves unaligned image-to-image translation using the Cycle-Consistency GANs. For our experiments, given access to paired data in dataset Dn, we implement RL-GAN using the Pix2Pix framework, which has shown better results than the original CycleGAN in our context. • LUSR learns a latent unified state representation that is consistent across multiple domains. It applies Cycle-Consistent VAE ito disentangle the original state s into a latent state representation composed of ¯s and ˆs, which are domain-general and domain-specific, respectively. The policy will focus on the domain-general embeddings to make decisions. In the SERL problem, we learn disentangled latent representations and the offline policy using the collected datatset Dn.17 Learning to Reuse Policies for State Evolvable Environments 
+
+• PAD makes the use of self-supervision to allow the policy to continue training after deployment. We decompose the policy into π = ( πe, π a, π s), where we first have intermediate embedding et = πe(st) and makes decision based on 
+
+at ∼ πa(et). πs(·, ·) takes et and et+1 as input to predict the resulting action at. During the training stage, we optimize the RL and self-supervised objectives jointly to learn the policy. During the deployment stage, states are collected to optimize the self-supervised objective alone. In SERL problem, we learn the original policy via optimizing: 
+
+L(π) = LSS (πe, π s) + LRL (πe, π a),
+
+LSS (πe, π s) = l(at, π s(πe(st), π e(st+1 ))) , (31) where l is the mean squared error between the ground truth and the model output in Mujoco and cross entropy in Atari. Then in evolving stage, we optimize the policy with the self-supervised objective LSS alone. • Offline learns a new policy for each Mn+1 using data Dn collected from the old policy. We choose sota offline RL methods: TD3+BC and CQL for Mujoco and Atari, respectively. • FPT proposes a framework for Few-Shot Policy Transfer between two domains through State Mapping and Behavior Cloning. It uses the Cycle-Consistency GANs which aims at a map to clone the successful source task behavior policy to the target domain. We extend it to SERL problem by replacing Cycle-Consistency GANs with Pix2Pix for better alignment. • CUP applies a critic-guided mechanism to reuse prior policies. It dynamically selects the policy with maximal one-step improvement at each state, forming a theoretically guaranteed guidance policy. The target policy is then regularized to imitate this guidance while preserving exploration. In our implementation, pretrained source policies guide the target policy before state evolution. The target policy is subsequently added to the source policy pool for future reuse. 
+
+## C. Algorithm and Experimental Details 
+
+In this section, we describe the detailed designs and techniques used for different modules of Lapse. We also provide the hyperparameters used in Lapse for consistency. 
+
+C.1. Robust Training 
+
+Lapse requires a robust initial policy π0 for efficient reuse and offline adaptive learning. We aim to improve the robustness by minimizing: 
+
+Ln 
+
+> robust
+
+= E
+
+
+
+max   
+
+> ˆsn∈Tϵn(sn)
+
+DTV (πn(·| sn), π n(·| ˆsn)) 
+
+
+
+. (32) To deal with the intractable objective, we apply Wocar-PPO (Liang et al., 2022) and RADIAL-DQN (Oikarinen et al., 2021) for Mujoco and Atari, respectively. 
+
+Wocar-PPO is built on PPO (Schulman et al., 2017) which aims to optimize the policy with: 
+
+LRL = E[− min ( ρtA(st, a t), g tA(st, a t))] (33) where ρt := π(at|st) 
+
+> πold (at|st)
+
+is importance sampling ratio, gt := clip (ρt, 1 − η, 1 + η), η is a hyperparameter, and A(st, a t) is an estimate of the advantage function A(st, a t) := Q(st, a t) − V (st). It also includes a term that minimizes the loss of the value function and rewards the entropy of the policy. Wocar-PPO introduces a worst-attack Bellman operator to estimate the lower bound of the policy value under the worst-case attack by minimizing the following estimation loss: 
+
+Lest = E[( Q(st, a t) − (rt + γ min   
+
+> ˆa∈A adv (st+1 ,π )
+
+Q(st+1 , ˆa))) 2], (34) where Aadv (s, π ) := {a ∈ A|∃ ˜s ∈ Bϵ(s) s.t. π(ˆ s) = a}. The worst action is selected through Interval Bound Propagation (IBP) (Wong & Kolter, 2018). With the worst-case value, it optimizes the policy to select actions that not only achieve high natural future reward, but also achieve high worst-case reward under adversarial attacks: 
+
+Lwst = −E[− min ( ρtQt(st, a t), g tQt(st, a t))] . (35) 18 Learning to Reuse Policies for State Evolvable Environments 
+
+Algorithm 1 recon train (n, D n, π n)
+
+1: Input: current stage n, πn
+
+2: Initialize gn and dn which are parameterized by θgn and θdn , respectively . 
+
+3: for iter = 1 to Tmax do 
+
+4: Sample a batch {(snt , s n+1  
+
+> t
+
+)} from Dn.
+
+5: ˆsnt ← gn(sn+1  
+
+> t
+
+).
+
+6: Compute Ln+1  
+
+> GAN
+
+according to Equation (1). 
+
+7: Optimize dn with θdn ← θdn + ∇θdn Ln+1 
+
+> GAN
+
+.
+
+8: Compute Ln+1  
+
+> Lp
+
+and Ln+1  
+
+> recon
+
+via Equations (2) and (3). 
+
+9: Optimize gn with θgn ← θgn − ∇ θgn Ln+1 
+
+> recon
+
+.
+
+10: end for 
+
+11: Return πrecon  
+
+> n+1
+
+= πn ◦ gn.Furthermore, it regularizes the policy network with a carefully designed state importance weight: 
+
+Lreg = E[w(st) · max  
+
+> ˜st∈Bϵ(st)
+
+MSE (π(st), π (˜ st))] , (36) where w(s) is state importance weight defined as w(s) := max a1∈A Q(s, a 1) − min a2∈A Q(s, a 2), which is approximated by V (st) − Q(st, a t). Combining the above objectives together, we have the overall Wocar-PPO objective: 
+
+LWocar = LRL + κwst Lwst + κreg Lreg , (37) where κwst and κreg are hyperparameters balancing between natural performance and robustness. 
+
+RADIAL-DQN is built upon Dueling-DQN, which splits Q-values into: Q(st, a t) = VQ(s) + AQ(s, a ), and optimizes the Q network with the objective: 
+
+LRL = E[( Q(st, a t) − (rt + max  
+
+> a′
+
+Qtgt (st+1 , a ′))) 2], (38) where Qtgt is a periodically updated target network. RADIAL-DQN designs a regularizer to minimize overlap between output bounds of actions with large difference in outcome. If there is no overlap, the original action’s Q-value is guaranteed to be higher than others even under perturbation, so the agent won’t change its behavior under perturbation. Meanwhile, it focuses on actions with different Q-values since taking a different but equally good action under perturbation is acceptable. RADIAL addresses it by adding a weight Qdiff (s, a 1, a 2) := max {0, Q (s, a 2) − Q(s, a 1)}. Then, it defines ¯Q(s, a, ϵ ) := max ˜s∈Bϵ(s) Q(˜ s, a ) and Q(s, a, ϵ ) := min ˜s∈Bϵ(s) Q(˜ s, a ), and the overlap between two actions: Ovl (s, a 1, a 2, ϵ ) := max (0 , ¯Q(s, a 2, ϵ )) − Q(s, a 1, ϵ ) + η, where η := 0 .5 · Qdiff (s, a 1, a 2). The final loss function is as follows: 
+
+Ladv = E
+
+" X
+
+> ˆat∈A
+
+Qdiff (st, ˆat, a t)Ovl (s, ˆat, a t)
+
+#
+
+. (39) Incorporating it with the original DQN loss, we have the overall RADIAL-DQN training objective: 
+
+LRADIAL = κLRL + (1 − κ)Ladv , (40) where κ is a hyperparameter controlling the trade-off between standard performance and robust performance with value between 0 and 1.
+
+C.2. State Reconstruction Model 
+
+During the nth state evolution, we learn a reconstruction model mapping the new state space Sn+1 back to Sn using collected paired data, so as to reuse the old policy πn. We propose to use conditional GANs to achieve the state reconstruction as described in Alg. 1. 
+
+C.3. Offline Adaptive Policy Learning 
+
+To learn a new policy which takes actions with new state space Mn+1 during state space evolution, we choose TD3+BC for Mujoco and CQL for Atari. Considering that the policy is vulnerable to perturbations of inputs, we make use of a 19 Learning to Reuse Policies for State Evolvable Environments 
+
+conservative smoothing technique introduced by Yang et al. (2022) to make the policy network smoother. The policy will therefore be more robust and facilitate future reuse with the state reconstruction model. Specifically, we generate a bounded neighbouring area Bϵn+1 (sn+1 ) = {s|∥ s − sn+1 ∥2 ≤ ϵ, s ∈ S n} around sn+1 . We simply denote it as Bϵ in the following. Then compute the upper bound of the variation distance between πoff 
+
+> n+1
+
+(sn+1 ) and πoff 
+
+> n+1
+
+(ˆ sn+1 ), ˆsn+1 ∈ Bϵ according to Equation (5). We use mean square error as the variation distance metric so that the loss function is as follows: 
+
+Ln+1  
+
+> robust
+
+= E
+
+
+
+max 
+
+> ˆsn+1 ∈Bϵ
+
+∥πoff 
+
+> n+1
+
+(·| sn+1 ), π off 
+
+> n+1
+
+(·| ˆsn+1 )∥22
+
+
+
+. (41) 
+
+Algorithm 2 off train (n, D n, π n, β n+1 )
+
+1: Initialize a new policy πoff  
+
+> n+1
+
+and Q network Qn+1 , parameterized by ϕπ and ϕQ, respectively. 
+
+2: Set target parameters equal to ϕπ and ϕQ.
+
+3: Compute the neighbouring area bound ϵ according to the scale of states in Dn.
+
+4: for iter = 1 to Tmax do 
+
+5: Sample a batch {(sn+1  
+
+> t
+
+, a n+1  
+
+> t
+
+, r t, s n+1  
+
+> t+1
+
+)} from Dn.
+
+6: Learn Qn+1 and optimize ϕQ via the TD3 algorithm. 
+
+7: Compute ˆLn+1  
+
+> off
+
+via Equation (6). 
+
+8: if iter mod policy delay = 0 then 
+
+9: Generate a bounded neighbouring area Bϵ(sn+1 ).
+
+10: Compute Ln+1  
+
+> robust
+
+via Equation (41). 
+
+11: Compute Ln+1  
+
+> off
+
+via Equation (7). 
+
+12: Optimize ϕπ with ϕπ ← ϕπ − ∇ ϕπ Ln+1  
+
+> off
+
+.
+
+13: Update target network with: 
+
+ϕtarg,π ← τTD3 ϕtarg,π + (1 − τTD3 )ϕπ
+
+ϕtarg,Q ← τTD3 ϕtarg,Q + (1 − τTD3 )ϕQ.
+
+14: end if 
+
+15: end for 
+
+16: Return πoff 
+
+> n+1
+
+.As for CQL applied in Atari games, the loss function is optimized as follows: 
+
+ˆLn+1  
+
+> off
+
+= βn+1 LRL + E
+
+"
+
+log X
+
+> a
+
+exp Q(st, a ) − Q(st, a t)
+
+#
+
+(42) where LRL is the standard DQN objective as is defined in Equation (38) . We also implement it on Quantile Regression-DQN (Bellemare et al., 2017) for effectiveness. We schedule βn+1 = βmax (1 − exp {− τ · n}) as is defined in Section 4.2. 
+
+C.4. Overall Training Algorithm 
+
+In SERL problem, we split it into the training phase and deployment phase. During the training phase, π0 is allowed to be learned under M0 in an online manner. To improve the robustness, we apply Wocar-PPO and RADIAL-DQN into Mujoco and Atari environments, respectively, where the objective is described in Equation (37) and Equation (40) . Before evolving into Mn+1 , we will learn the adaptive policy πn+1 following the paradigm of Lapse as is introduced in Alg. 3. Meanwhile, for Atari games that only instantiate Q-function, we do not distinguish π and Q here and make decisions through arg max a πn+1 (a|s). Furthermore, to calculate the distance between two policies π1, π 2, we approximate it through 
+
+E[DKL (π1(·| s), π 2(·| s))] .20 Learning to Reuse Policies for State Evolvable Environments 
+
+Algorithm 3 Lapse 
+
+1: Input: Environment Env , current stage n ≥ 0, old policy πn, size of dataset Bn
+
+2: Schedule the coefficient for offline adaptive policy learning: βn+1 ← βmax (1 − exp ( −τ · n)) .
+
+3: Collect Dn = {(snt , s n+1  
+
+> t
+
+, a t, r t, s nt+1 , s n+1  
+
+> t+1
+
+)} from Env within Bn episodes using πn.
+
+4: πrecon  
+
+> n+1
+
+← recon train (n, D n, π n).
+
+5: πoff  
+
+> n+1
+
+← off train (n, D n, π n, β n+1 ).
+
+6: Compute the distance D(πn, π recon  
+
+> n+1
+
+) and D(πn, π off 
+
+> n+1
+
+).
+
+7: Compute κn+1 according to Equation (9). 
+
+8: πn+1 ← κn+1 πrecon  
+
+> n+1
+
++ (1 − κn+1 )πoff 
+
+> n+1
+
+.
+
+9: πn+1 ← Pruning (πn+1 ). {(Optional) }
+
+10: Return πn+1 .
+
+C.5. The Hyperparameter Choice of Lapse 
+
+As π0 is trained following the paradigm of Wocar-PPO and RADIAL-DQN, default parameters in the frameworks are used. We introduce the hyperparameter choices of the left parts in Table 3 and omit the subscript n + 1 for simplicity. 
+
+Table 3. Hyperparameter choices of Lapse Env Hyperparameter Value Mujoco p value in LLp 2
+
+λ in Lrecon 10 
+
+βmax in ˆLoff 2.5 
+
+τ in ˆLoff 0.5
+
+αrobust in ˆLoff 0.1
+
+ϵ in Bϵ 0.001 
+
+policy update interval 2
+
+T recon  
+
+> max
+
+10000 
+
+T off  
+
+> max
+
+10000 
+
+learning rate 3e − 4
+
+target update τTD3 0.005 
+
+γ 0.99 
+
+Atari p value in LLp 1
+
+λ in Lrecon 10 
+
+βmax in ˆLoff 0.1 
+
+τ in ˆLoff ∞
+
+αrobust in ˆLoff 0.1
+
+ϵ in Bϵ 3/255 
+
+ema coefficient 0.995 
+
+ema interval 100 
+
+T recon  
+
+> max
+
+20000 
+
+T off  
+
+> max
+
+40000 
+
+learning rate 3e − 4
+
+number of quantiles in QRDQN 200 
+
+target update interval 400 
+
+γ 0.99 
+
+21 Learning to Reuse Policies for State Evolvable Environments 
+
+## D. Additional Experimental Results 
+
+D.1. Complete Adaptation Performance 
+
+Figure 10 illustrates the compelete continuous adaptation of various methods to the evolvable state space by comparing the performance over 5 different stages. The result is consistent with the conclusion in the main text. Despite the increased performance degradation over successive evolving stages, Lapse maintains superior performance compared with all other baseline methods. 
+
+D.2. Complete Training Curves of Lapse 
+
+We present the complete training curves in Figure 11, where blue dashed lines represent the performance during new paired data collection. Note that the policy is deployed to the environment only after training for the current stage is complete, thereby preventing costly trial-and-error during adaptation. 
+
+D.3. Pruning Strategies 
+
+We define πn+1 = κnπrecon  
+
+> n+1
+
++ (1 − κn)πoff  
+
+> n+1
+
+in a recursive way due to the reuse of old policies in πrecon  
+
+> n+1
+
+. To demonstrate the contribution of each model, we introduce occupancy weights c0: n+1 defined as: 
+
+ci =
+
+Qni=1 κi, i = 0 (1 − κi) Qn+1  
+
+> j=i+1
+
+κj , i = 1 , 2, ..., n 
+
+1 − κn+1 , i = n + 1 
+
+(43) Then we can expand the expression as: 
+
+πn+1 = c0π0 ◦ ˆg0 +
+
+> n
+
+X
+
+> i=1
+
+ciπoff  
+
+> i
+
+◦ ˆgi + cnπoff 
+
+> n+1
+
+, (44) where ˆgi = gi+1 ◦ gi+2 ◦ · · · ◦ gn+1 . This requires us to store all the learned reconstruction models and the offline adaptive policies, which is unbearable in memory storage and inference delay with the increase of the evolving stages. Take Mujoco environments Ant and Walker as examples, not all components of Lapse π5 are important as depicted in Figure 9. This way we can just use πoff 
+
+> 4,5
+
+, π recon  
+
+> 5
+
+in Ant and πoff 
+
+> 0,4,5
+
+, π recon  
+
+> 1:5
+
+in Walker. The occupancy weight of one model will not grow in the future by definition, so that we can only store the models that contribute a lot. To mitigate the problem, we propose to prune the heavy compound policies based on the decomposed non-recursive expression of πn+1 as shown in Equation (44). off 
+
+> 4
+> off
+> 5
+> Ant
+> 0
+> off
+> 4
+> off
+> 5
+> Walker
+
+Figure 9. The occupancy weights of Lapse policy in Mujoco 
+
+Algorithm 4 Pruning (πn+1 )
+
+1: Decompose and compute the occupancy weights {(ci)} via Equation (43). 
+
+2: for i = 0 to n + 1 do 
+
+3: if ci < pruning threshold then 
+
+4: ci ← 0. {Ignore the model that contributes few }
+
+5: end if 
+
+6: end for 
+
+7: Normalize the occupancy weights: 
+
+c′ 
+
+> i
+
+← ci
+
+Pn+1  
+
+> j=0
+
+cj
+
+, i = 0 , 1, ..., n + 1 .
+
+8: Return the pruned Lapse policy with {(c′
+
+> i
+
+)} via Equation (44). 22 Learning to Reuse Policies for State Evolvable Environments 0 1 2 3 4 5
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Normalized Average Return
+
+Ant 
+
+0 1 2 3 4 5
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+HalfCheetah 
+
+0 1 2 3 4 5
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+Hopper 
+
+0 1 2 3 4 5
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+Walker 
+
+0 1 2 3 4 5
+
+Evolving Stage 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Normalized Average Return
+
+BankHeist 
+
+0 1 2 3 4 5
+
+Evolving Stage 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+Freeway 
+
+0 1 2 3 4 5
+
+Evolving Stage 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+Pong 
+
+0 1 2 3 4 5
+
+Evolving Stage 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+RoadRunner 
+
+Lapse RL-GAN LUSR PAD Offline FPT CUP 
+
+Figure 10. The adaptation performance of the learned policy as the state space evolves 0
+
+> 25
+> 50
+> 75
+> 100
+> Normalized Return
+
+Ant 
+
+> 0
+> 25
+> 50
+> 75
+> 100
+> Normalized Return
+
+HalfCheetah 
+
+> 0
+> 25
+> 50
+> 75
+> 100
+> Normalized Return
+
+Hopper      
+
+> 012345
+
+Evolving Stage 
+
+> 0
+> 25
+> 50
+> 75
+> 100
+> Normalized Return
+
+Walker       
+
+> Lapse Lapse Behavior during Evolveing RL-GAN LUSR PAD Offline FPT
+
+Figure 11. Complete training curves of Lapse 
+
+23 Learning to Reuse Policies for State Evolvable Environments 
+
+D.4. Ablation Studies Ablation on Different Components We dissect the impact of each component within Lapse as depicted in Figure 12. 
+
+W/o offline and W/o recon break down on different tasks, illustrating that neither of them can handle continuous adaptation problems alone. W/o robust ’s poor performance on 3 out 4 tasks again emphasizes the necessity of the robustness. W/o kappa shows inferior adaptation capability compared to Lapse, manifesting the benefit of the automatic ensemble weight adjustment. To analyze the contribution of each component, we conducted a series of experiments in which components were incrementally added, culminating in the complete version of Lapse. Figure 13 shows this ablation study, demonstrating the impact of each added component and verifying their necessity. 0 1 2 3 4 5                   
+
+> Evolving Stages
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Normalized Average Return
+> Pong
+> 012345
+> Evolving Stages
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Normalized Average Return
+> BankHeist
+> 012345
+> Evolving Stages
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Normalized Average Return
+> Ant
+> 012345
+> Evolving Stages
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Normalized Average Return
+> Walker
+> Lapse W/o kappa W/o offline W/o recon W/o robust
+
+Figure 12. The overall ablation studies 0 30 60 90 
+
+Normalized Average Return 
+
+> base += kappa ( Lapse )
+> base += robust offline
+> base += offline
+> base += robust recon
+> base (recon)
+
+Ant 
+
+0 30 60 90 
+
+Normalized Average Return 
+
+> base += kappa ( Lapse )
+> base += robust recon
+> base += recon
+> base += robust offline
+> base (offline)
+
+Walker 
+
+Figure 13. Demonstration of each component’s contribution 
+
+Ablation on Ensemble Methods We employ linear mixing because determining weights via Equation (9) and performing linear mixing are cost-free and highly efficient. We evaluated how various ensemble methods affect the performance of Lapse. The results appear in Figure14. We do not plot the learning curve for stacking ensembles, as their returns never exceeded 1000 even after more than one million training steps. Alternative methods, such as hypernetworks, also showed no significant improvement. 0 25 50 75 100 
+
+Steps (K)     
+
+> 4800
+> 5000
+> 5200
+> 5400
+> 5600
+> Test Return
+> Ant
+> 025 50 75 100
+
+Steps (K)     
+
+> 3000
+> 3500
+> 4000
+> 4500
+> HalfCheetah
+> 025 50 75 100
+
+Steps (K)     
+
+> 3300
+> 3400
+> 3500
+> 3600
+> Hopper
+> 025 50 75 100
+
+Steps (K)  
+
+> 2000
+> 3000
+> 4000
+> 5000
+> Walker
+> Ensemble Training with Hyper-network Using Lapse Heuristic Kappa
+
+Figure 14. Test performance of dynamic ensemble weighting based on a hyper-network. The dashed line represents the performance achieved by linear mixing using the kappa from Lapse, while the solid curve demonstrates performance when dynamically learning ensemble weights via online RL using a hyper-network, which takes the state as input and outputs a weight vector used to weight each action dimension for ensemble aggregation. 
+
+24 Learning to Reuse Policies for State Evolvable Environments             
+
+> Table 4. Comparison of average performance R, storage Nand inference delay Tbetween vanilla Lapse and pruning strategies across 2 tasks. Results are averaged over 5 distinct seeds. The storage metrics are measured by thousands of parameters of πiand the inference delay metrics are measured by the number of seconds it takes for πito perform 10 3inferences in our experimental environment.
+
+M0 M1 M2 M3 M4 M5
+
+Ant 
+
+R vanilla 100.00 101.70 93.63 86.51 80.62 69.27 pruning 100.00 92.38 94.94 90.97 83.52 77.91 
+
+N vanilla 40.98 156.04 271.10 386.17 501.23 616.29 pruning 40.98 156.04 133.61 133.61 133.61 133.61 
+
+T vanilla 0.36 0.68 1.01 1.33 1.66 1.98 pruning 0.36 0.68 0.54 0.54 0.54 0.54 Walker 
+
+R vanilla 100.00 98.70 102.17 69.33 75.36 70.74 pruning 100.00 95.62 87.90 86.71 76.41 78.32 
+
+N vanilla 5.71 84.07 162.43 240.78 319.14 397.50 pruning 5.71 12.12 18.54 24.96 31.38 61.77 
+
+T vanilla 0.14 0.46 0.78 1.10 1.43 1.75 pruning 0.14 0.28 0.43 0.57 0.71 0.91 
+
+Ablation on Pruning Strategies We compare average performance, storage and inference delay metrics between vanilla Lapse and pruning strategies with pruning threshold = 0 .2 across 2 tasks. As shown in Table 4, we find that our pruning strategies save a lot of storage space and inference delay while ensuring excellent performance. In Ant, the pruning strategy only retains πoff  
+
+> i
+
+of the latest stage i when i > 1, which means that storage and inference delay remain lightweight and fast. In Walker, the pruning strategy only retains π0 and all πrecon  
+
+> i
+
+, which saves most of the storage and nearly half inference delay. The above experiments show our pruning strategies maintain SERL scalability and performance. 
+
+D.5. Sensitivity Studies 
+
+We further conduct more experiments in Mujoco to investigate how hyperparameters influence the performance of Lapse. The results can be seen in Figure 15. We selected a set of hyperparameters that performed well across tasks. Additionally, in order to explore the impact of the size of Dn on our method, we conduct experiments with size ranging from 6 to 18 trajectories. As shown in Figure 16, our method is robust to the various size, which is beneficial to obtain stable and good performance during the deployment stage. 
+
+D.6. More evolving stages 
+
+To provide a more comprehensive evaluation of Lapse’s adaptation performance over an extended number of evolving stages, we expanded the experiment to include 15 stages—three times the number in our initial tests. These additional stages were simulated using scalar multiplication, with pruning strategies employed to maintain scalability. Figure 17 showcases the results of this extended evaluation. Lapse demonstrates commendable adaptation performance in three of the four tested environments. However, in the Walker task, Lapse’s performance declines after the 7th stage. This drop in performance may be related to the inherent offline learning inefficiencies of TD3+BC within the Walker environment, as noted by Fujimoto & Gu (2021). It is anticipated that substituting TD3+BC with a more efficient algorithm could preserve Lapse’s adaptability in this scenario. 25 Learning to Reuse Policies for State Evolvable Environments 0.1 0.3 0.5 0.7 0.9 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Ant-
+
+1.5 2 2.5 3 3.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Ant- max 
+
+0.1 1 10 100 1000 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Ant- cgan 
+
+0.001 0.005 0.01 0.1 0.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Ant- td 3
+
+0.1 0.3 0.5 0.7 0.9 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+HalfCheetah-
+
+1.5 2 2.5 3 3.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+HalfCheetah- max 
+
+0.1 1 10 100 1000 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+HalfCheetah- cgan 
+
+0.001 0.005 0.01 0.1 0.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+HalfCheetah- td 3
+
+0.1 0.3 0.5 0.7 0.9 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Hopper-
+
+1.5 2 2.5 3 3.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Hopper- max 
+
+0.1 1 10 100 1000 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Hopper- cgan 
+
+0.001 0.005 0.01 0.1 0.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Hopper- td 3
+
+0.1 0.3 0.5 0.7 0.9 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Walker2d-
+
+1.5 2 2.5 3 3.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Walker2d- max 
+
+0.1 1 10 100 1000 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Walker2d- cgan 
+
+0.001 0.005 0.01 0.1 0.5 
+
+Parameter Value 
+
+60 
+
+80 
+
+100 
+
+> Normalized Return
+
+Walker2d- td 3
+
+Figure 15. The overall parameter sensitity studies 6 8 10 12 14 16 18 60 80 100 
+
+> Normalized Return
+
+Ant 
+
+60 80 100 
+
+> Normalized Return
+
+HalfCheetah 
+
+60 80 100 
+
+> Normalized Return
+
+Hopper 
+
+60 80 100 
+
+> Normalized Return
+
+Walker 
+
+Parameter Value 
+
+6 8 10 12 14 16 18 
+
+Parameter Value 
+
+6 8 10 12 14 16 18 
+
+Parameter Value 
+
+6 8 10 12 14 16 18 
+
+Parameter Value 
+
+Figure 16. Sensitity studies of the size of datatset Dn0 1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 
+
+Evolving Stage 
+
+0
+
+25 
+
+50 
+
+75 
+
+100 
+
+> Normalized Average Return
+
+Ant HalfCheetah Hopper Walker 
+
+Figure 17. Continual adaptation under more evolving stages 
+
+26

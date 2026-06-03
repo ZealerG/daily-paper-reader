@@ -1,0 +1,1221 @@
+Title: Fixing Value Function Decomposition for Multi-Agent Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=qUtxbtsfwp
+
+Number of Pages: 17
+
+Markdown Content:
+000 001 002 003 004 005 006 007 008 009 010 011 012 013 014 015 016 017 018 019 020 021 022 023 024 025 026 027 028 029 030 031 032 033 034 035 036 037 038 039 040 041 042 043 044 045 046 047 048 049 050 051 052 053 054 
+
+# Fixing Value Function Decomposition for Multi-Agent Reinforcement Learning 
+
+Anonymous Authors 1
+
+## Abstract 
+
+Value function decomposition methods for coop-erative multi-agent reinforcement learning com-bine individual per-agent utilities into joint values trained on a joint objective. To ensure consistent action selection between individual utilities and joint values, it is imperative for the composition to satisfy individual-global max (IGM). However, most methods that satisfy IGM are characterized by limited representation capabilities that hinder their performance, and the one known exception is unnecessarily convoluted. In this work, we reveal a minimalistic formulation of IGM that inspires the derivation of QFIX, a novel family of value function decomposition methods that expand the representation capabilities of prior methods by means of a small “fixing” network. We imple-ment three variants of QFIX, and demonstrate empirically that QFIX is able to meet or exceed state-of-the-art performance with better stability. 
+
+## 1. Introduction 
+
+Centralized training for decentralized execution (CTDE) (Lowe et al., 2017) is a powerful frame-work for cooperative multi-agent reinforcement learning (MARL) characterized by a centralized training phase where privileged information is freely shared between agents and a decentralized execution phase where agents act independently in adherence to standard decentralized control. As a consequence of a training phase that is informed by the full team’s behavior and experiences (and, when feasible, the environment state), CTDE is commonly associated with increased coordination between agents and superior performances. Value function decomposition (Sunehag et al., 2017) is a class of CTDE methods that construct a joint team value from individual per-agent utilities that encode agent be-
+
+> 1Anonymous Institution, Anonymous City, Anonymous Region, Anonymous Country. Correspondence to: Anonymous Author
+> <anon.email@domain.com >.Preliminary work. Under review by the International Conference on Machine Learning (ICML). Do not distribute.
+
+haviors. By training the joint value on a joint centralized objective, the individual utilities are also indirectly trained, resulting in decentralized agent policies that can be executed independently. Since its inception, value function decom-position has become a topic of great interest in cooperative MARL, with significant research effort put in both practical algorithms (Sunehag et al., 2017; Son et al., 2019; Rashid et al., 2020a;b; Wang et al., 2020; Marchesini et al., 2024) and theoretical understanding (Wang et al., 2021; March-esini et al., 2024). Individual-global max (IGM) (Son et al., 2019) has been identified as a key property that connects individual utilities and joint values, ensuring that their asso-ciated decision making processes remain consistent. In this work, we advance both theory and practice of value function decomposition. We formulate a novel minimal-istic formulation of IGM-complete value function decom-position. Our formulation (i) correctly addresses general decentralized partially observable control (avoiding strong assumptions like full observability or centralized control), and (ii) highlights the core mechanism that characterizes the full IGM-complete function class. In contrast, prior methods fail to satisfy at least one of these criteria (usually the first). We introduce QFIX, a novel family of value func-tion decomposition methods inspired by our formulation of IGM-complete decomposition. QFIX employs a simple “fixing” network to extend the representation capabilities of prior methods. We derive two main specializations of QFIX called QFIX-sum and QFIX-mono, respectively obtained by “fixing” VDN (Sunehag et al., 2017) and QMIX (Rashid et al., 2020b). To provide further insights into the core mech-anisms that make value function decomposition so effective, we also derive QFIX-lin, a third variant that technically falls outside of the QFIX family, but combines QFIX-sum with a core component of QPLEX. Finally, we extend prior work on stateful value function decomposition to QFIX. An em-pirical evaluation on the StarCraft Multi-Agent Challenge v2 (Ellis et al., 2023) demonstrates that QFIX (i) is effective at enhancing prior non-IGM-complete methods like VDN and QMIX, (ii) is simpler to implement and understand, and require smaller models than QPLEX, a state-of-the-art method in IGM-complete value function decomposition, (iii) is competitive or outperforms QPLEX while also show-ing more stable convergence. 1055 056 057 058 059 060 061 062 063 064 065 066 067 068 069 070 071 072 073 074 075 076 077 078 079 080 081 082 083 084 085 086 087 088 089 090 091 092 093 094 095 096 097 098 099 100 101 102 103 104 105 106 107 108 109 
+
+## 2. Related Work 
+
+Value Decomposition Networks (VDN) (Sunehag et al., 2017) are a precursor to value decomposition methods that employ a simple additive composition of individual utilities. QMIX (Rashid et al., 2020b) employs a monotonic compo-sition that generalizes the function class of VDN resulting in significant performance improvements. Since VDN and QMIX have limited expressiveness, several models have attempted to achieve a broader function class. Weighted-QMIX (WQMIX) (Rashid et al., 2020a) aims to expand the function class of QMIX to non-monotonic cases so as to include optimal values Q∗. However, WQMIX appears to conflate the possibility of exploiting state information dur-ing centralized training (which is correct) with the goal of learning the decision process for a team of fully observable agents (which is incorrect). As a consequence, the theory of WQMIX assumes state values ˆQ(s, a) and an optimization process that aims to recover the optimal fully observable decision making process argmax a Q∗(s, a), which is in-consistent with partially observable decentralized control. In contrast, QFIX is fully consistent with general partially observable decentralized control. Son et al. (2019) iden-tify individual-global max (IGM) as an important property that corresponds to consistency between the individual and joint decision making processes. Notably, VDN and QMIX satisfy IGM, but are unable to represent the entire IGM-complete function class. QTRAN (Son et al., 2019) identi-fies a set of constraints that are sufficient to imply IGM, and employs auxiliary objectives that softly enforce those con-straints. Son et al. (2019) argue that their constraints are also necessary for IGM under affine transformations, however they only show that one such affine transformation exists, rather than IGM being satisfied for all affine transformations. In contrast, QFIX is both sufficient and necessary to imply IGM, thus directly achieving the full IGM-complete func-tion class. QPLEX (Wang et al., 2020) employs a dueling network decomposition and multiple layers of transforma-tions to achieve the IGM-complete function class. However, QPLEX employs complex transformations that are superflu-ous in relation to its representation capabilities, and fails to identify the core underlying mechanism that is ultimately responsible to achieve the IGM function class. In contrast, QFIX is simpler to understand, and achieves the IGM func-tion class with smaller models. Further, QPLEX is only one instance in the space of IGM-complete models, and our work will allow researchers to explore other instances that can further improve performance while adhering to IGM. 
+
+## 3. Background 
+
+3.1. Decentralized Multi-Agent Control 
+
+A decentralized POMDP (Dec-POMDP) (Oliehoek & Amato, 2016) generalizes single-agent partially ob-servable control by accounting for multiple decen-tralized agents acting concurrently to solve a shared cooperative task. A Dec-POMDP is defined by a tuple ⟨N, S, {A 1, . . . , AN } , {O 1, . . . , ON } , T, R, O, γ ⟩
+
+composed of: (i) number of agents N ≥ 2; (ii) state space 
+
+S; (iii) individual action and observation spaces, respec-tively Ai and Oi; (iv) starting state distribution p ∈ ∆S;(v) state transition function T : S × A → ∆S; (vi) joint observation function O : A × S → ∆O; (vii) joint reward function R : S × A → R; (viii) discount factor γ ∈ [0 , 1) .The number of agents N determines a set of agent indices 
+
+I .
+
+= {1, . . . , N }. The joint action, observation, and history spaces are defined as the respective Cartesian products A .
+
+=
+
+# ×i Ai, O .
+
+= ×i Oi, and H .
+
+= ×i Hi. Therefore, joint actions a = ( a1, . . . , a N ), observations o = ( o1, . . . , o N ),and histories h = ( h1, . . . , h N ) are tuples of the respective individual actions, observations, and histories. Individual agent behaviors are generally modeled as indi-vidual stochastic policies πi : Hi → ∆Ai that act based on their respective history hi ∈ H i
+
+.
+
+= Oi × (Ai × O i)∗. The combined behavior of all policies is represented as a joint (but still decentralized) policy π(h, a) .
+
+= Q 
+
+> i
+
+πi(hi, a i) that factorizes accordingly. Decentralized multi-agent control aims to find policies that jointly maximize the expected sum of discounted rewards Jπ .
+
+= E [P 
+
+> t
+
+γtR(st, at)] .In this work, we focus on approaches that model agent poli-cies implicitly via parametric utilities ˆQi : Hi × A i → R,typically by means of greedy or ϵ-greedy action selec-tion. Such utilities ˆQi(hi, a i) are commonly decomposed into corresponding values ˆVi(hi) .
+
+= max ai
+
+ˆQi(hi, a i) and (non-positive) advantages ˆAi(hi, a i) .
+
+= ˆQi(hi, a i) − ˆVi(hi).When convenient, we occasionally employ shorthand nota-tion qi
+
+.
+
+= ˆQi(hi, a i), vi
+
+.
+
+= ˆVi(hi), and ui
+
+.
+
+= ˆAi(hi, a i).
+
+3.2. Value Function Decomposition 
+
+Value function decomposition methods (Sunehag et al., 2017; Rashid et al., 2020b; Wang et al., 2020) construct joint values ˆQ(h, a) from individual per-agent utilities 
+
+ˆQi(hi, a i). We specifically use the term utility here to un-derscore the fact that ˆQi(hi, ·) represents an ordering over actions, rather than any notion of expected performance. Notably, ˆQi is never trained to perform evaluation, and nei-ther ˆQi(hi, a i) ≈ Qπ 
+
+> i
+
+(hi, a i) nor ˆQi(hi, a i) ≈ Q∗ 
+
+> i
+
+(hi, a i)
+
+are expected interpretations of well-trained utilities ˆQi.Value function decomposition methods employ joint mod-els ˆQ(h, a) that are a function of the individual utilities 
+
+ˆQ(hi, a i), and mainly differ in terms of the relationship that is enforced and the corresponding emergent properties. The joint model ˆQ(h, a) is trained on a joint objective, 
+
+L ˆQ(h, a, r, o) .
+
+= 12
+
+
+
+r + γ max 
+
+> a′
+
+ˆQ−(hao , a′) − ˆQ(h, a)
+
+2
+
+,
+
+(1) 2110 111 112 113 114 115 116 117 118 119 120 121 122 123 124 125 126 127 128 129 130 131 132 133 134 135 136 137 138 139 140 141 142 143 144 145 146 147 148 149 150 151 152 153 154 155 156 157 158 159 160 161 162 163 164 which indirectly trains the individual utilities and behaviors. 3.2.1. I NDIVIDUAL -G LOBAL MAX 
+
+Son et al. (2019) identify individual-global max (IGM) as a useful property of decomposition models to achieve decen-tralized action selection and address scaling concerns. 
+
+Definition 3.1 (Individual-Global Max) . Individual utilities 
+
+{Qi(hi, a i)}Ni=1 and joint values Q(h, a) satisfy individual-global max (IGM) iff 
+
+argmax 
+
+> ai
+
+Qi(hi, a i) = 
+
+
+
+argmax 
+
+> a
+
+Q(h, a)
+
+
+
+> i
+
+. (2) IGM denotes whether the individual and global decision making processes are equivalent, and reduces the complexity of finding the maximal joint action from exponential to linear in the number of agents: For a given joint history h,the full search over the joint action space A can be replaced with N independent searches over the individual action spaces Ai. VDN (Section 3.2.2) and QMIX (Section 3.2.3) are well-known models that satisfy IGM, although their function class are limited subsets of all IGM values. 3.2.2. VDN: A DDITIVE DECOMPOSITION 
+
+Value Decomposition Networks (VDN) (Sunehag et al., 2017) is a precursor to value function decomposition meth-ods. VDN employs a simple additive value decomposition, 
+
+ˆQVDN (h, a) .
+
+= X
+
+> i
+
+ˆQi(hi, a i) . (3) 3.2.3. QMIX: M ONOTONIC DECOMPOSITION 
+
+QMIX (Rashid et al., 2020b) constructs joint values as a 
+
+monotonic function of individual utilities, 
+
+ˆQMIX (h, a) .
+
+= fmono (q1, . . . , q N ) , (4) where fmono : RN → R is a parametric mixing network that satisfies monotonicity, 
+
+∂f mono (q1, . . . , q N )
+
+∂q i
+
+≥ 0 . (5) Monotonic composition generalizes the additive compo-sition of VDN, consequently achieving a broader function class, though it still falls short from modeling the entire IGM function class. As in VDN, the joint model ˆQMIX (h, a) is trained on the centralized objective in Equation (1). 3.2.4. QPLEX: IGM-C OMPLETE DECOMPOSITION 
+
+QPLEX (Wang et al., 2020) reframes IGM in terms of ad-vantages, and employs dueling network decomposition to achieve full function class equivalence with IGM. 
+
+Definition 3.2 (IGM-Complete Function Class) . A func-tion class of individual utilities {Qi(hi, a i)}Ni=1 and joint values Q(h, a) is IGM-complete if it contains all and only functions that satisfy IGM. Given utilities Qi(hi, a i) and joint action-values Q(h, a),corresponding values and advantages are defined as follows, 
+
+Vi(hi) .
+
+= max 
+
+> ai
+
+Qi(hi, a i) , Ai(hi, a i) .
+
+= Qi(hi, a i) − Vi(hi) ,
+
+(6) 
+
+V (h) .
+
+= max  
+
+> a
+
+Q(h, a) , A(h, a) .
+
+= Q(h, a) − V (h) .
+
+(7) Wang et al. (2020) reformulate IGM as a set of numeric constraints between these individual and joint advantages. 
+
+Definition 3.3 (Advantage Constraints) . Individual utilities 
+
+{Qi(hi, a i)}Ni=1 and joint values Q(h, a) satisfy IGM iff, 
+
+∀h ∈ H, ∀a∗ ∈ A∗(h), and ∀a ∈ A \ A∗(h),
+
+A(h, a∗) = 0 , Ai(hi, a ∗ 
+
+> i
+
+) = 0 , (8) 
+
+A(h, a) < 0 , Ai(hi, a i) ≤ 0 , (9) where A∗(h) .
+
+= {a ∈ A | Q(h, a) = V (h)} is the subset of maximal joint actions according to the joint values. QPLEX employs a mixing structure that provably enforces Definition 3.3. Individual utilities ˆQi(hi, a i) are first de-composed into ˆVi(hi) and ˆAi(hi, a i), and then transformed using centralized joint history information as follows, 
+
+ˆVi(h) .
+
+= wi(h) ˆVi(hi) + bi(h) , (10) 
+
+ˆAi(h, a i) .
+
+= wi(h) ˆAi(hi, a i) , (11) where wi : H → R>0 are parametric positive weights and 
+
+bi : H → R are parametric biases. These transformed val-ues are aggregated as weighted sums, 
+
+ˆVPLEX (h) .
+
+= X
+
+> i
+
+ˆVi(h) , (12) 
+
+ˆAPLEX (h, a) .
+
+= X
+
+> i
+
+λi(h, a) ˆAi(h, a i) , (13) where λi : H × A → R>0 are parametric positive weights. Finally, ˆQPLEX (h, a) is obtained by recombining aggregate values and advantages, 
+
+ˆQPLEX (h, a) .
+
+= ˆVPLEX (h) + ˆAPLEX (h, a) . (14) This sequence of decomposition, transformations, and re-composition, combined with positive weights wi and λi
+
+results in the constraint from Definition 3.3 being satisfied. Wang et al. (2020) also demonstrate that QPLEX satisfies Definition 3.2 and its function class is IGM-complete, given sufficiently expressive models wi(h), bi(h), and λi(h, a).3.2.5. S TATEFUL VALUE FUNCTION DECOMPOSITION 
+
+Practical implementations of value function decomposition methods often employ stateful joint values Q(h, s, a) and 3165 166 167 168 169 170 171 172 173 174 175 176 177 178 179 180 181 182 183 184 185 186 187 188 189 190 191 192 193 194 195 196 197 198 199 200 201 202 203 204 205 206 207 208 209 210 211 212 213 214 215 216 217 218 219 diverge from the stateless theoretical derivations in ways that may undermine core IGM-related properties. To address the effects of state in value function decomposition, Marchesini et al. (2024) formulate a state-compliant version of IGM. 
+
+Definition 3.4 (Stateful-IGM) . Utilities {Qi(hi, a i)}Ni=1 
+
+and stateful joint values Q(h, s, a) satisfy IGM iff 
+
+argmax 
+
+> ai
+
+Qi(hi, a i) = 
+
+
+
+argmax 
+
+> a
+
+Es|h [Q(h, s, a)] 
+
+
+
+> i
+
+(15) Marchesini et al. (2024) show that the stateful implementa-tions of QMIX and QPLEX continue to satisfy IGM, while the stateful implementation of QPLEX (which employs historyless stateful weights wi(s), λ i(s, a)) is not IGM-complete. Nonetheless, stateful implementations often per-form well in practice, and remain a common occurrence. 
+
+## 4. Fixing Value Function Decomposition 
+
+Although QPLEX achieves the IGM-complete function class, it is expressed as a convoluted sequence of trans-formations that are never fully motivated. Unrolling the QPLEX values directly in terms of individual values, we get 
+
+ˆQPLEX (h, a) = X
+
+> i
+
+wi(h) ˆVi(hi) + bi(h)+ wi(h)λi(h, a) ˆAi(hi, a i) , (16) which raises questions about which components of this struc-ture are truly important or necessary, e.g., the product of individual advantages with two types of positive weights 
+
+wi(h) and λi(h, a) appears to be redundant. QPLEX only represents one instance in a space of models that achieve IGM-completeness, and whether simpler better-performing decompositions exist remains an open question. The con-voluted nature of the QPLEX transformations motivate us to find a simpler and more general formulation of IGM-complete decomposition. In this section, we first propose a minimal formulation of IGM-complete value function decomposition. Then, we use this formulation to develop QFIX , a novel family of value function decomposition models that operate by expanding the representation capabilities of prior non-IGM-complete models. We derive two primary instances of QFIX based on “fixing” VDN and QMIX respectively, and a third instance designed to resemble QPLEX. We also derive additive QFIX 
+
+(Q+FIX), a simple variant of QFIX that achieves significant practical performance gains, and derive Q+FIX counterparts of the QFIX instances. Finally, we discuss stateful variants of QFIX and how state affects its theoretical properties. 
+
+4.1. A Minimal Formulation of IGM-Complete Values 
+
+We aim to formalize IGM-complete value function decom-position in its simplest and most essential form. We begin by simplifying Definition 3.3, noting that three of the four constraints are satisfied by definition; The only constraint that requires active enforcement is Ai(hi, a ∗ 
+
+> i
+
+) = 0 .
+
+Definition 4.1 (Simplified Advantage Constraints) . Utilities 
+
+{Qi(hi, a i)}Ni=1 and joint values Q(h, a) satisfy IGM iff, 
+
+A(h, a) = 0 = ⇒ ∀ i (Ai(hi, a i) = 0) , (17) or, equivalently via contraposition, 
+
+∃i (Ai(hi, a i)̸ = 0) = ⇒ A(h, a)̸ = 0 . (18) In essence, constructing joint advantages A(h, a) that are negative iff any of the individual advantages Ai(hi, a i) are negative is both sufficient and necessary to satisfy IGM. Consider the aptly named function 
+
+QIGM (h, a) .
+
+= w(h, a)f (u1, . . . , u N ) + b(h) , (19) where ui = Ai(hi, a i) are the individual advantages, 
+
+w : H × A → R>0 is an arbitrary positive function of joint history and joint action, b : H → R is an arbitrary function of joint history, and f : Rn 
+
+> ≤0
+
+→ R≤0 is any non-positive function that is zero iff all inputs are zero (e.g., 
+
+f (u1, . . . , u N ) = P 
+
+> i
+
+ui is a simple instance of f ). We note 
+
+VIGM (h) .
+
+= max  
+
+> a
+
+QIGM (h, a)= b(h) , (20) 
+
+AIGM (h, a) .
+
+= QIGM (h, a) − VIGM (h)= w(h, a)f (u1, . . . , u N ) . (21) Essentially, QIGM denotes a relationship where any devia-tion from individual maximality (characterized by at least one negative utility ui < 0, and corresponding to a negative 
+
+f (u1, . . . , u N ) < 0) is transformed into an arbitrary devia-tion w(h, a)f (u1, . . . , u N ) < 0 from joint maximality. Per Definition 4.1, QIGM represents the IGM function class. 
+
+Lemma 4.2. For any f , w, and b, values {Qi}Ni=1 and 
+
+QIGM satisfy IGM. (See proof in Appendix A.1.) 
+
+Theorem 4.3. For any f , and given free choice of w and b,the function class of {Qi}Ni=1 and QIGM is IGM-complete. (See proof in Appendix A.2.) 
+
+QIGM is a minimal formulation of the IGM function class based on a single weighted transformation of individual ad-vantages. Next, we explore how this formulation can be used to derive QFIX, a novel family of value function decom-position models that work by expanding the representation capabilities of prior non-IGM-complete models. 
+
+4.2. QFIX 
+
+Let ˆQfixee (h, a) denote a “fixee” value function decomposi-tion model that satisfies IGM but is not IGM-complete, e.g., 4220 221 222 223 224 225 226 227 228 229 230 231 232 233 234 235 236 237 238 239 240 241 242 243 244 245 246 247 248 249 250 251 252 253 254 255 256 257 258 259 260 261 262 263 264 265 266 267 268 269 270 271 272 273 274 MLP  MLP  Agent  Agent  
+
+> ,,
+> Fixing Network
+> MLP
+> RNN
+> MLP
+> Fixee
+
+(a) QFIX diagram. MLP  MLP  Agent  Agent   
+
+> ,,
+> Additive Fixing Network
+> MLP
+> RNN
+> MLP
+> Fixee
+
+(b) Q+FIX diagram. 
+
+Figure 1. QFIX and Q+FIX diagrams. 
+
+VDN or QMIX. Equation (19) suggests a method to “fix” 
+
+ˆQfixee and have it achieve full IGM-completeness. We can extend the expressiveness of ˆQfixee by processing it through a “fixing” network that resembles Equation (19), 
+
+ˆQFIX (h, a) .
+
+= w(h, a) ˆAfixee (h, a) + b(h) , (22) where w : H × A → R>0 is a parametric positive model, 
+
+b : H → R is a parametric model, and ˆAfixee : H × A →
+
+R≤0 is the non-positive advantage of the fixee as defined by 
+
+ˆVfixee (h) .
+
+= max 
+
+> a
+
+ˆQfixee (h, a) , (23) 
+
+ˆAfixee (h, a) .
+
+= ˆQfixee (h, a) − ˆVfixee (h) . (24) Figure 1a shows a diagram of the QFIX fixing structure. We note that ˆAfixee (h, a) is zero iff the joint action a is maxi-mal according to ˆQfixee , and negative otherwise. Given that 
+
+ˆQfixee satisfies IGM by assumption, a is maximal according to ˆQfixee iff the individual actions ai are maximal according to ˆQi(hi, a i), or, equivalently, iff ˆAi(hi, a i) = 0 . In short, 
+
+ˆAfixee (h, a) satisfies the requirements of f in Equation (19). 
+
+Theorem 4.4. QFIX satisfies IGM. Given sufficiently expres-sive w and b, the function class of QFIX is IGM-complete. (See proof in Appendix A.3.) 
+
+Given the free choice of fixee model ˆQfixee , QFIX really represents a family of value function decomposition models. This enables us to consider more or less complex fixees (e.g., VDN vs QMIX) to find an acceptable tradeoff between min-imizing the complexity of the fixee model, and minimizing the “fixing” burden on the fixing network. Next, we compare QFIX to QPLEX, present two primary instances of QFIX based on fixing VDN and QMIX, and present yet another variant inspired by QPLEX. 4.2.1. R ELATIONSHIP TO QPLEX The advantage component of QFIX, w(h, a) ˆAfixee (h, a),is similar to one of the transformations of QPLEX, P 
+
+> i
+
+λi(h, a) ˆAi(h, a i) (see Equation (13)), which also ap-plies positive weights to transformed aggregates of the indi-vidual advantages. This similarity is no coincidence, as it is specifically that component of QPLEX that is singularly responsible for ensuring IGM-completeness; it is a more convoluted form of our proposed fixing structure. However, QPLEX also employs various other transformations that do not contribute to achieving the IGM-complete function class, and their necessity remains questionable (beyond general considerations of modelling structure and size). The weights λi(h, a) employed by QPLEX are also more complex in that there is one such model per agent, and each is implemented via self-importance. In contrast, we employ a simpler structure based on a single model implemented as a feed-forward network, and still manage to achieve performance improvements. Our formulation is simpler in that it focuses entirely on this single transformation, which is minimally sufficient to guarantee IGM-completeness. 4.2.2. QFIX-SUM : F IXING VDN. QFIX-sum is an instance of QFIX based on VDN, i.e., with ˆQfixee (h, a) = ˆQVDN (h, a), which results in (see Appendix B.3 for the formal derivation) 
+
+ˆQFIX-sum (h, a) = w(h, a) X
+
+> i
+
+ˆAi(hi, a i) + b(h) . (25) 4.2.3. QFIX-MONO : F IXING QMIX QFIX-mono is an instance of QFIX based on QMIX, i.e., with ˆQfixee (h, a) = ˆQMIX (h, a), which results in (see Ap-pendix B.4 for formal derivation) 
+
+ˆQFIX-mono (h, a) = w(h, a) ( fmono (q1, . . . , q N )
+
+−fmono (v1, . . . , v N )) + b(h) . (26) 4.2.4. QFIX-LIN : S IMPLIFYING QPLEX Given the similarity between QFIX and QPLEX shown in Section 4.2.1, we may consider yet another QFIX variant that also applies per-agent positive weights wi(h, a) > 0,similarly to QPLEX. Due to the linear structure that strictly generalizes the sum of QFIX-sum (though both achieve 5275 276 277 278 279 280 281 282 283 284 285 286 287 288 289 290 291 292 293 294 295 296 297 298 299 300 301 302 303 304 305 306 307 308 309 310 311 312 313 314 315 316 317 318 319 320 321 322 323 324 325 326 327 328 329 IGM-completeness), we may call this variant QFIX-lin. 
+
+ˆQFIX-lin (h, a) .
+
+= X
+
+> i
+
+wi(h, a) ˆAi(hi, a i) + b(h) . (27) QFIX-lin does not strictly satisfy the form of Equation (22), however, it represents a close enough variant of QFIX-sum that we consider it QFIX-adjacent and name it accordingly. QFIX-lin is a strict generalization of QFIX-sum, which can be recovered as a special case where all the weights wi(h, a)
+
+are equal. Formally, we must still explicitly prove the IGM properties of QFIX-lin. 
+
+Theorem 4.5. QFIX-lin satisfies IGM. Given sufficiently expressive wi and b, the function class of QFIX-lin is IGM-complete. (See proof in Appendix A.4.) 
+
+4.2.5. R ECOVERING THE FIXEE MODEL 
+
+We take a moment to note that QFIX is able to recover the fixee model via w(h, a) = 1 and b(h) = ˆVfixee (h),
+
+ˆQFIX (h, a) = w(h, a) ˆAfixee (h, a) + b(h)= 1 · ˆAfixee (h, a) + ˆVfixee (h)= ˆQfixee (h, a) . (28) Such values of w(h, a) and b(h) establish a direct relation-ship between the fixee and fixed models, which is relevant as we next use this relationship to derive a theoretically equivalent but better-performing additive variant of QFIX. 
+
+4.3. Additive QFIX (Q+FIX) 
+
+In this section, we further derive a simple variant of QFIX which, albeit having the same theoretical properties, achieves significant practical performance improvements. This variant will take on an additive form, when compared to the fixee model, hence its name additive QFIX (Q+FIX). As noted in Section 4.2.5, the values of w(h, a) = 1 and 
+
+b(h) = ˆVfixee (h) hold a special significance for QFIX. Q+FIX is derived by reparameterizing w and b to incor-porate such values via simple addition, as follows, 
+
+ˆQ+FIX (h, a)
+
+.
+
+= ( w(h, a) + 1) ˆAfixee (h, a) + ( b(h) + ˆVfixee (h)) = ˆQfixee (h, a) + w(h, a) ˆAfixee (h, a) + b(h) , (29) where w : H × A → R>−1 is a parametric model con-strained by w(h, a) > −1, b : H → R is a parametric model, and ˆQfixee and ˆAfixee are the fixee action-values and advantages. Figure 1b shows a diagram of the Q+FIX fixing structure. This reparameterization allows Q+FIX to more directly exploit the original fixee model, providing the IGM-complete function class as a separate additive component. Note that, following the reparameterization of the w model, the constraint imposed on its output has changed: since it’s the full addition w(h, a) + 1 > 0 that must satisfy the posi-tivity constraint from QFIX, the corresponding constraint for Q+FIX is now w(h, a) > −1.
+
+Theorem 4.6. Q+FIX satisfies IGM. Given sufficiently ex-pressive w and b, the function class of Q+FIX is IGM-complete. (See proof in Appendix A.5.) 
+
+4.3.1. Q+FIX-SUM , Q+FIX-MONO , AND Q+FIX-LIN 
+
+Here, we show the Q+FIX counterparts to QFIX-sum, QFIX-mono, and QFIX-lin, respectively called Q+FIX-sum, Q+FIX-mono, and Q+FIX-lin. See Appendices B.5 to B.7 for their corresponding derivations and graphical diagrams. 
+
+ˆQ+FIX-sum (h, a) = X
+
+> i
+
+ˆQi(hi, a i)+ w(h, a) X
+
+> i
+
+ˆAi(hi, a i) + b(h). (30) 
+
+ˆQ+FIX-mono (h, a) = fmono (q1, . . . , q N )+ w(h, a) ( fmono (q1, . . . , q N )
+
+−fmono (v1, . . . , v N )) + b(h) . (31) 
+
+ˆQ+FIX-lin (h, a) = X
+
+> i
+
+ˆQi(hi, a i)+ X
+
+> i
+
+wi(h, a) ˆAi(hi, a i) + b(h). (32) 4.3.2. D ETACHING THE ADVANTAGES 
+
+The additive form of Q+FIX enables the use of an imple-mentation detail already employed by QPLEX that appears to significantly improve performance, i.e., the detachment of the advantages when computing gradients. This can be expressed using the stop-gradient operator 1 stop as follows, 
+
+ˆQ+FIX (h, a) = ˆQfixee (h, a)+ w(h, a) stop 
+
+h ˆAfixee (h, a)
+
+i
+
++ b(h) (33) The reason why detaching the advantages improves per-formance is not fully understood. Wang et al. (2020, Ap-pendix B.2) argue that it (cit.) “ increases the optimization stability of the max operator of the dueling structure ”, in reference to dueling networks (Wang et al., 2016). However, the connection between the detach and dueling networks remains unclear. Instead, we hypothesize that detaching the advantage may mitigate adverse effects that the fixing        
+
+> 1The stop-gradient function is a mathematical anomaly whose value behaves like the identity function, stop [ x] = x, while its gra-dient behaves like the zero function, ∇xstop [ x] = 0 . It is a func-tionality commonly provided by deep learning frameworks, e.g.,
+> pytorch provides this via the Tensor.detach() method.
+
+6330 331 332 333 334 335 336 337 338 339 340 341 342 343 344 345 346 347 348 349 350 351 352 353 354 355 356 357 358 359 360 361 362 363 364 365 366 367 368 369 370 371 372 373 374 375 376 377 378 379 380 381 382 383 384                      
+
+> Table 1. Mixer sizes for Protoss in number of parameters.
+> Protoss 5vs5 10vs10 20vs20
+> QMIX 38 k 83 k 201 k QPLEX 135 k 326 k 882 k Q+FIX-sum 20 k 50 k 138 k Q+FIX-mono 54 k 180 k 743 k Q+FIX-lin 21 k 51 k 140 k
+
+structure may have on the gradients ∇θi
+
+ˆQ+FIX (h, a) of the joint values w.r.t. the agent parameters θi (see Appendix C). 
+
+4.4. Stateful Variants 
+
+As with QMIX and QPLEX, we may consider stateful vari-ants of QFIX that partially deviate from the stateless theory developed so far. Such variants warrant a discussion on the implications of employing state information on the corre-sponding theoretical properties (Marchesini et al., 2024). Different versions of stateful QFIX are possible by combin-ing stateless/stateful fixees with stateless/stateful fixing net-works. We briefly summarize the conclusions for two main stateful variants. See additional discussion in Appendix D. 
+
+History-State QFIX When employing history-state fix-ing models w(h, s, a) and b(h, s ), QFIX continues to both satisfy IGM and achieve the IGM-complete function class. 
+
+State-Only QFIX When employing state-only fixing models w(s, a) and b(s), QFIX continues to satisfy IGM, but fails to achieve the IGM-complete function class. As Q+FIX is a reparameterization of QFIX, its properties re-main the same in this regard. These conclusions are compa-rable to those for stateful QPLEX (Marchesini et al., 2024). 
+
+## 5. Evaluation 
+
+We perform an empirical evaluation comparing Q+FIX-sum, Q+FIX-mono, and Q+FIX-lin to competitive baselines in the pymarl2 (Ellis et al., 2023) multi-agent framework. 
+
+StarCraft Multi-Agent Challenge Pymarl2 provides baseline implementations for the StarCraft Multi-Agent Challenge v2 (SMACv2) (Ellis et al., 2023), a popular benchmark for cooperative multi-agent control based on the real-time strategy game StarCraft II. SMACv2 features two battling teams composed by configurable races, race-dependent and stochastically determined unit types, and team sizes. Our empirical evaluation is based on 9 common scenarios obtained by combining the 3 races ( Protoss ,
+
+Terran , and Zerg ) with 3 team sizes ( 5vs5 , 10vs10 ,and 20vs20 ). Pymarl2 provides implementations for VDN, QMIX, and QPLEX, our available baselines. 
+
+Implementation Details We note that pymarl2 pro-vides stateful implementations of QMIX and QPLEX. For QPLEX in particular, this means that state-only weights 
+
+wi(s) and λi(s, a) are employed. To maintain a fair com-parison, our implementation of Q+FIX methods employs an analogous stateful implementation with state-only weights 
+
+w(s, a) for Q+FIX-sum and Q+FIX-mono, and wi(s, a)
+
+for Q+FIX-lin. QPLEX and Q+FIX implementations both employ gradient detaching as described in Section 4.3.2. 
+
+Metrics SMACv2 logs various metrics pertaining to team performance, including the mean return and the mean win-rate obtained as the ratio of episodes where the agents suc-ceed in defeating the enemies. Although the winrate is a common metric used in prior work (e.g., Wang et al. (2020) use the winrate in their SMACv1 evaluation), we have found that winrates induce a different ordering over performances, i.e., it is possible to obtain a higher winrate while achiev-ing a lower return, and vice versa. This indicates that the rewards of SMACv2 do not perfectly encode the task of defeating the enemies—a matter of reward design that is beyond the scope of this work. Since returns are the metric that the methods are directly trained to maximize, we priori-tize returns as our primary evaluation metric. Appendix E contains additional results and discussion based on winrates. 
+
+Results We execute 3 independent runs per model per sce-nario, and show learning performance for each in Figure 2. To exploit the total sum of collected data, we also show (normalized) aggregate returns across scenarios in Figure 3. As expected, VDN fails to be a competitive baseline on its own for most scenarios, likely due to the well-known limited representation. Fixing VDN via Q+FIX-sum, we are able to overcome this limitation (as noted by the perfor-mance gap between VDN and Q+FIX-sum), expanding its representation space and reaching SOTA performance. QMIX sometimes exhibits fast initial learning speeds, albeit often to a sub-competitive final performance (Protoss-5vs5 , Terran-5vs5 , Terran-10vs10 ,
+
+Zerg-10vs10 , Terran-20vs20 , Zerg-20vs20 ), again a likely consequence of its limited representation. Fix-ing QMIX via Q+FIX-mono, we are often able to exploit the initial learning speeds and complement them with improved performance at convergence reaching SOTA performance. QPLEX is highly competitive and performs very well in some scenarios ( Protoss-5vs5 , Protoss-20vs20 ,
+
+Terran-20vs20 , Zerg-20vs20 ), but underper-forms in others ( Terran-5vs5 , Protoss-10vs10 ,
+
+Zerg-10vs10 ), and exhibits troubling convergence instabilities as well ( Zerg-5vs5 , Terran-10vs10 ). Q+FIX-lin, as the simplified variant inspired by QPLEX, manages to avoid such convergence instabilities, plausibly 7385 386 387 388 389 390 391 392 393 394 395 396 397 398 399 400 401 402 403 404 405 406 407 408 409 410 411 412 413 414 415 416 417 418 419 420 421 422 423 424 425 426 427 428 429 430 431 432 433 434 435 436 437 438 439 10.0                    
+
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> Return
+> 5vs5 | Protoss 10vs10 | Protoss 20vs20 | Protoss
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> Return
+> 5vs5 | Terran 10vs10 | Terran 20vs20 | Terran
+> 02 M 4 M 6 M 8 M 10 M
+> Timesteps
+> 10.0
+> 12.5
+> 15.0
+> 17.5
+> 20.0
+> Return
+> 5vs5 | Zerg
+> 02 M 4 M 6 M 8 M 10 M
+> Timesteps
+> 10vs10 | Zerg
+> 02 M 4 M 6 M 8 M 10 M
+> Timesteps
+> 20vs20 | Zerg
+> Model
+> Q+FIX-sum
+> Q+FIX-mono
+> Q+FIX-lin
+> QPLEX
+> QMIX
+> VDN
+
+Figure 2. SMACv2 mean returns and bootstrapped confidence intervals. 0 2 M 4 M 6 M 8 M 10 M 
+
+> Timesteps
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> Return (Normalized)
+> Model
+> Q+FIX-sum
+> Q+FIX-mono
+> Q+FIX-lin
+> QPLEX
+> QMIX
+> VDN
+
+Figure 3. SMACv2 mean (normalized) aggregate returns and boot-strapped confidence intervals. Aggregates are normalized via 
+
+˜Gi
+
+.
+
+= Gi−min k Gk    
+
+> max kGk−min kGk
+
+∈ [0 , 1] , where {Gi}i is the total set of returns logged by all models in all scenarios. 
+
+as a consequence of the simpler minimalist structure. Q+FIX-sum, Q+FIX-mono, and Q+FIX-lin achieve simi-lar learning performances in most cases, with only minor differences across scenarios. Overall, Q+FIX-sum may be slightly outperforming other variants in some scenar-ios ( Terran-5vs5 , Zerg-5vs5 ), possibly an indication that a simpler compositions are preferable, so long as the full IGM-complete space is accessible. The normalized aggregate returns in Figure 3 provide more accurate estimations of expected performance due to the larger sample size ( 27 total runs per model), and show more clearly the trends discussed above. With these aggregate re-sults, it becomes more clear that, even ignoring the unstable convergence of QPLEX, the Q+FIX variants all manage to at least mildly outperform QPLEX. These results demonstrate that Q+FIX succeeds in enhancing the native performances of VDN and QMIX fixees, and lifts them to a similar level as QPLEX while maintaining more stable convergence. Fi-nally, Table 1 shows that Q+FIX (especially Q+FIX-sum and Q+FIX-lin) is able to achieve these performances while using the smallest mixing network by a significant margin. 
+
+## 6. Conclusions 
+
+In recent years, value function decomposition methods that employ the CTDE training paradigm for MARL have risen to state-of-the-art status, achieving significant learning per-formance benefits in cooperative multi-agent control prob-lems. Such methods are often centered around the IGM property, and recent work has focused on developing mod-els that are able to represent the entire IGM-complete func-tion class. When put under scrutiny, most such methods have failed at that objective, and QPLEX represents the singular exception. However, QPLEX only represents a single instance in the space of models that achieve the IGM-complete function class, and whether other better options exist remained was an open question to explore. In this work, we have advanced our understanding of the IGM-complete function class by proposing a minimal for-mulation of the IGM property that is directly implementable. Inspired by such formulation, we were able to naturally de-rive QFIX, a novel family of value function decomposition methods that enhance the representation capabilities of prior models via a simple manipulation of their outputs. As a result, we are able to implement a number of IGM-complete models that are significantly simpler than QPLEX. Our em-pirical evaluation on SMACv2 demonstrates that our QFIX methods succeed in both enhancing the performance of prior methods like VDN and QMIX, and achieving better con-vergence properties than QPLEX while needing a fraction of the parameters. Our contribution not only represents a novel approach that performs well, but also opens the door for new methods based on the QFIX framework. 8440 441 442 443 444 445 446 447 448 449 450 451 452 453 454 455 456 457 458 459 460 461 462 463 464 465 466 467 468 469 470 471 472 473 474 475 476 477 478 479 480 481 482 483 484 485 486 487 488 489 490 491 492 493 494 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Multi-Agent Reinforcement Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Ellis, B., Cook, J., Moalla, S., Samvelyan, M., Sun, M., Mahajan, A., Foerster, J. N., and Whiteson, S. SMACv2: An Improved Benchmark for Cooperative Multi-Agent Reinforcement Learning, October 2023. URL http:// arxiv.org/abs/2212.07489 . arXiv:2212.07489. Lowe, R., Wu, Y., Tamar, A., Harb, J., Abbeel, P., and Mor-datch, I. Multi-agent actor-critic for mixed cooperative-competitive environments. In Conference on Neural In-formation Processing Systems (NeurIPS) , 2017. Marchesini, E., Baisero, A., Bhati, R., and Amato, C. On Stateful Value Factorization in Multi-Agent Reinforce-ment Learning, September 2024. URL http://arxiv. org/abs/2408.15381 . arXiv:2408.15381 [cs]. Oliehoek, F. A. and Amato, C. A concise introduction to decentralized POMDPs . Springer, 2016. Rashid, T., Farquhar, G., Peng, B., and Whiteson, S. Weighted QMIX: Expanding Monotonic Value Function Factorisation for Deep Multi-Agent Re-inforcement Learning. In Advances in Neural Information Processing Systems , volume 33, pp. 10199–10210. Curran Associates, Inc., 2020a. URL https://proceedings.neurips. cc/paper_files/paper/2020/hash/ 73a427badebe0e32caa2e1fc7530b7f3-Abstract. html .Rashid, T., Samvelyan, M., Witt, C. S. d., Farquhar, G., Foerster, J., and Whiteson, S. Monotonic Value Func-tion Factorisation for Deep Multi-Agent Reinforcement Learning. Journal of Machine Learning Research , 21 (178):1–51, 2020b. ISSN 1533-7928. URL http: //jmlr.org/papers/v21/20-081.html .Son, K., Kim, D., Kang, W. J., Hostallero, D. E., and Yi, Y. QTRAN: Learning to Factorize with Transformation for Cooperative Multi-Agent Reinforcement Learning. In Proceedings of the 36th International Conference on Machine Learning , pp. 5887–5896. PMLR, May 2019. URL https://proceedings.mlr.press/v97/ son19a.html . ISSN: 2640-3498. Sunehag, P., Lever, G., Gruslys, A., Czarnecki, W. M., Zambaldi, V., Jaderberg, M., Lanctot, M., Sonnerat, N., Leibo, J. Z., Tuyls, K., and Graepel, T. Value-Decomposition Networks For Cooperative Multi-Agent Learning, June 2017. URL http://arxiv.org/ abs/1706.05296 . arXiv:1706.05296 [cs]. Wang, J., Ren, Z., Liu, T., Yu, Y., and Zhang, C. QPLEX: Duplex Dueling Multi-Agent Q-Learning. October 2020. URL https://openreview.net/forum? id=Rcmk0xxIQV .Wang, J., Ren, Z., Han, B., Ye, J., and Zhang, C. Towards Understanding Cooperative Multi-Agent Q-Learning with Value Factorization. In Advances in Neural Information Processing Systems , vol-ume 34, pp. 29142–29155. Curran Associates, Inc., 2021. URL https://proceedings. neurips.cc/paper/2021/hash/ f3f1fa1e4348bfbebdeee8c80a04c3b9-Abstract. html .Wang, Z., Schaul, T., Hessel, M., Hasselt, H., Lanc-tot, M., and Freitas, N. Dueling Network Archi-tectures for Deep Reinforcement Learning. In Pro-ceedings of The 33rd International Conference on Ma-chine Learning , pp. 1995–2003. PMLR, June 2016. URL https://proceedings.mlr.press/v48/ wangf16.html . ISSN: 1938-7228. 9495 496 497 498 499 500 501 502 503 504 505 506 507 508 509 510 511 512 513 514 515 516 517 518 519 520 521 522 523 524 525 526 527 528 529 530 531 532 533 534 535 536 537 538 539 540 541 542 543 544 545 546 547 548 549 
+
+## A. Proofs 
+
+A.1. Proof of Lemma 4.2 
+
+Proof. For any given joint history h, let a∗ 
+
+> i
+
+= argmax ai Qi(hi, a i) denote the maximal action according to the individual utilities, and a∗ = ( a∗
+
+> 1
+
+, . . . , a ∗ 
+
+> N
+
+) the joint action constructed by those individual actions. For this joint action a∗, the corresponding advantage utilities are zero ∀i (u∗ 
+
+> i
+
+= 0) by definition, and 
+
+QIGM (h, a∗) = w(h, a∗) f (u∗
+
+> 1
+
+, . . . , u ∗ 
+
+> N
+
+)
+
+| {z }
+
+> =0
+
++b(h)= b(h) . (34) For any other non-maximal action a, we have at least one strictly negative utility ∃i (ui < 0) , and 
+
+QIGM (h, a) = w(h, a)
+
+| {z }
+
+> >0
+
+f (u1, . . . , u N )
+
+| {z }
+
+> <0
+
++b(h)
+
+< b (h) . (35) Therefore a∗ = argmax a QIGM (h, a), and the actions that maximize the individual utilities also maximize the joint value. 
+
+A.2. Proof of Theorem 4.3 
+
+Proof. Let us denote the function class of QIGM as FC (QIGM ), and the IGM-complete function class as FC IGM . We prove the equivalence FC (QIGM ) = FC IGM in two steps: 1. Q ∈ FC (QIGM ) = ⇒ Q ∈ FC IGM , i.e., QIGM satisfies IGM, 2. Q ∈ FC IGM =⇒ Q ∈ FC (QIGM ), i.e., any function that satisfies IGM can be represented by QIGM .
+
+Step 1. Q ∈ FC (QIGM ) = ⇒ Q ∈ FC IGM follows directly from Lemma 4.2. 
+
+Step 2. Let Qi(hi, a i) and Q(h, a) denote an arbitrary set of individual and joint values that satisfy IGM, i.e., Q ∈ FC IGM .Let us denote the usual corresponding values and advantages as follows, 
+
+Vi(hi) = max 
+
+> ai
+
+Qi(hi, a i) , Ai(hi, a i) = Qi(hi, a i) − Vi(hi) , (36) 
+
+V (h) = max  
+
+> a
+
+Q(h, a) , A(h, a) = Q(h, a) − V (h) , (37) with the usual shorthand qi = Qi(hi, a i) and vi = Vi(hi), and ui = Ai(hi, a i).For any f that satisfies the requirements of Equation (19), let w and b be defined as follows, 
+
+b(h) = V (h) , (38) 
+
+w(h, a) = 
+
+( A(h,a)   
+
+> f(u1,...,u N)
+
+, if f (u1, . . . , u N )̸ = 0 ,
+
+any value , otherwise . (39) For any given joint history h, let a∗ 
+
+> i
+
+= argmax ai Qi(hi, a i) denote the maximal action according to the individual utilities, and a∗ = ( a∗
+
+> 1
+
+, . . . , a ∗ 
+
+> N
+
+) the corresponding joint action. Given that Q satisfies IGM by assumption, we have 
+
+a∗ = argmax a Q(h, a), and Q(h, a∗) = max a Q(h, a) = V (h).10 550 551 552 553 554 555 556 557 558 559 560 561 562 563 564 565 566 567 568 569 570 571 572 573 574 575 576 577 578 579 580 581 582 583 584 585 586 587 588 589 590 591 592 593 594 595 596 597 598 599 600 601 602 603 604 For this joint action a∗, the corresponding individual advantage utilities are zero ∀i (ui = 0) by definition, and 
+
+QIGM (h, a∗) = w(h, a∗)f (u1, . . . , u N ) + b(h)= w(h, a∗) f (0 , . . . , 0) 
+
+| {z }
+
+> =0
+
++b(h)= V (h)= Q(h, a∗) . (40) For any other non-maximal action a†, we have at least one strictly negative utility ∃i (ui < 0) , and 
+
+QIGM (h, a†) = w(h, a†)f (u1, . . . , u N ) + b(h)= A(h, a†)
+
+f (u1, . . . , u N ) f (u1, . . . , u N ) + V (h)= A(h, a†) + V (h)= Q(h, a†) . (41) In either case, QIGM (h, a) = Q(h, a) for all joint histories and actions. Therefore Q ∈ FC IGM =⇒ Q ∈ FC (QIGM ).
+
+A.3. Proof of Theorem 4.4 
+
+Proof. Equation (22) satisfies the form and requirements of Equation (19). Therefore, IGM follows from Lemma 4.2. Given 
+
+w and b models that are sufficienty expressive, IGM-completeness follows from Theorem 4.3 
+
+A.4. Proof of Theorem 4.5 
+
+Proof. QFIX-lin is a monotonic function of individual advantages and therefore satisfies IGM. QFIX-lin is also a general-ization of QFIX-sum, therefore its function class is a superset of the QFIX-sum function class, which is the IGM-complete function class. Therefore, QFIX-lin can represent all models that satisfy IGM, and none of those that do not satisfy IGM. 
+
+A.5. Proof of Theorem 4.6 
+
+Proof. (w(h, a) + 1) > 0 satisfies the positivity constraint of QFIX. Therefore, Theorem 4.4 applies. 
+
+## B. Derivations 
+
+This section contains explicit long-form derivations that had to be removed from the main document due to space limitations. Appendices B.1 and B.2 contain the maximal value V (h) and advantage A(h, a) for VDN and QMIX. Appendices B.3 and B.4 contain the derivation for QFIX-sum and QFIX-mono. Appendices B.5 to B.7 contain the derivation for Q+FIX-sum, Q+FIX-mono, and Q+FIX-lin. 11 605 606 607 608 609 610 611 612 613 614 615 616 617 618 619 620 621 622 623 624 625 626 627 628 629 630 631 632 633 634 635 636 637 638 639 640 641 642 643 644 645 646 647 648 649 650 651 652 653 654 655 656 657 658 659 
+
+B.1. VDN Maximal Values ˆVMIX (h) and Advantages ˆAMIX (h, a)
+
+As a reminder, VDN action-values are defined as ˆQVDN (h, a) .
+
+= P 
+
+> i
+
+ˆQi(hi, a i). Due to the the linear (monotonic) mixing structure, the joint maximal values ˆVVDN (h) can be expressed as the sum of the individual maximal values, 
+
+ˆVVDN (h) .
+
+= max 
+
+> a
+
+ˆQVDN (h, a)= max 
+
+> a
+
+X
+
+> i
+
+ˆQi(hi, a i)= max 
+
+> a1,...,a N
+
+X
+
+> i
+
+ˆQi(hi, a i)= X
+
+> i
+
+max 
+
+> ai
+
+ˆQi(hi, a i) (monotonicity) 
+
+= X
+
+> i
+
+ˆVi(hi) , (42) and the joint advantages ˆAVDN (h, a) can be expressed as the sum of the individual advantages, 
+
+ˆAVDN (h, a) .
+
+= ˆQVDN (h, a) − ˆVVDN (h)= X
+
+> i
+
+ˆQi(hi, a i) − X
+
+> i
+
+ˆVi(hi)= X
+
+> i
+
+ˆQi(hi, a i) − ˆVi(hi)= X
+
+> i
+
+ˆAi(hi, a i) . (43) 
+
+B.2. QMIX Maximal Values ˆVMIX (h) and Advantages ˆAMIX (h, a)
+
+As a reminder, QMIX action-values are defined as ˆQMIX (h, a) .
+
+= fmono (q1, . . . , q N ). Due to the monotonic mixing structure, the joint maximal values ˆVMIX (h) can be expressed as the monotonic mixing of the individual maximal values, 
+
+ˆVMIX (h) .
+
+= max 
+
+> a
+
+ˆQMIX (h, a)= max  
+
+> a
+
+fmono (q1, . . . , q N )= max 
+
+> a1,...,a N
+
+fmono 
+
+ ˆQ1(h1, a 1), . . . , ˆQN (hN , a N )
+
+
+
+= fmono 
+
+
+
+max 
+
+> a1
+
+ˆQ1(h1, a 1), . . . , max 
+
+> aN
+
+ˆQN (hN , a N )
+
+
+
+(monotonicity) 
+
+= fmono 
+
+ ˆV1(h1), . . . , ˆVN (hN )
+
+
+
+= fmono (v1, . . . , v N ) , (44) and the joint advantages ˆAMIX (h, a) can be expressed as the corresponding difference, 
+
+ˆAMIX (h, a) .
+
+= ˆQMIX (h, a) − ˆVMIX (h)= fmono (q1, . . . , q N ) − fmono (v1, . . . , v N ) . (45) 
+
+B.3. QFIX-sum 
+
+QFIX-sum is an instance of QFIX based on VDN as fixee model, ˆQfixee (h, a) = ˆQVDN (h, a). From Equation (43), we have that the VDN joint advantage is given as the sum of individual advantages (hence the “-sum” suffix). Therefore, QFIX-sum is simply obtained as 
+
+ˆQFIX-sum (h, a) .
+
+= w(h, a) ˆAVDN (h, a) + b(h)= w(h, a) X
+
+> i
+
+ˆAi(hi, a i) + b(h) . (46) 12 660 661 662 663 664 665 666 667 668 669 670 671 672 673 674 675 676 677 678 679 680 681 682 683 684 685 686 687 688 689 690 691 692 693 694 695 696 697 698 699 700 701 702 703 704 705 706 707 708 709 710 711 712 713 714 MLP  MLP  
+
+> Agent Agent
+> VDN + Additive Fixing Network
+> MLP
+> RNN
+> MLP
+
+(a) Q+FIX-sum diagram. MLP  MLP   
+
+> Agent Agent
+> QMIX + Additive Fixing Network
+> MLP
+> RNN
+> MLP
+
+(b) Q+FIX-mono diagram. MLP  MLP  
+
+> Agent Agent
+> VDN + Additive Fixing Network
+> MLP
+> RNN
+> MLP
+
+(c) Q+FIX-lin diagram. 
+
+Figure 4. Specialized diagrams for Q+FIX-sum, Q+FIX-mono, and Q+FIX-lin. 
+
+B.4. QFIX-mono 
+
+QFIX-mono is an instance of QFIX based on QMIX as fixee model, ˆQfixee (h, a) = ˆQMIX (h, a). From Equation (45), we have that the QMIX advantage is given as a difference between monotonic compositions of individual utilities (hence the “-mono” suffix). Therefore, QFIX-mono is simply obtained as 
+
+ˆQFIX-mono (h, a) .
+
+= w(h, a) ˆAMIX (h, a) + b(h)= w(h, a)( fmono (q1, . . . , q N ) − fmono (v1, . . . , v N )) + b(h) . (47) 
+
+B.5. Q+FIX-sum 
+
+Q+FIX-sum is an instance of Q+FIX based on VDN as fixee model, ˆQfixee (h, a) = ˆQVDN (h, a) and ˆAfixee (h, a) = ˆAVDN (h, a), also equivalent to the additive formulation of QFIX-sum. Therefore, Q+FIX-sum is simply obtained as 
+
+ˆQ+FIX-sum 
+
+.
+
+= ˆQVDN (h, a) + w(h, a) ˆAVDN (h, a) + b(h)
+
+.
+
+= X
+
+> i
+
+ˆQi(h, a) + w(h, a) X
+
+> i
+
+ˆAi(h, a) + b(h) . (48) Figure 4a shows a graphical diagram for Q+FIX-sum. 
+
+B.6. Q+FIX-mono 
+
+Q+FIX-mono is an instance of Q+FIX based on QMIX as fixee model, ˆQfixee (h, a) = ˆQMIX (h, a) and ˆAfixee (h, a) = ˆAMIX (h, a), also equivalent to the additive formulation of QFIX-mono. Therefore, Q+FIX-mono is simply obtained as 
+
+ˆQ+FIX-mono 
+
+.
+
+= ˆQVDN (h, a) + w(h, a) ˆAVDN (h, a) + b(h)
+
+.
+
+= fmono (q1, . . . , q N ) + w(h, a) ( fmono (q1, . . . , q N ) − fmono (v1, . . . , v N )) + b(h) . (49) Figure 4b shows a graphical diagram for Q+FIX-mono. 
+
+B.7. Q+FIX-lin 
+
+Q+FIX-lin is the additive formulation of QFIX-lin. Just as QFIX-lin is not formally a member of the QFIX family, but rather a generalization of QFIX-sum, so is Q+FIX-lin not formally a member of Q+FIX, but rather a generalization of Q+FIX-sum. 13 715 716 717 718 719 720 721 722 723 724 725 726 727 728 729 730 731 732 733 734 735 736 737 738 739 740 741 742 743 744 745 746 747 748 749 750 751 752 753 754 755 756 757 758 759 760 761 762 763 764 765 766 767 768 769 Given that QFIX-lin is obtained by introducing per-agent weights wi(h, a), Q+FIX-lin is simply obtained as 
+
+ˆQ+FIX-lin 
+
+.
+
+= X
+
+> i
+
+ˆQi(hi, a i) + X
+
+> i
+
+wi(h, a) ˆAi(hi, a i) + b(h) .
+
+Figure 4c shows a graphical diagram for Q+FIX-lin. 
+
+## C. Why Detaching the Advantages Helps Q+FIX 
+
+First, we note that the gradients ∇θi
+
+ˆQ+FIX (h, a) when the advantages are not detached are as follows, 
+
+∇θi
+
+ˆQ+FIX (h, a)= ∇θi
+
+ˆQfixee (h, a) + w(h, a)∇θi
+
+ˆAfixee (h, a)= ∇θi
+
+ˆVfixee (h) + ( w(h, a) + 1) ∇θi
+
+ˆAfixee (h, a) . (50) It seems plausible that there may be poor values of w(h, a) that could result in degenerate gradient signals. For example, a low fixing weight w(h, a) ≈ − 1 results in a dampened gradient ∇θi
+
+ˆQ+FIX (h, a) ≈ ∇ θi
+
+ˆVfixee (h), that is notably independent on actions. On the other end of the spectrum, a very large fixing weight w(h, a) ≫ − 1 results in a gradient that is dominated by the highly-weighted advantage component, overcoming the value component, ∇θi
+
+ˆQ+FIX (h, a) ≈
+
+w(h, a)∇θi
+
+ˆAfixee (h, a). On each end of the spectrum, the gradient will propagate almost exclusively through the values 
+
+∇θi
+
+ˆVfixee (h) or through the advantages ∇θi
+
+ˆAfixee (h, a).On the other hand, the gradients ∇θi
+
+ˆQ+FIX (h, a) when the advantages are detached are as follows, 
+
+∇θi
+
+ˆQ+FIX (h, a) = ∇θi
+
+ˆQfixee (h, a)= ∇θi
+
+ˆVfixee (h) + ∇θi
+
+ˆAfixee (h, a) , (51) and are unaffected by the fixing structure, equally dependent on the value and advantage components of ˆQfixee (h, a).
+
+## D. Stateful QFIX 
+
+For simplicity, we assume a stateless fixee ˆQfixee (h, a), although these results can be easily extended to stateful fixees 
+
+ˆQfixee (h, s, a) under mild conditions. 
+
+D.1. History-State QFIX IGM In the case of history-state QFIX, as defined by 
+
+ˆQFIX (h, s, a) .
+
+= w(h, s, a) ˆAfixee (h, a) + b(h, s ) , (52) where w(h, s, a) > 0, we first show that ˆQFIX (h, s, a) satisfies stateful-IGM. We employ the same methodology used by Marchesini et al. (2024), whereby we show that the presence of the state is able to alter the values of ˆQFIX (h, s, a), but not the identity of the corresponding maximal action. For that purpose, let a∗ = argmax ˆAfixee (h, a) be the maximal action of the fixee. For that action a∗, we have that 
+
+ˆQFIX (h, s, a∗) = w(h, s, a∗) ˆAfixee (h, a∗)
+
+| {z }
+
+> =0
+
++b(h, s ) (53) 
+
+= b(h, s ) , (54) whereas for any other non-maximal action a, we have 
+
+ˆQFIX (h, s, a) = w(h, s, a)
+
+| {z }
+
+> >0
+
+ˆAfixee (h, a∗)
+
+| {z }
+
+> <0
+
++b(h, s ) (55) 
+
+< b (h, s ) . (56) Therefore, the action a∗ that maximizes the fixee ˆQfixee (h, a) also maximizes the stateful QFIX ˆQFIX (h, s, a) regardless of the state. Since the fixee is assumed to satisfy IGM, then the same set of individual actions maximize the individual utilities ˆQi(hi, a i), therefore QFIX satisfies stateful-IGM. 14 770 771 772 773 774 775 776 777 778 779 780 781 782 783 784 785 786 787 788 789 790 791 792 793 794 795 796 797 798 799 800 801 802 803 804 805 806 807 808 809 810 811 812 813 814 815 816 817 818 819 820 821 822 823 824 
+
+IGM-Completeness This proof takes on a similar form to that for Theorem 4.3, although we proceed less formally. We need to prove that any stateful value function Q(h, s, a) that satisfies stateful-IGM can be represented via history-state QFIX. Let V (h, s ) .
+
+= max a Es|h [Q(h, s, a)] and A(h, s, a) .
+
+= Q(h, s, a) − V (h, s ). Note the distinction between Q(h, s, a),the stateful-IGM-compliant value we aim to model, and ˆQfixee (h, a), the fixee we attempt to fix. To that end, let w and b be defined as follows, 
+
+b(h, s ) = V (h, s ) , (57) 
+
+w(h, s, a) = 
+
+( A(h,s, a)ˆAfixee (h,a) , if ˆAfixee (h, a)̸ = 0 ,
+
+any value , otherwise . (58) For any given joint history h, let a∗ 
+
+> i
+
+= argmax ai Qi(hi, a i) denote the maximal action according to the individual utilities, and a∗ = ( a∗
+
+> 1
+
+, . . . , a ∗ 
+
+> N
+
+) the corresponding joint action. Given that Q(h, s, a) satisfies stateful-IGM by assumption, we have 
+
+a∗ = argmax a Es|h [Q(h, s, a)] and Q(h, s, a∗) = V (h, s ).For this joint action a∗, the corresponding fixee advantage is zero by definition, and 
+
+ˆQFIX (h, s, a∗) = w(h, s, a∗) ˆAfixee (h, a∗)
+
+| {z }
+
+> =0
+
++b(h, s ) (59) 
+
+= b(h, s ) (60) 
+
+= V (h, s ) (61) 
+
+= Q(h, s, a∗) . (62) For any other non-maximal action a†, we have ˆAfixee (h, a†) < 0, and 
+
+ˆQFIX (h, s, a†) = w(h, s, a†) ˆAfixee (h, a†) + b(h, s ) (63) 
+
+= A(h, s, a†)ˆAfixee (h, a†)ˆAfixee (h, a†) + V (h, s ) (64) 
+
+= A(h, s, a†) + V (h, s ) (65) 
+
+= Q(h, s, a†) . (66) In either case, ˆQFIX (h, s, a) = Q(h, s, a) for all joint histories, states, and joint actions. 
+
+D.2. State-Only QFIX IGM In the case of state-only QFIX, as defined by 
+
+ˆQFIX (h, s, a) .
+
+= w(s, a) ˆAfixee (h, a) + b(s) , (67) where w(s, a) > 0, we first show that ˆQFIX (h, s, a) satisfies stateful-IGM. We employ the same methodology used above, whereby we show that the presence of the state is able to alter the values of ˆQFIX (h, s, a), but not the identity of the corresponding maximal action. For that purpose, let a∗ = argmax ˆAfixee (h, a) be the maximal action of the fixee. For that action a∗, we have that 
+
+ˆQFIX (h, s, a∗) = w(s, a∗) ˆAfixee (h, a∗)
+
+| {z }
+
+> =0
+
++b(s) (68) 
+
+= b(s) , (69) whereas for any other non-maximal action a, we have 
+
+ˆQFIX (h, s, a) = w(s, a)
+
+| {z }
+
+> >0
+
+ˆAfixee (h, a∗)
+
+| {z }
+
+> <0
+
++b(s) (70) 
+
+< b (s) . (71) Therefore, the action a∗ that maximizes the fixee ˆQfixee (h, a) also maximizes the stateful QFIX ˆQFIX (h, s, a) regardless of the state. Since the fixee is assumed to satisfy IGM, then the same set of individual actions maximize the individual utilities ˆQi(hi, a i), therefore state-only QFIX satisfies stateful-IGM. 15 825 826 827 828 829 830 831 832 833 834 835 836 837 838 839 840 841 842 843 844 845 846 847 848 849 850 851 852 853 854 855 856 857 858 859 860 861 862 863 864 865 866 867 868 869 870 871 872 873 874 875 876 877 878 879 20%                    
+
+> 40%
+> 60%
+> 80%
+> Winrate
+> 5vs5 | Protoss 10vs10 | Protoss 20vs20 | Protoss
+> 20%
+> 40%
+> 60%
+> 80%
+> Winrate
+> 5vs5 | Terran 10vs10 | Terran 20vs20 | Terran
+> 02 M 4 M 6 M 8 M 10 M
+> Timesteps
+> 20%
+> 40%
+> 60%
+> 80%
+> Winrate
+> 5vs5 | Zerg
+> 02 M 4 M 6 M 8 M 10 M
+> Timesteps
+> 10vs10 | Zerg
+> 02 M 4 M 6 M 8 M 10 M
+> Timesteps
+> 20vs20 | Zerg
+> Model
+> Q+FIX-sum
+> Q+FIX-mono
+> Q+FIX-lin
+> QPLEX
+> QMIX
+> VDN
+
+Figure 5. SMACv2 mean winrates and bootstrapped confidence intervals. 0 2 M 4 M 6 M 8 M 10 M 
+
+Timesteps 
+
+20% 
+
+40% 
+
+60% 
+
+80% 
+
+> Winrate
+
+Model 
+
+Q+FIX-sum 
+
+Q+FIX-mono 
+
+Q+FIX-lin 
+
+QPLEX 
+
+QMIX 
+
+VDN 
+
+Figure 6. SMACv2 mean (normalized) aggregate winrates and bootstrapped confidence intervals. 
+
+IGM-Completeness In contrast to history-state QFIX, we are not able to use the same proof to show that state-only QFIX satisfies IGM-completeness. 
+
+## E. Additional Winrate Results 
+
+In this section, we show additional results based on the winrate metric. As with the return-based results, we show the learning performance for each model and scenario in Figure 5, and the aggregate winrate across scenarios in Figure 6. 
+
+Winrates vs Returns As mentioned in the main document, the winrate and return metrics induce correlated but notably different orderings over the evaluated methods. Comparing Figures 2 and 5, this is notable by the following non-exhaustive examples: • In Terran-5vs5 ,
+
+– Return implies Q+FIX-sum ≻ Q+FIX-mono. 
+
+– Winrate implies Q+FIX-sum ≺ Q+FIX-mono. • In Zerg-5vs5 ,
+
+– Return implies Q+FIX-sum ≻ Q+FIX-mono ≈ Q+FIX-lin. 16 880 881 882 883 884 885 886 887 888 889 890 891 892 893 894 895 896 897 898 899 900 901 902 903 904 905 906 907 908 909 910 911 912 913 914 915 916 917 918 919 920 921 922 923 924 925 926 927 928 929 930 931 932 933 934 
+
+– Winrate implies Q+FIX-sum ≈ Q+FIX-mono ≈ Q+FIX-lin. • In Zerg-10vs10 ,
+
+– Return implies VDN ≈ Q+FIX. 
+
+– Winrate implies VDN ≺ Q+FIX. • In Protoss-20vs20 ,
+
+– Return implies VDN ≈ Q+FIX-mono. 
+
+– Winrate implies VDN ≺ Q+FIX-mono. • In Terran-10vs10 , the return of QPLEX drops significantly around the 9M timestep mark, whereas its winrate is able to recover temporarily, indicating that high winrates are achievable even with low returns. Comparing the final performances in Figures 3 and 6, • Return implies VDN ≺ QMIX ≺ QPLEX. • Winrate implies QPLEX ≺ VDN ≈ QMIX. 
+
+Winrate Results Despite this notable and concerning difference between returns and winrates as evaluation metrics, the winrate-based evaluation arrives to largely the same conclusions as the return-based one in the main document. As in the return-based results, VDN fails to be a competitive baseline on its own for most scenarios, likely due to the well-known limited representation. Fixing VDN via Q+FIX-sum, we are able to overcome this limitation (as noted by the performance gap between VDN and Q+FIX-sum), expanding its representation space and reaching SOTA performance. As in the return-based results, QMIX sometimes exhibits fast initial learning speeds, albeit often to a sub-competitive final performance (Protoss-5vs5 , Terran-5vs5 , Terran-10vs10 , Zerg-10vs10 , Terran-20vs20 ,
+
+Zerg-20vs20 ), again a likely consequence of its limited representation. Fixing QMIX via Q+FIX-mono, we are often able to exploit the initial learning speeds and complement them with improved performance at convergence reaching SOTA performance. Compared to return-based results, QPLEX appears less competitive, and performs very well in fewer sce-narios ( Protoss-20vs20 , Terran-20vs20 , Zerg-20vs20 ), and underperforms in more ( Terran-5vs5 ,
+
+Zerg-10vs10 ), and exhibits the same troubling convergence instabilities as well ( Zerg-5vs5 , Terran-10vs10 ). Q+FIX-lin, as the simplified variant inspired by QPLEX, manages to avoid such convergence instabilities, plausibly as a consequence of the simpler minimalist structure. As in the return-based results, Q+FIX-sum, Q+FIX-mono, and Q+FIX-lin achieve similar learning performances in most cases, with only minor differences across scenarios. Compared to the return-based results, it is Q+FIX-mono that may be slightly outperforming other variants in some scenarios ( Terran-5vs5 , Zerg-5vs5 ). The normalized aggregate returns in Figure 3 largely confirm the trends discussed above. Despite the concerning difference between the return and winrate metrics, both demonstrate that Q+FIX succeeds in enhancing the native performances of VDN and QMIX fixees, and lifts them to a similar level as QPLEX while maintaining more stable convergence. 17

@@ -1,0 +1,3383 @@
+Title: Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=O6tenHWTUU
+
+Number of Pages: 24
+
+Markdown Content:
+## Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Hongming Zhang ∗ 1 Tongzheng Ren ∗ 2 Chenjun Xiao 3 Dale Schuurmans 4 1 Bo Dai 4 5 
+
+Abstract 
+
+In most real-world reinforcement learning appli-cations, state information is only partially observ-able, which breaks the Markov decision process assumption and leads to inferior performance for algorithms that conflate observations with state. Partially Observable Markov Decision Processes (POMDPs), on the other hand, provide a general framework that allows for partial observability to be accounted for in learning, exploration and planning , but presents significant computational and statistical challenges. To address these dif-ficulties, we develop a representation-based per-spective that leads to a coherent framework and tractable algorithmic approach for practical rein-forcement learning from partial observations. We provide a theoretical analysis for justifying the statistical efficiency of the proposed algorithm, and also empirically demonstrate the proposed al-gorithm can surpass state-of-the-art performance with partial observations across various bench-marks, advancing reliable reinforcement learning towards more practical applications. 
+
+1. Introduction 
+
+Reinforcement learning (RL) addresses the problem of mak-ing sequential decisions that maximize a cumulative re-ward through interaction and observation in an environ-ment (Mnih et al., 2013; Levine et al., 2016). The Markov decision process (MDP) has been the standard mathematical model used for most RL algorithm design. However, the success of MDP-based RL algorithms (Zhang et al., 2022; Ren et al., 2023c) relies on an assumption that state infor-mation is fully observable, which implies that the optimal policy is memoryless, i.e. , optimal actions can be selected based purely on the current state (Puterman, 2014). How-       
+
+> *Equal contribution 1University of Alberta 2UT Austin 3The Chinese University of Hong Kong, Shenzhen 4Google DeepMind
+> 5Georgia Tech. Correspondence to: Bo Dai <bodai@google.com>.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+ever, such an assumption typically does not hold in practice. For example, in chatbot learning (Jiang et al., 2021) or video game control (Mnih et al., 2013) only dialogue exchanges or images are observed, from which state information only can be partially inferred. The violation of full observability can lead to significant performance degeneration of MDP-based RL algorithms in such scenarios. The Partially Observed Markov Decision Process (POMDP) (Åström, 1965) has been proposed to extend the classical MDP formulation by introducing observation variables that only give partial information about the underlying latent state (Hauskrecht & Fraser, 2000; Roy & Gordon, 2002; Chen et al., 2016). This extension greatly expands the practi-cal applicability of POMDPs over MDPs, but the additional uncertainty over the underlying state given only observa-tions creates a non-Markovian dependence between suc-cessive observations, even though Markovian dependence is preserved between latent states. Consequently, the op-timal policy for a POMDP is no longer memoryless but 
+
+entire-history dependent, expanding the state complexity exponentially w.r.t. horizon length. Such a non-Markovian dependence creates significant computational and statistical challenges in planning , and in learning and exploration . In fact, without additional assumptions, computing an optimal policy for a POMDP with known dynamics ( i.e. , planning) is PSPACE-complete (Papadimitriou & Tsitsiklis, 1987), while the sample complexity of learning for POMDPs grows exponentially w.r.t. the horizon (Jin et al., 2020a). Despite the worst case hardness of POMDPs, given their importance in practice, there has been extensive work on de-veloping practical RL algorithms that can cope with partial observations. One common heuristic is to extend MDP-based RL algorithms by maintaining a history window over observations to encode a policy or value function, e.g. , re-current neural networks (Wierstra et al., 2007; Hausknecht & Stone, 2015; Zhu et al., 2017). Such algorithms have been applied to many real-world applications with image- or text-based observations (Berner et al., 2019; Jiang et al., 2021), sometimes even surpassing human-level performance (Mnih et al., 2013; Kaufmann et al., 2023). These empirical successes have motivated investigation into 
+
+structured POMDPs that allow some of the core compu-1Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+tational and statistical complexities to be overcome, and provides an improved understanding of exploitable struc-ture and practical new algorithms with rigorous justification. For example, the concept of decodability has been used to express POMDPs where the latent state can be exactly re-covered from a window of past observations (Efroni et al., 2022; Guo et al., 2023). Observability is another special structure, where the m-step emission model is assumed to be full-rank, allowing the latent state to be identified from 
+
+m future observation sequences (Jin et al., 2020a; Golowich et al., 2022; Liu et al., 2022; 2023). Such structures elim-inate unbounded history dependence, and thus, reduce the computational and statistical complexity. However, most works rely on the existence of an ideal computational oracle for planning, which, unsurprisingly, is infeasible in most cases, hence difficult to apply in practice. Although there have been a few attempts to overcome the computational complexity of POMDPS, these algorithms are either only applicable to the tabular setting (Golowich et al., 2022) or rely on an integration oracle that quickly become intractable for large observation spaces (Guo et al., 2018). This gap immediately motivates the question: 
+
+Can efficient and practical RL algorithms be designed for partial observations by exploiting natural structures? 
+
+By “efficient" we mean the statistical complexity avoids an exponential dependence on history length, while by “practi-cal" we mean that every component of learning, planning 
+
+and exploration can be easily implemented and applied in practical settings. In this paper, we provide an affirmative 
+
+answer to this question. More specifically, • We reveal for the first time that an L-decodable POMDP admits a sufficient representation, the Multi-step Latent Variable Representation ( μLV-Rep) , that supports exact and tractable linear representation of the value functions (Section 4.1), breaking the fundamental computational barriers explained in more detail in Section 3. • We design a computationally efficient planning algorithm that can implement both the principles of optimism and pessimism in the face of uncertainty for online and offline POMDPs respectively, by leveraging the learned sufficient representation μLV-Rep (Section 4.2). • We provide a theoretical analysis of the sample complex-ity of the proposed algorithm, justifying its efficiency in balancing exploitation versus exploration in Section 5. • We conduct a comprehensive empirical comparison to current existing RL algorithms for POMDPs on several benchmarks, demonstrating the superior empirical perfor-mance of μLV-Rep (Section 7). 
+
+2. Preliminaries 
+
+We follow the definition of a POMDP given in (Efroni et al., 2022; Liu et al., 2022; 2023), which is formally denoted as a tuple P = ( S, A, O, r, H, ρ 0, P, O), where S is the state space, A is the action space, and O is the observation space. The positive integer H denotes the horizon length, 
+
+ρ0 is the initial state distribution, r : O × A → [0 , 1] is the reward function, P(·| s, a ) : S × A → ∆( S) is the transition kernel capturing dynamics over latent states, and 
+
+O(·| s) : S → ∆( O) is the emission kernel, which induces an observation from a given state. Initially, the agent starts at a state s0 drawn from ρ0(s). At each step h, the agent selects an action a from A. This leads to the generation of a new state sh+1 following the distribution P(·| sh, a h), from which the agent observes oh+1 
+
+according to O(·| sh+1 ). The agent also receives a reward 
+
+r(oh+1 , a h+1 ). Observing o instead of the true state s leads to a non-Markovian transition between observations, which means we need to consider policies πh : O × (A × O )h →
+
+∆( A) that depend on the entire history, denoted by τh =
+
+{o0, a 0, · · · , o h}. Let [H] := {0, . . . , H }. Then the value associated with policy π = {πh}h∈[H] is defined as vπ =
+
+Eπ
+
+hP 
+
+> h∈[H]
+
+r(oh, a h)
+
+i
+
+. The goal is to find the optimal policy π∗ = arg max π vπ . Note that the MDP given by 
+
+M = ( S, A, r, H, ρ 0, P) is a special case of a POMDP, where the state space S is equivalent to the observation space 
+
+O, and the emission kernel O(o|s) is defined as δ(o = s).Define the belief function b(·) : O× (A×O )h → ∆( S). Let 
+
+b(s1|o1) = P(s1|o1). Then we can recursively compute: 
+
+b(sh+1 |τh+1 ) ∝
+
+Z
+
+> S
+
+b(sh|τh)P(sh+1 |sh, a h)O(oh+1 |sh+1 )ds h.
+
+(1) With such a definition, one can convert a POMDP to an equivalent MDP over beliefs, denoted as Mb =(B, A, R h, H, μ b, T b), where B ⊆ ∆( S) represents the set of possible beliefs, μb(·) = R b(·| o1)μ(o1)do 1, and 
+
+Pb (bh+1 |bh, a h)=
+
+Z
+
+1bh+1 =b(τh,a h,o h+1 )P(oh+1 |bh, a h)do h+1 . (2) Notice that b(·) ∈ B is a mapping b : O × (A × O )h →
+
+∆( S), i.e. , each belief corresponds to a density measure over the state space, thus Pb (·| bh, a h) represents a con-ditional operator that characterizes the transition between belief distributions. For a given policy π : B → ∆( A), we can define the state value function V πh (bh) and state-action value function Qπh (bh, a h) respectively for the belief MDP (i.e. , equivalently for the original POMDP) as: 
+
+V πh (bh) = E
+
+hPHt=h r(ot, a t)|bh
+
+i
+
+,Qπh (bh, a h) = E
+
+hPHt=h r(ot, a t)|bh, a h
+
+i
+
+. (3) Therefore, the Bellman equation can be expressed as 
+
+V πh (bh) = Eπ [Qπh (bh, a h)] ,Qπh (bh, a h) = r(oh, a h) + EPb
+
+V πh+1 (bh+1 ) . (4) Although this reformulation of a POMDP provides a re-2Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+duction to an equivalent MDP, it is crucial to recognize that the equivalent MDP is based on beliefs, which are also not directly observed. More importantly, these beliefs are densities that depend on the entire history , hence the joint distribution is supported on a space of growing dimen-sion, leading to exponential representation complexity even when the number of states is finite. These difficulties result in infeasible computational and statistical complexity (Pa-padimitriou & Tsitsiklis, 1987; Jin et al., 2020a), and reveal the inherent suboptimality of directly applying MDP-based RL algorithms in a POMDP. Moreover, incorporating func-tion approximation in learning and planning is significantly more involved in a POMDP than an MDP. Consequently, several special structures have been inves-tigated in the theoretical literature to reduce the statis-tical complexity of learning in a POMDP. Specifically, 
+
+L-decodability and γ-observability have been introduced in (Du et al., 2019; Efroni et al., 2022) and (Golowich et al., 2022; Even-Dar et al., 2007) respectively. 
+
+Definition 1 (L-decodability (Efroni et al., 2022)) . ∀h ∈
+
+[H], define 
+
+xh ∈ X := ( O × A )L−1 × O ,xh = ( oh−L+1 , a h−L+1 , · · · , o h). (5) 
+
+A POMDP is L-decodable if there exists a decoder p∗ :
+
+X → ∆( S) such that p∗(xh) = b(τh).
+
+Definition 2 (γ-observability (Golowich et al., 2022; Even– Dar et al., 2007)) . Denote ⟨O, b ⟩ := R Oh (·| s) b (s) ds ,for arbitrary beliefs b and b′ over states. A POMDP is 
+
+γ-observable if ∥⟨ O, b ⟩ − ⟨ O, b ′⟩∥ 1 ⩾ γ ∥b − b′∥1.
+
+Note that we slightly generalize the decodability definition of Efroni et al. (2022), which assumes b(τh) is a Dirac measure on S. It is worth noticing that γ-observability and L-decodability are highly related. Existing works have shown that a γ-observable POMDP can be well approxi-mated by a decodable POMDP with a history of suitable length L (Golowich et al., 2022; Uehara et al., 2022; Guo et al., 2023) (see Appendix B for a detailed discussion). Hence, in the main text, we focus on L-decodable POMDPs, which can be directly extended to γ-observable POMDPs. Although these structural assumptions have been introduced to ensure the sample complexity of learning in a structured POMDP is reduced, the computational tractability of plan-ning and exploring given such structures remains open. 
+
+3. Difficulties in Learning with POMDPs 
+
+Before attempting to design practical RL algorithms for structured POMDPs, we first demonstrate the generic dif-ficulties of learning in POMDPs, including the difficulty of planning even in a known POMDP. These challenges only become more difficult when combined with the need to explore in an unknown POMDP during learning. The major difficulty of planning in a known POMDP 
+
+lies in evaluating the value function (Ross et al., 2008), which is necessary for both temporal-difference and policy gradient based planning and learning methods. For clarity in explaining the difficulties, consider estimating Qπ for a given policy π. (The same difficulties arise in estimating 
+
+Q∗.) Based on the Bellman equation (4), we have: 
+
+Qπh (bh, a h) = r (oh, a h) + EP(oh+1 |bh,a h)
+
+V πh+1 (bh+1 ) .
+
+To execute dynamic programming in the hth time step, i.e. ,to determine Qπh , we require several components: 
+
+i) The belief bh+1 (·) must be calculated, as defined in (1) ,which requires marginalization and renormalization, with a computational complexity proportional to the number of states. For continuous control, the calculation involves integration, which is intractable in general. 
+
+ii) Representing the value function V πh+1 (·) quickly becomes intractable, even for discrete state and action spaces. In general, expressing V πh+1 (·) requires space proportional to size of the support of beliefs, which is exponential w.r.t. the horizon. (The optimal value function V ∗ 
+
+> h+1
+
+(·) can be represented by convex piece-wise linear function (Small-wood & Sondik, 1973), but the number of components can grow exponentially in the horizon.) For continuous state POMDPS, no compact characterization is yet known for the space of value functions. 
+
+iii) The expectation EP(oh+1 |bh,a h) [V π (bh+1 )] requires in-tegration w.r.t. the distribution P(oh+1 |bh, a h) =R O(oh+1 |sh+1 )P (sh+1 |sh, a h) bh (sh) ds hds h+1 with computational cost proportional to the size of the sup-port of beliefs, which is also exponential in the horizon. These calculations are generally intractable in a POMDP, particularly one with a continuous state space. Due to this intractability, the exact calculation of the value function via the Bellman equation is generally infeasible. Consequently, many approximation methods have been proposed for each component of planning (Ross et al., 2008). However, the approximation error in each step can be amplified when these steps are composed through the Bellman recursion, leading to significantly suboptimal performance. Due to promising theoretical results that exploit γ-observability or L-decodability to reduce the exponential dependence on horizon in terms of statistical complexity, there have been many attempts to exploit these properties to also achieve computationally tractable planning for RL in a POMDP. Golowich et al. (2022) construct an approximate MDP for an L-observable POMDP, whose approximation error can be characterized for planning. However, the pro-posed algorithm only works for POMDPs with discrete observations, states and actions. Alternatively, Guo et al. (2023) exploits low-rank latent dynamics in an L-decodable POMDP, which induces a nonlinear representation for value functions. Unfortunately, this nonlinear structure has not been shown to support any practical algorithm. To imple-3Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+ment the backup step in dynamic programming for Qπ , the algorithm in (Guo et al., 2023) requires an integration-oracle to handle the nonlinearity, which is generally infeasible. Another barrier to practical learning in a POMDP is ex-ploration , which is usually implemented in planning by appealing to the principle of optimism in the face of un-certainty (OFU). Unfortunately, OFU usually requires not only the estimation of the model or value function, but also their uncertainty, e.g. , a confidence interval in frequentist ap-proaches (Liu et al., 2022; 2023) or the posterior in Bayesian approaches (Simchowitz et al., 2021). Practical and general implementations are not yet known in either case. These major issues, which have not been carefully consid-ered in empirical RL algorithms that leverage history-based neural networks (Wierstra et al., 2007; Hausknecht & Stone, 2015; Zhu et al., 2017), interact in ways that exaggerate the difficulty of developing efficient algorithms for POMDPs. 
+
+4. Multi-step Latent Variable Representation 
+
+In this section, we develop the first computationally effi-cient planning and exploration algorithm by further lever-aging the structure of an L-decodable POMDP. The main contribution is to identify a latent variable representation that can linearly represent the value function of an arbitrary policy in an L-step decodable POMDP. From this represen-tational perspective, we show that explicit belief calculation can be bypassed and the backup step can be directly calcu-lated via optimization. We then show how a latent variable representation learning algorithm can be designed, based upon (Ren et al., 2023b), that leads to the proposed Multi-step Latent Variable Representation ( μLV-Rep) method. 
+
+4.1. Efficient Policy Evaluation from Key Observations 
+
+Although the equivalent belief MDP provides a Markovian Bellman recursion (4) , as discussed in Section 3, this belief viewpoint hampers tractability in planning. In the following, we introduce the key observations that allow us to resolve the aforementioned difficulties in planning step-by-step. 
+
+Belief Elimination. Our first key observation is that L-decodability eliminates an aspect of exponential complexity: • In an L-decodable POMDP, it is sufficient to recover the belief state by an L-step memory xh rather than the entire history τh.
+
+This is exactly the definition of L-decodability given in Definition 1. From this observation that beliefs bh (s)
+
+can be represented with a decoder from L-step windows 
+
+xh (5) , we obtain the simplification Qπh (bh (τh) , a h) = 
+
+Qπh (bh (xh) , a h). In addition, L-decodability also helps reduce dependence in the dynamics, leading to 
+
+P (oh+1 |bh (τh) , a h) = P (oh+1 |bh (xh) , a h). This out-come reduces the statistical complexity, as previously ex-ploited in (Efroni et al., 2022; Guo et al., 2023). However, it is not sufficient to ensure computationally friendly planning. Next we make a second key observation that allows us to eliminate the explicit use of beliefs in the Bellman equation: • An observation-based value function and transition model bypasses the necessity for belief computation. 
+
+That is, since bh (·) is a mapping from the history 
+
+xh to the space of probability densities over state, we can reparametrize the composition Qπh (bh(xh), a h) as 
+
+Qπh (xh, a h), which is a function directly over (xh, a h).Similarly, we can also consider the transition dynamics di-rectly defined over the observation history, P (oh+1 |xh, a h),rather than work with the far more complex dynamics be-tween successive beliefs. With such a reformulation, we avoid explicit dependence on beliefs in the Qπ -function and dynamics in the Bellman recursion (4) . This resolves the first difficulty that arises from explicit belief calculation, leading to the simplified Bellman equation:          
+
+> Qπh(xh, a h) = r(oh, a h) + EPπ(oh+1 |xh,a h)
+> Vπh+1 (xh+1 ).
+
+(6) 
+
+Linear Representation for Qπ . Next, we address a sec-ond key difficulty that arises in representing V πh+1 (xh+1 ) = 
+
+Ea∼π
+
+Qπh+1 (xh+1 , a h+1 ). We seek an exact represen-tation that can be recursively maintained. Inspired by the success of representing value functions exactly in lin-ear MDPs (Jin et al., 2020b; Yang & Wang, 2020), it is natural to consider xh as a mega-state (Efroni et al., 2022) and factorize the observation distribution in (6) as 
+
+P (oh+1 |bh, a h) = ⟨ϕ (xh, a h) , μ (oh+1 )⟩ over basis func-tions ϕ and μ. However, it is important to realize there is an additional dependence of V πh+1 (xh+1 ) on (xh, a h), since 
+
+xh+1 = ( oh−L+2 , a h−L+2 , · · · , o h, a h,o h+1 )
+
+has an overlap with 
+
+(xh, a h) = ( oh−L+1 , a h−L+1 , o h−L+2 , a h−L+2 , · · · , o h, a h).
+
+This overlap breaks the maintained linear structure, since 
+
+Qπh (bh, a h) = rh (oh, a h) + 
+
+*
+
+ϕ (xh, a h) ,
+
+Z
+
+μ (oh+1 ) Vh+1 (xh, a h, o h+1 ) do h+1 
+
+| {z }
+
+> w(xh,a h)
+
++
+
+.
+
+That is, the nonlinearity in w (xh, a h) prevents the direct extension of linear MDPs with mega-states (Efroni et al., 2022) to the POMDP case (Guo et al., 2023). Nevertheless, a linear representation for the value function can still be recovered if the dependence of the h + 1 -step value function on (xh, a h) can be eliminated. The next key observation shows how this overlap might be avoided: • By L-step decodability, V πh+L(xh+L) is independent of 
+
+(xh, a h).
+
+This observation inspires us to consider the L-step Bellman equation for Qπh (τh, a h), which can be easily derived by expanding (4) forward in time to: 
+
+Qπh (xh, a h) = (7) 
+
+Eπxh+1: h+L|xh,a h
+
+hPh+L−1 
+
+> i=h
+
+r(oi, a i) + V πh+L(xh+L)
+
+i
+
+.
+
+4Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+At first glance, the L-step forward expansion only involves 
+
+V πh+L(xh+L), which would seem to eliminate the overlap-ping dependence of xh+L on (xh, a h) due to L-step decod-ability. However, the forward steps are conducted according to the policy πh+1: h+L−1, which still depends on parts of 
+
+(xh, a h), hence the distribution Pπ (xh+L|xh, a h) in the ex-pectation in (7) still retains a dependence on (xh, a h).We introduce the final key observation that allows us to fully eliminate the dependence: • For any policy π, there exists a corresponding policy νπ
+
+that conditions on a sufficient latent variable to gener-ate the same expected observation dynamics while being independent of history older than L steps. 
+
+The νπ is known as the “moment matching policy" (Efroni et al., 2022). The existence of such an equivalent νπ is guaranteed by L-decodability: we defer the detailed con-struction of νπ to Appendix C to avoid distraction, and focus on algorithm design in the main text. With such a policy νπ , the dependence of πh+1: h+L−1 on 
+
+(xh, a h) at the Lth-step in Pπ (xh+L|xh, a h) can be elimi-nated. Specifically, consider 
+
+Pπ (xh+L|xh, a h)= 
+
+Z
+
+p(zh+1 |xh, a h)Pνπ (xh+L|zh+1 ) dz h+1 
+
+=⟨p(·| xh, a h), Pνπ (xh+L|· )⟩L2(μ) , (8) where z denotes the latent variable and the first equality follows from the construction of νπ . We emphasize that the idea of the moment matching policy was only considered as a proof technique in (Efroni et al., 2022), and not previously exploited to uncover linear structure for algorithm design. 
+
+Remark (Identifiability): It should be noted that we de-liberately use a latent variable z rather than s in (8) , to em-phasize the learned latent variable structure can be different from the ground truth state, thus avoiding an identifiabil-ity assumption. Nevertheless, the learned structure has the same effect in representing Qπ linearly. Based on the above observations, we have addressed the necessary components for a linear representation of the value function, achieved by introducing (8) into (7) . For the first term in (7), for ∀k ∈ { 1, . . . , L − 1}, we have 
+
+Eπoh+k |xh,a h [r (oh+k, a h+k)] (9)        
+
+> =
+> *
+> p(·| xh, a h),
+> Z
+> Pνπ(oh+k, a h+k|· )r(oh+k, a h+k)do h+kda h+k
+> |{z }
+> wπk(·)
+> +
+> .
+
+That is, using the “moment matching policy" trick, the pol-icy νπ is independent of (xh, a h), while Pνπ (oh+k, a h+k|· )
+
+is independent of history, leading to the linear representation in (9). Similarly, for the second term in (7), we have            
+
+> Eπ
+> Vπh+L(xh+L)=RPπ(xh+L|xh, a h)Vπ(xh+L)dx h+L
+
+(10) 
+
+=
+
+*
+
+p(·| xh, a h),
+
+Z
+
+Pνπ (xh+L|· ) V π (xh+L) dx h+L
+
+| {z }
+
+> wπh+L(·)
+
++
+
+.
+
+Recall that xh+L does not overlap with xh, so under νπ ,
+
+wπh+L (·) is independent of (xh, a h).By combining (9) and (10) and defining wπ = Ph+Lk=h wπh+k,we conclude that, in an L-step decodable POMDP, the value function Qπ can be represented linearly in p (·| xh, a h) as 
+
+Qπh (xh, a h) = ⟨p (·| xh, a h) , w π (·)⟩L2(μ) , (11) under the assumption that r (oh, a h) = ⟨p(·| xh, a h), ω r (·)⟩,which can be easily achieved by feature augmentation (Ren et al., 2023a). 
+
+Least Square Policy Evaluation. The final difficulty in a practical algorithm design is addressing the expectation calculation in the Bellman equation (7) . With the linear rep-resentation established for the value function Qπh , the entire backup step for dynamic programming with the Bellman recursion can be replaced by a least squares regression in the space spanned by ϕ (xh, a h). Specifically, at step h, we seek an estimate of Qπh+L(xh+L, a x+L) that is expressed as ˜wπh+L, p (·| xh+L, a a+L) , which can be obtained by the optimization: 
+
+min 
+
+> wπh
+
+Eπxh+1: h+L,x h,a h
+
+ 
+
+⟨wπh , p (·| xh, a h)⟩ − (12) 
+
+ h+L−1X
+
+> i=h
+
+r(oi, a i) + ˜wπh+L, p (·| xh+L, a h+L)
+
+2
+
+,
+
+This problem can be easily solved by stochastic gradient descent. Setting the gradient to zero, one obtains the optimal solution to (12) as: 
+
+⟨wπh , p (·| xh, a h)⟩ =
+
+Exh+1: h+L
+
+"h+L−1X
+
+> i=h
+
+r(oi, a i) + ˜wπh+L, p (·| xh+L, a h+L)
+
+#
+
+,
+
+which completes the Bellman backup. In summary, we obtain an efficient policy evaluation algo-rithm for L-decodable POMDPs that only requires least squares optimization upon a linear representation of an 
+
+observation-based value function. 
+
+Remark (Connection to Linear MDPs (Jin et al., 2020b; Yang & Wang, 2020)): The linear structure we have re-vealed for POMDP value functions has some similarity to value function representations in linear MDPs. One key difference between the factorization in (8) and that in a linear MDP, i.e. , P (s′|s, a ) = ⟨ϕ (s, a ) , μ (s′)⟩, is that the latter factorizes for different transitions of the representa-tion. Therefore, in a linear MDP, one obtains a policy-independent decomposition, where both the components 
+
+ϕ (s, a ) and μ (s′) from the transition dynamics are invari-ant w.r.t. the policy. By contrast, in (8) for a POMDP, one of the factors, Pνπ (xh+L|· ), depends on the policy. Never-theless, we have demonstrated that this does not affect the linear representation ability of p (·| xh, a h) for Qπ .
+
+Remark (Connection to PSR (Littman & Sutton, 2001): 
+
+Both the linear representation revealed in this paper and 5Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Algorithm 1 Online Exploration for L-step decodable POMDPs with Latent Variable Representation 
+
+1: Input: Model Class M =
+
+{{ (ph(z|xh, a h), p h(oh+1 |z)}h∈[H]}, Variational Distribution Class Q = {{ qh(z|xh, a h, o h+1 )}h∈[H]},Episode Number K.
+
+2: Initialize πh 
+
+> 0
+
+(s) = U(A), ∀h ∈ [H] where U(A) de-notes the uniform distribution on A; D0,h = ∅, D′ 
+
+> 0,h
+
+=
+
+∅, ∀h ∈ [H].
+
+3: for episode k = 1 , · · · , K do 
+
+4: Initialize Dk,h = Dk−1,h , D′ 
+
+> k,h
+
+= D′
+
+> k−1,h
+
+5: for Step h = 1 , · · · , H do 
+
+6: Collect the transition 
+
+(xh, a h, o h+1 , a h+1 , · · · , o h+L−1, a h+L−1, o h+L)
+
+where xh ∼ dπk ,h  
+
+> P
+
+, ah:h+L−1 ∼ U(A),
+
+oh+i ∼ PP (·| xh+i−1, a h+i−1), ∀i ∈ [L].
+
+7: Dk,h = Dk,h ∪ { xh, a h, o h+1 }, D′ 
+
+> k,h +i
+
+=
+
+D′ 
+
+> k,h +i
+
+∪ { xh+i, a h+i, o h+i+1 }, ∀i ∈ [L].
+
+8: end for 
+
+9: Learn the latent variable model ˆpk(z|xh, a h)
+
+with Dk,h ∪ D′ 
+
+> k,h
+
+via maximizing the ELBO, and obtain the learned model bPk =
+
+{(ˆ ph,k (z|xh, a h), ˆph,k (oh+1 |z)) }h∈[H].
+
+10: (Optional) Set the exploration bonus ˆbk,h (s, a ).
+
+11: Update policy πk = arg max π V π 
+
+> bPk,r +ˆbk
+
+.
+
+12: end for 
+
+13: Return π1, · · · , π K .the predictive state representation (PSR) (Littman & Sut-ton, 2001) bypass explicit belief calculation by factorizing the observation transition system. However, there are sig-nificant differences between the two structures that affect planning and exploration. Specifically, the PSR is based on the assumption that, for any finite sequence of events 
+
+yh+1: k = ( oh+1: h+k, a h:h+k−1), k ∈ N+, following a history xh, the probability can be linearly factorized as 
+
+P (oh+1: h+k|xh, a h:h+k−1) = ωyh+1: k , P (U |xh) , where 
+
+ωyh+1: k ∈ Rd, U := [ ui]di=1 is a set of core test events, and P (U |xh) is the predictive state representation at step h.Then, the forward observation dynamics can be represented in a PSR via Bayes’ rule, P (oh+2: k|xh, a h:h+k−1, o h+1 ) = 
+
+⟨ωyh+2: k ,P(U |xh)⟩⟨ωyh+1 ,P(U |xh)⟩ , which introduces a nonlinear operation, making planning and exploration both extremely difficult. 
+
+4.2. Learning with Exploration 
+
+We have developed a linear representation for Qπh that en-ables efficient planning. This section discusses how to learn and explore on top of this representation. The full algorithm is presented in Algorithm 1. 
+
+Variational Learning of μLV-Rep. As we generally do not have the latent variable representation p(·| xh, a h) be-forehand, it is essential to perform representation learning with online collected data. One straightforward idea is to apply maximum likelihood estimation on Pπ (xh+k|xh, a h).Although this is theoretically correct, due to the overlap be-tween xh+k and xh, a naive parametrization unnecessarily wastes memory and computational costs. Recall that we only need p (zh|xh) to represent Qπh , and from 
+
+p (oh+1: h+l|xh, a h) = 
+
+Z
+
+> Z
+
+p(zh|xh, a h) (13) 
+
+·
+
+> l
+
+Y
+
+> i=1
+
+Z 
+
+> Z
+
+Pπ (zh+i|zh+i−1, a i)p(oh+i|zh+i)dz h+i
+
+| {z } 
+
+> Pπ(oh+1: h+l|zh)
+
+dz h,
+
+we can obtain p(·| xh, a h) by performing maximum likeli-hood estimation (MLE) on p (oh+1: h+l|xh, a h) for arbitrary 
+
+l ∈ N+. To obtain a tractable surrogate for the MLE of the latent variable model (13) , we exploit the evidence lower bound (ELBO) (Ren et al., 2023b): 
+
+log p (oh+1: h+l|xh, a h)= log 
+
+Z
+
+> Z
+
+p(zh|xh, a h)Pπ (oh+1: h+l|zh)= log R  
+
+> Z
+> p(zh|xh,a h)Pπ(oh+1: h+l|zh)
+> q(z|xh,a h,o h+1: h+l)
+
+q(z|xh, a h, o h+1: h+l)= max  
+
+> q∈∆( Z)
+
+Eq(·| xh,a h,o h+1: h+l) [log Pπ (oh+1: h+l|zh)] 
+
+− DKL (q(z|xh, a h, o h+1: h+l)|| p(zh|xh)) , (14) where the last equation comes from Jensen’s inequal-ity, with equality holding when q(z|xh, a h, o h+1: h+l) ∝
+
+p(zh|xh, a h)Pπ (oh+1: h+l|zh). One can use (14) with data to fit the μLV-Rep. For the ease of the presentation, we choose l = 1 in Algorithm 1. 
+
+Practical Parametrization of Qπ with μLV-Rep. 
+
+With μLV-Rep, we can represent Qπh (xh, a h) =
+
+⟨p(z|xh), w πh (z)⟩L2(μ). If the latent variable z in p(z|xh)
+
+is an enumeratable discrete variable, Qπ (xh, a h) =P 
+
+> i=m
+
+wπ (zi) p(zi|xh), can be simply represented. However, a discrete latent variable is not differentiable, which causes difficulty in learning. Therefore, we use a continuous latent variable z, which induces an infinite-dimensional w(z). To address this challenge, we follow the trick in LV-Rep (Ren et al., 2023b) that forms Qπ (xh, z h)
+
+as an expectation: 
+
+Qπ (xh, a h) = ⟨p(z|xh), w π (z)⟩ = Ep(z|xh) [wπ (z)] 
+
+which can then be approximated by a Monte-Carlo method or random feature quadrature (Ren et al., 2023b): 
+
+Qπ (xh, a h) ≈ 1
+
+> m
+
+Pmi=1 wπ (zi) or 1
+
+> m
+
+Pmi=1 ˜wπ (ξi)φ (zi, ξ i)
+
+with samples zi ∼ p(z|xh) and ξi ∼ P (ξ) as the random feature measure for the RKHS containing w(z). Both ap-proximations can be implemented by a neural network. Due to space limitations, we defer the derivation of the random feature quadrature to Appendix E. 
+
+Planning and Exploration with μLV-Rep. Given an ac-curate estimator for Q functions, we can perform plan-ning with standard dynamic programming (e.g. Munos & Szepesvári, 2008). However, dynamic programming in-6Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+volves an arg max operation, which is only tractable when 
+
+|A| < ∞. To deal with continuous actions, we leverage popular policy gradient methods like SAC (Haarnoja et al., 2018), with the critic parameterized by μLV-Rep. To improve the exploration, we can leverage the idea of Ue-hara et al. (2021); Ren et al. (2023b) and add an additional ellipsoid bonus to implement optimism in the face of uncer-tainty. Specifically, if we use random feature quadrature, we can compute such a bonus via: 
+
+ˆψh,k (xh, a h) = [ φ(zi; ξi)] i∈[m] ,
+
+where {zi}i∈[m] ∼ ˆpk,h (z|xh, a h), {ξi}i∈[m] ∼ P (ξ),
+
+ˆbk,h (s, a ) = αk ˆψh,k (xh, a h) ˆΣ−1 
+
+> k,h
+
+ˆψh,k (xh, a h),
+
+where ˆΣk,h = P
+
+> Dk,h
+
+ˆψk,h (xh,i , a h,i ) ˆψk,h (xh,i , a h,i )⊤ +
+
+λI , and αk, λ are user-specified constants. Similarly, the bonus can be used to implement pessimism in the face of un-certainty for offline settings, which we defer to Appendix D. 
+
+5. Theoretical Analysis 
+
+In this section, we provide a formal sample complexity anal-ysis of the proposed algorithm. We start from the following assumptions, that are commonly used in the literature (e.g. Agarwal et al., 2020; Uehara et al., 2021; Ren et al., 2023b). 
+
+Assumption 1 (Finite Candidate Class with Realizabil-ity) . |M| < ∞ and {(p∗
+
+> h
+
+(z|xh, a h), p ∗
+
+> h
+
+(oh+1 |z)) }h∈[H] ∈M. Meanwhile, for all (ph(z|xh, a h), p (oh+1 |z)) ∈ M ,
+
+ph(z|xh, a h, o h+1 ) ∈ Q .
+
+Assumption 2 (Normalization Conditions) . ∀P ∈M, (xh, a h) ∈ X × A , ∥ph(·| xh, a h)∥HK ⩽ 1 for some kernel K. Furthermore, ∀g : X → R such that ∥g∥∞ ⩽ 1,we have R 
+
+> X
+
+p(xh+L|· )g(xh+L)dx h+L HK
+
+⩽ C.
+
+Then, we have the following sample complexity bound for 
+
+μLV-Rep, with detailed proofs given in Appendix F. 
+
+Theorem 3 (PAC Guarantee, Informal version of Theo-rem 13) . Assume the kernel K satisfies the regularity condi-tions in Appendix F.1. If we properly choose the exploration bonus ˆbk(x, a ), we can obtain an ε-optimal policy with prob-ability at least 1 − δ after we interact with the environments for N = poly  C, H, |A| L, L, ε, log( |M| /δ ) episodes. 
+
+6. Related Work 
+
+Representation has been previously considered in partially observable reinforcement learning, but for different pur-poses. Vision-based representations (Yarats et al., 2020; Seo et al., 2023) have been designed to extract compact features from raw pixel observations. We emphasize that this type of observation feature does not explicitly capture dynam-ics properties, and is essentially orthogonal to (but natu-rally compatible with) the proposed representation. Many dynamic-aware representation methods have been devel-oped, such as bi-simulation (Ferns et al., 2004; Gelada et al., 2019; Zhang et al., 2020), successor features (Dayan, 1993; Barreto et al., 2017; Kulkarni et al., 2016), spectral repre-sentation (Mahadevan & Maggioni, 2007; Wu et al., 2018; Duan et al., 2019), and contrastive representation (Oord et al., 2018; Nachum & Yang, 2021; Yang et al., 2021). Our proposed representation for POMDPs has been inspired by recent progress (Jin et al., 2020b; Yang & Wang, 2020; Agar-wal et al., 2020; Uehara et al., 2022) in revealing low-rank structure in the transition kernel of MDPs, and inducing effective linear representations for the state-action value function for an arbitrary policy. These prior discoveries have led to a series of practical and provable RL algorithms in the MDP setting, achieving a delicate balance between learning, planning and exploration (Ren et al., 2022; Zhang et al., 2022; Ren et al., 2023c;b). Although these algorithms demonstrate theoretical and empirical benefits, they rely on the Markovian assumption, hence are not applicable to the POMDP setting we consider here. There have been several attempts to exploit the low-rank representation in POMDPs to reduce statistical complex-ity (Efroni et al., 2022). Azizzadenesheli et al. (2016) and Guo et al. (2016) exploit spectral learning for model estima-tion without exploration; Jin et al. (2020a) explores within an spectral estimation set; Uehara et al. (2022) builds upon the Bellman error ball; Zhan et al. (2022); Liu et al. (2022) consider the MLE confidence set for low-rank structured models; and (Huang et al., 2023) construct a UCB-type algo-rithm upon the MLE ball of PSR. However, these algorithms rely on intractable oracles for planning, and fewer works consider exploiting low-rank structure to achieve computa-tionally tractable planning. One exception is (Zhang et al., 2023; Guo et al., 2023), which still includes intractable operations, i.e. , infinite-dimensional operations or integrals. 
+
+7. Experimental Evaluation 
+
+We evaluate the proposed method on Meta-world (Yu et al., 2019), which is an open-source simulated benchmark con-sisting of 50 distinct robotic manipulation tasks with visual observations. We also provide experiment results on partial observable control problems constructed based on OpenAI gym MuJoCo (Todorov et al., 2012) in Appendix H.2. Com-parison on classic POMDP benchmarks, such as the Rock-Sample problem, is worth further study. (Smith & Simmons, 2012; Kurniawati et al., 2009). We notice that directly acquiring a robust control represen-tation through predicting future visual observations can be challenging due to the redundancy of information in images for effective decision-making. As a result, a more advanta-geous approach involves obtaining an image representation first and subsequently learning a latent representation based on this initial image representation. In particular, we em-ploy visual observations with dimensions of 64 × 64 × 3 and apply a variational autoendocer (VAE) (Kingma & Welling, 2013) to learn a representation of these visual observations. The VAE is trained during the online learning procedure. 7Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 0.0 0.2 0.4 0.6 0.8 1.0                    
+
+> Environment Steps 1e6
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Coffee Push
+> LV-Rep
+> MWM
+> DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0
+> Environment Steps 1e6
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Plate Slide
+> LV-Rep
+> MWM
+> DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0
+> Environment Steps 1e6
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Success Rate (%)
+> Push
+> LV-Rep
+> MWM
+> DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0
+> Environment Steps 1e6
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> 120
+> Success Rate (%)
+> Sweep Into
+> LV-Rep
+> MWM
+> DreamerV2
+
+Figure 1. Learning curves on visual robotic manipulation tasks from Meta-world measured by success rate. Our method shows better or comparable sample efficiency compared to baseline methods. Learning curves on all 50 tasks are reported in Appendix H. ButtonPress 
+
+> CoffeeButton
+> FaucetOpen
+> ButtonPressTopdown
+> DrawerOpen
+> DrawerClose
+> FaucetClose
+> ButtonPressWall
+> ButtonPressTopdownWall
+> DoorLock
+> DoorUnlock
+> DoorOpen
+> PlateSlideSide
+> HandlePullSide
+> BinPicking
+> HandlePressSide
+> LeverPull
+> HandlePress
+> HandlePull
+> PegInsertSide
+> PlateSlide
+> PlateSlideBack
+> PlateSlideBackSide
+> Reach
+> WindowOpen
+> DoorClose
+> ReachWall
+> WindowClose
+> BoxClose
+> Hammer
+> Sweep
+> CoffeePush
+> Push
+> PegUnplugSide
+> HandInsert
+> CoffeePull
+> SweepInto
+> PushBack
+> PushWall
+> Basketball
+> DialTurn
+> PickPlace
+> Soccer
+> StickPush
+> Assembly
+> Disassemble
+> PickOutOfHole
+> PickPlaceWall
+> ShelfPlace
+> StickPull -100.0%
+> 0.0%
+> 100.0%
+> 200%
+> Performance Gain
+
+Figure 2. The performance gain on 50 Meta-world tasks after 1 million interactions. Our results surpass or are comparable to (with a difference of less than or equal to 10%) the best baselines on 41 out of the 50 tasks. 
+
+This produces compact vector representations for the im-ages, which are then forwarded as input to the representation learning method. As detailed in Section 4.2, we learn the latent representations by making predictions about future outcomes using a history of length L. To achieve this, we employ a continuous latent variable model similar to (Ren et al., 2023b; Hafner et al., 2020), approximating distri-butions with Gaussians parameterized by their mean and variance. We then apply Soft Actor-Critic (SAC) as the planner (Haarnoja et al., 2018), which takes the learned rep-resentation as input of the critic. We apply L = 3 across all domains (with an ablation study provided in Appendix H.1). More implementation details, including network architec-tures and hyper-parameters, are provided in Appendix H. We consider two baseline methods, DreamerV2 (Hafner et al., 2021) and the Masked World Model (MWM) (Seo et al., 2023). DreamerV2 is designed to acquire latent rep-resentations, which are subsequently input into a recurrent neural network for environment modeling. MWM utilizes an autoencoder equipped with convolutional layers and vi-sion transformers (ViT) rather than reconstructing visual observations. This autoencoder is employed to reconstruct pixels based on masked convolutional features, allowing MWM to learn a latent dynamics model that operates on the representations derived from the autoencoder. Figure 1 presents the learning curves of all algorithms as measured on the success rate for 1M environment steps, averaged over 5 random seeds. We observe that μLV-Rep exhibits superior performance compared to both DreamerV2 and MWM, demonstrating faster convergence and achiev-ing higher final performance across all four tasks reported. We also provide the learning curves for all 50 Meta-world tasks in Appendix H.2. It is noteworthy that while MWM achieves comparable sample efficiency with μLV-Rep in cer-tain tasks, it incurs higher computational costs and longer running times due to the incorporation of ViT network in its model. In our experimental configurations, μLV-Rep demonstrates a training speed of 21.3 steps per second, out-performing MWM, which achieves a lower training speed of 8.1 steps per second. This highlights the computational effi-ciency of the proposed method. Figure 5 illustrates the final performance of μLV-Rep across 50 Meta-world tasks (blue bars), comparing it with the best performance achieved by DreamerV2 and MWM (gray bars). We observe that μLV-Rep achieves better than 90% success on 33 tasks. It also performs better or equivalent to (within 10% difference) the best of DreamerV2 and MWM on 41 tasks. 
+
+8. Conclusion 
+
+In this paper, we aimed to develop a practical RL algorithm for structured POMDPs that obtained efficiency in terms of both statistical and computational complexity. We revealed some of the challenges in computationally exploiting the low-rank structure of a POMDP, then derived a linear repre-sentation for the Qπ -function, which automatically implies a practical learning method, with tractable planning and exploration, as in μLV-Rep. We theoretically analyzed the sub-optimality of the proposed μLV-Rep, and empirically demonstrated its advantages on several benchmarks. 8Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+References 
+
+Agarwal, A., Kakade, S., Krishnamurthy, A., and Sun, W. Flambe: Structural complexity and representation learn-ing of low rank mdps. Advances in neural information processing systems , 33:20095–20107, 2020. Aronszajn, N. Theory of reproducing kernels. Transactions of the American mathematical society , 68(3):337–404, 1950. Åström, K. J. Optimal control of markov processes with incomplete state information. Journal of mathematical analysis and applications , 10(1):174–205, 1965. Azizzadenesheli, K., Lazaric, A., and Anandkumar, A. Re-inforcement learning of pomdps using spectral methods. In COLT , 2016. Bakker, B. Reinforcement learning with long short-term memory. NeurIPS , 2001. Barreto, A., Dabney, W., Munos, R., Hunt, J. J., Schaul, T., van Hasselt, H. P., and Silver, D. Successor features for transfer in reinforcement learning. NeurIPS , 2017. Barth-Maron, G., Hoffman, M. W., Budden, D., Dabney, W., Horgan, D., Tb, D., Muldal, A., Heess, N., and Lil-licrap, T. Distributed distributional deterministic policy gradients. arXiv preprint arXiv:1804.08617 , 2018. Berner, C., Brockman, G., Chan, B., Cheung, V., D˛ ebiak, P., Dennison, C., Farhi, D., Fischer, Q., Hashme, S., Hesse, C., et al. Dota 2 with large scale deep reinforcement learning. arXiv preprint arXiv:1912.06680 , 2019. Chen, M., Frazzoli, E., Hsu, D., and Lee, W. S. Pomdp-lite for robust robot planning under uncertainty. In 2016 IEEE International Conference on Robotics and Automation (ICRA) , pp. 5427–5433. IEEE, 2016. Dayan, P. Improving generalization for temporal difference learning: The successor representation. Neural computa-tion , 5(4):613–624, 1993. Deisenroth, M. P. and Peters, J. Solving nonlinear con-tinuous state-action-observation pomdps for mechanical systems with gaussian noise. In European Workshop on Reinforcement Learning , 2012. Du, S., Krishnamurthy, A., Jiang, N., Agarwal, A., Dudik, M., and Langford, J. Provably efficient rl with rich obser-vations via latent state decoding. In International Con-ference on Machine Learning , pp. 1665–1674. PMLR, 2019. Duan, Y., Ke, T., and Wang, M. State aggregation learning from markov transition data. NeurIPS , 2019. Efroni, Y., Jin, C., Krishnamurthy, A., and Miryoosefi, S. Provable reinforcement learning with a short-term mem-ory. In International Conference on Machine Learning ,pp. 5832–5850. PMLR, 2022. Even-Dar, E., Kakade, S. M., and Mansour, Y. The value of observation for monitoring dynamic systems. In IJCAI ,pp. 2474–2479, 2007. Ferns, N., Panangaden, P., and Precup, D. Metrics for finite markov decision processes. In UAI , 2004. Gangwani, T., Lehman, J., Liu, Q., and Peng, J. Learning belief representations for imitation learning in pomdps. In UAI , 2020. Gelada, C., Kumar, S., Buckman, J., Nachum, O., and Belle-mare, M. G. Deepmdp: Learning continuous latent space models for representation learning. In ICML , 2019. Golowich, N., Moitra, A., and Rohatgi, D. Learning in observable pomdps, without computationally intractable oracles. Advances in Neural Information Processing Sys-tems , 35:1458–1473, 2022. Gregor, K., Jimenez Rezende, D., Besse, F., Wu, Y., Merzic, H., and van den Oord, A. Shaping belief states with generative environment models for rl. NeurIPS , 2019. Guo, J., Li, Z., Wang, H., Wang, M., Yang, Z., and Zhang, X. Provably efficient representation learning with tractable planning in low-rank pomdp. arXiv preprint arXiv:2306.12356 , 2023. Guo, Z. D., Doroudi, S., and Brunskill, E. A pac rl algo-rithm for episodic pomdps. In Artificial Intelligence and Statistics , pp. 510–518. PMLR, 2016. Guo, Z. D., Azar, M. G., Piot, B., Pires, B. A., and Munos, R. Neural predictive belief representations. arXiv preprint arXiv:1811.06407 , 2018. Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. Soft actor-critic: Off-policy maximum entropy deep reinforce-ment learning with a stochastic actor. In International conference on machine learning , pp. 1861–1870. PMLR, 2018. 9Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Hafner, D., Lillicrap, T., Ba, J., and Norouzi, M. Dream to control: Learning behaviors by latent imagination. In International Confer-ence on Learning Representations , 2020. URL 
+
+https://openreview.net/forum?id=S1lOTC4tDS .Hafner, D., Lillicrap, T. P., Norouzi, M., and Ba, J. Mas-tering atari with discrete world models. In International Conference on Learning Representations , 2021. URL 
+
+https://openreview.net/forum?id=0oabwyZbOu .Hausknecht, M. and Stone, P. Deep recurrent q-learning for partially observable mdps. In AAAI fall symposium series , 2015. Hauskrecht, M. and Fraser, H. Planning treatment of is-chemic heart disease with partially observable markov decision processes. Artificial intelligence in medicine , 18 (3):221–244, 2000. Heess, N., Hunt, J. J., Lillicrap, T. P., and Silver, D. Memory-based control with recurrent neural networks. 
+
+arXiv:1512.04455 , 2015. Huang, R., Liang, Y., and Yang, J. Provably efficient ucb-type algorithms for learning predictive state representa-tions. arXiv preprint arXiv:2307.00405 , 2023. Igl, M., Zintgraf, L., Le, T. A., Wood, F., and Whiteson, S. Deep variational reinforcement learning for pomdps. In 
+
+ICML , 2018. Jiang, H., Dai, B., Yang, M., Zhao, T., and Wei, W. To-wards automatic evaluation of dialog systems: A model-free off-policy evaluation approach. arXiv preprint arXiv:2102.10242 , 2021. Jin, C., Kakade, S., Krishnamurthy, A., and Liu, Q. Sample-efficient reinforcement learning of undercom-plete pomdps. Advances in Neural Information Process-ing Systems , 33:18530–18539, 2020a. Jin, C., Yang, Z., Wang, Z., and Jordan, M. I. Provably efficient reinforcement learning with linear function ap-proximation. In COLT , 2020b. Kaelbling, L. P., Littman, M. L., and Cassandra, A. R. Plan-ning and acting in partially observable stochastic domains. 
+
+Artificial intelligence , 101(1-2):99–134, 1998. Kaufmann, E., Bauersfeld, L., Loquercio, A., Müller, M., Koltun, V., and Scaramuzza, D. Champion-level drone racing using deep reinforcement learning. Nature , 620 (7976):982–987, 2023. Kingma, D. P. and Welling, M. Auto-encoding variational bayes. arXiv preprint arXiv:1312.6114 , 2013. Kulkarni, T. D., Saeedi, A., Gautam, S., and Gersh-man, S. J. Deep successor reinforcement learning. 
+
+arXiv:1606.02396 , 2016. Kurniawati, H., Hsu, D., and Lee, W. S. Sarsop: Efficient point-based pomdp planning by approximating optimally reachable belief spaces. 2009. Lee, A. X., Nagabandi, A., Abbeel, P., and Levine, S. Stochastic latent actor-critic: Deep reinforcement learn-ing with a latent variable model. NeurIPS , 2020. Levine, S., Finn, C., Darrell, T., and Abbeel, P. End-to-end training of deep visuomotor policies. The Journal of Machine Learning Research , 17(1):1334–1373, 2016. Littman, M. and Sutton, R. S. Predictive representations of state. Advances in neural information processing systems ,14, 2001. Liu, Q., Chung, A., Szepesvári, C., and Jin, C. When is partially observable reinforcement learning not scary? In 
+
+Conference on Learning Theory , pp. 5175–5220. PMLR, 2022. Liu, Q., Netrapalli, P., Szepesvari, C., and Jin, C. Optimistic mle: A generic model-based algorithm for partially ob-servable sequential decision making. In Proceedings of the 55th Annual ACM Symposium on Theory of Comput-ing , pp. 363–376, 2023. Mahadevan, S. and Maggioni, M. Proto-value functions: A laplacian framework for learning representation and control in markov decision processes. JMLR , 8(10), 2007. Meng, L., Gorbet, R., and Kuli´ c, D. Memory-based deep reinforcement learning for pomdps. In 2021 IEEE/RSJ In-ternational Conference on Intelligent Robots and Systems (IROS) , pp. 5619–5626. IEEE, 2021. Mnih, V., Kavukcuoglu, K., Silver, D., Graves, A., Antonoglou, I., Wierstra, D., and Riedmiller, M. Playing atari with deep reinforcement learning. arXiv preprint arXiv:1312.5602 , 2013. Munos, R. and Szepesvári, C. Finite-time bounds for fitted value iteration. Journal of Machine Learning Research , 9 (5), 2008. Nachum, O. and Dai, B. Reinforcement learning via fenchel-rockafellar duality. arXiv preprint arXiv:2001.01866 ,2020. Nachum, O. and Yang, M. Provable representation learning for imitation with contrastive fourier features. NeurIPS ,2021. 10 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Ni, T., Eysenbach, B., and Salakhutdinov, R. Recurrent model-free rl is a strong baseline for many pomdps. 
+
+arXiv:2110.05038 , 2021. Oord, A. v. d., Li, Y., and Vinyals, O. Representation learn-ing with contrastive predictive coding. arXiv:1807.03748 ,2018. Papadimitriou, C. H. and Tsitsiklis, J. N. The complexity of markov decision processes. Mathematics of operations research , 12(3):441–450, 1987. Paulsen, V. I. and Raghupathi, M. An introduction to the theory of reproducing kernel Hilbert spaces , volume 152. Cambridge university press, 2016. Puterman, M. L. Markov decision processes: discrete stochastic dynamic programming . John Wiley & Sons, 2014. Ren, T., Zhang, T., Szepesvári, C., and Dai, B. A free lunch from the noise: Provable and practical exploration for representation learning. In Uncertainty in Artificial Intelligence , pp. 1686–1696. PMLR, 2022. Ren, T., Ren, Z., Li, N., and Dai, B. Stochastic nonlinear control via finite-dimensional spectral dynamic embed-ding. arXiv preprint arXiv:2304.03907 , 2023a. Ren, T., Xiao, C., Zhang, T., Li, N., Wang, Z., Sanghavi, S., Schuurmans, D., and Dai, B. Latent variable repre-sentation for reinforcement learning. In The Eleventh International Conference on Learning Representations ,2023b. Ren, T., Zhang, T., Lee, L., Gonzalez, J. E., Schuurmans, D., and Dai, B. Spectral decomposition representation for reinforcement learning. ICLR , 2023c. Riesz, F. and Nagy, B. S. Functional analysis . Courier Corporation, 2012. Ross, S., Pineau, J., Paquet, S., and Chaib-Draa, B. Online planning algorithms for pomdps. Journal of Artificial Intelligence Research , 32:663–704, 2008. Roy, N. and Gordon, G. J. Exponential family pca for belief compression in pomdps. Advances in Neural Information Processing Systems , 15, 2002. Schmidhuber, J. Reinforcement learning in markovian and non-markovian environments. NeurIPS , 3, 1990. Seo, Y., Hafner, D., Liu, H., Liu, F., James, S., Lee, K., and Abbeel, P. Masked world models for visual control. In 
+
+Conference on Robot Learning , pp. 1332–1344. PMLR, 2023. Simchowitz, M., Tosh, C., Krishnamurthy, A., Hsu, D. J., Lykouris, T., Dudik, M., and Schapire, R. E. Bayesian decision-making under misspecified priors with applica-tions to meta-learning. Advances in Neural Information Processing Systems , 34:26382–26394, 2021. Smallwood, R. D. and Sondik, E. J. The optimal control of partially observable markov processes over a finite horizon. Operations research , 21(5):1071–1088, 1973. Smith, T. and Simmons, R. Heuristic search value iteration for pomdps. arXiv preprint arXiv:1207.4166 , 2012. Steinwart, I. and Scovel, C. Mercer’s theorem on general domains: On the interaction between measures, kernels, and rkhss. Constructive Approximation , 35(3):363–417, 2012. Tassa, Y., Doron, Y., Muldal, A., Erez, T., Li, Y., Casas, D. d. L., Budden, D., Abdolmaleki, A., Merel, J., Lefrancq, A., et al. Deepmind control suite. arXiv preprint arXiv:1801.00690 , 2018. Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics engine for model-based control. In 2012 IEEE/RSJ inter-national conference on intelligent robots and systems , pp. 5026–5033. IEEE, 2012. Uehara, M., Zhang, X., and Sun, W. Representation learning for online and offline rl in low-rank mdps. arXiv preprint arXiv:2110.04652 , 2021. Uehara, M., Sekhari, A., Lee, J. D., Kallus, N., and Sun, W. Provably efficient reinforcement learning in partially observable dynamical systems. Advances in Neural In-formation Processing Systems , 35:578–592, 2022. Wang, T., Bao, X., Clavera, I., Hoang, J., Wen, Y., Lan-glois, E., Zhang, S., Zhang, G., Abbeel, P., and Ba, J. Benchmarking model-based reinforcement learning. 
+
+arXiv preprint arXiv:1907.02057 , 2019. Weigand, S., Klink, P., Peters, J., and Pajarinen, J. Reinforcement learning using guided observability. 
+
+arXiv:2104.10986 , 2021. Wierstra, D., Foerster, A., Peters, J., and Schmidhuber, J. Solving deep memory pomdps with recurrent policy gra-dients. In ICANN , 2007. Wu, Y., Tucker, G., and Nachum, O. The laplacian in rl: Learning representations with efficient approximations. 
+
+arXiv:1810.04586 , 2018. Yang, L. and Wang, M. Reinforcement learning in feature space: Matrix bandit, kernels, and regret bound. In In-ternational Conference on Machine Learning , pp. 10746– 10756. PMLR, 2020. 11 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Yang, M., Levine, S., and Nachum, O. Trail: Near-optimal imitation learning with suboptimal data. 
+
+arXiv:2110.14770 , 2021. Yarats, D., Kostrikov, I., and Fergus, R. Image augmentation is all you need: Regularizing deep reinforcement learning from pixels. In International conference on learning representations , 2020. Yarats, D., Zhang, A., Kostrikov, I., Amos, B., Pineau, J., and Fergus, R. Improving sample efficiency in model-free reinforcement learning from images. In Proceedings of the AAAI Conference on Artificial Intelligence , vol-ume 35, pp. 10674–10681, 2021. Yarats, D., Fergus, R., Lazaric, A., and Pinto, L. Master-ing visual continuous control: Improved data-augmented reinforcement learning. In International Conference on Learning Representations , 2022. Yu, T., Quillen, D., He, Z., Julian, R., Hausman, K., Finn, C., and Levine, S. Meta-world: A benchmark and eval-uation for multi-task and meta reinforcement learning. In Conference on Robot Learning (CoRL) , 2019. URL 
+
+https://arxiv.org/abs/1910.10897 .Zhan, W., Uehara, M., Sun, W., and Lee, J. D. Pac reinforce-ment learning for predictive state representations. arXiv preprint arXiv:2207.05738 , 2022. Zhang, A., McAllister, R., Calandra, R., Gal, Y., and Levine, S. Learning invariant representations for reinforcement learning without reconstruction. arXiv:2006.10742 , 2020. Zhang, M., Vikram, S., Smith, L., Abbeel, P., Johnson, M., and Levine, S. Solar: Deep structured representations for model-based reinforcement learning. In ICML , 2019. Zhang, T., Ren, T., Yang, M., Gonzalez, J., Schuurmans, D., and Dai, B. Making linear mdps practical via contrastive representation learning. In ICML , 2022. Zhang, T., Ren, T., Xiao, C., Xiao, W., Gonzalez, J., Schuurmans, D., and Dai, B. Energy-based predictive representations for partially observed re-inforcement learning. In The 39th Conference on Uncertainty in Artificial Intelligence , 2023. URL 
+
+https://openreview.net/forum?id=Z1BobPmCTy .Zhu, P., Li, X., Poupart, P., and Miao, G. On improving deep reinforcement learning for pomdps. arXiv preprint arXiv:1704.07978 , 2017. 12 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+A. More Related Work 
+
+Partially Observable RL. The majority of existing practical RL algorithms for partially observable settings can also be categorized into model-based vs . model-free. The model-based algorithms (Kaelbling et al., 1998) for partially observed scenarios are naturally derived based on the definition of POMDPs, where both the emission and transition models are learned from data. The planning procedure for optimal policy is conducted over the posterior of latent state, i.e. , beliefs, which is approximately inferred based on learned dynamics and emission model. With different model parametrizations, (ranging from Gaussian processes to deep models), and different planning methods, a family of algorithms has been proposed (Deisenroth & Peters, 2012; Igl et al., 2018; Gregor et al., 2019; Zhang et al., 2019; Lee et al., 2020; Hafner et al., 2021). However, due to the compounding errors from 
+
+i) , mismatch in model parametrization, ii) , inaccurate beliefs calculation, iii) , approximation in planning over nonlinear dynamics, and iv) , neglecting of exploration, such methods might suffer from sub-optimal performances in practice. As we discussed in Section 1, the memory-based policy and value function have been exploited to extend the MDP-based model-free RL algorithms to handle the non-Markovian dependency induced by partial observations. For example, the value-based algorithms introduces memory-based neural networks to Bellman recursion, including temporal difference learning with explicit concatenation of 4 consecutive frames as input (Mnih et al., 2013) or recurrent neural networks for longer windows (Bakker, 2001; Hausknecht & Stone, 2015; Zhu et al., 2017), and DICE (Nachum & Dai, 2020) with features extracted from transformer (Jiang et al., 2021); the policy gradient-based algorithms have been extended to partially observable setting by introducing recurrent neural network for policy parametrization (Schmidhuber, 1990; Wierstra et al., 2007; Heess et al., 2015; Ni et al., 2021). The actor-critic approaches exploits memory-based value and policy together (Ni et al., 2021; Meng et al., 2021). Despite their simplicity in the algorithm extension, these algorithms demonstrate potentials in real-world applications. However, the it has been observed that the sample complexity for purely model-free RL with partial observations is very high (Mnih et al., 2013; Barth-Maron et al., 2018; Yarats et al., 2021), and the exploration remains difficult, and thus, largely neglected. 
+
+B. Observability Approximation 
+
+Although the proposed μLV-Rep is designed based on the L-step decodability in POMDPs, Golowich et al. (2022) shows that the γ-observable POMDPs can be ϵ-approximated with a L = ˜O  γ−4 log ( |S|/ϵ )-step decodable POMDP. By exploiting the low-rank structure in the latent dynamics, this result has been extend with function approximator (Uehara et al., 2022). Specifically, 
+
+Theorem 4 (Proprosition 7 (Guo et al., 2023), Lemma 12 (Uehara et al., 2022)) . Given a γ-observable POMDP with d-rank latent transition, there exists an L-step decodable POMDP M with L = ˜O  γ−4 log ( d/ϵ ), ∀ϵ > 0, such that 
+
+Ea1: h,o 2: h∼π
+
+ Ph (oh+1 |o1: h, a 1: h) − PM 
+
+> h
+
+(oh+1 |xh, a h) 1
+
+ ⩽ ϵ. (15) 
+
+where πh ∈ ∆
+
+QHh=1 AHh
+
+
+
+with Hh := Ah−1 × O h, is mapping the whole history to a distribution of action. 
+
+With this understanding, the proposed μLV-Rep can be directly applied for γ-observable POMDPs, while still maintains theoretical guarantees. Due to the space limitation, please refer to (Uehara et al., 2022; Guo et al., 2023) for the details of the proofs. 
+
+C. Moment Matching Policy 
+
+We provide a formal definition of the moment matching policy here. 
+
+Definition 5 (Moment Matching Policy (Efroni et al., 2022)) . With the L-decodability assumption, for h ∈ [H], h′ ∈ [h−L+1, h ] and l = h′ −h+L−1, we can define the moment matching policy νπ,h = {νh,π h′ : Sl ×O l ×A l−1 → ∆( A)}hh′=h−L+1 
+
+introduced by Efroni et al. (2022) , such that 
+
+νπ,h h′ (ah′ |(sh−L+1: h′ , o h−L+1: h′ , a h−L+1: h′−1)) := EP 
+
+> π
+
+[πh′ (ah′ |xh′ )|(sh−L+1: h′ , o h−L+1: h′ , a h−L+1: h′−1)] , ∀h′ ⩽ h − 1,
+
+and νπ,h h = πh. We further define ˜πh, which takes first h − L actions from π and the remaining L actions from νπ,h .
+
+The main motivation to define such moment matching policy is that, we want to define a policy that is conditionally independent from the past history for theoretical justification while indistinguishable from the history dependent policy 13 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Algorithm 2 Offline Learning for L-step decodable POMDPs with Latent Variable Representation  
+
+> 1:
+
+Input: Model Class M = {{ (ph(z|xh, a h), p h(oh+1 |z)}h∈[H]}, Variational Distribution Class Q =
+
+{{ qh(z|xh, a h, o h+1 )}h∈[H]}, Offline Dataset {D h}Hh=1  
+
+> 2:
+
+Learn the latent variable model ˆp(z|xh, a h) with Dh via maximizing the ELBO, and obtain the learned model bP =
+
+{(ˆ ph(z|xh, a h), ˆph(oh+1 |z)) }h∈[H]. 
+
+> 3:
+
+Set the exploitation penalty ˆbh(s, a ) with Dk. 
+
+> 4:
+
+Learn the policy ˆπ∗ = arg max π V π
+
+> bP,r −ˆbk
+
+. 
+
+> 5:
+
+Return ˆπ∗.to match the practical algorithm. By Lemma B.2 in Efroni et al. (2022), under the L-decodability assumption, for a fixed h ∈ [H], we have dP,π h (xh) = dP,˜πh 
+
+> h
+
+(xh), for all L-step policy π and xh ∈ X h. As νπ,h h = πh. we have 
+
+dP,π h (xh, a h) = dP,˜πh 
+
+> h
+
+(xh, a h), and hence EP 
+
+> π
+
+(xh, a h) = EP 
+
+> ˜πh
+
+(xh, a h). This enables the factorization in (10) without the dependency of the overlap observation trajectory. 
+
+D. Pessimism in the Offline Setting 
+
+Similar to Uehara et al. (2021); Ren et al. (2023b), the proposed algorithm can be directly extended to the offline setting by converting the optimism into the pessimism. Specifically, we can learn the latent variable model, set the penalty with the data and perform planning with the penalized reward. The whole algorithm is shown in Algorithm 2. Following the identical proof strategy from Uehara et al. (2021); Ren et al. (2023b), we can obtain a similar sub-optimal gap guarantee for ˆπ∗.
+
+E. Technical Background 
+
+In this section, we revisit several core concepts of the kernel and the reproducing kernel Hilbert space (RKHS) that will be used in the theoretical analysis. For a complete introduction, we refer the reader to Ren et al. (2023b). 
+
+Definition 6 (Kernel and Reproducing Kernel Hilbert Space (RKHS) (Aronszajn, 1950; Paulsen & Raghupathi, 2016)) .
+
+The function k : X × X → R is called a kernel on X if there exists a Hilbert space H and a mapping ϕ : X → H (termed as a feature map), such that ∀x, x ′ ∈ X , k(x, x ′) = ⟨ϕ(x), ϕ (x′)⟩H. The kernel k is said to be positive semi-definite if 
+
+∀n ⩾ 1, {ai}i∈[n] ⊂ R and mutually distinct {xi}i∈[n], we have 
+
+X
+
+> i∈[n]
+
+X
+
+> j∈[n]
+
+aiaj k(xi, x j ) ⩾ 0.
+
+The kernel k is said to be positive definite if the inequality is strict (which means we can replace ⩾ with >). With a given kernel k, we can define the Hilbert space Hk consists of R-valued function on X as a reproducing kernel Hilbert space associated with k if both of the following conditions hold: 
+
+• ∀x ∈ X , k(x, ·) ∈ H k.
+
+• Reproducing Property: ∀x ∈ X , f ∈ H k, f (x) = ⟨f, k (x, ·)⟩Hk .The RKHS norm of f ∈ H k is induced by the inner product, i.e. ∥f ∥Hk := p⟨f, f ⟩Hk .
+
+Theorem 7 (Mercer’s Theorem (Riesz & Nagy, 2012; Steinwart & Scovel, 2012)) . Let k be a continuous positive definite kernel defined on X × X . There exists at most countable {μi}i∈I such that μ1 ⩾ μ2 ⩾ · · · > 0 and a set of orthonormal basis {ei}i∈I on L2(μ) where μ is a Borel measure on X , such that 
+
+∀x, x ′ ∈ X , k(x, x ′) = X
+
+> i∈I
+
+μiei(x)ei(x′),
+
+where the convergence is absolute and uniform. 
+
+Definition 8 (Random Feature) . The kernel k : X × X → R has a random feature representation if there exists a function 
+
+ψ : X × Ξ → R and a probability measure P over Ξ such that 
+
+k(x, x ′) = 
+
+Z
+
+> Ξ
+
+ψ(x; ξ)ψ(x′; ξ)dP (ξ).
+
+Remark (random feature quadrature): We here justify the random feature quadrature (Ren et al., 2023b) for complete-ness. 14 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+We can represent Qπh as an expectation, 
+
+Qπh (xh, a h) = ⟨p(z|xh), w πh (z)⟩ = Ep(z|xh) [wπh (z)] L2(μ)
+
+Under the assumption that wπh (·) ∈ H k, where Hk denoting some RKHS with some kernel k (·, ·). When k (·, ·) can be represented through random feature, i.e. ,
+
+k (x, y ) = EP (ξ) [ψ (x; ξ) ψ (y; ξ)] ,
+
+the wπh (z) admits a representation as 
+
+wπh (z) = EP (ξ) [ ˜ wπh (ξ) ψ (z; ξ)] .
+
+Therefore, we plug this random feature representation of wπh (z) to Qπh (xh, a h), we obtain 
+
+Qπh (xh, a h) = Ep(z|xh),P (ξ) [ ˜ wπh (ξ)ψ (z; ξ)] . (16) Applying Monte-Carlo approximation to (16), we obtain the random feature quadrature. 
+
+F. Theoretical Analysis 
+
+F.1. Technical Conditions 
+
+We adopt the following assumptions for the reproducing kernel, which have been used in Ren et al. (2023b) for the MDP setting. 
+
+Assumption 3 (Regularity Conditions) . Z is a compact metric space with respect to the Lebesgue measure ν when Z is continuous. Furthermore, R 
+
+> Z
+
+k(z, z )dν ⩽ 1.
+
+Assumption 4 (Eigendecay Conditions) . Assume {νi}i∈I defined in Theorem 7 satisfies one of the following conditions: 
+
+• β-finite spectrum: for some positive integer β, we have νi = 0 , ∀i > β .
+
+• β-polynomial decay: νi ⩽ C0i−β with absolute constant C0 and β > 1.
+
+• β-exponential decay: νi ⩽ C1 exp( −C2iβ ), with absolute constants C1, C2 and β > 0.We will use Cpoly to denote constants in the analysis of β-polynomial decay that only depends on C0 and β, and Cexp to denote constants in the analysis of β-exponential decay that only depends on C1, C2 and β, to simplify the dependency of the constant terms. Both of Cpoly and Cexp can be varied step by step. 
+
+F.2. Formal Proof 
+
+Before we proceed, we first define 
+
+ρk,h = 1
+
+k
+
+X
+
+> i∈[K]
+
+dπk
+
+> P,h
+
+,
+
+and ◦LU(A) means uniformly taking actions in the consecutive L steps. 
+
+Lemma 9 (L-step back inequality for the true model) . Given a set of functions [gh]h∈[H], where gh : X × A → R,
+
+∥gh∥∞ ⩽ B, ∀h ∈ [H], we have that ∀π,
+
+X
+
+> h∈[H]
+
+EP 
+
+> π
+
+[g(xh, a h)] ⩽ X
+
+> h∈[H]
+
+EP
+
+> (xh−L,a h−L)∼dπ
+> P,h −L
+
+
+
+∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+·
+
+q
+
+k|A| L · E(˜ xh,˜ah)∼ρk,h −L◦LU(A) [g(˜ xh, ˜ah)2] + λB 2C
+
+Proof. The proof can be adapted from the proof of Lemma 6 in Ren et al. (2023b), and we include it for the complete-ness. Recall the moment matching policy νπ Since νπ,h does not depend on (xh−L, a h−L), we can make the following 15 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+decomposition: 
+
+EP
+
+˜πh (xh, a h)=EP
+
+(xh−L,a h−L)∼π
+
+"Z
+
+sh−L+1 
+
+⟨p∗(·| xh−L, a h−L), p ∗(sh−L+1 |· )⟩L2(μ) · EP
+
+ah−L+1: h∼νπ,h [g(xh, a h)|sh−L+1 ]ds h−L+1 
+
+#
+
+⩽EP
+
+(xh−L,a h−L)∼π ∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+·
+
+Z
+
+sh−L+1 
+
+p∗(sh−L+1 |· )E[g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+L2(μ),Σρk,h −L,p ∗
+
+.
+
+Direct computation shows that 
+
+Z
+
+sh−L+1 
+
+p∗(sh−L+1 |· )EP [g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+L2(μ),Σρk,h −L,p ∗
+
+=kE(˜ xh−L,˜ah−L)∼ρk,h −L
+
+h
+
+EP
+
+sh−L+1 ∼PP
+
+> h−L
+
+(·| xh−L,a h−L)[g(xh, a h)|sh−L+1 , ν π,h ]
+
+i2
+
++
+
+Z
+
+sh−L+1 
+
+p∗(sh−L+1 |· ) · EP [g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+2
+
+H
+
+⩽kE(˜ xh−L,˜ah−L)∼ρk,h −L EP
+
+sh−L+1 ∼PP
+
+> h−L
+
+(·| xh−L,a h−L),a h−L+1: h∼νπ,h [g(xh, a h)] 2 + λB 2C
+
+⩽k|A| LEP
+
+(˜ xh,˜ah)∼ρk,h −L◦LU(A)[g(˜ xh, ˜ah)] 2 + λB 2C, 
+
+which finishes the proof. 
+
+Lemma 10 (L-step back inequality for the learned model) . Assume we have a set of functions [gh]h∈[H], where gh :
+
+X × A → R, ∥gh∥∞ ⩽ B, ∀h ∈ [H]. Given Lemma 15, we have that ∀π,
+
+X
+
+h∈[H]
+
+E bPk
+
+π [g(xh, a h)] ⩽ X
+
+h∈[H]
+
+E bPk
+
+(xh−L,a h−L)∼dπ
+
+> bPk ,h −L
+
+]
+
+
+
+∥ˆp(·| xh−L, a h−L)∥L2(μ),Σ−1  
+
+> ρk,h −2L◦LU(A),ˆp
+
+
+
+·
+
+q
+
+k|A| L · E(˜ xh,˜ah)∼ρk,h −2L◦2LU(A) [g(˜ xh, ˜ah)2] + λB 2C + kL |A| L−1B2ζk
+
+Proof. The proof can be adapted from the proof of Lemma 5 in Ren et al. (2023b), and we include it for the completeness. We define a similar moment matching policy and make the following decomposition: 
+
+E bPk
+
+π (xh, a h)=E bPk
+
+(xh−L,a h−L)∼π
+
+"Z
+
+sh−L+1 
+
+⟨ˆp(·| xh−L, a h−L), ˆp(sh−L+1 |· )⟩L2(μ) · E bPk [g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+#
+
+⩽E bPk
+
+(xh−L,a h−L)∼π ∥ˆp(·| xh−L, a h−L)∥L2(μ),Σ−1  
+
+> ρk,h −2L◦LU(A),ˆp
+
+·
+
+Z
+
+sh−L+1 
+
+ˆp(sh−L+1 |· )E bPk [g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+L2(μ),Σρk,h −2L◦LU (A), ˆp
+
+.
+
+16 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Direct computation shows that 
+
+Z
+
+sh−L+1 
+
+ˆp(sh−L+1 |· )E bPk [g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+2
+
+L2(μ),Σρk,h −2L◦LU (A), ˆp
+
+=kE(˜ xh−L,˜ah−L)∼ρk,h −2L◦LU(A)
+
+
+
+Esh−L+1 ∼P bPkh−L(·| ˜xh−L,˜ah−L)E bPk [g(xh, a h)|sh−L+1 , ν π,h ]
+
+2
+
++
+
+Z
+
+sh−L+1 
+
+ˆp(sh−L+1 |· )E[g(xh, a h)|sh−L+1 , ν π,h ]ds h−L+1 
+
+2
+
+H
+
+⩽kE(˜ xh−L,˜ah−L)∼ρk,h −2L◦LU(A)E bPk
+
+sh−L+1 ∼P bPkh−L(·| ˜xh−L,˜ah−L),ν π,h 
+
+[g(xh, a h)] 2 + λB 2C
+
+⩽k|A| LE(˜ xh−L,˜ah−L)∼ρk,h −2L◦LU(A)E bPk
+
+ah−L+1: h∼◦ LU(A)[g(xh, a h)] 2 + λB 2C
+
+⩽k|A| LE(˜ xh,˜ah)∼ρk,h −2L◦2LU(A)[g(˜ xh, ˜ah)] 2 + kL |A| L−1B2ζk + λB 2C, 
+
+where we use the MLE guarantee for each individual step to obtain the last inequality. This finishes the proof. 
+
+Lemma 11 (Almost Optimism) . For episode k ∈ [K], set 
+
+ˆbk,h = min 
+
+n
+
+αk∥ˆpk(·| xh−L, a h−L)∥L2(μ), ˆΣ−1 
+
+> k,h, ˆpk
+
+, 2
+
+o
+
+,
+
+with αk =
+
+√5kL |A| Lζk +4 λd c ,
+
+ˆΣk,h, ˆpk : L2(μ) → L2(μ), ˆΣk,h, ˆpk := X
+
+(xh,i ,a h,i )∈D k,h 
+
+ˆpk(z|xh,i , a h,i )ˆ pk(z|xh,i , a h,i )⊤ + λT −1
+
+K
+
+where TK is the integral operator associated with K (i.e. TK f = R f (x)K(x, ·)dx ) and λ is set for different eigendecay of 
+
+K as follows: 
+
+• β-finite spectrum: λ = Θ( β log K + log( K|P| /δ )) 
+
+• β-polynomial decay: λ = Θ( Cpoly K1/(1+ β) + log( K|P| /δ )) ;
+
+• β-exponential decay: λ = Θ( Cexp (log K)1/β + log( K|P| /δ )) ;
+
+c is an absolute constant, then with probability at least 1 − δ, ∀k ∈ [K] we have 
+
+V π∗, bPk ,r +bbk − V π∗,P,r ⩾ −
+
+q
+
+|A| L+1 ζk
+
+Proof. With Lemma 14, we have that 
+
+V π∗, bPk ,r +bbk
+
+− V π∗,P,r 
+
+= X
+
+h∈[H]
+
+E(xh,a h)∼dπ∗
+
+> bPk ,h
+
+bbkh(xh, a h) + Eo′∼P bPkh (·| xh,a h)[V π∗,P,r h+1 (x′
+
+h+1 )] − Eo′∼PP 
+
+> h
+
+(·| xh,a h)[V π∗,P,r h+1 (x′
+
+h+1 )] 
+
+
+
+⩾ X
+
+h∈[H]
+
+E(xh,a h)∼dπ∗
+
+> bPk ,h
+
+
+
+min 
+
+
+
+cα k ∥ˆp(·| xh−L, a h−L)∥L2(μ),Σ−1 
+
+> ρk,h −L,ˆp
+
+, 2
+
+
+
++ Eo′∼P bPkh (·| xh,a h)[V π∗,P,r h+1 (x′
+
+h+1 )] 
+
+−Eo′∼PP 
+
+> h
+
+(·| xh,a h)[V π∗,P,r h+1 (x′
+
+h+1 )] 
+
+i
+
+,
+
+where in the last step we replace the empirical covariance with the population counterpart thanks to Lemma 17 in Ren et al. (2023b). Define 
+
+gh(zh, a h) = Eo′∼PP 
+
+> h
+
+(·| xh,a h)[V π∗,P,r h+1 (x′
+
+h+1 )] − Eo′∼P bPkh (·| xh,a h)[V π∗,P,r h+1 (x′
+
+h+1 )] ,
+
+With Hölder’s inequality, we have that ∥gh∥∞ ⩽ 2.17 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Furthermore, with Lemma 10, we have that X
+
+h∈[H]
+
+E(xh,a h)∼dπ∗
+
+> bPk ,h
+
+[gh(xh, a h)] 
+
+⩽ X
+
+h∈[H]
+
+E(xh−L,a h−L)∼dπ∗
+
+> bPk ,h
+
+
+
+∥ˆp(·| xh−L, a h−L)∥L2(μ),Σ−1 
+
+> ρk,h −L,ˆp
+
+
+
+·
+
+q
+
+k|A| L · E(˜ xh,˜ah)∼ρh−2L◦2LU(A) [g(˜ xh, ˜ah)2] + 4 λC + 4 kL |A| L−1ζk
+
+⩽ X
+
+h∈[H]
+
+E(xh−L,a h−L)∼dπ∗
+
+> bPk ,h
+
+
+
+cα k ∥ˆp(·| xh−L, a h−L)∥L2(μ),Σ−1 
+
+> ρk,h −L,ˆp
+
+
+
+,
+
+where we use Lemma 15 in the last step. Now we deal with the case with h ∈ [L]. Note that, ∀h ∈ [L]
+
+E(xh,a h)∼π [gh(xh, a h)] 
+
+⩽|A| hEx1∼d1,a 1: h∼◦ hU(A) P bPk
+
+h (·| xh, a h) − PP
+
+h (·| xh, a h) 1
+
+⩽
+
+r
+
+Ex1∼d1,a 1: h◦LU(A) P bPk
+
+h (·| xh, a h) − PP
+
+h (·| xh, a h) 21
+
+⩽
+
+q
+
+|A| hζk,
+
+where in the last step we use Lemma 15. We finish the proof by summing over h ∈ [L].
+
+Lemma 12 (Regret) . With probability at least 1 − δ, we have that 
+
+• For β-finite spectrum, we have 
+
+KX
+
+k=1 
+
+V π∗,P,r − V πk ,P,r ≲
+
+KX
+
+k=1 
+
+V π∗,P,r − V πk ,P,r ≲ H2β3/2|A| L log KpCLK log( K|M| /δ ); 
+
+• For β-polynomial decay, we have 
+
+KX
+
+k=1 
+
+V π∗,P,r − V πk ,P,r ≲ Cpoly H2|A| LK 12 + 11+ β
+
+pCL log( K|M| /δ ); 
+
+• For β-exponential decay, we have 
+
+KX
+
+k=1 
+
+V π∗,P,r − V πk ,P,r ≲ Cexp H2|A| L(log K)1+ 32β
+
+pCLK log( K|M| /δ ); 
+
+Proof. With Lemma 11 and Lemma 14, we have 
+
+V π∗,P,r − V πk ,P,r 
+
+⩽V π∗, bPk ,r +bbk
+
++
+
+q
+
+|A| L+1 ζk − V πk ,P,r 
+
+⩽V πk , bPk ,r +bbk
+
++
+
+q
+
+|A| L+1 ζk − V πk ,P,r 
+
+= X
+
+h∈[H]
+
+E(xh,a h)∼dπk
+
+> P,h
+
+bbkh(xh, a h) + Eo′∼P bPkh (·| xh,a h)
+
+h
+
+V πk , bPk ,r +bbkh
+
+h+1 (x′
+
+h+1 )
+
+i
+
+− Eo′∼PP 
+
+> h
+
+(·| xh,a h)
+
+h
+
+V πk , bPk ,r +bbkh
+
+h+1 (x′
+
+h+1 )
+
+i
+
+,
+
++
+
+q
+
+|A| L+1 ζk.
+
+Note that bbkh ∞
+
+⩽ 2. Applying Lemma 9, we have that 
+
+X
+
+h∈[H]
+
+E(xh,a h)∼dπk
+
+> P,h
+
+hbbkh(xh, a h)
+
+i
+
+⩽ X
+
+h∈[H]
+
+E(˜ xh−L,˜ah−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+·
+
+r
+
+k|A| L · E(˜ xh,˜ah)∼ρk,h −L◦LU(A)
+
+hbbkh(˜ xh, ˜ah)2
+
+i
+
++ 4 λC 
+
+Following the proof of Lemma 8 in Ren et al. (2023b), we have that: 18 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+• for β-finite spectrum, 
+
+kE(˜ xh,˜ah)∼ρk,h −L◦LU(A)
+
+hbbkh(˜ xh, ˜ah)2i
+
+= O(β log K); 
+
+• for β-polynomial decay, 
+
+kE(˜ xh,˜ah)∼ρk,h −L◦LU(A)
+
+hbbkh(˜ xh, ˜ah)2i
+
+= O
+
+
+
+Cpoly K 12(1+ β) log K
+
+
+
+;
+
+• for β-exponential decay, 
+
+kE(˜ xh,˜ah)∼ρk,h −L◦LU(A)
+
+hbbkh(˜ xh, ˜ah)2i
+
+= O
+
+
+
+Cexp (log K)1+1 /β 
+
+.
+
+We then consider 
+
+X
+
+h∈[H]
+
+E(xh,a h)∼dπk
+
+> P,h
+
+
+
+Eo′∼P bPkh (·| xh,a h)
+
+h
+
+V πk , bPk ,r +bbkh
+
+h+1 (x′
+
+h+1 )
+
+i
+
+− Eo′∼PP 
+
+> h
+
+(·| xh,a h)
+
+h
+
+V πk , bPk ,r +bbkh
+
+h+1 (x′
+
+h+1 )
+
+i
+
+.
+
+Define 
+
+g(xh, a h) = 12H + 1 
+
+
+
+Eo′∼P bPkh (·| xh,a h)
+
+h
+
+V πk , bPk ,r +bbkh
+
+h+1 (x′
+
+h+1 )
+
+i
+
+− Eo′∼PP 
+
+> h
+
+(·| xh,a h)
+
+h
+
+V πk , bPk ,r +bbkh
+
+h+1 (x′
+
+h+1 )
+
+i
+
+.
+
+With Hölder’s inequality and note that bbkh ⩽ 2, we have that ∥g∥∞ ⩽ 2. With Lemma 9, we have that 
+
+X
+
+h∈[H]
+
+E(xh,a h)∼dπk
+
+> P,h
+
+[g(xh, a h)] 
+
+⩽ X
+
+h∈[H]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+·
+
+q
+
+k|A| LE(˜ xh,˜ah)∼ρk,h −L◦LU(A) [g(˜ xh, ˜ah)2] + 4 λC 
+
+⩽ X
+
+h∈[H]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+·
+
+q
+
+k|A| Lζk + 4 λC 
+
+⩽cα k
+
+X
+
+h∈[H]
+
+EP
+
+(xh−L,a h−L)∼dπ
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+With Cauchy-Schwartz inequality, we know that 
+
+X
+
+k∈[K]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+⩽
+
+vuutK X
+
+k∈[K]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥2
+
+L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+.
+
+Following the proof of Lemma 8 in Ren et al. (2023b), we have that • for β-finite spectrum, 
+
+X
+
+k∈[K]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥2
+
+L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+= O(β log K); 
+
+• for β-polynomial decay, 
+
+X
+
+k∈[K]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥2
+
+L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+= O
+
+
+
+Cpoly K 12(1+ β) log K
+
+
+
+;
+
+• for β-exponential decay, 
+
+X
+
+k∈[K]
+
+EP
+
+(xh−L,a h−L)∼dπk
+
+> P,h
+
+
+
+∥p∗(·| xh−L, a h−L)∥2
+
+L2(μ),Σ−1
+
+> ρk,h −L,p ∗
+
+
+
+= O
+
+
+
+Cexp (log K)1+1 /β 
+
+.
+
+Combine the previous steps and take the dominating term out, we have that • for β-finite spectrum, KX
+
+k=1 
+
+V π∗,P,r − V πk ,P,r ≲ H2β3/2|A| L log KpCLK log( K|M| /δ ); 
+
+19 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+• for β-polynomial decay, 
+
+> K
+
+X
+
+> k=1
+
+V π∗,P,r − V πk ,P,r ≲ Cpoly H2|A| LK 12 + 11+ β
+
+pCL log( K|M| /δ ); 
+
+• for β-exponential decay, 
+
+> K
+
+X
+
+> k=1
+
+V π∗,P,r − V πk ,P,r ≲ Cexp H2|A| L(log K)1+ 32β
+
+pCLK log( K|M| /δ ); 
+
+which finishes the proof. 
+
+Theorem 13 (PAC Guarantee) . After interacting with the environments for KH episodes 
+
+• K = Θ 
+
+ CH 4Lβ 3|A| 2L log( |P| /δ ) 
+
+> ε2
+
+log 3  CH 4Lβ 3|A| 2L log( |P| /δ )
+
+> ε2
+
+ 
+
+for β-finite spectrum; 
+
+• K = Θ 
+
+Cpoly 
+
+ H2L|A| L√C log( |P| /δ ) 
+
+> ε
+
+log 3/2  √CH 2L|A| L log( |P| /δ )
+
+> ε
+
+ 2(1+ β)
+
+> β−1
+
+ for β-polynomial decay; 
+
+• K = Θ 
+
+ Cexp CH 4L|A| 2L log( |P| /δ ) 
+
+> ε2
+
+log 3+2 ββ
+
+ CH 4L|A| 2L log( |P| /δ )
+
+> ε2
+
+ 
+
+for β-exponential decay; we can obtain an ε-optimal policy with high probability. Proof. This is a direct extension of the proof of Theorem 9 in Ren et al. (2023b). 
+
+G. Technical Lemma 
+
+Lemma 14 (Simulation Lemma) . For two MDPs M = ( P, r ) and M′ = ( P ′, r + b), we have 
+
+V πP ′,r +b − V πP,r 
+
+= X
+
+> h∈[H]
+
+E(sh,a h)∼dhP,π 
+
+bh(sh, a h) + Esh+1 ∼P ′(sh,a h)
+
+V πP ′,r +b,h +1 (sh+1 ) − Esh+1 ∼P (sh,a h)
+
+V πP ′,r +b,h +1 (sh+1 ) ,
+
+and 
+
+V πP ′,r +b − V πP,r 
+
+= X
+
+> h∈[H]
+
+E(sh,a h)∼dhP ′,π 
+
+bh(sh, a h) + Esh+1 ∼P ′(sh,a h)
+
+V πP,r,h +1 (sh+1 ) − Esh+1 ∼P (sh,a h)
+
+V πP,r,h +1 (sh+1 ) ,
+
+For the proof, see Uehara et al. (2021) for an example. 
+
+Lemma 15 (MLE Guarantee) . For any episoode k ∈ [K], step h ∈ [H], define ρh as the joint distribution of (xh, a h) in the dataset Dh,k at episode k. Then with probability at least 1 − δ, we have that 
+
+E(xh,a h)∼D h,k PP 
+
+> h
+
+(·| xh, a h) − P bPk 
+
+> h
+
+(·| xh, a h) 21
+
+⩽ ζk,
+
+where ζk = O(log( Hk |M| /δ )/k )
+
+For the proof, see Agarwal et al. (2020). 
+
+H. Implementation Details on Image-based Continuous Control 
+
+We evaluate our method on Meta-world (Yu et al., 2019) 1 and DeepMind Control Suites (Tassa et al., 2018) 2 to demonstrate its capability for complex visual control tasks. Meta-world is an open-source simulated benchmark consisting of 50 distinct robotic manipulation tasks. The DeepMind Control Suite is a set of continuous control tasks with a standardized structure and interpretable rewards, intended to serve as performance benchmarks for reinforcement learning agents. The visualization 
+
+> 1
+
+https://github.com/Farama-Foundation/Metaworld 
+
+> 2
+
+https://github.com/google-deepmind/dm_control 
+
+20 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+of some tasks from the two domains are shown in Figures 3 and 4. With only one frame of the visual observation, we will miss some information related to the task, for example the speed, thus these tasks are partially observable. The performance for Meta-world tasks are shown in Figure 5.         
+
+> (a) Coffee Pull (b) Hand Insert (c) Push (d) Plate Slide
+> Figure 3. Visualization of the visual robotic manipulation tasks in Meta-world.
+> (a) Acrobot Swingup (b) Reacher hard (c) Reach Duplo (d) Quadruped Run
+> Figure 4. Visualization of the visual control tasks in DeepMind Control Suites.
+
+In particular, we employ visual observations with dimensions of 64 × 64 × 3 and apply a variational autoencoder (VAE) to learn representations for these visual observations. The VAE is first pre-trained with random trajectories at the beginning and then fine-tuned during the online learning procedure. It produces compact vector representations for the images, which are then forwarded as input to our representation learning method. We apply actor-critic Learning based on the representation learned by VAE. The configuration of used tasks are given in Table 1. The hyperparameters used in the RL agent are shown in Table 2. 
+
+H.1. Ablation Studies 
+
+The importance of the exploration has been demonstrated in (Zhang et al., 2022). We perform ablation studies to demonstrate the effects of the major components, including representation dimension and window size, as illustrated below. Figure 6 presents an ablation study on representation dimension, where we compare μLV-Rep with latent representation dimensions 2048, 512, and 128. We also ablate the effect of window size L. In Figure 7, we compare μLV-Rep with window size 
+
+L = 1 , 3, 5. We also compare DrQ-v2 (Yarats et al., 2022) with L = 1 , 3, 5 to show the effect of L on other algorithms. The results show that for L = 1 , both μLV-Rep and DrQ-v2 struggle with learning, which confirms the Non-Markovian property of the DMC control problems. We can also find that L = 3 is sufficient for learning in both test domains. 
+
+H.2. Experiment of Partially Observable Continuous Control 
+
+We also evaluate the proposed approach on RL tasks with partial observations, constructed based on the OpenAI gym MuJoCo (Todorov et al., 2012). Standard MuJoCo tasks from the OpenAI gym and DeepMind Control Suites are not 21 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+> Success Rate (%)
+
+Assembly 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+50 
+
+60 
+
+70 
+
+> Success Rate (%)
+
+Basketball 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+> Success Rate (%)
+
+Bin Picking 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+50 
+
+60 
+
+70 
+
+> Success Rate (%)
+
+Box Close 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Button Press 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Button Press Topdown 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Button Press Topdown Wall 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Button Press Wall 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Coffee Button 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Coffee Pull 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Coffee Push 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+> Success Rate (%)
+
+Dial Turn 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+> Success Rate (%)
+
+Disassemble 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Door Close 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Door Lock 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Door Open 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Door Unlock 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Drawer Close 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Drawer Open 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Faucet Close 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Faucet Open 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+> Success Rate (%)
+
+Hammer 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+10 
+
+20 
+
+30 
+
+40 
+
+50 
+
+60 
+
+> Success Rate (%)
+
+Hand Insert 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Handle Press 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Handle Press Side 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Handle Pull 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Handle Pull Side 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Lever Pull 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Peg Insert Side 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Peg Unplug Side 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Pick Out Of Hole 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Pick Place 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Pick Place Wall 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Plate Slide 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Plate Slide Back 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Plate Slide Back Side 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Plate Slide Side 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Push 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Push Back 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Push Wall 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Reach 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Reach Wall 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+> Success Rate (%)
+
+Shelf Place 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Soccer 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Stick Pull 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Stick Push 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Sweep 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Sweep Into 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Window Close 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 0.0 0.2 0.4 0.6 0.8 1.0 
+
+Environment Steps 1e6 
+
+0
+
+20 
+
+40 
+
+60 
+
+80 
+
+100 
+
+120 
+
+> Success Rate (%)
+
+Window Open 
+
+LV-Rep 
+
+MWM 
+
+DreamerV2 
+
+Figure 5. Overall performance on MetaWorld tasks. 
+
+22 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 
+
+Table 1. Configuration of environments. 
+
+Hyperparameter Value Image observation 64 ×64 ×3
+
+Image normalization Mean: (0 .485 , 0.456 , 0.406) , Std: (0 .229 , 0.224 , 0.225) 
+
+Action repeat 2Episode length 500 (Meta-world), 1000 (DMC) Normalize action [-1,1] Camera corner2 (Meta-world), camera2 (DMC) Total steps in environment 1M (Meta-world), 0.5M (DMC) 
+
+Table 2. Hyperparameters in μLV-Rep. The numbers in Conv and MLP denote the output channels and units. 
+
+Hyperparameter Value Buffer size 1,000,000 Batch size 256 Random steps 4000 Pretrain step 10000 Features dim. 100 Hidden dim. 1024 Encoder (Conv(32), Conv(32), Conv(32), Conv(32), MLP(100)) Image Decoder (MLP(100), MLP(1024), ConvT(32), ConvT(32), ConvT(32), ConvT(32), Conv(3)) Actor Network (MLP(1024),MLP(1024),MLP(Action Space)) Critic Network (MLP(1024),MLP(1024),MLP(1)) Optimizer Adam Learning rate 0.0001 Discount 0.99 Critic soft-update rate 0.01 Evaluate interval 10,000 Evaluate episodes 10 (Meta-world), 5 (DMC) 0 1 2 3 4 5       
+
+> Environment Steps 1e5
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> 1200
+> Episode Returns
+> Reacher Easy
+> 2048
+> 512
+> 128 012345
+> Environment Steps 1e5
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> Episode Returns
+> Reacher Hard
+> 2048
+> 512
+> 128
+
+Figure 6. Ablation of feature dimension on visual control tasks from DeepMind Control Suites. Increasing the dimension of the feature gets better performance. 
+
+23 Provable Representation with Efficient Planning for Partially Observable Reinforcement Learning 0 1 2 3 4 5       
+
+> Environment Steps 1e5
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Episode Returns
+> Reacher Easy
+> Ours-L=1
+> Ours-L=3
+> Ours-L=5
+> DrQ-v2-L=1
+> DrQ-v2-L=3
+> DrQ-v2-L=5 012345
+> Environment Steps 1e5
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Episode Returns
+> Reacher Hard
+> Ours-L=1
+> Ours-L=3
+> Ours-L=5
+> DrQ-v2-L=1
+> DrQ-v2-L=3
+> DrQ-v2-L=5
+
+Figure 7. Ablation of window size L on visual control tasks from DeepMind Control Suites. L = 3 is sufficient for learning in both test domains. 
+
+Table 3. Performance on various continuous control problems with partial observation. All results are averaged across 4 random seeds and a window size of 10K. μLV-Rep achieves the best performance compared to the baselines. Here, Best-FO denotes the performance of LV-Rep using full observations as inputs, providing a reference on how well an algorithm can achieve most in our tests. 
+
+HalfCheetah Humanoid Walker Ant Hopper 
+
+μLV-Rep 3596.2 ± 874.5 806.7 ± 120.7 1298.1 ± 276.3 1621.4 ± 472.3 1096.4 ± 130.4 
+
+Dreamer-v2 2863.8 ± 386 672.5 ± 36.6 1305.8 ± 234.2 1252.1 ± 284.2 758.3 ± 115.8 SAC-MLP 1612.0 ± 223 242.1 ± 43.6 736.5 ± 65.6 1612.0 ± 223 614.15 ± 67.6 SLAC 3012.4 ± 724.6 387.4 ± 69.2 536.5 ± 123.2 1134.8 ± 326.2 739.3 ± 98.2 PSR 2679.75 ±386 534.4 ± 36.6 862.4 ± 355.3 1128.3 ± 166.6 818.8 ± 87.2 Best-FO 5557.6 ±439.5 1086 ±278.2 2523.5 ±333.9 2511.8 ±460.0 2204.8 ±496.0 Cheetah-run Walker-run Hopper-run Humanoid-run Pendulum 
+
+μLV-Rep 525.3 ± 89.2 702.3 ± 124.3 69.3 ± 12.8 9.8 ± 6.4 168.2 ± 5.3 
+
+Dreamer-v2 602.3 ± 48.5 438.2 ± 78.2 59.2 ± 15.9 2.3 ± 0.4 172.3 ± 8.0 
+
+SAC-MLP 483.3 ± 77.2 279.8 ± 190.6 19.2 ± 2.3 1.2 ± 0.1 163.6 ± 9.3 SLAC 105.1 ± 30.1 139.2 ± 3.4 36.1 ± 15.3 0.9 ± 0.1 167.3 ± 11.2 
+
+PSR 173.7 ± 25.7 57.4 ± 7.4 23.2 ± 9.5 0.8 ± 0.1 159.4 ± 9.2 Best-FO 639.3 ±24.5 724.2 ±37.8 72.9 ±40.6 11.8 ±6.8 167.1 ±3.1 
+
+partially observable. To generate partially observable problems based on these tasks, we adopt a widely employed approach of masking velocities within the observations (Ni et al., 2021; Weigand et al., 2021; Gangwani et al., 2020). In this way, it becomes impossible to extract complete decision-making information from a single environment observation, yet the ability to reconstruct the missing observation remains achievable by aggregating past observations. We provide the best performance when using the original fully observable states (without velocity masking) as input, denoted by Best-FO (Best result with Full Observations). This gives a reference for the best result an algorithm is expected to achieve in our tests. We consider four baselines in the experiments, including two model-based methods Dreamer (Hafner et al., 2020; 2021) and Stochastic Latent Actor-Critic (SLAC) (Lee et al., 2020), and a model-free baseline, SAC-MLP, that concatenates history sequences (past four observations) as input to an MLP layer for both the critic and policy. This simple baseline can be viewed as an analogue to how DQN processes observations in Atari games (Mnih et al., 2013) as a sanity check. We also compare to the neural PSR (Guo et al., 2018). We compare all algorithms after running 200K environment steps. This setup exactly follows the benchmark (Wang et al., 2019), which has been widely adopted in (Zhang et al., 2022; Ren et al., 2023c;b) for fairness. All results are averaged across four random seeds. Table 3 presents all the experimental results, averaged over four random seeds. The results clearly demonstrate that the proposed method consistently delivers either competitive or superior outcomes across all domains compared to both the model-based and model-free baselines. We note that in most domains, μLV-Rep nearly matches the performance of Best-FO, further confirming that the proposed method is able to extract useful representations for decision-making in partially observable environments. 24

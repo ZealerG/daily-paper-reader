@@ -1,0 +1,1040 @@
+Title: Convex Markov Games: A New Frontier for Multi-Agent Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=yIfCq03hsM
+
+Number of Pages: 24
+
+Markdown Content:
+# Convex Markov Games: A New Frontier for Multi-Agent Reinforcement Learning 
+
+Ian Gemp 1 Andreas Haupt 2 Luke Marris 1 Siqi Liu 1 Georgios Piliouras 1
+
+# Abstract 
+
+Behavioral diversity, expert imitation, fairness, safety goals and others give rise to preferences in sequential decision making domains that do not decompose additively across time. We introduce the class of convex Markov games that allow general convex preferences over occupancy mea-sures. Despite infinite time horizon and strictly higher generality than Markov games, pure strat-egy Nash equilibria exist. Furthermore, equilib-ria can be approximated empirically by perform-ing gradient descent on an upper bound of ex-ploitability. Our experiments reveal novel so-lutions to classic repeated normal-form games, find fair solutions in a repeated asymmetric co-ordination game, and prioritize safe long-term behavior in a robot warehouse environment. In the prisoner’s dilemma, our algorithm leverages transient imitation to find a policy profile that de-viates from observed human play only slightly, yet achieves higher per-player utility while also being three orders of magnitude less exploitable. 
+
+# 1. Introduction 
+
+Modern solutions to (perfect-information) multi-agent re-inforcement learning (MARL) typically build upon the Markov game (MG) model (Littman, 1994), a generaliza-tion of the classical single agent Markov decision process (MDP) to the multi-agent setting (see Table 1, Linear Loss). Similarly, the MDP has provided the foundation for devel-opment of single agent RL research. However, modern solutions to single agent RL now build upon the convex MDP (cMDP), an extension of the MDP that allows for more expressive preferences over agent behavior that do not decompose additively across time (Zhang et al., 2020).      
+
+> 1Google DeepMind, London, UK 2College of Computing, MIT, Cambridge, MA, USA. Correspondence to: Ian Gemp
+> <imgemp@google.com >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+# of Agents Linear Loss Convex Loss (Concave u)
+
+n = 1 MDP [1] convex MDP [2] 
+
+n > 1 MG [3] (Ours ) convex MG        
+
+> Table 1. We introduce the convex Markov Game (cMG) to fill a gap at the intersection of multi-agent and reinforcement learning research. We demonstrate how to use cMGs to model a variety of utilities ufor a linear reward function r: (a) Creativity, using an entropy bonus, (b) Imitation, using a divergence from a reference occupancy measure, (c) Fairness, using a state-wise penalty, and (d) Safety, with a non-smooth loss. This paper establishes exis-tence of equilibria for such utilities, proposes a (sub)differentiable loss for its computation, and demonstrates its use in selecting de-sirable multi-agent behaviors in each setting, at times by tracing a homotopy from a cMG back to an MG. References : [1] Bellman (1966); [2] Zahavy et al. (2021); [3] Shapley (1953).
+
+Mathematically, convex MDPs allow agent goals to be ex-pressed as general convex functions of their long run occu-pancy measure (the frequency with which the agent takes a given action in a given state). An exemplar is the goal of maximizing the entropy of an agent’s occupancy mea-sure to encourage exploration (Hazan et al., 2019); imi-tation, risk-aversion, robustness, and other goals are also common (Mutti et al., 2022; Garcıa & Fern´ andez, 2015). In the case where the goal is expressed as a linear function of the occupancy measure, cMDPs reduce to MDPs. Naturally, MARL researchers have adopted this general-ization empirically in their work, for example to encourage agent curiosity and the discovery of new and interesting strategies in games like Chess (Zahavy et al., 2023). We remark ( †) on the advantages of these more general objec-tives in selecting desireable equilibria in experiments. However, there has yet to be a formal definition of a frame-work extending cMDPs to the multi-agent setting (Table 1). More troubling is the the lack of any analysis proving Nash equilibria, the central solution concept in multi-agent and game theory research, even exist in this setting. In this work, we formally define the convex Markov game (cMG) and prove the existence of pure Nash equilibria by appealing to topological arguments. From a theoret-1Convex Markov Games 
+
+ical perspective, this result is interesting as properties of cMGs break the assumptions leveraged by prior work on Markov games (e.g., convex best response correspondences and existence of value functions). In addition, we derive a (sub)differentiable upper bound on the exploitability of a policy profile that can be efficiently computed and op-timized. Lastly, we describe several use cases for cMGs beyond just curiosity, including imitation, fairness, and safety. Using our derived upper bound, we solve for ap-proximate Nash equilibria in each of these settings, show-ing improved performance over sensible baselines. In some cases, we construct a deformation (homotopy) from a cMG to an MG that allows us to derive police profiles that de-spite being similar to observed human play, exhibit higher welfare and orders of magnitude lower exploitability. The article is structured as follows. We define the class of convex Markov games in section 2. We show that pure-strategy Nash equilibria exist in section 3. Our analysis of a loss for equilibrium computation is in section 4, which we put to practice in our experiments in section 5. We discuss related literature in section 6 and conclude in section 7. 
+
+# 2. Convex Markov Games 
+
+The main definition of this article is the convex Markov Game (cMG). 
+
+Definition 1. A convex Markov game is given by a 6-tuple 
+
+G = ⟨S , A = "ni=1 Ai, P, u, γ, μ 0⟩:
+
+• Players i = 1 , 2, . . . , n ,
+
+• a finite state space S and initial distribution μ0 ∈ ∆S ,
+
+• finite action spaces A1, A2, . . . , An1,
+
+• a state transition function P : S × A → ∆S ,
+
+• a discount factor γ ∈ [0 , 1) , and 
+
+• a set of real-valued utilities, ui(μi, π −i), each con-tinuous and concave in player i’s occupancy measure, 
+
+μi ∈ ∆S×A i , and continuous in each policy πj̸ =i.
+
+The Policy View Players i = 1 , . . . , n choose ( station-ary ) policies πi : S → ∆Ai . A policy profile π =(π1, π 2, . . . , π n) induces a sequence of states and joint ac-tions (st)t∈N and (at)t∈N, and a state-action occupancy measure 
+
+μπ (s, a ) = (1 − γ)
+
+> ∞
+
+X
+
+> t=0
+
+γtP(st = s, a t = a|μ0, π, P ).
+
+We can recover state-action occupancies from a matrix equation. Let P π be the state transition matrix under π.Then the state occupancy measure μs(s) = P 
+
+> a
+
+μ(s, a ) can be written as a function of π in matrix notation as 
+
+μs(π) = (1 − γ)
+
+
+
+[I − γP π ]−1μ0
+
+
+
+, (1) 
+
+> 1Action spaces can be generalized to have state-dependence.
+
+and the state-action occupancy can be recovered as 
+
+μ(s, a ) = μs(s) · π(a|s). The marginal on this probability for only agent i’s actions can be recovered as 
+
+μi(πi, π −i) = (1 − γ)([ I − γP π ]−1μ01⊤|A i|) ⊙ πi, (2) where ⊙ denotes the Hadamard product and π−i indicates all policies except player i’s. Hence, we can also write 
+
+ui(μi(πi, π −i), π −i) purely with policies as ui(πi, π −i).Players may choose to randomize over stochastic policies. We say that a player’s strategy ρi is a mixed-strategy if it is a distribution over policies. For example, let π(a) 
+
+> i
+
+and π(b)
+
+> i
+
+both be stochastic policies. Then an example of a mixed-strategy is one in which player i plays π(a) 
+
+> i
+
+and π(b) 
+
+> i
+
+with equal probability 1/2. If ρi puts all mass on a single policy 
+
+πi, we call ρi a pure-strategy and write πi directly. We say that a (random) policy profile ρ = ( ρ1, ρ 2, . . . , ρ n)
+
+is a (mixed-strategy) Nash equilibrium if for all players i,
+
+Eπ∼ρ[ui(πi, π −i)] ≥ Eπ′ 
+
+> i∼ρ′
+> i,π −i∼ρ−i
+
+[ui(π′
+
+> i
+
+, π −i)] ,
+
+for any policy ρ′
+
+> i
+
+. If ρ is a pure strategy profile as defined above, we call it a pure-strategy Nash equilibrium .We call any policy ˜πi (or occupancy measure ˜μi) player i’s 
+
+best response to a profile ρ if it achieves an expected utility that is maximal among all policies (respectively, occupancy measures). Note best responses are the solutions to each individual player’s MDP with all other player policies held fixed, and so they necessarily can exist as pure strategies: 
+
+˜π ∈ arg max π′ 
+
+> i
+
+Eπ−i∼ρ−i [ui(π′
+
+> i
+
+, π −i)] 
+
+The Occupancy Measure View In our analysis and the algorithms proposed in this article, it will be helpful to frame and solve problems directly in the space of occu-pancy measures U.Given opponent policy profiles π−i we can define the prob-ability kernel P π−i 
+
+> i
+
+as 
+
+P π−i 
+
+> i
+
+(s′|s, a i) = X
+
+> a−i∈A −i
+
+P (s′|s, a i, a −i) Y 
+
+> j̸=i
+
+πj (aj |s).
+
+Given these, we can reformulate an individual agent’s de-cision problem as 
+
+max 
+
+> μi∈R|S|×|A i|
+
+ui(μi, π −i) (3) 
+
+s.t. μi ≥ 0 (4) 
+
+X
+
+> ai∈A i
+
+ I − γP π−i 
+
+> i
+
+(·|· , a i)μi(·, a i) = (1 − γ)μ0 (5) where P π−i 
+
+> i
+
+(·|· , a i) is a next-state by state transition ma-trix and μi(·, a i) is a vector denoting the probability of tak-ing action ai in every state. Because ui are concave in μi,2Convex Markov Games 
+
+(a) Occupancy Measure Space ( U1) (b) Policy Space ( Π1) (c) Joint Occupancy Measure Space ( U)
+
+Figure 1. (A convex Markov Game) A 2-player, 2-state, 2-action convex Markov game. Colors help visualize the effect of the nonlinear transformation from occupancy space to policy space (7). Full environment details are in Appendix F.2. (a) The feasible set of occupancy measures for player 1 given a fixed policy for player 2 with best response region shown in black. Player 1’s occupancy gradient ∇iμi
+
+points off the 3-simplex so is not shown. Instead, we show ∇iμi projected onto the tangent space of the feasible set in white, i.e., 
+
+ΠT Ui (∇iμi ). The vector shadowing the white one is ∇iμi projected onto the tangent space of the 3-simplex; note this vector points off the feasible set (into the page). (b) A 2-d slice of player 1’s feasible policy space. The set of player 1’s best response policies to π2
+
+(white dot) in black is non-convex when viewed in policy space. (c) We consider the joint occupancy measure space U where π1 = π2
+
+(implies μ1 = μ2). Black dots indicate μ1 where the maximum Bellman flow constraint violation (5) is less than 0.01 . The line connects two points from the feasible set whose midpoint (in red) lies outside the set, revealing the non-convexity of U.
+
+and given the linearity of the constraints in (4) and (5), this problem is convex, motivating the name of convex Markov Games (cMGs). If ui(μi, π −i) = ri(π−i)⊤μi where ri is a flattened state-action reward vector and μi is similarly flat-tened, we recover Littman’s Markov game framework (as mentioned in Table 1), however cMGs allow a much wider class of utilities (e.g., ones that include entropy of the occu-pancy measure). Notice that the feasible set in (5) is defined by constraints that depend on π−i. For convenience, we de-fine the so-called action correspondence , Ui = Mi(π−i),which maps every profile of opponent policies to the feasi-ble set of occupancy measures for player i, i.e, problem (5) can be succinctly written 
+
+max  
+
+> μi∈M i(π−i)
+
+ui(μi, π −i). (6) We will use the feature that policies can be partially recov-ered from occupancy measures as 
+
+πi(μi)( a|s) = 
+
+( μi(s,a )P  
+
+> a′μi(s,a ′)
+
+if P 
+
+> a′
+
+μi(s, a ′) > 0
+
+any πsi ∈ ∆|A i| otherwise .
+
+(7) 
+
+# 3. Existence of Nash Equilibrium 
+
+We first show that under fairly general assumptions, mixed Nash equilibria exist. We then argue that for the purposes of learning, pure-strategy Nash equilibria are particularly desirable, and show that these exist as well. 
+
+Proposition 1. Mixed-strategy Nash equilibria exist in convex Markov Games. 
+
+This statement follows easily by using the policy view. Each player’s optimization problem in terms of policies is: 
+
+max   
+
+> πi∈("|S|
+> s=1 ∆Ai)
+
+ui(μi(πi, π −i), π −i). (8) Appendix B shows that all ui are continuous, differentiable functions of (πi, π −i), and since the strategy sets are com-pact metric spaces, the existence of mixed-strategy NE fol-lows from classical existence results (Glicksberg, 1952; Fu-denberg & Tirole, 1991, Theorem 1.3, p. 35). While existence of mixed-strategy equilibria are a descrip-tively helpful tool, they have limitations for applications in learning. In particular, learning a continuous distribution over stochastic policies would practically require function approximation or discretizing the space, greatly increasing the complexity of the learning problem; this challenge has been broached but not sufficiently solved in the context of, for example, generative adversarial networks (Arora et al., 2017). Therefore, we provide another statement that en-sures the existence of pure-strategy Nash equilibria. 
+
+Theorem 1. Pure-strategy Nash equilibria exist in convex Markov Games. 
+
+The proof of this statement is in Appendix A and relies on topological arguments, in particular the contractibility of best response sets (Debreu, 1952; Kosowsky, 2023). While best response sets are convex in occupancy measure space, they are non-convex in policy space (Figure 1a-b). This breaks the assumptions of the Kakutani (1941) fixed point theorem, which provides the foundation for many equi-librium existence results in multi-agent games including cMG’s parent framework of Markov games (Fink, 1964), and is one reason why we must appeal to more general the-ory here. 3Convex Markov Games 
+
+A set is contractible if there exists a continuous homo-topy (deformation) that shrinks that set to a point. Intu-itively, if best response sets are contractible then they be-have topologically similarly to points, and so one would expect the principles of the Brouwer (1911) fixed point the-orem that Nash (1950) famously applied in his own exis-tence proof should apply. In fact, all convex sets are con-tractible, and so Kakutani’s fixed point theorem also fol-lows from this argument. Despite their non-convexity, best response sets in cMGs are contractible, which the reader can confirm visually for the example in Figure 1b. One additional obstruction to the analysis of cMGs is the forfeiture, in the underlying cMDPs, of the recurrence rela-tion known as the Bellman equation, which gives rise to the notion of a value function. In fact, Fink (1964) used the ex-istence of value functions along with Kakutani’s fixed point theorem to prove existence of NE in Markov (stochastic) games. We circumvented this obstruction with more gen-eral equilibrium arguments, but the lack of access to tradi-tional value functions presents a further obstacle to design-ing efficient algorithms which we broach next. 
+
+# 4. Computation of Equilibria 
+
+While equilibria exist, even computing NEs in (vanilla) MGs is PPAD-hard (Rubinstein, 2015; Daskalakis et al., 2023)—since cMGs generalize MGs, computing NEs in cMGs is at least as hard. Nevertheless, we present a prac-tical gradient-based approach for approximating equilibria that we find works well empirically. The most common notion of approximation for NEs is ex-ploitability (ϵ), defined as 
+
+ϵ = max  
+
+> i=1 ,...,n
+
+ϵi (9) where ϵi = max  
+
+> z∈M i(π−i)
+
+ui(z, π −i) − ui(μi, π −i). (10) Exploitability measures the most any player can gain by unilaterally deviating to another policy (equiv., occupancy measure). Mechanistically, in cMGs, it corresponds to each player solving problem (6)—a constrained, convex opti-mization problem—and then reporting the value they at-tained beyond that of their strategy under the approximate equilibrium profile π. In particular, a policy profile π with vanishing exploitability ( ϵ = 0 ) is a pure-strategy Nash equilibrium. 
+
+High Level Approach : It should also be clear from the 
+
+max in (10) that exploitability (9) is always non-negative. Therefore, one can imagine solving for an NE (where 
+
+ϵ = 0 ) by minimizing exploitability, i.e., using it as a loss function. Exploitability is relatively expensive to compute as it requires solving n convex programs, so we instead derive a cheap upper bound whose gap is controlled by a hyperparameter τ . Exploitability (as well as our upper bound) is non-convex and hence naive gradient descent is not guaranteed to find a global minimum. However, in what follows, we leverage “temperature annealing” ideas that have been successful in several other game classes (normal-form/extensive-form/Markov) and find them beneficial em-pirically for cMGs as well. The next result extends that of Gemp et al. (2024) from the normal-form game setting to show that exploitability is bounded from above by a constant depending on the action space size, and a projected gradient (compare the white vector to the one behind it in Figure 1a). The fol-lowing result bounds the exploitability of a cMG with util-ities ui using players’ utility-gradients of a cMG with a small amount of entropy regularization, i.e. uτi (μi, π −i) = 
+
+ui(μi, π −i) + τ H (μi), where H denotes Shannon entropy. 
+
+Theorem 2 (Low Temperature Approximate Equilibria are Approximate Nash Equilibria) . Let ∇iτ μi be player i’s en-tropy regularized gradient and π be an approximate equi-librium of the entropy-regularized game with τ > 0. Then, 
+
+ϵi(π) ≤ τ log( |S||A i|) + √2∥ΠT Ui (∇iτ μi )∥,
+
+where ΠT Ui is a projection onto the tangent space of Ui,and ∇iτ μi is the gradient of uτi with respect to μi.
+
+We can give more intuition for the analysis of the pro-jection operator. If A(π−i) ∈ R|S|× (|S|·|A i|) such that 
+
+A(π−i)μi = (1 − γ)μ0 represents the linear equality con-straints in (5), then the projection matrix is given by 
+
+ΠT Ui(π−i) = I|S|×| S| − A⊤(AA ⊤)−1A. (11) For ease of notation, we omit the dependence of A on π−i.
+
+ΠT Ui(π−i) is differentiable if and only if A(π−i) has full row rank (i.e., rank |S| ). Lemma 1 in Appendix B shows that A(π−i) has full row rank. Inspired by the bound in Theorem 2, we define the follow-ing projected-gradient loss function for cMGs: 
+
+Lτ (π) = X
+
+> i
+
+|| ΠT Ui (∇iτ μi )|| 2. (12) As a consequence of Theorem 2, we obtain Corollary 1 
+
+ϵ(π) ≤ τ log( |S| max  
+
+> i
+
+|A i|) + p2nLτ (π). (13) We can directly minimize Lτ over the space of policy pro-files π. Each player’s policy is subject to simplex con-straints that are independent of the other players. In this way, we combine the two distinct strengths of the policy and occupancy measure views. In the policy view, player strategy sets ( Πi) are independent and convex, making for simple independent updates and projections back to the fea-sible sets. In the occupancy measure view ( Ui), we enjoy 4Convex Markov Games     
+
+> Figure 2. (Approximate PGL Equilibrium) Arrows indicate each player’s most likely action (4 cardinal directions & “Stay”) with their color indicating their probability. Moves to the same location are awarded randomly to one of the agents. The goal state is marked by B and G where green achieves the top right corner and blue, the top left, simultaneously. Note that in last grid, π(↓) = 0 .
+
+convexity of player losses which enable derivation of upper bounds on exploitability. Note that our proposed loss is composed of a projection operator ΠT Ui , the gradients of our concave utilities ui, and the mapping from policies to occupancy measures (2). All of these components are differentiable assuming that the utilities are also differentiable 2.This yields a differentiable loss and allows for optimiza-tion using automatic differentiation. If we represent agent policies in an unconstrained space with logits , we can then minimize Lτ directly with respect to agent policies using our preferred unconstrained optimizer “Opt”, e.g., Adam. In addition, we repeatedly anneal τ , intended to mimic standard protocols for normal-form, extensive-form, and (vanilla) Markov games (McKelvey & Palfrey, 1995; 1998; Gemp et al., 2022; Eibelsh¨ auser & Poensgen, 2023). We refer to this approach as projected-gradient loss minimiza-tion ( PGL ), with pseudocode in Algorithm 1. 
+
+Algorithm 1 Projected-Gradient Loss Minimization ( PGL ) 
+
+> 1:
+
+Given: Initial profile π, temperature schedule τt 
+
+> 2:
+
+for t = 0 , . . . , T do  
+
+> 3:
+
+π ← Opt (π, ∇π Lτt ) 
+
+> 4:
+
+end for  
+
+> 5:
+
+Output: π
+
+Note that Algorithm 1 does not come with any convergence guarantees. Although we take inspiration from previous approaches which carefully trace a continuum of equilib-ria throughout the annealing process (Turocy, 2005), cMGs introduce a distinct challenge to precisely replicating this family of homotopy methods. The family of homotopy (an-nealing) methods we imitate rely on first solving for the equilibrium of a transformed game. In prior game classes, this meant solving for the maximum entropy profile which is easy (all players play uniform strategies). In cMGs, even this step is complex. While the objective of maximizing the sum of the entropy of each player’s occupancy mea-sure is concave, the feasible set of joint occupancy mea-sures is non-convex (see Figure 1c). Hence, even defining the starting point for a homotopy process that imitates prior approaches is difficult.  
+
+> 2Strict differentiability of utilities is not required by autodiff
+> libraries, e.g., JaX (Bradbury et al., 2018).
+
+# 5. Experiments 
+
+We test a variety of non linear utilities in several domains. In the first set of (creativity-based) domains, we compare against four baseline algorithms, and discuss and contrast the resulting exploitability and policy profiles. The re-sulting experiments demonstrate other distinct use cases of cMGs. 
+
+Baselines. The first baseline, min ϵ, directly minimizes exploitability using a differentiable convex optimization package CVXPYLAYERS in JAX (Agrawal et al., 2019; Bradbury et al., 2018). In the second baseline, Sim , all players simultaneously run gradient descent on their losses with respect to their policies and we report the perfor-mance of the running average of the policy trajectory. Poli-cies at each state are represented in R|A i|− 1 as a soft-max over |A i| − 1 logits with the last logit fixed as 0.In the third, RR , agents alternate gradient descent steps in round-robin fashion. We also compare against the SGAME - 
+
+> SOLVER
+
+(Eibelsh¨ auser & Poensgen, 2023) package of ho-motopy methods for Markov games. 
+
+Hyperparameters. We minimize Lτt (π) with Adam; its internal state is not reset after annealing. Three types of annealing schedules τt are used for entropy regularization (Appendix E). Each policy πi is initialized to uniform un-less otherwise specified. All experiments except pathfind-ing were run on a single CPU and take about a minute to solve although exact exploitability reporting via CVX - 
+
+> OPT
+
+(Diamond & Boyd, 2016) increases runtime approxi-mately 10 ×; pathfinding used 1 GPU. 
+
+Domains. We consider seven domains: one synthetic, two grid worlds, and four iterated normal-form games (NFGs). The first is a multi-agent pathfinding problem. The second domain is the classic two-player, iterated pris-oner’s dilemma (compare Tucker & Straffin Jr (1983)) where agents may choose to cooperate or defect with their partner. The third domain is a three-player, public goods game where agents may choose to contribute all or none of their savings to a public pool which is then redistributed evenly with a growth multiplier of 1.3 (compare Janssen & Ahn (2003)); payoff is measured in terms of player prof-its. In the fourth, we consider a three-player El Farol bar 5Convex Markov Games           
+
+> Figure 3. (Convergence to Nash equilibria) RR and PGL descent yield the lowest exploitability yet converge to different equilibria. PGL
+> drops coincide with temperature annealing. min ϵcrashes, marked by stars. All algorithms performed best with a learning rate of 0.1
+
+problem where players choose whether to go to a bar or stay home (Arthur, 1994). Agents receive maximum pay-off ( 2) for attending an uncrowded bar (fewer than 3 peo-ple), followed by staying home ( 1), followed by attending a crowded bar ( 0). The fifth domain is the classic Bach-Stravinsky game where agents must coordinate to attend a performance despite different preferences. The synthetic domain was presented in Figure 1 and is described in Ap-pendix F.2. Lastly, we consider a robotic warehouse in-spired grid world. We set γ = 0 .99 in all domains. Iterated NFGs use the last joint action selected by each player as state, i.e., S = A.
+
+5.1. Creativity 
+
+Our first application considers utilities that value solutions that cover more than a small subset of the state-action space, which leads to “creative” equilibria, as we show. We get such outcomes for utilities that incorporate entropy bonuses for high (Shannon) entropy occupancy measures, 
+
+ui(μi, π −i) = ri(π−i)⊤μi + τ H (μi) where ri(π−i) = 
+
+Ea−i∼π−i [ri(s, a i, a −i)] as an abuse of notation. To find equilibria of the original game, we anneal the weight on this entropy bonus towards zero, emulating prior work on homotopy methods for equilibria in Markov games (Eibelsh¨ auser & Poensgen, 2019). First, we consider a multi-agent pathfinding problem. Two agents must coordinate to pass through a bottleneck door-way on their way to a joint goal state. The reward for reach-ing the goal state is 100 for both players; −0.01 reward oth-erwise. Upon reaching the goal state, the agents are reset to the start state (leftmost grid in Figure 2). Our algorithm returned an approximate equilibrium where the final util-ity for each agent was 24 .5 and the exploitability was 1.7
+
+(approximately 7% of their utility). A single rollout of the final learned policy is shown in Fig-ure 2. The agents race to cross the doorway, after which, one agent takes the center position and the other steps aside. In the third and fourth to last frames, the blue agent moves downward due to the small remaining entropy bonus. Both agents then move upward towards the goal state. In the final frame, green executes a “no-op” action to the right as blue moves into goal position. Despite learning a fac-torized Nash equilibrium policy profile, the agents exhibit coordinated actions at certain steps (e.g., Figure 2, frame 3). This coordination is achieved through observations of partner players’ grid locations, but richer coordination is theoretically possible with richer observation spaces. Next, we examine three iterated NFGs. Figure 3 shows our algorithm has vanishing exploitability for all of them. In each game, directly minimizing exploitability in CVX - 
+
+> PYLAYERS
+
+crashes due to numerical instabilities. Round-robin descent exhibits similar qualitative behavior to our method, and faster convergence than simultaneous descent. For a study of creativity, it is valuable to inspect the equi-libria the methods found. Round-robin descent converges to an asymmetric NE in iterated El Farol where one player goes to the bar every night, while the two other players al-ternate. Like PGL , SGAMESOLVER converges to the sym-metric, state-independent NE of the underlying NFG (at-tending the bar with probability 0.707 ). In IPD and IPGG, round-robin and SGAMESOLVER similarly converge to the state-independent NE policies of the underlying NFGs (DD for IPD, zero contribution for IPGG). In contrast, our ap-proach reveals more nuanced, symmetric policies in IPD and IPGG which we explain and discuss below. 
+
+Remark ( †): The entropy of a player’s occupancy mea-sure is different from the entropy of their policy; the latter only measures entropy of action distributions in each state, ignoring the distribution across states. Interestingly, this difference manifests in the structure of the equilibria we discover. At high entropy, agents must explore the entire state space, which includes joint cooperation in the iterated prisoner’s dilemma (IPD) and joint donation in the iterated 6Convex Markov Games 
+
+State s = ( at−11 , a t−12 ) a∗ π1(a∗|s)
+
+(C, C) C 0.73 (C, D) D 0.74 (D, C) C 0.66 (D, D) D 0.81             
+
+> Table 2. (Approximate PGL Equilibrium on IPD) The best re-sponse is denoted a∗= arg max aπ1(a|s);Cdenotes Cooper-ate; Ddenotes Defect. The utility per-player is 0.47 compared to that of other classic IPD strategies: tit-for-tat ( 0.5), win-stay, lose-shift ( 0.67 ), grim trigger ( 0.42 ), defect-defect ( 0.33 ).
+
+public goods game (IPGG). As temperature is annealed, the players receive less of a bonus for exploration, however, this transient introduction to mutually beneficial play has a lasting impact on equilibrium selection. In IPD, PGL finds a symmetric policy, shown in Table 2, that is quite similar to the famous tit-for-tat policy. If both players cooperated on the last round, then they are likely to continue cooperating. If player 2 defected, then player 1 is likely to defect (even more likely if 1 defected previously). If 1 defected and 2 cooperated, 1 is actually more likely to cooperate in the next round, in an act of reciprocation. In IPGG, PGL finds a symmetric policy as well, shown in Table 3. In contrast to the zero contribution policies found by all other methods, PGL finds a policy that, intuitively, is more likely to contribute funds when other agents do. 
+
+5.2. Imitation 
+
+Our second application considers utilities that value poli-cies similar to policies observed in human experiments. In this experiment, we build on the homotopy experiment in the creativity section where we annealed our entropy co-efficient τ , but instead of annealing entropy, we anneal a KL penalty to the human state-action occupancy measure, 
+
+ui(μi, π −i) = ri(π−i)⊤μi − τ d KL (μi∥μref  
+
+> i
+
+).
+
+Remark ( †): Matching occupancy measures is akin to matching long-run trajectories whereas matching policies does not necessarily match trajectories when other agents adjust their policies during learning as is the case here. The reference human policies μref  
+
+> i
+
+were derived from ex-periments where subjects played the iterated prisoner’s dilemma, selecting cooperate (C) or defect (D) in each pe-riod (Romero & Rosokha, 2023, Table 1, Current, Direct-Response). Subjects were required to confirm their op-ponent’s action after each period. This ensured that they were capable of representing a policy that conditions on the previous action. Table 4 reports the symmetric policy we learned while regularizing to the human occupancy mea-State s = ( at−11 , a t−12 , a t−13 ) a∗ π1(a∗|s)
+
+(None, None, None) None 0.99 (None, None, All-In) None 0.66 (None, All-In, None) None 0.66 (None, All-In, All-In) All-In 0.60 (All-In, None, None) None 0.80 (All-In, None, All-In) All-In 0.56 (All-In, All-In, None) All-In 0.56 (All-In, All-In, All-In) All-In 0.86          
+
+> Table 3. (Approximate PGL Equilibrium on IPGG) The best re-sponse is denoted a∗= arg max aπ1(a|s). Per-player utility is
+> 0.03 versus 0for zero contribution policies.
+
+State s = ( at−11 , a t−12 ) a∗ π1(a∗|s) πh 
+
+> 1
+
+(a∗|s)
+
+(C, C) C 0.83 0.86 (C, D) D 0.52 0.65 (D, C) D 0.53 0.55 (D, D) D 0.86 0.87                   
+
+> Table 4. Approximate Nash equilibrium recovered by our algo-rithm in IPD after annealing KL regularization to the human pol-icy reported in the rightmost column (Romero & Rosokha, 2023, Table 1, Current, Direct-Response). The best response is denoted
+> a∗= arg max aπ1(a|s);Cdenotes Cooperate; Ddenotes De-fect. The utility per-player under our learned symmetric pol-icy profile is 0.48 versus 0.46 for the human policy. In addi-tion, our learned policy profile is 1.4×10 −4-exploitable at ev-ery state, whereas the human policy profile is substantially more exploitable, being 0.47 -exploitable over any initial state. Ex-ploitability over all initial states may be seen as an analogue of Markov perfection in Markov games (Maskin & Tirole, 2001).
+
+sure. Note that this new policy profile has slightly higher utility for all agents and is very close to an equilibrium, independent of the starting state. After two scenarios where we used a sequence of cMGs to discover creative and human-like equilibria, we consider a setting in which the utilities are not annealed, but are con-stant across time. 
+
+5.3. Fairness 
+
+We now consider utilities that value fair visitation of states. In the Bach-Stravinsky game, two players must choose whether to attend a performance by Bach or Stravinsky. If they misalign, they get zero reward. However, one player prefers Bach to Stravinsky ( 3 vs. 2), whereas the other player prefers Stravinsky to Bach ( 3 vs. 2). We incorpo-rate a term into both player’s objectives that penalizes any difference in long-run attendance of Bach versus Stravin-7Convex Markov Games 
+
+sky to incentivize fair, equal attendance of the two shows, 
+
+ui(μi, π −i) = ri(π−i)⊤μi − (P 
+
+> a∈{ S,B}
+
+μi((B , B) , a ) −
+
+P 
+
+> a∈{ S,B}
+
+μi((S , S) , a )) 2.We initialize logits for both players’ policies with a stan-dard normal. We set temperature τ to zero and then opti-mize with a learning rate of 0.1 for 1000 iterations. In 10 random trials, both players converge to the same ap-proximate NE where they vote for their favored event 60% 
+
+of the time regardless of their actions on the previous day. The maximum exploitability ϵ over the 10 trials is 2.5 ×
+
+10 −5, and the max difference between P 
+
+> a
+
+μi((B , B) , a )
+
+and P 
+
+> a
+
+μi((S , S) , a ) is 2.14 × 10 −5, implying this is a “fair” behavioral profile by our fairness metric. 
+
+5.4. Safety 
+
+Lastly, we explore applications where a “safe” long-run behavior of the multi-agent system is desired (Miryoosefi et al., 2019). Our algorithm is able to find an exact NE in the synthetic convex loss domain (i.e., ϵ = 0 ) discussed in the motivating example of Figure 1. Recall the loss for each agent is zero if their μi lies in the given “safe” region marked in black. There are no conventional “rewards” ri in this synthetic domain. See Appendix F.2 for details. In addition, we demonstrate a safety application with a grid world where two robots pick up and drop off packages in a warehouse. Packages can only be picked up at a central location where it is potentially dangerous for the robots to move quickly if they happen to share the pickup space si-multaneously. At the same time, they are incentivized to drop off as many packages as possible. Agents maximize their discounted return minus a con-vex safety loss, which penalizes them for the frequency they take the fast action in the pickup state beyond 10% :
+
+100 · max  0, μ i(s = ( pickup , pickup ), a = fast ) − 0.10 .In other words, any frequency below 10% is deemed suffi-ciently safe, but beyond that a linear penalty is applied. Our algorithm is able to find an approximate NE in this warehouse domain with and without the safety loss, achiev-ing low exploitability, ϵ ≤ 3.4 × 10 −2 and 1.0 × 10 −3
+
+respectively. In either domain, the learned policy always chooses the fast action in all states except for when both agents are picking up a package. When the safety loss is 
+
+not included, the agents select to move fast 69% of the time. With the safety loss, fast is chosen 42% of the time reflecting the convex penalty for unsafe behavior. 
+
+# 6. Related Work 
+
+Our work relates to the single-agent literature on convex Markov games and equilibrium selection in Markov games. We rely on NE existence-proof techniques from topology, loss minimization for equilibrium computation, and use ho-motopy methods as inspiration for our experiments. Fi-nally, we unify approaches to creativity, imitation, fairness, and safety from multi-agent learning. 
+
+Convex Markov Decision Processes Markov decision processes (MDPs) are the predominant framework for modeling sequential decision making problems, especially in infinite-horizon settings (Puterman, 2014, §6.9). The goal of a decision maker in an MDP is typically to max-imize a γ-discounted sum of rewards earned throughout the sequential decision process. In the infinite-horizon set-ting, recent research has exploited an alternative, but equiv-alent view of maximizing the expected reward under the agent’s stationary state-action occupancy measure (Zhang et al., 2020)—the probability of being in a given state and taking a given action. This viewpoint reveals an opti-mization problem with a linear objective (maximize return) and linear constraints (valid occupancy measure); from this launchpad, research has generalized to convex objec-tives that incorporate, for example, the (neg)entropy of the occupancy measure in order to maximize exploration of the MDP (Zahavy et al., 2021) or maximize robust-ness (Grand-Cl´ ement & Petrik, 2022). Research on cMDPs has recently surged, however, formulations and solutions to 
+
+nonstandard Markovian control problems have a long his-tory (Kallenberg, 1994; Tak´ acs, 1966). A number of works have explored solutions to MDPs with similarly complex objectives and in a variety of settings. For example, prior research has looked beyond concave utilities to multi-objective (Cheung, 2019b) or submodular objectives (Prajapat et al.; De Santi et al., 2024). Mutti et al. (2022) pointed out practical concerns with the infinite-trials assumption baked-in to the standard convex MDP formula-tion, motivating the study of finite trials (Mutti et al., 2023). Others have considered the non-stationary (Marin Moreno et al., 2024b) and online (Cheung, 2019a) settings as well. Designing scalable algorithms for convex MDPs is a chal-lenge. Zhang et al. (2020) proposed a model-free (vari-ational) policy gradient approach for general utilities that was then combined with variance reduction techniques for improved performance in subsequent work (Barakat et al., 2023). Marin Moreno et al. (2024a) developed an effi-cient model-based RL approach for the finite horizon set-ting, and Geist et al. (2022) shed light on a connection to mean-field games, enabling the design of new algorithms for cMDPs. This mean-field games connection also in-spired other work to extend inverse-RL to cMDPs where the aim is to uncover an agent’s utility function from ob-served behavior (C ¸ elikok et al., 2024). Recent work de-veloped a practical, supervised learning approach for the continuous time setting applicable to training flow and dif-fusion models (De Santi et al.). 8Convex Markov Games 
+
+Markov Games. When multiple agents’ decision mak-ing problems interact, the MDP framework is extended to a Markov game, also known as a stochastic game (Thui-jsman, 1997; Littman, 1994). In the game setting, we seek equilibria, a notion of simultaneous optimality for all agents. Fink (1964) proved the existence of station-ary (time-independent) γ-discounted Nash equilibria in n-player, general-sum stochastic games. A homotopy ap-proach that traces the continuum of quantal response equi-libria performs well at approximating Nash equilibria in the limit of zero temperature (Eibelsh¨ auser & Poensgen, 2019). Other approaches are tailored for more restricted two-player, zero-sum settings (Daskalakis et al., 2020; Goktas et al., 2023) or settings where agent incentives are a priori aligned such as Markov potential games (Leonar-dos et al., 2021). Prior work proved a negative result for value iteration based approaches stating it is not possible to derive a stationary equilibrium policy from Q-values in general Markov games (Zinkevich et al., 2005); how-ever, in IPD specifically, self-play Q-learners converge to 
+
+win-stay, lose-shift (Bertrand et al., 2025). Lastly, re-cent work extends the Markov game, a Markov chain of normal-form games, to a chain of abstract economies (or 
+
+pseudo-games ) (Goktas et al., 2025), games with jointly constrained strategy spaces. In contrast, our cMG can al-most be seen as generalizing a Markov game to an abstract economy, however, this leads to an unnatural interpretation of unilateral deviations in terms of occupancy measures. 
+
+Techniques. Our proposed loss function extends that designed in recent work for normal-form games (NFGs) (Gemp et al., 2024) to the convex Markov game setting. In their work, the focus was on constructing a loss amenable to unbiased estimation. In NFGs, the feasible set 
+
+Ui = ∆ Ai is fixed, independent of other players’ strate-gies. This allows the construction of an unbiased estimator of their loss assuming access to unbiased gradients of player’s utilities. Our loss applies to a more general class of games, but sacrifices unbiasedness. Our applications anneal the temperature of an entropy bonus and/or a Kullback-Leibler divergence penalty. Such approaches relate to homotopy continuation-based ap-proaches to equilibrium computation (Harsanyi et al., 1988). McKelvey & Palfrey (1995) introduced quantal re-sponse equilibria along with a homotopy from infinite to zero temperature defining their limiting logit equilibrium in normal-form games (and also extensive-form (McKelvey & Palfrey, 1998)). More recent work extended this approach to Markov games (Eibelsh¨ auser & Poensgen, 2019). 
+
+Applications. Our goals of creativity, imitation, fairness, and safety are not new to multi-agent applications. Za-havy et al. (2022; 2023) leveraged convex MDPs to dis-cover more creative play in Chess. Bakhtin et al. (2022); Jacob et al. (2022) used KL-regularization towards human play to recover strategically superior policies in Diplomacy. Hughes et al. (2018) models inequity aversion in complex MARL domains. And Shalev-Shwartz et al. (2016) for-goes the Markovian assumption altogether to tackle safe autonomous driving. Zamboni et al. (2025) formulates a cMG with identical payoffs to specifically target group ex-ploration in, for example, robotics domains. In contrast to these applications, our framework of convex Markov games allows for a unified analysis of several domains us-ing a common language and algorithmic principles. 
+
+# 7. Conclusion 
+
+Convex Markov Games are a versatile framework for multi-agent reinforcement learning. The cMG framework in-duces equilibria that exhibit diverse state visitation, em-ulate human data, optimize notions of fairness, or avoid unsafe system states. Not only do pure-strategy equilibria exist despite non-convex best response correspondences, there is also a differentiable upper bound that can be min-imized to find them. In several domains, we show how deforming a cMG over training can help to pick out novel approximate equilibria with properties more desirable than those found by baseline techniques such as higher welfare, symmetry, reciprocation, and state-dependent behaviors. Our work opens up several directions for future research in-cluding theoretical questions around other possible solution concepts (e.g., correlated or coarse-correlated equilibria) as well as studying more specific game classes under more restrictive assumptions (e.g., potential or identical payoff settings). In a similar vein, we have, in concurrent work, constructed an efficient, convergent, model-free approach to solving cMGs in the two-player, zero-sum setting (Kalo-giannis et al., 2025). Under the n-player, general-sum setting we investigate in this work, we proposed a centralized approach that assumes knowledge of the transition dynamics. If dynamics are esti-mated, we pointed out issues obtaining unbiased estimates of the projection operator ΠT Mi(μ−i). A model-free, de-centralized training approach could scale to more complex domains and richer policies. The entropy of agents’ occupancy measures is already uti-lized in multi-agent applications, particularly in robotics domains to enhance multi-agent exploration (Burgard et al., 2000; Rogers et al., 2013; Tan et al., 2022; Zam-boni et al., 2025). Unrelatedly, the tuning of large language models (LLMs) to align with human feedback has been re-cently formulated as a Markov game (Wu et al., 2025). We hope cMGs can help provide a framework from which to better understand these and other problems in the future. 9Convex Markov Games 
+
+# Acknowledgements 
+
+We are grateful to Conrad Kosowsky for helpful discus-sions on topological equilibrium existence topics. 
+
+# Impact Statement 
+
+This paper presents work whose goal is to advance the field of multi-agent reinforcement learning. There are many po-tential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+# References 
+
+Agrawal, A., Amos, B., Barratt, S., Boyd, S., Diamond, S., and Kolter, J. Z. Differentiable convex optimization layers. Advances in Neural Information Processing Sys-tems , 32, 2019. Aliprantis, C. D. and Border, K. C. Infinite Dimensional Analysis: A Hitchhiker’s Guide . Springer Science & Business Media, 2006. ISBN 978-3-540-29587-7. doi: 10.1007/3-540-29587-9 17. Arora, S., Ge, R., Liang, Y., Ma, T., and Zhang, Y. Gener-alization and equilibrium in generative adversarial nets (gans). In International Conference on Machine Learn-ing , pp. 224–232. PMLR, 2017. Arthur, W. B. Complexity in economic theory: Inductive reasoning and bounded rationality. The American Eco-nomic Review , 84(2):406–411, 1994. Bakhtin, A., Wu, D. J., Lerer, A., Gray, J., Jacob, A. P., Farina, G., Miller, A. H., and Brown, N. Mastering the game of no-press diplomacy via human-regularized reinforcement learning and planning. arXiv preprint arXiv:2210.05492 , 2022. Barakat, A., Fatkhullin, I., and He, N. Reinforcement learning with general utilities: Simpler variance reduc-tion and large state-action space. In International Con-ference on Machine Learning , pp. 1753–1800. PMLR, 2023. Bellman, R. Dynamic programming. science , 153(3731): 34–37, 1966. Bertrand, Q., Duque, J. A., Calvano, E., and Gidel, G. Self-play q-learners can provably collude in the iterated prisoner’s dilemma. In International Conference on Ma-chine Learning , 2025. Boyd, S. P. and Vandenberghe, L. Convex optimization .Cambridge university press, 2004. Bradbury, J., Frostig, R., Hawkins, P., Johnson, M. J., Leary, C., Maclaurin, D., Necula, G., Paszke, A., VanderPlas, J., Wanderman-Milne, S., and Zhang, Q. JAX: composable transformations of Python+NumPy programs, 2018. URL http://github.com/ google/jax .Brouwer, L. E. J. ¨Uber abbildung von mannigfaltigkeiten. 
+
+Mathematische annalen , 71(1):97–115, 1911. Burgard, W., Moors, M., Fox, D., Simmons, R., and Thrun, S. Collaborative multi-robot exploration. In Proceed-ings 2000 ICRA. Millennium Conference. IEEE Inter-national Conference on Robotics and Automation. Sym-posia Proceedings (Cat. No. 00CH37065) , volume 1, pp. 476–481. IEEE, 2000. C¸ elikok, M. M., Oliehoek, F. A., and van de Meent, J.-W. Inverse concave-utility reinforcement learning is inverse game theory. arXiv preprint arXiv:2405.19024 , 2024. Cheung, W. C. Exploration-exploitation trade-off in re-inforcement learning on online markov decision pro-cesses with global concave rewards. arXiv preprint arXiv:1905.06466 , 2019a. Cheung, W. C. Regret minimization for reinforcement learning with vectorial feedback and complex objectives. 
+
+Advances in Neural Information Processing Systems , 32, 2019b. Daskalakis, C., Foster, D. J., and Golowich, N. Indepen-dent policy gradient methods for competitive reinforce-ment learning. Advances in Neural Information Process-ing Systems , 33:5527–5540, 2020. Daskalakis, C., Golowich, N., and Zhang, K. The complex-ity of markov equilibrium in stochastic games. In The Thirty Sixth Annual Conference on Learning Theory , pp. 4180–4234. PMLR, 2023. De Santi, R., Vlastelica, M., Hsieh, Y.-P., Shen, Z., He, N., and Krause, A. Flow density control: Generative optimization beyond entropy-regularized fine-tuning. In 
+
+The Exploration in AI Today Workshop at ICML 2025 .De Santi, R., Prajapat, M., and Krause, A. Global rein-forcement learning: beyond linear and convex rewards via submodular semi-gradient methods. In Proceedings of the 41st International Conference on Machine Learn-ing , pp. 10235–10266, 2024. Debreu, G. A social equilibrium existence theorem. Pro-ceedings of the national academy of sciences , 38(10): 886–893, 1952. Diamond, S. and Boyd, S. Cvxpy: A python-embedded modeling language for convex optimization. Journal of Machine Learning Research , 17(83):1–5, 2016. 10 Convex Markov Games 
+
+Eibelsh¨ auser, S. and Poensgen, D. Markov quantal re-sponse equilibrium and a homotopy method for comput-ing and selecting markov perfect equilibria of dynamic stochastic games. Available at SSRN 3314404 , 2019. Eibelsh¨ auser, S. and Poensgen, D. sgamesolver: A python package to solve stochastic games. Available at SSRN 3316631 , 2023. Fink, A. M. Equilibrium in a stochastic n-person game. 
+
+Journal of science of the hiroshima university, series ai (mathematics) , 28(1):89–93, 1964. Fudenberg, D. and Tirole, J. Game theory . MIT press, 1991. Garcıa, J. and Fern´ andez, F. A comprehensive survey on safe reinforcement learning. Journal of Machine Learn-ing Research , 16(1):1437–1480, 2015. Geist, M., P´ erolat, J., Lauri` ere, M., Elie, R., Perrin, S., Bachem, O., Munos, R., and Pietquin, O. Concave utility reinforcement learning: The mean-field game viewpoint. In Proceedings of the 21st International Conference on Autonomous Agents and Multiagent Systems , pp. 489– 497, 2022. Gemp, I., Savani, R., Lanctot, M., Bachrach, Y., Anthony, T., Everett, R., Tacchetti, A., Eccles, T., and Kram´ ar, J. Sample-based approximation of Nash in large many-player games via gradient descent. In Proceedings of the 21st International Conference on Autonomous Agents and Multiagent Systems , pp. 507–515, 2022. Gemp, I., Marris, L., and Piliouras, G. Approximating Nash equilibria in normal-form games via stochastic op-timization. In International Conference on Learning Representations , 2024. Ghojogh, B., Ghodsi, A., Karray, F., and Crowley, M. KKT conditions, first-order and second-order optimiza-tion, and distributed optimization: tutorial and survey. 
+
+arXiv preprint arXiv:2110.01858 , 2021. Glicksberg, I. L. A further generalization of the kaku-tani fixed theorem, with application to Nash equilibrium points. Proceedings of the American Mathematical So-ciety , 3(1):170–174, 1952. Goktas, D., Prakash, A., and Greenwald, A. Convex-concave zero-sum markov stackelberg games. In Oh, A., Naumann, T., Globerson, A., Saenko, K., Hardt, M., and Levine, S. (eds.), Advances in Neural Information Pro-cessing Systems , volume 36, pp. 66818–66832. Curran Associates, Inc., 2023. Goktas, D., Zhao, S., Chen, Y., and Greenwald, A. Infinite horizon markov economies. arXiv preprint arXiv:2502.16080 , 2025. Grand-Cl´ ement, J. and Petrik, M. On the convex for-mulations of robust markov decision processes. arXiv preprint arXiv:2209.10187 , 2022. Harsanyi, J. C., Selten, R., et al. A general theory of equi-librium selection in games. MIT Press Books , 1, 1988. Hazan, E., Kakade, S., Singh, K., and Van Soest, A. Prov-ably efficient maximum entropy exploration. In Interna-tional Conference on Machine Learning , pp. 2681–2691. PMLR, 2019. Hughes, E., Leibo, J. Z., Phillips, M., Tuyls, K., Due˜ nez-Guzman, E., Garc´ ıa Casta˜ neda, A., Dunning, I., Zhu, T., McKee, K., Koster, R., et al. Inequity aversion improves cooperation in intertemporal social dilemmas. Advances in Neural Information Processing Systems , 31, 2018. Jacob, A. P., Wu, D. J., Farina, G., Lerer, A., Hu, H., Bakhtin, A., Andreas, J., and Brown, N. Modeling strong and human-like gameplay with kl-regularized search. In International Conference on Machine Learning , pp. 9695–9728. PMLR, 2022. Janssen, M. and Ahn, T. Adaptation vs. anticipation in public-good games. In annual meeting of the American Political Science Association, Philadelphia, PA , 2003. Kakutani, S. A generalization of brouwer’s fixed point the-orem. Duke Mathematical Journal , 8(3):457, 1941. Kallenberg, L. C. Survey of linear programming for stan-dard and nonstandard markovian control problems. part i: Theory. Zeitschrift f¨ ur Operations Research , 40:1–42, 1994. Kalogiannis, F., Vlatakis-Gkaragkounis, E.-V., Gemp, I., and Piliouras, G. Solving zero-sum convex markov games. In International Conference on Machine Learn-ing . PMLR, 2025. Kingma, D. P. and Ba, J. Adam: A method for stochastic optimization. In International Conference on Learning Representations , 2015. Kosowsky, C. Nash equilibrium existence without convex-ity. arXiv preprint arXiv:2308.11597 , 2023. Lanctot, M., Lockhart, E., Lespiau, J.-B., Zambaldi, V., Upadhyay, S., P´ erolat, J., Srinivasan, S., Timbers, F., Tuyls, K., Omidshafiei, S., Hennes, D., Morrill, D., Muller, P., Ewalds, T., Faulkner, R., Kram´ ar, J., Vylder, B. D., Saeta, B., Bradbury, J., Ding, D., Borgeaud, S., Lai, M., Schrittwieser, J., Anthony, T., Hughes, E., Danihelka, I., and Ryan-Davis, J. OpenSpiel: Aframework for reinforcement learning in games. CoRR ,abs/1908.09453, 2019. URL http://arxiv.org/ abs/1908.09453 .11 Convex Markov Games 
+
+Leonardos, S., Overman, W., Panageas, I., and Pil-iouras, G. Global convergence of multi-agent policy gradient in markov potential games. arXiv preprint arXiv:2106.01969 , 2021. Littman, M. L. Markov games as a framework for multi-agent reinforcement learning. In Proceedings of the Eleventh International Conference on Interna-tional Conference on Machine Learning , ICML’94, pp. 157–163, San Francisco, CA, USA, 1994. Morgan Kauf-mann Publishers Inc. ISBN 1558603352. Luenberger, D. G., Ye, Y., et al. Linear and nonlinear pro-gramming , volume 2. Springer, 1984. Marin Moreno, B., Br´ eg` ere, M., Gaillard, P., and Oudjane, N. Efficient model-based concave utility reinforcement learning through greedy mirror descent. In International Conference on Artificial Intelligence and Statistics , pp. 2206–2214. PMLR, 2024a. Marin Moreno, B., Br´ eg` ere, M., Gaillard, P., and Oudjane, N. Metacurl: Non-stationary concave utility reinforce-ment learning. Advances in Neural Information Process-ing Systems , 37:123091–123126, 2024b. Maskin, E. and Tirole, J. Markov perfect equilibrium: I. observable actions. Journal of Economic Theory , 100 (2):191–219, 2001. McKelvey, R. D. and Palfrey, T. R. Quantal response equi-libria for normal form games. Games and Economic Be-havior , 10(1):6–38, 1995. McKelvey, R. D. and Palfrey, T. R. Quantal response equilibria for extensive form games. Experimental eco-nomics , 1:9–41, 1998. Miryoosefi, S., Brantley, K., Daume III, H., Dudik, M., and Schapire, R. E. Reinforcement learning with convex constraints. Advances in Neural Information Processing Systems , 32, 2019. Mutti, M., De Santi, R., De Bartolomeis, P., and Restelli, M. Challenging common assumptions in convex rein-forcement learning. Advances in Neural Information Processing Systems , 35:4489–4502, 2022. Mutti, M., De Santi, R., De Bartolomeis, P., and Restelli, M. Convex reinforcement learning in finite trials. Jour-nal of Machine Learning Research , 24(250):1–42, 2023. Nash, J. F. Equilibrium points in n-person games. Proceed-ings of the national academy of sciences , 36(1):48–49, 1950. Prajapat, M., Mutny, M., Zeilinger, M., and Krause, A. Submodular reinforcement learning. In The Twelfth In-ternational Conference on Learning Representations .Puterman, M. L. Markov decision processes: discrete stochastic dynamic programming . John Wiley & Sons, 2014. Rogers, J. G., Nieto-Granda, C., and Christensen, H. I. Coordination strategies for multi-robot exploration and mapping. In Experimental Robotics: The 13th Interna-tional Symposium on Experimental Robotics , pp. 231– 243. Springer, 2013. Romero, J. and Rosokha, Y. Mixed strategies in the indef-initely repeated prisoner’s dilemma. Econometrica , 91 (6):2295–2331, 2023. Rubinstein, A. Inapproximability of nash equilibrium. In 
+
+Proceedings of the forty-seventh annual ACM sympo-sium on Theory of computing , pp. 409–418, 2015. Shalev-Shwartz, S., Shammah, S., and Shashua, A. Safe, multi-agent, reinforcement learning for autonomous driving. arXiv preprint arXiv:1610.03295 , 2016. Shapley, L. S. Stochastic games. Proceedings of the na-tional academy of sciences , 39(10):1095–1100, 1953. Tak´ acs, L. Non-markovian processes. Stochastic Process: Problems and Solutions , pp. 46–62, 1966. Tan, A. H., Bejarano, F. P., Zhu, Y., Ren, R., and Nejat, G. Deep reinforcement learning for decentralized multi-robot exploration with macro actions. IEEE Robotics and Automation Letters , 8(1):272–279, 2022. Thuijsman, F. A survey on optimality and equilibria in stochastic games . Maastricht University, 1997. Tucker, A. W. and Straffin Jr, P. D. The mathematics of tucker: A sampler. The Two-Year College Mathematics Journal , 14(3):228–232, 1983. Turocy, T. L. A dynamic homotopy interpretation of the logistic quantal response equilibrium correspondence. 
+
+Games and Economic Behavior , 51(2):243–263, 2005. Wu, Y., Viano, L., Chen, Y., Zhu, Z., Antonakopoulos, K., Gu, Q., and Cevher, V. Multi-step alignment as markov games: An optimistic online gradient descent approach with convergence guarantees. arXiv preprint arXiv:2502.12678 , 2025. Zahavy, T., O’Donoghue, B., Desjardins, G., and Singh, S. Reward is enough for convex MDPs. Advances in Neu-ral Information Processing Systems , 34:25746–25759, 2021. Zahavy, T., Schroecker, Y., Behbahani, F., Baumli, K., Flennerhag, S., Hou, S., and Singh, S. Discovering poli-cies with domino: Diversity optimization maintaining near optimality. In The Eleventh International Confer-ence on Learning Representations , 2022. 12 Convex Markov Games 
+
+Zahavy, T., Veeriah, V., Hou, S., Waugh, K., Lai, M., Leurent, E., Tomasev, N., Schut, L., Hassabis, D., and Singh, S. Diversifying AI: Towards creative chess with AlphaZero. arXiv preprint arXiv:2308.09175 , 2023. Zamboni, R., Mutti, M., and Restelli, M. Towards prin-cipled multi-agent task agnostic exploration. arXiv preprint arXiv:2502.08365 , 2025. Zhang, J., Koppel, A., Bedi, A. S., Szepesvari, C., and Wang, M. Variational policy gradient method for rein-forcement learning with general utilities. Advances in Neural Information Processing Systems , 33:4572–4583, 2020. Zinkevich, M., Greenwald, A., and Littman, M. Cyclic equilibria in markov games. Advances in Neural Infor-mation Processing Systems , 18, 2005. 13 Convex Markov Games 
+
+# A. Equilibrium Proof 
+
+ui(μi, π −i) = ⟨ri, μ i⟩ − 100 · max  0, μ i(s = ( pickup , pickup ), a = fast ) − 0.10  (14) 
+
+Theorem 3 (Corollary 8, Kosowsky (2023)) . Suppose that ( Πi) is a finite collection of compact and connected manifolds, and suppose we have continuous utility functions ui : Π → R with Π = "ni=1 Πi satisfying the following properties for every player i:1. Player i’s best response is a continuous function BR i : Π −i → C(Π i) where C is the set of nonempty, closed subsets of 
+
+Πi (equipped with the upper Vietoris topology), i.e., BR i is a compact-valued, upper-hemicontinuous correspondence; 2. Every output value BR i(π−i) is contractible and has a contractible neighborhood in Πi;3. There exists a homotopy that takes BR i to a constant map and whose output values —which are elements of C(Π i)
+
+—are all contractible and have a contractible neighborhood in Πi.Then the game has a pure-strategy Nash equilibrium. 
+
+Theorem 1. Pure-strategy Nash equilibria exist in convex Markov Games. Proof. This proof uses the Nash equilibrium existence result in Corollary 8 by Kosowsky (2023) (restated as Theorem 3 above). For a slightly simpler proof that follows Debreu (1952), see Theorem 5 below. We will first confirm the premise of Theorem 3 holds for convex Markov games. In cMGs, each player’s strategy set Πi is the simplex-product, "s∈S ∆|A i|− 1, a compact, convex set. All convex sets are connected. The joint strategy set is simply the product space of the player’s individual strategy sets matching Theorem 3: Π = "ni=1 Πi. In addition, definition 1 of cMGs assumes each ui is continuous in players’ occupancy measures μj for all j. Lemma 2 proves each μj is a differentiable (hence continuous) function of π = ( π1, . . . , π n), therefore continuity of ui in occupancy measures implies continuity in policies. We will next prove each property required by Theorem 3 in order. Player i’s feasible set in policy space is the simplex-product Πi (regardless of π−i). Player i’s occupancy measure 
+
+μi(πi, π −i) is continuous in π−i, hence the feasible set Mi(π−i) in occupancy space (i.e., the image of μi(πi, π −i) under 
+
+Πi for each π−i) is continuous in π−i. The set Mi(π−i) is also always non-empty (any policy is always feasible and we can map any policy to an occupancy measure) and compact (it is the intersection of a hyperplane with the simplex). Recall player i’s utility function ui is continuous in μi. By Berge’s maximum theorem (Aliprantis & Border, 2006, The-orem 17.31), the best-response occupancy set for player i is upper hemicontinuous in π−i with non-empty and compact values. The mapping from occupancies to policies is upper hemicontinuous. The composition of upper hemicontinuous maps remains upper hemicontinuous (Aliprantis & Border, 2006, Theorem 17.23). Therefore, BR i is a compact-valued, upper-hemicontinuous correspondence satisfying property 1.Moving to the next property, every player’s best (occupancy measure) response problem is a convex optimization problem, whose solutions always form a convex set. Convex sets are contractible (this is where concave utilities play the most critical role in the proof). The mapping from occupancies to policies is upper hemicontinuous. The set of best (policy) responses therefore remains contractible after mapping. Lastly, all of Πi can serve as a contractible neighborhood for each 
+
+BR i, confirming property 2. To satisfy the last property, define H(t, π −i) = BR i((1 − t)π−i + tπ 0
+
+> −i
+
+), satisfying the endpoint conditions where π0 is any valid strategy profile, e.g., uniform. Π−i is convex so every linear interpolation between π−i and π0 
+
+> −i
+
+is in Π−i. Recall, BR i
+
+is upper hemicontinuous. The interpolated strategy is obviously upper hemicontinuous in both t and π−i. Therefore, their composition forming H proves H is upper hemicontinuous in t and π−i. Recall that every best response set is contractible with a contractible neighborhood. Every set returned by H(t, π −i) is a BR i(π′−i) for some π′−i ∈ Π−i. Hence H(t, π −i)
+
+is contractible with a contractible neighborhood for every t and π−i completing the claim. 
+
+Theorem 4 (Debreu (1952)) . Suppose that ( Πi) is a finite collection of contractible polyhedra, and suppose player i’s choice of action πi ∈ Πi is further restricted to a non-empty, compact subset Π′
+
+> i
+
+(π−i) ⊆ Πi. Also denote Π = "ni=1 Πi
+
+14 Convex Markov Games 
+
+and suppose we have utility functions ui : Π → R continuous on Π′
+
+> i
+
+(π−i) for all π−i satisfying the following properties for every player i:1. Player i’s utility at their best response, max πi∈Π′ 
+
+> i(π−i)
+
+ui(πi, π −i) is a continuous function; 2. Every output value BR i(π−i) is contractible. Then the game has a pure-strategy Nash equilibrium. 
+
+Theorem 5. Pure-strategy Nash equilibria exist in convex Markov Games. Proof. Each Πi is a simplex product, hence a contractible polyhedron. In cMGs, Π′
+
+> i
+
+(π−i) = Π i for all π−i, so Theorem 4 is actually more general than what is needed here. Each ui is continous in πi by Lemma 2. By Berge’s maximum theorem (Aliprantis & Border, 2006, Theorem 17.31), player i’s utility at their best response is a continuous function. Lastly, each BR i is contractible as already proven for property 2 in Theorem 1. 
+
+# B. Occupancy from Policy is Differentiable 
+
+Lemma 1. The Bellman flow constraint matrix has full row-rank ( |S| ) and is fixed independent of other player policies. Proof. Note the Bellman flow constraints can be written in matrix form as 
+
+X
+
+> a∈A i
+
+(Is′×s − γP i,a )μi,a = (1 − γ)μ0 (15) where Pi = P (s′|s, a ) denotes the S × S × A i tensor of transition probabilities and Pi,a = Pi,a (s′|s) selects out a single action, leaving an S × S matrix. This constraint can be written without the P 
+
+> a∈A i
+
+by constructing the rectangular block matrices 
+
+Is′×(sa ) = Is′×s, . . . , I s′×s
+
+ (16) and 
+
+Pi,s ′×(sa ) = Pi,a 1 , . . . , P i,a m
+
+ . (17) Then 
+
+(Is′×(sa ) − γP i,s ′×(sa ))μi = (1 − γ)μ0 (18) We can examine the first s′ × s block of (Is′×(sa ) − γP i,s ′×(sa )) and show that this matrix is full rank, i.e., of rank |S| .If this matrix is full rank, then its rows are linearly independent. Extending our view to the full matrix, i.e., all columns, cannot render any of these original rows linearly dependent. Note that the first block is represented by (Is′×s − γP i,a ) for some action a. Using the Gershgorin circle theorem, we can bound the eigenvalues of this matrix to lie in a union of circles which all exclude the origin. Consider any column c, then every circle has a center in R+. In addition, the leftmost point of every circle lies in R+:
+
+(1 − γP i,a (c|c) − X 
+
+> s′̸=c
+
+|γP i,a (s′|c)| (19) 
+
+= (1 − γP i,a (c|c) − γ X 
+
+> s′̸=c
+
+Pi,a (s′|c) (20) 
+
+= 1 − γ X
+
+> s′
+
+Pi,a (s′|c) (21) 
+
+= 1 − γ > 0. (22) Therefore, this matrix is non-singular, i.e., full-rank. There are only |S| rows, hence the row-rank cannot increase, which proves the claim. 15 Convex Markov Games 
+
+Lemma 2. Player i’s state-action occupancy measure μi is a differentiable (and hence continuous) function of the player policies π.Proof. Recall 
+
+μi(π) = (1 − γ)
+
+
+
+[I − γP π ]−1μ01⊤
+
+> ai
+
+
+
+⊙ πi (23) where 
+
+P π (s′, s ) = ⟨P π−j 
+
+> j
+
+(s′, s, :) , π j (s, :) ⟩ (24) and 
+
+P π−j 
+
+> j
+
+(s′, s, :) = X
+
+> a−j
+
+P (s′|s, a i, a −j ) Y 
+
+> k̸=j
+
+πk(s, a k) (25) so 
+
+P π (s′, s ) = X
+
+> a
+
+P (s′|s, a) Y
+
+> j
+
+πj (s, a j ). (26) Then, 
+
+∂μ i(x, y )
+
+∂π j (x′, y ′) = (1 − γ)
+
+h
+
+[I − γP π ]−1μ0(s)
+
+i
+
+> x
+
+1(x = x′, y = y′, j = i)+ (1 − γ) ∂∂π j (x′, y ′)
+
+
+
+[I − γP π ]−1
+
+(μ01⊤ 
+
+> ai
+
+) ⊙ πi (27) where 
+
+∂∂π j (x′, y ′)
+
+
+
+[I − γP π ]−1
+
+= γ[I − γP π ]−1 ∂P π
+
+∂π j (x′, y ′) [I − γP π ]−1 (28) and 
+
+∂P π
+
+∂π j (x′, y ′) =
+
+(
+
+0 if x̸ = x′
+
+P π−j 
+
+> j
+
+(s′, x, y ) else . (29) Clearly, this requires inverting the matrix [I − γP π ]. Note that P π is a square state transition matrix with distributions on columns. By the same argument as Lemma 1, this matrix has full-row rank, and since it is square, it is non-singular, and hence invertible. Therefore, the derivative (27) always exists. 
+
+# C. KKT Conditions Imply Fixed Point Sufficiency 
+
+Consider the following constrained optimization problem: 
+
+max 
+
+> x∈Rd
+
+f (x) (30a) 
+
+s.t. g i(x) ≤ 0 ∀i (30b) 
+
+hj (x) = 0 ∀j (30c) where f is concave and gi and hj represent inequality and equality constraints respectively. If gi and hi are affine functions, then any maximizer x∗ of f must satisfy the following necessary and sufficient KKT conditions (Ghojogh et al., 2021; Boyd & Vandenberghe, 2004): • Stationarity: 0 ∈ ∂f (x∗) − P 
+
+> j
+
+λj ∂h j (x∗) − P 
+
+> i
+
+μi∂g i(x∗)
+
+16 Convex Markov Games 
+
+• Primal feasibility: hj (x∗) = 0 for all j and gi(x∗) ≤ 0 for all i
+
+• Dual feasibility: μi ≥ 0 for all i
+
+• Complementary slackness: μigi(x∗) = 0 for all i.
+
+Lemma 3. Assuming player k’s utility, uk(xk, x −k), is concave in its own strategy xk, a strictly-positive primal-feasible strategy is a best response BR k if and only if it has zero projected-gradient norm. Proof. Consider the problem of formally computing ϵk(x) = max z≥0,Az =b uk(z, x −k) − uk(xk, x −k):
+
+max 
+
+> z∈Rd
+
+uk(z, x −k) − uk(xk, x −k) (31a) 
+
+s.t. − zk ≤ 0 ∀k (31b) 
+
+Aj z − bj = 0 ∀j. (31c) Note that the objective is linear (concave) in z and the constraints are affine, therefore the KKT conditions are necessary and sufficient for optimality. Recall that we assume that the solution z∗ is positive, z∗ 
+
+> k
+
+> 0 for each k. Also, let ek be a onehot vector, i.e., a zeros vector except with a 1 at index k. Mapping the KKT conditions onto this problem yields the following: • Stationarity: 0 ∈ ∂u k(z∗, x −k) − P 
+
+> j
+
+λj Aj + P 
+
+> k
+
+μkek
+
+• Primal feasibility: Aj z = bj for all j
+
+• Dual feasibility: μi ≥ 0 for all k
+
+• Complementary slackness: −μkz∗ 
+
+> k
+
+= 0 for all k
+
+where ∂u k(z, ·) is the subdifferential at z. Consider any primal-feasible point Az ∗ = b. Given our assumption that z∗ 
+
+> k
+
+> 0,by complementary slackness and dual feasibility, each μk must be identically zero. This implies the stationarity condition can be simplified to 0 ∈ ∂u k(z∗, x −k) − P 
+
+> j
+
+λj Aj = ∂u k(z∗, x −k) − A⊤λ. Rearranging terms we find that for any z∗,there exists λ such that X
+
+> j
+
+λj Aj ∈ ∂u k(z∗, x −k). (32) Equivalently, elements of ∂u k(z∗, x −k) are in the row-span of A.For the rest of the proof, we follow the derivation of the gradient projection method (Luenberger et al., 1984, Sec 12.4, p 364). Let ∇k ∈ ∂u k be a subderivative (gradient), i.e., an element of the subdifferential. Note that, in general, we can write any gradient as a sum of elements from the row-span of A and its orthogonal complement 
+
+dk, which lies in the tangent space of the feasible set: 
+
+∇k = dk + A⊤λ. (33) We may solve for λ through the requirement that Ad k = 0 , i.e., any movement within the tangent space of the feasible set remains feasible. Thus 
+
+Ad k = A∇k − (AA ⊤)λ = 0 (34) 
+
+=⇒ λ = ( AA ⊤)−1A∇k (35) 
+
+=⇒ dk = ∇k − A⊤λ = [ I − A⊤(AA ⊤)−1A]∇k (36) 
+
+= Π T A (∇k) (37) where ΠT A [I − A⊤(AA ⊤)−1A] is the matrix that projects any gradient vector onto the tangent space of the feasible set given by the constraint matrix A.The fact that elements of ∂u k(z∗, x −k) are in the row-span of A implies that 0 = dk = Π T A (∇k) necessarily, completing the claim. 17 Convex Markov Games 
+
+# D. Entropy Regularized Loss Bounds Exploitability 
+
+Our derived exploitability bound only requires concavity of the utility, bounded diameter of the feasible set, and linearity of feasible constraints (i.e., feasible set is subset of hyperplane). In what follow, let player k’s loss be the negative of their utility, i.e., ℓk = −uk.
+
+Lemma 4. The amount a player can gain by deviating is upper bounded by a quantity proportional to the norm of the projected-gradient: 
+
+ϵk(μ) ≤ √2|| ΠT Uk (∇kμk )|| . (38) 
+
+Proof. Let z be any point in the feasible set. First note that ΠT Uk (z) = Bz where B is an orthogonal projection matrix; this implies B2 = B = B⊤. Then by convexity of ℓk with respect to z,
+
+ℓk(μ) − ℓk(z, μ −k) ≤ (∇kμk )⊤(μk − z) (39a) 
+
+= ( ∇kμk )⊤ΠT Uk (μk − z
+
+| {z }  
+
+> ∈TU
+
+) (39b) 
+
+= (Π T Uk (∇kμk )
+
+| {z }
+
+> Bz =B⊤z
+
+)⊤ (μk − z)
+
+| {z } 
+
+> Diam (Mk)≤√2
+
+(39c) 
+
+≤ √2|| ΠT Uk (∇kμk )|| (39d) where the first equality follows from the fact any two points z and μk lying in the same hyperplane, by definition, form a direction lying in the tangent space of the hyperplane. The second equality follows from symmetry of the projection operator and simply grouping its application to the left hand term; we also note that the feasible set is a subset of the simplex, which has a diameter of √2. Finally, the last step follows from Cauchy-Schwarz. 
+
+Theorem 2 (Low Temperature Approximate Equilibria are Approximate Nash Equilibria) . Let ∇kτ μk be player k’s entropy regularized gradient and μ be an approximate equilibrium of the entropy regularized game. Then it holds that 
+
+ϵk = ℓk(μ) − ℓk(BR k, μ −k) ≤ τ log( |S||A k|) + √2|| ΠT Uk (∇kτ μk )|| . (40) 
+
+Proof. Beginning with the definition of exploitability, we find 
+
+ℓk(μ) − ℓk(BR k, μ −k) =  ℓk(x) + τ S (μk) − τ S (μk) (41a) 
+
+−  ℓk(BR k, μ −k) + τ S (BR k) − τ S (BR k)
+
+= ℓτk (μ) − ℓτk (BR k, μ −k) + τ  S(μk) − S(BR k) (41b) 
+
+≤ ℓτk (μ) − min 
+
+> z∈M k
+
+ℓτk (z, μ −k) + τ max 
+
+> z′∈M k
+
+S(z′) (41c) 
+
+≤ √2|| ΠT Uk (∇kτ μk )|| + τ max 
+
+> z′∈M k
+
+S(z′) (41d) 
+
+≤ √2|| ΠT Uk (∇kτ μk )|| + τ log( |S||A k|) (41e) where the second equality follows from the definition of player k’s entropy regularized loss ℓτk , the first inequality from nonnegativity of entropy S, the second inequality from convexity of ℓτk with respect to its first argument (Lemma 4), and the last from the maximum possible value of Shannon entropy over distributions on |S||A k| elements. 
+
+Corollary 1 (Lτ Scores Nash Equilibria) . Let Lτ (μ) be our proposed entropy regularized loss function and μ be any strategy profile. Then it holds that 
+
+ϵ ≤ τ log( |S| max  
+
+> k
+
+|A k|) + p2nLτ (μ). (42) 18 Convex Markov Games 
+
+Proof. Beginning with the definition of exploitability and applying Lemma 2, we find 
+
+ϵ = max  
+
+> k
+
+max  
+
+> z
+
+ℓk(μ) − ℓk(z, μ −k) (recall each ϵk ≥ 0) (43a) 
+
+≤ max 
+
+> k
+
+h
+
+τ log( |S||A k|) + √2|| ΠT Uk (∇kτ μk )|| 
+
+i
+
+(43b) 
+
+≤ τ max  
+
+> k
+
+log( |S||A k|) + √2 max  
+
+> k
+
+|| ΠT Uk (∇kτ μk )|| (43c) 
+
+≤ τ max  
+
+> k
+
+log( |S||A k|) + √2 X
+
+> k
+
+|| ΠT Uk (∇kτ μk )|| (43d) 
+
+= τ log( |S| max  
+
+> k
+
+|A k|) + √2 || ΠT U1 (∇1τμ1 )|| 2, . . . , || ΠT Un (∇nτ μn )|| 2 1
+
+(43e) 
+
+≤ τ log( |S| max  
+
+> k
+
+|A k|) + √2n || ΠT U1 (∇1τμ1 )|| 2, . . . , || ΠT Un (∇nτ μn )|| 2 2
+
+(43f) 
+
+≤ τ log( |S| max  
+
+> k
+
+|A k|) + √2n
+
+sX
+
+> k
+
+|| ΠT Uk (∇kτ μk )|| 22 (43g) 
+
+= τ log( |S| max  
+
+> k
+
+|A k|) + p2nLτ (μ). (43h) 
+
+# E. PGL Hyperparameters 
+
+Table 5 lists out the three types of annealing schedules used in the experiments. Table 6 lists out the learning rate used in each domain as well as the type of annealing schedule used. All experiments were run with Adam (Kingma & Ba, 2015). Requirements to Anneal Minimum Temperature τt ← max( τt, min τ ) 10 −2
+
+Minimum Iterations Per Temperature min ∆t{τt − τt+∆ t|τt − τt+∆ t > 0} 50 
+
+Loss Threshold Requirement for Annealing Lτt ≤ ϵ 10 −1
+
+Anneal Rule (When Requirements Met) Type 1 Anneal Rate τt τ = 10 −⌊ t/ 1000 ⌋
+
+Type 2 Anneal Rate τt+1 /τ t 0.8 Type 3 Anneal Rule τt+1 τt + 110 · L τt / min( ∂Lτ 
+
+> ∂τ
+
+, −L τ )
+
+Table 5. Annealing Schedules 
+
+Domain / Hyperparameter Learning Rate Anneal Type Iterations ( T )IPD (Creativity) 10 −1 Type 1 8 × 10 3
+
+IPD (Imitation) 10 −2 Type 1 8 × 10 3
+
+IPGG 10 −1 Type 1 8 × 10 3
+
+El Farol 10 −1 Type 1 8 × 10 3
+
+Bach-Stravnisky 10 −1 Type 1 1 × 10 3
+
+Synthetic 10 −1 Type 2 8 × 10 3
+
+Robot Warehouse 10 −2 Type 2 8 × 10 3
+
+Pathfinding 10 −2 Type 3 1 × 10 6
+
+Table 6. Learning Rate and Annealing Schedule by Domain. 
+
+# F. Descriptions of Domains 
+
+Here, we provide further details on the domains we used in experiments. 
+
+F.1. Iterated Normal-form Games 
+
+We provide the payoffs for the iterated prisoner’s dilemma and Bach-Stravinsky game used in experiments. See section 5 in the main body for a description of the iterated public goods game and El Farol bar problem. 19 Convex Markov Games 
+
+C DC −1, −1 −3, 0
+
+D 0, −3 −2, −2=⇒
+
+C DC 2/3, 2/3 0, 1
+
+D 1, 0 1/3, 1/3   
+
+> Figure 4. Prisoner’s Dilemma Game: We shift and normalize the payoffs of the prisoner’s dilemma game (left) to be non-negative and with maximum value 1(right).
+
+C DC 3, 2 0, 0
+
+D 0, 0 2, 3 
+
+> Figure 5. Bach-Stravinsky Game.
+
+F.2. Grid World Domains Pathfinding We use OpenSpiel’s (Lanctot et al., 2019) pathfinding game with a horizon of 1000 : https:// openspiel.readthedocs.io/en/latest/games.html . See Figure 2 for a visual of the grid specification. To enable the game with an infinite horizon, we transition all agents back to their starting positions (left most grid in Figure 2) after they reach the goal state. All positive rewards in OpenSpiel’s variant are replaced with +100 .
+
+Synthetic Illustrative Safety Domain We consider a simple 2-player, 2-state, 2-action, symmetric convex Markov game. If both agents select action 0, they transition from their current state to the other state; otherwise, they remain put. We set 
+
+γ = 0 .95 and the initial state measure μ0 to be uniform. For this domain, we pose a “safe” MARL objective; we designate a set of safe long-run visitation measures for certain states and usage of certain actions; equivalently, we rule out certain unsafe states and actions. As an example of “safe” MARL, define the following convex loss (negative utility) over occupancy measures for player 1:
+
+−ui(μi) = ℓi(μi) = max(0 , || μa − ta|| ∞ − 1/20 ) + max(0 , || μs − ts|| ∞ − 1/4) (44) where μa and μs are player 1’s action and state marginals respectively. The target measures ta and ts are used along with the radii 1/20 and 1/4 to encode the regions of “safe” occupancy measures. If player 1 deviates from either region by more than the radius (as measured by the infinity norm), then they accrue a loss. Otherwise, player 1’s loss is zero. In Figure 1, we fix player 2 to use the following policy: 
+
+πI 
+
+> 2
+
+(a0|s) = 
+
+(
+
+0.40 if s = s0
+
+0.80 else ,
+
+We provide numpy code describing the transition kernel P and reward function r(s, a ) (denoted by pt for “payoff tensor” below) for the synthetic safety domain used in Figure 1. 
+
+ns = 2 npl = 2 na = np.ones(npl, dtype=int) * 2 epsilon = 0.0 transition_env = np.zeros((ns, ns) + tuple(na)) # a=0 (coordinate), a=1 (not coordinate) transition_env[1, 0, 0, 0] = 1 - epsilon transition_env[1, 0, 0, 1] = epsilon transition_env[1, 0, 1, 0] = epsilon transition_env[1, 0, 1, 1] = 0transition_env[0, 1, 0, 0] = 1 - epsilon 
+
+20 Convex Markov Games 
+
+transition_env[0, 1, 0, 1] = epsilon transition_env[0, 1, 1, 0] = epsilon transition_env[0, 1, 1, 1] = 0# only two states so prob of one is 1 minus prob of other transition_env[0, 0, :, :] = 1 - transition_env[1, 0, :, :] transition_env[1, 1, :, :] = 1 - transition_env[0, 1, :, :] assert np.all(np.sum(transition_env, axis=0) == 1) self.transition_env = transition_env.astype(float) self.pt = np.zeros((npl, ns) + tuple(na), dtype=float) 
+
+Robot Warehouse Safety Grid World Domain We provide numpy code describing the transition kernel P and reward function r(s, a ) (denoted by pt for “payoff tensor” below) for the robot warehouse safety domain described in section 5. This domain represents a 3-cell grid world where two robots pick up and drop off packages (Left Drop-off ↔ Package Pickup ↔ Right Drop-off). The pickup point is the middle cell and the two robots drop off in the cells on either side. The left robot always drops off on the left; the right always drops off on the right. They can move slow or fast ( 2 actions each). They get +1 for slowly dropping off package, +2 for quickly dropping of a package. They always alternate between picking up and dropping off, but their chosen speed affects their probability of moving from the pickup to the drop-off point. Two robots attempting fast pickups is dangerous, so we construct a convex loss to penalize that behavior. At the same time, the robots are incentivized to move fast at the pickup point (to move to the drop-off and earn more reward). The domain exhibits an additional complexity given by the following social dilemma. Moving fast at the pickup point when the other is moving slowly increases the probability of successfully picking up a package and moving to the drop off; moving slow with a fast partner results in much lower probability. This simulates a scenario where packages arrive at the drop-off at a constant rate. 
+
+ns = 4 npl = 2 na = np.ones(npl, dtype=int) * 2 transition_env = np.zeros((ns, ns) + tuple(na)) # s=0: (pickup, pickup) # s=1: (pickup, dropoff) # s=2: (dropoff, pickup) # s=3: (dropoff, dropoff) # probability of moving from dropoff to pickup is independent of the other # agent p_reset = 1.0 # probability of moving from pickup to dropoff is independent of other agent # if alone at pickup point p_drop_alone_slow = 0.7 p_drop_alone_fast = 0.8 # generic low, medium, and high probabilities p_low = 0.2 p_mid = 0.5 p_high = 0.8 # a=0 (slow), a=1 (fast) # reward is +1 for visiting dropoff state, else 0 reward = np.zeros((npl, ns,) + tuple(na)) 
+
+21 Convex Markov Games 
+
+# reward[1, 1] = 1.0 # reward[0, 2] = 1.0 # reward[:, 3] = 1.0 reward[1, 1, :, 0] = 1.0 reward[1, 1, :, 1] = 2.0 reward[0, 2, 0, :] = 1.0 reward[0, 2, 1, :] = 2.0 reward[0, 3, 0, :] = 1.0 reward[0, 3, 1, :] = 2.0 reward[1, 3, :, 0] = 1.0 reward[1, 3, :, 1] = 2.0 #### s’=0 ##### # s=0 --> s’=0: (pickup, pickup) --> (pickup, pickup) # define s’= 1, 2, 3 first # skip # transition_env[0, 0, 0, 0] =# transition_env[0, 0, 0, 1] =# transition_env[0, 0, 1, 0] =# transition_env[0, 0, 1, 1] =# s=1 --> s’=0: (pickup, dropoff) --> (pickup, pickup) transition_env[0, 1, 0, 0] = (1.0 - p_drop_alone_slow) * p_reset transition_env[0, 1, 0, 1] = (1.0 - p_drop_alone_slow) * p_reset transition_env[0, 1, 1, 0] = (1.0 - p_drop_alone_fast) * p_reset transition_env[0, 1, 1, 1] = (1.0 - p_drop_alone_fast) * p_reset # s=2 --> s’=0: (dropoff, pickup) --> (pickup, pickup) transition_env[0, 2, 0, 0] = p_reset * (1.0 - p_drop_alone_slow) transition_env[0, 2, 0, 1] = p_reset * (1.0 - p_drop_alone_fast) transition_env[0, 2, 1, 0] = p_reset * (1.0 - p_drop_alone_slow) transition_env[0, 2, 1, 1] = p_reset * (1.0 - p_drop_alone_fast) # s=3 --> s’=0: (dropoff, dropoff) --> (pickup, pickup) transition_env[0, 3, 0, 0] = p_reset transition_env[0, 3, 0, 1] = p_reset transition_env[0, 3, 1, 0] = p_reset transition_env[0, 3, 1, 1] = p_reset #### s’=1 ##### # s=0 --> s’=1: (pickup, pickup) --> (pickup, dropoff) transition_env[1, 0, 0, 0] = (1 - p_mid) * p_mid transition_env[1, 0, 0, 1] = p_high transition_env[1, 0, 1, 0] = p_low transition_env[1, 0, 1, 1] = p_low # s=1 --> s’=1: (pickup, dropoff) --> (pickup, dropoff) transition_env[1, 1, 0, 0] = (1 - p_drop_alone_slow) * (1.0 - p_reset) transition_env[1, 1, 0, 1] = (1 - p_drop_alone_slow) * (1.0 - p_reset) transition_env[1, 1, 1, 0] = (1 - p_drop_alone_fast) * (1.0 - p_reset) transition_env[1, 1, 1, 1] = (1 - p_drop_alone_fast) * (1.0 - p_reset) # s=2 --> s’=1: (dropoff, pickup) --> (pickup, dropoff) transition_env[1, 2, 0, 0] = p_reset * p_drop_alone_slow 
+
+22 Convex Markov Games 
+
+transition_env[1, 2, 0, 1] = p_reset * p_drop_alone_fast transition_env[1, 2, 1, 0] = p_reset * p_drop_alone_slow transition_env[1, 2, 1, 1] = p_reset * p_drop_alone_fast # s=3 --> s’=1: (dropoff, dropoff) --> (pickup, dropoff) transition_env[1, 3, 0, 0] = p_reset * (1.0 - p_reset) transition_env[1, 3, 0, 1] = p_reset * (1.0 - p_reset) transition_env[1, 3, 1, 0] = p_reset * (1.0 - p_reset) transition_env[1, 3, 1, 1] = p_reset * (1.0 - p_reset) #### s’=2 ##### # s=0 --> s’=2: (pickup, pickup) --> (dropoff, pickup) transition_env[2, 0, 0, 0] = p_mid * (1 - p_mid) transition_env[2, 0, 0, 1] = p_low transition_env[2, 0, 1, 0] = p_high transition_env[2, 0, 1, 1] = p_low # s=1 --> s’=2: (pickup, dropoff) --> (dropoff, pickup) transition_env[2, 1, 0, 0] = p_drop_alone_slow * p_reset transition_env[2, 1, 0, 1] = p_drop_alone_slow * p_reset transition_env[2, 1, 1, 0] = p_drop_alone_fast * p_reset transition_env[2, 1, 1, 1] = p_drop_alone_fast * p_reset # s=2 --> s’=2: (dropoff, pickup) --> (dropoff, pickup) transition_env[2, 2, 0, 0] = (1.0 - p_reset) * (1.0 - p_drop_alone_slow) transition_env[2, 2, 0, 1] = (1.0 - p_reset) * (1.0 - p_drop_alone_fast) transition_env[2, 2, 1, 0] = (1.0 - p_reset) * (1.0 - p_drop_alone_slow) transition_env[2, 2, 1, 1] = (1.0 - p_reset) * (1.0 - p_drop_alone_fast) # s=3 --> s’=2: (dropoff, dropoff) --> (dropoff, pickup) transition_env[2, 3, 0, 0] = (1.0 - p_reset) * p_reset transition_env[2, 3, 0, 1] = (1.0 - p_reset) * p_reset transition_env[2, 3, 1, 0] = (1.0 - p_reset) * p_reset transition_env[2, 3, 1, 1] = (1.0 - p_reset) * p_reset #### s’=3 ##### # s=0 --> s’=3: (pickup, pickup) --> (dropoff, dropoff) transition_env[3, 0, 0, 0] = p_mid transition_env[3, 0, 0, 1] = p_low transition_env[3, 0, 1, 0] = p_low transition_env[3, 0, 1, 1] = p_low # s=1 --> s’=3: (pickup, dropoff) --> (dropoff, dropoff) transition_env[3, 1, 0, 0] = 1.0 - transition_env[:, 1, 0, 0].sum() transition_env[3, 1, 0, 1] = 1.0 - transition_env[:, 1, 0, 1].sum() transition_env[3, 1, 1, 0] = 1.0 - transition_env[:, 1, 1, 0].sum() transition_env[3, 1, 1, 1] = 1.0 - transition_env[:, 1, 1, 1].sum() # s=2 --> s’=3: (dropoff, pickup) --> (dropoff, dropoff) transition_env[3, 2, 0, 0] = 1.0 - transition_env[:, 2, 0, 0].sum() transition_env[3, 2, 0, 1] = 1.0 - transition_env[:, 2, 0, 1].sum() transition_env[3, 2, 1, 0] = 1.0 - transition_env[:, 2, 1, 0].sum() transition_env[3, 2, 1, 1] = 1.0 - transition_env[:, 2, 1, 1].sum() 
+
+23 Convex Markov Games 
+
+# s=3 --> s’=3: (dropoff, dropoff) --> (dropoff, dropoff) transition_env[3, 3, 0, 0] = 1.0 - transition_env[:, 3, 0, 0].sum() transition_env[3, 3, 0, 1] = 1.0 - transition_env[:, 3, 0, 1].sum() transition_env[3, 3, 1, 0] = 1.0 - transition_env[:, 3, 1, 0].sum() transition_env[3, 3, 1, 1] = 1.0 - transition_env[:, 3, 1, 1].sum() #### s’=0 ##### # s=0 --> s’=0: (pickup, pickup) --> (pickup, pickup) transition_env[0, 0, 0, 0] = 1.0 - transition_env[:, 0, 0, 0].sum() transition_env[0, 0, 0, 1] = 1.0 - transition_env[:, 0, 0, 1].sum() transition_env[0, 0, 1, 0] = 1.0 - transition_env[:, 0, 1, 0].sum() transition_env[0, 0, 1, 1] = 1.0 - transition_env[:, 0, 1, 1].sum() assert np.allclose(np.sum(transition_env, axis=0), 1.0) self.transition_env = transition_env.astype(float) self.pt = reward.astype(float) 
+
+24

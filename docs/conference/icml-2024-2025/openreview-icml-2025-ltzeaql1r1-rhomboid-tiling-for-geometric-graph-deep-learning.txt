@@ -1,0 +1,757 @@
+Title: Rhomboid Tiling for Geometric Graph Deep Learning
+
+URL Source: https://openreview.net/pdf?id=lTZEAqL1R1
+
+Number of Pages: 21
+
+Markdown Content:
+# Rhomboid Tiling for Geometric Graph Deep Learning 
+
+Yipeng Zhang * 1 Longlong Li * 2 Kelin Xia 1
+
+# Abstract 
+
+Graph Neural Networks (GNNs) have proven ef-fective for learning from graph-structured data through their neighborhood-based message pass-ing framework. Many hierarchical graph cluster-ing pooling methods modify this framework by introducing clustering-based strategies, enabling the construction of more expressive and powerful models. However, all of these message passing framework heavily rely on the connectivity struc-ture of graphs, limiting their ability to capture the rich geometric features inherent in geometric graphs. To address this, we propose Rhomboid Tiling (RT) clustering, a novel clustering method based on the rhomboid tiling structure, which per-forms clustering by leveraging the complex geo-metric information of the data and effectively ex-tracts its higher-order geometric structures. More-over, we design RTPool, a hierarchical graph clus-tering pooling model based on RT clustering for graph classification tasks. The proposed model demonstrates superior performance, outperform-ing 21 state-of-the-art competitors on all the 7 benchmark datasets. 
+
+# 1. Introduction 
+
+Graph Neural Networks (GNNs) have emerged as a pow-erful framework for learning from graph-structured data, which is pervasive in diverse domains such as social net-works (Guo & Wang, 2020; Min et al., 2021), cheminformat-ics (Jiang et al., 2021; Kojima et al., 2020), and computa-tional biology (Li et al., 2021). The foundation of GNNs lies in message passing, where nodes and edges exchange and aggregate message from their neighbors. This mechanism enables GNNs to capture both local and global relationships       
+
+> *Equal contribution 1Division of Mathematical Sciences, School of Physical and Mathematical Sciences, Nanyang Tech-nological University, Singapore, 637371, Singapore 2School of Mathematics, Shandong University, Jinan, 250100, China. Corre-spondence to: Kelin Xia <xiakelin@ntu.edu.sg >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+within the graph, extracting deep structural features for var-ious graph-related tasks, such as node classification, link prediction, and graph classification. The versatility of GNNs enables them to address a range of real-world challenges, including identifying user roles or group memberships in social networks (Hamilton et al., 2017), predicting molecu-lar interactions or protein-protein interactions (Huang et al., 2020; R ´eau et al., 2023), and predicting molecular prop-erties (Wieder et al., 2020; Shen et al., 2023; Cai et al., 2022). The message aggregation process is a fundamental com-ponent of GNNs, and the development of novel message aggregation mechanisms constitutes a critical direction for advancing GNN architectures. Traditional models such as GCN and GAT aggregate messages from a node’s neighbors and update the node’s representation based on the aggre-gated information. An alternative approach involves clus-tering nodes in the original graph into clusters, followed by aggregating messages within each cluster. A coarser graph is naturally generated through this process, with each cluster represented as a new node, enabling a hierarchical representation of the graph. This paradigm has led to the development of models referred to as hierarchical graph clustering pooling, such as DiffPool (Ying et al., 2018) and MinCutPool (Bianchi et al., 2020). These models have shown considerable improvements in performance over tra-ditional GNNs models. However, these clustering-based pooling methods primarily depend on the graph’s connectiv-ity structure and often utilize learnable matrices to determine node assignments to clusters, instead of leveraging prede-fined clusters derived from prior knowledge. In the case of geometric graphs, such as molecular graphs, the connec-tivity information alone may be insufficient to capture the rich geometric features inherent in the data. As a result, these methods face challenges in effectively incorporating geometric properties, limiting their ability to fully exploit the underlying structure of geometric graphs. We propose a novel clustering method based on the rhom-boid tiling structure for geometric graph deep learning. This method is inspired by the concept of Alpha shape, which is widely used in reconstructing 3D shapes from data, such as molecular surface reconstruction (Edelsbrunner & M ¨ucke, 1994; Liang et al., 1998). The core idea of Alpha shapes is to partition data using spheres, naturally enabling the 1Rhomboid Tiling for Geometric Graph Deep Learning 
+
+construction of clustering methods. In fact, Alpha shapes have already been applied in clustering tasks in fields like cosmology (Gerke et al., 2012). Rhomboid tiling struc-tures generalize Alpha shapes by capturing higher-order geometric information of point clouds while maintaining a natural hierarchical structure. Each layer of this structure corresponds to a high-order Delaunay complex (see Fig-ure 1 D), where each vertex represents a substructure of the point cloud separated by a sphere from the remaining points. Consequently, each vertex can be regarded as a clus-ter of the point cloud. Moreover, the hierarchical nature of rhomboid tiling allows for further clustering of these clus-ters, enabling a hierarchical clustering method. This new clustering method is entirely driven by the geometric struc-ture of the data and effectively uncovers complex geometric information that is difficult to extract using standard graph representations. Based on this method, we designed a graph clustering pooling model for graph classification tasks. Our main contributions are as follows: 1. We design a hierarchical clustering method, RT cluster-ing, based on the rhomboid tiling structure to geometrically cluster data. 2. We provide a theoretical analysis of the optimal architec-tures for RT clustering and introduce a weighting mecha-nism to represent the importance of individual points within clusters. 3. We develop a graph clustering pooling model, RTPool, based on RT clustering and validate its performance on multiple graph classification tasks. Our model outperforms 21 state-of-the-art competitors on 7 benchmark datasets from chemistry and bioinformatics. 
+
+# 2. Related Work 
+
+Graph Neural network and Graph Clustering Pooling 
+
+Graph Neural Networks (GNNs) have emerged as power-ful tools for learning graph-structured data, with various architectures differing in their message aggregation mech-anisms. The Graph Convolutional Network (GCN) aggre-gates node information using a neighborhood averaging approach weighted by normalized adjacency matrix entries, effectively capturing local smoothness (Kipf & Welling, 2017). The Graph Attention Network (GAT), on the other hand, employs attention mechanisms to learn the importance of neighboring nodes dynamically, allowing for more flex-ible aggregation based on node relationships. (Veli ˇckovi ´cet al., 2018) The Graph Isomorphism Network (GIN) uti-lizes sum-based aggregation, theoretically achieving maxi-mal expressiveness among GNNs by distinguishing different graph structures (Xu et al., 2018). Another message aggre-gation mechanism involves clustering the nodes in a graph, performing message aggregation within each cluster, and updating the underlying graph into a coarsened graph where clusters act as nodes. Models based on this mechanism are referred to as graph clustering pooling models. DiffPool learns a differentiable cluster assignment matrix that maps nodes to clusters, jointly optimizing node representations and cluster assignments to generate a coarsened graph (Ying et al., 2018). MinCutPool, inspired by spectral clustering, performs pooling by minimizing the normalized cut of the graph while encouraging orthogonality in the cluster assign-ment matrix (Bianchi et al., 2020). 
+
+Voronoi Tessellation and Delaunay Complex Voronoi tessellation and Delaunay complex are fundamental con-cepts in computational geometry (Fortune, 2017). Voronoi tessellation partitions a space into regions around a set of points, such that each region consists of all points closer to its corresponding seed point than to any other. The Delau-nay complex, on the other hand, is a dual structure of the Voronoi tessellation, comprising simplices formed by con-necting points whose Voronoi cells share a common bound-ary. These two concepts have been widely applied across various domains due to their versatility and robustness in analyzing spatial relationships. For instance, in astron-omy, Voronoi tessellation and Delaunay complexes are used to identify and characterize galaxy groups in large-scale cosmic surveys (Gerke et al., 2012). In material science, Voronoi-Delaunay analysis has been applied to study voids in systems of nonspherical particles, providing insights into structural properties of disordered systems (Luchnikov et al., 1999). In protein structure analysis, it facilitates the com-putation of solvent-accessible surfaces and atomic packing densities (Richards, 1974). 
+
+# 3. Method 
+
+3.1. Rhomboid Tiling High-Order Voronoi Tessellation High-order Voronoi tessellation generalizes the concept of the classical Voronoi tessellation, providing a method to partition space based on subsets of a given point set. For a point set X ⊂ Rd,consider each subset Q ⊂ X. The Voronoi cell associated with Q, denoted as dom (Q), is defined as: dom (Q) = {p ∈ Rd | ∥ p−x∥ ≤ ∥ p−y∥, ∀x ∈ Q, ∀y ∈ X\Q}.
+
+It is important to note that dom (Q) is non-empty only when the points in Q can be separated from all other points in X
+
+by a sphere. That is, there must exist a sphere S such that Q
+
+lies inside or on S, while X \ Q lies outside S. This implies that such subsets Q are, in some geometric sense, clustered together. All the subsets Q ⊂ X containing exactly k points define a 2Rhomboid Tiling for Geometric Graph Deep Learning           
+
+> Figure 1. Flowchart of the Rhomboid Tiling clustering process. A: An example geometric graph and the corresponding point cloud X,obtained by embedding the graph’s vertices into R2.B: 1-, 2-, and 3-order Voronoi tessellations constructed from X.C: 1-, 2-, and 3-order Delaunay complexes obtained as the nerves of the corresponding Voronoi tessellations. D: The Rhomboid Tiling constructed based on X.E: Illustration of 1-layer Rhomboid Tiling clustering, focusing on a single rhomboid.
+
+partition of the entire space Rd, expressed as: 
+
+Rd = [
+
+> Q⊂X, |Q|=k
+
+dom (Q).
+
+The collection of these partitions, denoted as Vor k(X) = {dom (Q) | Q ⊂ X, |Q| = k, dom (Q)̸ = ∅} ,
+
+is referred to as the order-k Voronoi tessellation . This struc-ture enables the exploration of higher-order relationships and geometric properties of point clusters within the space. 
+
+High-Order Delaunay Complex Similar to how the tradi-tional Delaunay complex is defined as the nerve of the clas-sical Voronoi tessellation, the high-order Delaunay complex is defined as the nerve of the high-order Voronoi tessellation: Del k(X) := Nrv (Vor k(X)) .
+
+This means each vertex vQ ∈ Del k(X) corresponds to a cell dom (Q) ∈ Vor k(X), which is associated with the subset 
+
+Q ⊂ X. A set of vertices vQ1 , v Q2 , . . . , v Qm forms an 
+
+(m−1) -simplex in Del k(X) if and only if the corresponding cells dom (Q1), dom (Q2), . . . , dom (Qm) have a non-empty intersection. If we interpret each subset Q1, Q 2, . . . , Q m as a cluster, the simplex (vQ1 , v Q2 , . . . , v Qm ) ∈ Del k(X) signifies that these clusters are geometrically close. Thus, the high-order Delaunay complex Del k(X) encodes the relationships be-tween these clusters, allowing us to analyze high-order in-teractions within the given point set. 
+
+Rhomboid Tiling To establish a natural relationship be-tween Delaunay complexes of different orders, Edelsbrunner introduced the concept of Rhomboid Tiling (Edelsbrunner & Osang, 2021). The core idea of this concept is to generalize the use of spheres for partitioning a given point set X ⊂ Rd
+
+to relate Delaunay complexes of different orders. To achieve this, we first consider a way to describe the partition induced by a sphere S. Let In X (S), On X (S), and Out X (S) denote the subsets of X that are inside, on, and outside S, respec-tively. Then each vertex vQ ∈ Del k(X) is mapped to Rd+1 
+
+using the following transformation: 
+
+vQ 7 → yQ := 
+
+X
+
+> x∈Q
+
+x, −k
+
+ ∈ Rd+1 , (1) It can be seen that we map the vertices of Del k(X) to the hyperplane {(x1, x 2, . . . , x d+1 ) ∈ Rd+1 | xd+1 = −k}.The first d coordinates of yQ are the sum of the coordinates of all points in the subset Q ⊂ X. yQ is the geometric realization of vQ in Rd+1 . Henceforth, unless otherwise specified or where ambiguity arises, we will not distinguish between vQ and yQ.Using the vertices from different Del k(X) complexes and an arbitrary (d − 1) −dimensional sphere S, a rhomboid constructed based on S is defined as: 
+
+ρX (S) := conv {yQ | In X (S) ⊂ Q ⊂ In X (S) ∪ On X (S)}.
+
+The collection of all such rhomboids forms a complex called the Rhomboid Tiling :
+
+Rhomb( X) := {ρX (S) | S is a sphere in Rd}.
+
+3Rhomboid Tiling for Geometric Graph Deep Learning 
+
+Rhomb (X) is a polyhedral complex. To ensure that this poly-hedral complex exhibits good combinatorial properties, we assume that X is in general position in Rd. The concept of general position is commonly used in geometry and carries different meanings in various contexts. In this paper, we define X to be in general position in Rd if no d + 1 points in 
+
+X lie on the same (d − 1) -dimensional plane, and no d + 2 
+
+points lie on the same (d − 1) -dimensional sphere. All the data used in this study satisfy this condition. Edelsbrunner proved that the intersection of Rhomb( X)
+
+with the hyperplane {(x1, x 2, . . . , x d+1 ) ∈ Rd+1 | xd+1 =
+
+−k} corresponds precisely to the order-k Delaunay com-plex Del k(X) when X is in general position in Rd (Edels-brunner & Osang, 2021). Moreover, it can be proven that 
+
+Rhomb( X) ∩ { (x1, x 2, . . . , x d+1 ) ∈ Rd+1 | xd+1 ≥ − k}
+
+is homotopy equivalent to Del k(X) (Corbet et al., 2023). This indicates that if the portion of Rhomb( X) where the last coordinate is less than −k is discarded, the remaining part can be continuously deformed into Del k(X).To aid understanding, we provide a concrete example in the Appendix G that illustrates how to construct a rhomboid tiling from a 2D point cloud. 
+
+3.2. Rhomboid Tiling Clustering (RT Clustering) 
+
+As previously mentioned, each vertex of Del k(X) can be interpreted as a cluster of the point cloud X ⊂ Rd, where the cluster contains exactly k points. This cluster arises from partitioning the point cloud using spheres, ensuring that geometrically close points are grouped into the same cluster while avoiding the formation of excessive clusters in dense regions. This concept can be extended further. Instead of clustering the points in X to form the vertices of Del k1 (X), we can de-fine a second-level clustering on the vertex set of Del k1 (X),such that the resulting clusters correspond bijectively to the vertices of Del k2 (X)( k2 > k 1). This second-level cluster-ing is defined through the following relation: 
+
+vQ ∼ vQ′ ⇐⇒ ∃ σ ∈ Rhomb (X) such that vQ, v Q′ ∈ σ, 
+
+where vQ and vQ′ are vertices in Del k1 (X) and Del k2 (X) ( k2 > k 1).Using this relation, we can define the cluster associated with a vertex vQ′ as: 
+
+CQ′ = {vQ ∈ Del k1 (X) | vQ ∼ vQ′ },
+
+where Q′ is a subset of X such that vQ′ ∈ Del k2 (X). In this way, the vertices in Del k1 (X) are clustered into groups that correspond bijectively to the vertices in Del k2 (X). Figure 1 shows the flowchart of rhomboid tiling clustering. The following theorem provides a necessary and sufficient condition for vQ to belong to the cluster CQ′ , offering a geometric explanation of the Rhomboid Tiling Clustering: 
+
+Theorem 3.1. Vertice vQ ∈ Del k1 (X) belongs to the clus-ter CQ′ if and only if ∃(d − 1) -dimensional sphere S such that: 
+
+• vQ′ ∈ Del k2 (X) with k2 > k 1,
+
+• In X (S) ⊂ Q ∩ Q′,
+
+• Q ∪ Q′ ⊂ In X (S) ∪ On X (S)
+
+This theorem illustrates that the underlying idea of Rhom-boid Tiling Clustering is similar to concepts like Alpha shapes, where spheres are used to partition a given point set 
+
+X. These partitions are then used to define geometric rela-tionships among the points, enabling clustering of the points or further clustering of the already-formed clusters. This method ensures that points within the same cluster are close in the sense of geometric proximity, while the clustering structure also encodes higher-order geometric relationships within the point set X.Next, we discuss a more specific and practical scenario: the point set X lies in R3 and is in general position. In this case, the following theorem provides guidance on how to choose appropriate values of k1 and k2 to cluster the points in Del k1 (X) into the clusters corresponding to the points in Del k2 (X).
+
+Theorem 3.2. Suppose X is in general position in R3.Considering the vertices in Del k1 (X) and Del k2 (X) with 
+
+k1 < k 2 ≤ | X|, we have: 
+
+Case 1: k2 − k1 > 4, then for any vQ ∈ Del k1 (X), vQ does not belong to any cluster corresponding to the vertices in Del k2 (X).
+
+Case 2: 1 ≤ k2 − k1 ≤ 2, then for any vQ ∈ Del k1 (X),there exists vQ′ ∈ Del k2 (X) such that vQ ∈ CQ′ .
+
+Case 3: k2 − k1 = 1 , then for any Q ⊂ Q′ with vQ ∈
+
+Del k1 (X) and vQ′ ∈ Del k2 (X), we have vQ ∈ CQ′ .
+
+Note: In the theorem above, there is one additional case that has not been explicitly discussed: 3 ≤ k2 − k1 ≤ 4. For this range of k2 − k1, we observe in our empirical data that there exist certain point clouds X and vertices vQ ∈ Del k1 (X)
+
+such that vQ does not belong to any cluster corresponding to the vertices in Del k2 (X).
+
+This theorem indicates that the step size k2 − k1 for clus-tering should be chosen within an appropriate range. From Theorem 3.2 Case 1, we know that k2 − k1 cannot exceed 4, as otherwise, none of the points will be clustered into any cluster. Additionally, as noted above, k2 − k1 should preferably not be 3 or 4, as in this case, some points may still fail to be clustered into any cluster. 4Rhomboid Tiling for Geometric Graph Deep Learning 
+
+The ideal choice for k2 −k1 is 1 or 2. According to Theorem 3.2 Case 2, in this range, all points are guaranteed to be clustered into at least one cluster. And the optimal choice might be k2 − k1 = 1 , as per Theorem 3.2 Case 3, where 
+
+vQ will be clustered into CQ′ as long as Q ⊂ Q′. If we sequentially cluster the original information on every point in X into Del 2(X), then cluster Del 2(X) into Del 3(X),and so on, eventually reaching Del k(X), the cluster CQ′
+
+corresponding to a point in Del k(X) will contain all the original information from points in Q′ ⊂ X.
+
+Weight for RT Clustering When performing RT cluster-ing, introducing a weight for each point in a cluster CQ′
+
+might be a beneficial choice. Although points vQ1 and vQ2
+
+may belong to the same cluster CQ′ , the geometric proxim-ity or significance of the subsets Q1 and Q2 relative to Q′
+
+may differ. This motivates the introduction of a weight for each point vQ in CQ′ to quantify such relationships. We propose using N (Q, Q ′) := # {σ is a depth-(d+1) rhom-boid | vQ, v Q′ ∈ σ}, which counts the number of depth-
+
+(d + 1) rhomboids simultaneously containing vQ and vQ′ ,as a suitable weight to measure this relationship. Note that a depth-k rhomboid refers to a k-dimensional cell in Rhomb (X), where the corresponding sphere S satisfies 
+
+|On X (S)| = k. A depth-(d + 1) rhomboid is the max-imal rhomboid in Rhomb (X), assuming X is in general position in Rd.The following theorem explains why N (Q, Q ′) is an appro-priate choice for this weight: 
+
+Theorem 3.3. Suppose X is in general position in R3, and 
+
+vQ1 , v Q2 ∈ Del k1 (X), v Q′ ∈ Del k2 (X). If vQ1 , v Q2 ∈
+
+CQ′ , then the following hold: 1. If 3 ≤ k2 − k1 ≤ 4, then Q1 ⊂ Q′ and N (Q1, Q ′) ≤
+
+5 − (k2 − k1).2. If Q1̸ ⊂ Q′, then N (Q1, Q ′) ≤ 3 − (k2 − k1).3. If Q1 ∩ Q′ ⊊ Q2 ∩ Q′, then N (Q1, Q ′) ≤ N (Q2, Q ′).
+
+When |Q′| − | Q| is large or Q̸ ⊂ Q′, it can be inferred that 
+
+Q and Q′ are not geometrically closely connected. The first and second points of the theorem above indicate that, in such cases, N (Q, Q ′) does not exceed 2. Furthermore, when Q1 ∩ Q′ ⊊ Q2 ∩ Q′, it is evident that 
+
+Q2 has a closer geometric relationship with Q′ than Q1
+
+does. The third point of the theorem also confirms that, in this situation, N (Q1, Q ′) ≤ N (Q2, Q ′). Thus, the theorem demonstrates that N (Q, Q ′) serves as a good metric for measuring the geometric relationship between Q and Q′.
+
+3.3. RT Clustering-Based Model RT Clustering-Based Pooling Model (RTPool) It is a very natural idea to design a clustering pooling model based on RT clustering. We start by using the incident matrix Ik to represent which vertices of Del k(X) are contained in which maximal rhomboids: 
+
+(Ik)(i,j ) =
+
+(
+
+1, if vj ∈ σi,
+
+0, otherwise .
+
+Here, σi denotes the i-th maximal rhomboid in Rhomb (X),and vj represents the j-th vertex of Del k(X).To cluster the vertices of Del k1 (X) onto Del k2 (X), we con-sider Ck2 
+
+> k1
+
+:= ( Ik2 )T · Ik1 as the clustering matrix. In fact, it is not difficult to prove that (Ck2 
+
+> k1
+
+)(i,j ) = N (Qi, Q ′ 
+
+> j
+
+), where 
+
+vQi is the i-th vertex of Del k1 (X), and v′ 
+
+> Qj
+
+is the j-th ver-tex of Del k2 (X). In other words, the clustering matrix Ck2
+
+> k1
+
+defined in this way not only accounts for whether vQi be-longs to the cluster CQ′ 
+
+> j
+
+but also incorporates the weight 
+
+N (Qi, Q ′ 
+
+> j
+
+) discussed in the previous section. To construct a hierarchical pooling structure, we introduce a tunable hyperparameter ∆k that specifies the step size in the order of the Delaunay complexes, i.e., we let k2 − k1 = ∆ k.This means that at the l-th pooling layer ( l = 0 , 1, 2, . . . ), node features are clustered from the order-(l∆k + 1) De-launay complex to the order-(( l + 1)∆ k + 1) Delaunay complex. Specifically, we use the matrix C(l+1)∆ k+1  
+
+> l∆k+1
+
+for the clustering process. Each row of C(l+1)∆ k+1  
+
+> l∆k+1
+
+is normal-ized by dividing each element by the sum of the elements in that row. The resulting row-normalized matrix is denoted as 
+
+ˆCl ∈ Rnl×nl+1 , where nl and nl+1 are the numbers of ver-tices in Del l∆k+1 (X) and Del (l+1)∆ k+1 (X), respectively. The normalized matrix ˆCl is used as the clustering matrix for pooling from layer l to layer l + 1 :
+
+Z(l+1) = ˆCl · H(l), (2) where H(l) is the node feature matrix at layer l. Then we update the node features obtained after pooling using a given underlying graph Gl+1 at layer (l + 1) and a GNNs model. This process produces the node features for the (l + 1) -th layer as follows: 
+
+H(l+1) = GNNs (Z(l+1) , A l+1 ), (3) where Al+1 is the adjacency matrix of the underlying graph 
+
+Gl+1 . And after pooling reaches the final layer L, we com-pute the final embedding Hfinal using the following formula: 5Rhomboid Tiling for Geometric Graph Deep Learning 
+
+Hfinal = H(L)T · (H(L)W ),
+
+where W is a learnable matrix of size f × 1, and f is the feature dimension. We use a 1-layer MLP to map the final embedding into a 2-dimensional vector, representing the classification scores for label 0 and label 1, respectively. The underlying graph Gl used at layer l for updating the node feature can be defined arbitrarily, as long as its vertices correspond one-to-one with the vertices of Del l(X). In this paper, we consider two methods for constructing Gl:1. The first method directly uses the 1-skeleton of Del l(X)
+
+as Gl. We refer to this type of underlying graphs as Delau-nay graphs. 2. The second method assumes that the original point cloud 
+
+X is associated with a given graph Gini . In our paper, 
+
+Gini is naturally defined as the corresponding chemical or molecular graph. The vertex set of Gl is given by the vertex set of Del l(X), {vQ1 , v Q2 , . . . }, where Q1, Q 2, . . . 
+
+correspond to subsets of X of size l. An edge (vQi , v Qj )
+
+exists in Gl if and only if there exist points p ∈ Qi and 
+
+q ∈ Qj such that (p, q ) is an edge in the initial graph Gini .We refer to this type of underlying graphs as generated graphs. 
+
+3.4. Time Complexity Analysis 
+
+We theoretically analyze the time complexity of the pro-posed RTPool model. The following theorem characterizes the overall computational cost: 
+
+Theorem 3.4. Let K = ∆ k · L + 1 , where ∆k is the step size and L is the number of pooling layers. Then the total time complexity of RTPool on a point cloud in Rd of size n
+
+is 
+
+O
+
+
+
+K⌈ d+3 2 ⌉n⌊ d+1 2 ⌋ + K5n2
+
+.
+
+The first term corresponds to the cost of constructing the rhomboid tiling up to order K, and the second term ac-counts for the cumulative computation over all L pooling layers. Here, ⌊·⌋ and ⌈·⌉ denote the floor and ceiling func-tions, respectively. 
+
+In our experiments, the step size ∆k and the number of pooling layers L are both set to at most 2, so the total order 
+
+K = ∆ k · L + 1 remains a small constant. Moreover, all of the point clouds are in dimension d = 3 . Under this setting, the overall time complexity of RTPool simplifies to O(n2),making it suitable for practical use. Furthermore, empirical results in Appendix F support the theoretical analysis, demonstrating that RTPool achieves competitive efficiency compared to other state-of-the-art graph pooling methods. 
+
+# 4. Experiments 
+
+4.1. Datasets 
+
+We evaluate the performance of RTPool on graph classifi-cation tasks using seven real-world graph datasets from the commonly utilized TUDataset benchmark. Among these, three datasets represent chemical compounds, while the remaining four datasets are molecular compounds datasets. 
+
+Chemical Compound Datasets The chemical compound datasets include COX-2 (Sutherland et al., 2003), BZR (Sutherland et al., 2003), and MUTAG (Debnath et al., 1991). The COX-2 dataset comprises cyclooxygenase-2 (COX-2) inhibitors tested for their ability to inhibit the human recom-binant COX-2 enzyme, with compounds classified as active or inactive. The BZR dataset includes ligands for the ben-zodiazepine receptor (BZR), with labels indicating activity or inactivity. The MUTAG dataset consists of chemical compounds categorized by their mutagenic effect on a spe-cific bacterium, with labels distinguishing mutagenic from non-mutagenic compounds. 
+
+Molecular Compound Datasets The molecular com-pound datasets include PTC MM, PTC MR, PTC FM, and PTC FR (Chen et al., 2007). These datasets classify chem-ical compounds based on their carcinogenicity in rodents: 
+
+PTC MM (male mice), PTC MR (male rats), PTC FM 
+
+(female mice), and PTC FR (female rats). Labels indicate whether a compound is carcinogenic or non-carcinogenic. For all datasets, compounds are represented as graphs where vertices correspond to atoms, and edges represent chemical bonds. Hydrogen atoms are removed during preprocessing. 
+
+4.2. Baselines 
+
+Wit-TopoPool achieves state-of-the-art performance across the above datasets (Chen & Gel, 2023), making it our pri-mary baseline for comparison. To ensure a fair and consis-tent evaluation, we adopt the same seeds as Wit-TopoPool for a 90/10 random training/test split, guaranteeing identical training and test sets. We evaluate the performance of RTPool by comparing it against 21 state-of-the-art methods across four cate-gories: (I) Graph kernel-Based Methods, including (1) Weis-feiler–Lehman Kernel (WL) (Shervashidze et al., 2011), (2) Weisfeiler–Lehman Optimal Assignment Kernel (WL-OA) (Kriege et al., 2016), (3) Weisfeiler–Lehman Hash Graph Kernel (HGK-WL) (Morris et al., 2016), (4) Shortest Path Hash Graph Kernel (HGK-SP) (Morris et al., 2016), and (5) Subgraph Matching Kernel (CSM) (Kriege & Mutzel, 2012); (II) Graph Neural Network-Based Methods, in-cluding (6) Graph Convolutional Network (GCN) (Kipf & Welling, 2017), (7) Deep Graph Convolutional Neural 6Rhomboid Tiling for Geometric Graph Deep Learning   
+
+> Table 1. Performance of different models on benchmark datasets. The best performance for each dataset is highlighted in bold .
+
+Model BZR COX2 MUTAG PTC MR PTC MM PTC FM PTC FR 
+
+No. graphs 405 467 188 344 336 349 351 No. avg nodes 35.75 41.22 17.93 25.56 24.25 25.00 24.96 WL 86.16±0.97 79.67±1.32 85.75±1.96 57.97±0.49 67.28±0.97 64.80±0.85 67.64±0.74 WL-OA 87.43±0.81 81.08±0.89 86.10±1.95 62.70±1.40 66.60±1.16 66.28±1.83 67.82±5.03 HGK-WL 81.42±0.60 78.16±0.00 75.51±1.34 59.90±4.30 67.22±5.98 64.72±1.66 67.90±1.81 HGK-SP 81.99±0.30 78.16±0.00 80.90±0.48 57.26±1.41 57.52±9.98 52.41±1.79 66.91±1.46 CSM 84.54±0.65 79.78±1.04 87.29±1.25 58.24±2.44 63.30±1.70 63.80±1.00 65.51±9.82 GCN 79.34±2.43 76.53±1.82 80.42±2.07 62.26±4.80 67.80±4.00 62.39±0.85 69.80±4.40 DGCNN 79.40±1.71 79.85±2.64 85.83±1.66 58.59±2.47 62.10±14.09 60.28±6.67 65.43±11.30 GIN 85.60±2.00 80.30±5.17 89.39±5.60 64.60±7.00 67.18±7.35 64.19±2.43 66.97±6.17 SAGPool 82.95±4.91 79.45±2.98 76.78±2.12 69.41±4.40 66.67±8.57 67.65±3.72 65.71±10.69 EigenGCN 83.05±6.00 80.16±5.80 79.50±0.66 N/A N/A N/A N/A MinCutPool 82.64±5.05 80.07±3.85 79.17±1.64 64.16±3.47 N/A N/A N/A Top-K 79.40±1.20 80.30±4.21 67.61±3.36 64.70±6.80 67.51±5.96 65.88±4.26 66.28±3.71 DiffPool 83.93±4.41 79.66±2.64 79.22±1.02 64.85±4.30 66.00±5.36 63.00±3.40 69.80±4.40 HaarPool 83.95±5.68 82.61±2.69 90.00±3.60 66.68±3.22 69.69±5.10 65.59±5.00 69.40±5.21 PersLay 82.16±3.18 80.90±1.00 89.80±0.90 N/A N/A N/A N/A MPR N/A N/A 84.00±8.60 66.36±6.55 68.60±6.30 63.94±5.19 64.27±3.78 FC-V 85.61±0.59 81.01±0.88 87.31±0.66 N/A N/A N/A N/A SIN N/A N/A N/A 66.80±4.56 70.55±4.79 68.68±6.80 69.80±4.36 Wit-TopoPool 87.80±2.44 87.24±3.15 93.16±4.11 70.57±4.43 79.12±4.45 71.71±4.86 75.00±3.51 HopPool 85.37±4.36 85.11±3.74 94.74±4.76 65.71±2.85 73.59±5.27 64.15±4.62 65.71±3.71 MvPool 78.05±3.38 82.98±5.24 89.64±2.43 68.58±2.61 70.65±4.83 62.86±3.37 65.72±2.14 RTPool 88.29±0.98 92.76±1.90 94.74±3.33 78.86±1.57 82.94±2.20 77.72±1.14 82.29±2.80 
+
+Network (DGCNN) (Zhang et al., 2018), and (8) Graph Isomorphism Network (GIN) (Xu et al., 2018); (III) Graph Pooling-Based Methods, including (9) Self-Attention Graph Pooling (SAGPool) (Lee et al., 2019), (10) GCNs with Eigen Pooling (EigenGCN) (Ma et al., 2019), (11) Spec-tral Clustering Pooling (MinCutPool) (Bianchi et al., 2020), (12) TopKPooling with Graph U-Nets (Top-K) (Gao & Ji, 2019), (13) Differentiable Pooling (DiffPool) (Ying et al., 2018), (14) Haar Graph Pooling (HaarPool) (Wang et al., 2020), (15) Multi-hop Graph pooling (HopPool) (Zhang et al., 2024), and (16) Multi-view Graph pooling (MvPool) (Ma et al., 2024); and (IV) Topology-Based Methods, in-cluding (17) Neural Networks for Persistence Diagrams (PersLay) (Carri `ere et al., 2020), (18) Deep Graph Mapper (MPR) (Bodnar et al., 2021a), (19) Filtration Curves with a Random Forest (FC-V) (O’Bray et al., 2021), (20) Message Passing Simplicial Networks (SIN) (Bodnar et al., 2021b), and (21) Witness complex-based topological pooling (Wit-TopoPool) (Chen & Gel, 2023). 
+
+4.3. Experiment Settings 
+
+In our study, the experiments were conducted on a machine equipped with NVIDIA RTX A5000 GPUs with 32GB of memory. To enhance the model’s performance across var-ious datasets, we carefully selected appropriate hyperpa-rameter settings, including learning rate, dropout ratio, and number of pooling layers, detailed in the Appendix Materi-als. The number of epochs was set to 500, and each dataset was evaluated five times, with the mean value used as the final metric and the standard deviation recorded. For the baseline results, the performance of HopPool and MvPool was obtained by running the original implementa-tions with grid search to determine the best hyperparameters. For all other baseline methods, we directly cite the results from (Chen & Gel, 2023), which also adopted grid search based on the settings specified in each original paper. 
+
+4.4. Experiment Results 
+
+The comparison of our model with 21 baseline methods across 7 benchmark datasets is summarized in Table 1. We also conducted an ablation study on the COX2, MUTAG, and PTC MR datasets to analyze the impact of replacing RTPooling with trivial mean pooling in the model, the ef-fect of different GNNs models used for feature updates in the pooling layers, and the influence of the choice of the underlying graph during updates. The detailed results are presented in Table 2, 3 and 4. Furthermore, we provide 7Rhomboid Tiling for Geometric Graph Deep Learning 
+
+additional experimental analyses in Appendix, including (i) hyperparameter sensitivity studies, (ii) graph regression task performance, (iii) social network dataset evaluation, and (iv) computational efficiency analysis. In all these tables, N/A indicates that the result is not available. Values are reported as mean accuracy ± standard deviation. 
+
+Molecular and Chemical Graphs Table 1 presents the performance comparison among 21 baseline models on the BZR, COX-2, MUTAG, and the four PTC datasets (PTC MR, PTC MM, PTC FM, and PTC FR) for graph classifi-cation tasks. The performance results for all other models are directly from (Chen & Gel, 2023). To ensure a fair comparison of results, we follow the same train-test split strategy used in their work, utilize the corresponding molec-ular or chemical compound graphs as the initial graphs, and adopt the same node features: simple 1-hot vectors encod-ing the atom types represented by the nodes. Our RTPool consistently outperforms all baseline models across these 7 datasets, with the runner-up being Wit-TopoPool in all cases. Notably, RTPool achieves an average relative im-provement of 5.94% over the runner-up, demonstrating its effectiveness. This significant performance gain highlights the limitations of existing methods. All baseline models are constrained by their reliance on graph structures and do not fully exploit the geometric information inherent in molec-ular or compound graphs. Our RTPool model employs a rhomboid tiling structure that is sensitive to geometric in-formation. It performs well in detecting subtle geometric variations in densely packed regions of the point cloud, en-abling it to fully leverage this geometric data. As a result, our model can make full use of this geometric information and consistently outperforms all the baseline approaches. 
+
+Ablation Study To assess the impact of each component in our RTPool model, we conducted comprehensive abla-tion experiments across multiple datasets, including COX2, MUTAG, and PTC MR, to gain deeper insights into their individual contributions. We designed three experiments for the ablation study: In the first experiment, we replaced the entire pooling component of our RTPool model with the commonly used mean pooling and max pooling. This experiment was conducted to validate the effectiveness of RTPool as the pooling mechanism in graph deep learning. In the second experiment, we used GCN, GAT, and GIN as the models for updating node features after pooling, as described in Equation 3. This allowed us to explore the impact of employing different GNNs architectures for fea-ture updates. Lastly, in the third experiment, we considered two types of graphs: Delaunay graphs and generated graphs. These graphs were used as the underlying structures for updating node features at each new layer after RT clustering pooling (see equation 3). This experiment aimed to inves-tigate how the choice of the underlying graph affects the performance of our model.   
+
+> Table 2. Performance comparison of replacing RTPooling with trivial mean pooling. The best performance for each dataset is highlighted in bold
+
+Dataset Pooling Method Accuracy 
+
+COX2 mean pool 78.72±0.85 max pool 78.31±0.81 RTPool 92.76±1.90 
+
+MUTAG mean pool 84.21±1.37 max pool 75.53±2.26 RTPool 94.74±3.33 
+
+PTC MR mean pool 65.71±0.00 max pool 67.43±1.40 RTPool 78.86±1.57 
+
+The results in Table 2 highlight significant advantage of RTPool over trivial mean and max pooling across all three datasets. Our model achieved relative accuracy gains of 10% to 20%, underscoring the value of an advanced pooling mechanism. This substantial performance gap demonstrates RTPool’s effectiveness in capturing both geometric and topo-logical information, establishing it as a robust graph pooling model that consistently drives superior performance across tasks.   
+
+> Table 3. Performance of different GNNs models used for node fea-ture updates. The best performance for each dataset is highlighted in bold .
+
+Dataset GNNs Model Accuracy 
+
+COX2 GCN 88.93±0.84 GAT 87.23±1.15 GIN 92.76±1.90 
+
+MUTAG GCN 89.47±2.33 GAT 88.73±1.48 GIN 94.74±3.33 
+
+PTC MR GCN 74.28±0.86 GAT 71.43±1.40 GIN 78.86±1.57 
+
+Table 3 demonstrates that while the choice of GNN model for feature updates impacts performance, the differences are relatively modest. For example, on the COX2 dataset, the accuracy gap between the top-performing model (GIN) and others (GCN, GAT) is around 4%, increasing to about 5% on the MUTAG and PTC MR datasets. Notably, GIN con-sistently achieves the highest accuracy across all datasets, likely due to its expressiveness and alignment with the Weisfeiler-Lehman graph isomorphism test, which enhances its effectiveness in graph classification tasks. These results 8Rhomboid Tiling for Geometric Graph Deep Learning 
+
+suggest that GIN is the optimal choice for node feature updates in the RTPool model.   
+
+> Table 4. Performance comparison based on the choice of the un-derlying graph for feature updates. The best performance for each dataset is highlighted in bold .
+
+Dataset Underlying Graph Accuracy 
+
+COX2 Delaunay 88.94±0.85 generated 92.76±1.90 
+
+MUTAG Delaunay 86.32±2.58 generated 94.74±3.33 
+
+PTC MR Delaunay 71.43±0.00 generated 78.86±1.57 
+
+Table 4 summarizes the third experiment’s results, showing the impact of different underlying graph constructions on model performance. As discussed in Section 3.3, we ex-plored two approaches for constructing underlying graphs after pooling: Delaunay graphs and generated graphs. The table highlights a performance gap of up to 8% on the MU-TAG dataset, underscoring the importance of graph choice. This gap arises because RT clustering already captures ge-ometric structure, so Delaunay graphs provide little addi-tional information, as many Delaunay-connected nodes are already clustered together. Moreover, RT clustering ignores the edge semantics of the input graph, which are critical in domains like molecular modeling where chemical bonds encode key functional information. By reconstructing post-pooling graphs using the original graph’s connectivity, we preserve high-order graph structural details and better in-tegrate both geometric and graph connectivity information. This explains why using generated graphs consistently leads to better performance. 
+
+Hyperparameter Sensitivity Analysis Theorem 3.2 sug-gests that the difference ∆k = k2 − k1 between consecutive clustering levels should be set to 1 or 2, as larger values may result in some nodes being left unclustered, leading to information loss during pooling. To validate this theoretical insight, we conduct a sensitivity analysis on ∆k. The results, shown in Table 5. We observe that RTPool achieves robust and competitive results when ∆k = 1 or 2, aligning well with the geometric guarantees of Theorem 3.2. In contrast, ∆k = 3 leads to consistent performance drops across all datasets, likely due to some nodes failing to be grouped into valid clusters. We thus recommend setting ∆k = 1 as the default choice, with 
+
+∆k = 2 being a viable alternative that can yield even better results on some datasets. Additional sensitivity experiments on other hyperparameters are provided in Appendix C.        
+
+> Table 5. Sensitivity of the hyperparameter ∆k=k2−k1. The best performance for each dataset is highlighted in bold .
+
+Dataset ∆k Accuracy 
+
+COX2 1 89.36±2.33 2 92.76±1.90 
+
+3 86.38±1.90 MUTAG 1 94.74±3.33 
+
+2 89.64±2.36 3 88.42±2.10 PTC MR 1 76.57±1.14 2 78.86±1.57 
+
+3 69.71±1.56 
+
+# 5. Conclusion 
+
+This paper introduces Rhomboid Tiling (RT) clustering, a hierarchical method designed to capture intricate high-order geometric information from geometric graphs. Building on this foundation, we developed RTPool, a pooling model that achieves exceptional performance across various tasks. In the future, we plan to extend RT clustering to topological deep learning models. 
+
+# Software and Data 
+
+The code for our proposed method is available at https: //github.com/ZhangYipeng01/RT_pooling .
+
+# Acknowledgements 
+
+This work was supported in part by Singapore Min-istry of Education Academic Research fund Tier 1 grant RG16/23, Tier 2 grants MOE-T2EP20120-0010 and MOE-T2EP20221-0003; Program of China Scholarship Council (Grant No. 202306220143). 
+
+# Author Contributions 
+
+Yipeng Zhang contributed to the method design, theoretical analysis, model implementation, and writing and revision of the manuscript. Longlong Li was responsible for data preprocessing, model development, reproduction of base-line methods, and revision of the manuscript. Kelin Xia proposed the original idea, provided critical feedback on the manuscript, and supported the project with computational resources. 
+
+# Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal 9Rhomboid Tiling for Geometric Graph Deep Learning 
+
+consequences of our work, none which we feel must be specifically highlighted here. 
+
+# References 
+
+Bianchi, F. M., Grattarola, D., and Alippi, C. Spectral clustering with graph neural networks for graph pooling. In International conference on machine learning , pp. 874– 883. PMLR, 2020. Bodnar, C., Cangea, C., and Li `o, P. Deep Graph Mapper: Seeing Graphs Through the Neural Lens. Frontiers in big Data , 4:680535, 2021a. Bodnar, C., Frasca, F., Wang, Y., Otter, N., Montufar, G. F., Lio, P., and Bronstein, M. Weisfeiler and Lehman Go Topological: Message Passing Simplicial Networks. In 
+
+International Conference on Machine Learning , pp. 1026– 1037. PMLR, 2021b. Cai, H., Zhang, H., Zhao, D., Wu, J., and Wang, L. FP-GNN: a versatile deep learning architecture for enhanced molec-ular property prediction. Briefings in bioinformatics , 23 (6):bbac408, 2022. Carri `ere, M., Chazal, F., Ike, Y., Lacombe, T., Royer, M., and Umeda, Y. Perslay: A neural network layer for per-sistence diagrams and new graph topological signatures. In International Conference on Artificial Intelligence and Statistics , pp. 2786–2796. PMLR, 2020. Chen, J. H., Linstead, E., Swamidass, S. J., Wang, D., and Baldi, P. Chemdb update—full-text search and vir-tual chemical space. Bioinformatics , 23(17):2348–2351, 2007. Chen, Y. and Gel, Y. R. Topological pooling on graphs. In 
+
+Proceedings of the AAAI Conference on Artificial Intelli-gence , volume 37, pp. 7096–7103, 2023. Corbet, R., Kerber, M., Lesnick, M., and Osang, G. Comput-ing the multicover bifiltration. Discrete & Computational Geometry , 70(2):376–405, 2023. Debnath, A. K., Lopez de Compadre, R. L., Debnath, G., Shusterman, A. J., and Hansch, C. Structure-activity rela-tionship of mutagenic aromatic and heteroaromatic nitro compounds. correlation with molecular orbital energies and hydrophobicity. Journal of medicinal chemistry , 34 (2):786–797, 1991. Edelsbrunner, H. and M ¨ucke, E. P. Three-dimensional alpha shapes. ACM Transactions On Graphics (TOG) , 13(1): 43–72, 1994. Edelsbrunner, H. and Osang, G. The Multi-Cover Persis-tence of Euclidean Balls. Discrete & Computational Geometry , 65:1296–1313, 2021. Fortune, S. Voronoi Diagrams and Delaunay Triangulations. In Handbook of discrete and computational geometry , pp. 705–721. Chapman and Hall/CRC, 2017. Gao, H. and Ji, S. Graph U-Nets. In international conference on machine learning , pp. 2083–2092. PMLR, 2019. Gerke, B. F., Newman, J. A., Davis, M., Coil, A. L., Cooper, M. C., Dutton, A. A., Faber, S., Guhathakurta, P., Konidaris, N., Koo, D. C., et al. The DEEP2 Galaxy Redshift Survey: The Voronoi-Delaunay Method catalog of galaxy groups. The Astrophysical Journal , 751(1):50, 2012. Guo, Z. and Wang, H. A Deep Graph Neural Network-Based Mechanism for Social Recommendations. IEEE Transactions on Industrial Informatics , 17(4):2776–2783, 2020. Hamilton, W. L., Ying, R., and Leskovec, J. Representation Learning on Graphs: Methods and Applications. IEEE Data Eng. Bull. , 40:52–74, 2017. Huang, K., Xiao, C., Glass, L. M., Zitnik, M., and Sun, J. SkipGNN: predicting molecular interactions with skip-graph networks. Scientific reports , 10(1):21092, 2020. Jiang, D., Wu, Z., Hsieh, C.-Y., Chen, G., Liao, B., Wang, Z., Shen, C., Cao, D., Wu, J., and Hou, T. Could graph neural networks learn better molecular representation for drug discovery? a comparison study of descriptor-based and graph-based models. Journal of cheminformatics , 13: 1–23, 2021. Kipf, T. N. and Welling, M. Semi-Supervised Classification with Graph Convolutional Networks. In International Conference on Learning Representations , 2017. Kojima, R., Ishida, S., Ohta, M., Iwata, H., Honma, T., and Okuno, Y. kGCN: a graph-based deep learning framework for chemical structures. Journal of Cheminformatics , 12: 1–10, 2020. Kriege, N. and Mutzel, P. Subgraph matching kernels for attributed graphs. In Proceedings of the 29th Interna-tional Coference on International Conference on Machine Learning , pp. 291–298, 2012. Kriege, N. M., Giscard, P.-L., and Wilson, R. On valid optimal assignment kernels and applications to graph classification. Advances in neural information processing systems , 29, 2016. Lee, D.-T. On k-Nearest Neighbor Voronoi Diagrams in the Plane. IEEE transactions on computers , 100(6):478–487, 1982. 10 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+Lee, J., Lee, I., and Kang, J. Self-Attention Graph Pool-ing. In International conference on machine learning , pp. 3734–3743. pmlr, 2019. Li, R., Yuan, X., Radfar, M., Marendy, P., Ni, W., O’Brien, T. J., and Casillas-Espinosa, P. M. Graph Signal Pro-cessing, Graph Neural Network and Graph Learning on Biological Data: A Systematic Review. IEEE Reviews in Biomedical Engineering , 16:109–135, 2021. Liang, J., Edelsbrunner, H., Fu, P., Sudhakar, P. V., and Subramaniam, S. Analytical shape computation of macro-molecules: I. molecular area and volume through alpha shape. Proteins: Structure, Function, and Bioinformatics ,33(1):1–17, 1998. Luchnikov, V., Medvedev, N., Oger, L., and Troadec, J.-P. Voronoi-Delaunay analysis of voids in systems of nonspherical particles. Physical review E , 59(6):7205, 1999. Ma, X., Fu, X., Wang, T., Zhuo, L., and Zou, Q. Graphadt: empowering interpretable predictions of acute dermal tox-icity with multi-view graph pooling and structure remap-ping. Bioinformatics , 40(7):btae438, 2024. Ma, Y., Wang, S., Aggarwal, C. C., and Tang, J. Graph Con-volutional Networks with EigenPooling. In Proceedings of the 25th ACM SIGKDD international conference on knowledge discovery & data mining , pp. 723–731, 2019. Min, S., Gao, Z., Peng, J., Wang, L., Qin, K., and Fang, B. STGSN — A Spatial–Temporal Graph Neural Network framework for time-evolving social networks. 
+
+Knowledge-Based Systems , 214:106746, 2021. Morris, C., Kriege, N. M., Kersting, K., and Mutzel, P. Faster Kernels for Graphs with Continuous Attributes via Hashing. In 2016 IEEE 16th International Conference on Data Mining (ICDM) , pp. 1095–1100. IEEE, 2016. O’Bray, L., Rieck, B., and Borgwardt, K. Filtration Curves for Graph Representation. In Proceedings of the 27th ACM SIGKDD Conference on Knowledge Discovery & Data Mining , pp. 1267–1275, 2021. R ´eau, M., Renaud, N., Xue, L. C., and Bonvin, A. M. DeepRank-GNN: a graph neural network framework to learn patterns in protein–protein interfaces. Bioinformat-ics , 39(1):btac759, 2023. Richards, F. M. The interpretation of protein structures: total volume, group volume distributions and packing density. Journal of molecular biology , 82(1):1–14, 1974. Shen, C., Luo, J., and Xia, K. Molecular geometric deep learning. Cell reports methods , 3(11), 2023. Shervashidze, N., Schweitzer, P., Van Leeuwen, E. J., Mehlhorn, K., and Borgwardt, K. M. Weisfeiler-Lehman Graph Kernels . Journal of Machine Learning Research ,12(9), 2011. Sutherland, J. J., O’brien, L. A., and Weaver, D. F. Spline-Fitting with a Genetic Algorithm: A Method for De-veloping Classification Structure-Activity Relationships. 
+
+Journal of chemical information and computer sciences ,43(6):1906–1915, 2003. Veli ˇckovi ´c, P., Cucurull, G., Casanova, A., Romero, A., Li `o, P., and Bengio, Y. Graph Attention Networks. In 
+
+International Conference on Learning Representations ,2018. Wang, Y. G., Li, M., Ma, Z., Montufar, G., Zhuang, X., and Fan, Y. Haar Graph Pooling. In International conference on machine learning , pp. 9952–9962. PMLR, 2020. Wieder, O., Kohlbacher, S., Kuenemann, M., Garon, A., Ducrot, P., Seidel, T., and Langer, T. A compact review of molecular property prediction with graph neural networks. 
+
+Drug Discovery Today: Technologies , 37:1–12, 2020. Wu, Z., Ramsundar, B., Feinberg, E. N., Gomes, J., Ge-niesse, C., Pappu, A. S., Leswing, K., and Pande, V. Moleculenet: a benchmark for molecular machine learn-ing. Chemical science , 9(2):513–530, 2018. Xu, K., Hu, W., Leskovec, J., and Jegelka, S. How Powerful are Graph Neural Networks? In International Conference on Learning Representations , 2018. Ying, Z., You, J., Morris, C., Ren, X., Hamilton, W., and Leskovec, J. Hierarchical graph representation learning with differentiable pooling. Advances in neural informa-tion processing systems , 31, 2018. Zhang, J., Tian, J., Yan, P., Wu, S., Luo, H., and Yin, S. Multi-hop graph pooling adversarial network for cross-domain remaining useful life prediction: A distributed federated learning perspective. Reliability Engineering & System Safety , 244:109950, 2024. Zhang, M., Cui, Z., Neumann, M., and Chen, Y. An end-to-end deep learning architecture for graph classification. In 
+
+Proceedings of the AAAI conference on artificial intelli-gence , volume 32, 2018. 11 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+# A. Proofs of Theorems 
+
+Theorem A.1. A vertex vQ ∈ Del k1 (X) belongs to the cluster CQ′ if and only if there exists a (d − 1) -dimensional sphere 
+
+S such that: 
+
+• vQ′ ∈ Del k2 (X) with k2 > k 1,
+
+• In X (S) ⊂ Q ∩ Q′,
+
+• Q ∪ Q′ ⊂ In X (S) ∪ On X (S).
+
+Proof. From the definition of the rhomboid associated with S, we have In X (S) ⊂ Q ⊂ In X (S) ∪ On X (S) and In X (S) ⊂
+
+Q′ ⊂ In X (S) ∪ On X (S). Using these properties, it follows directly that the stated conditions are sufficient and necessary for vQ ∈ CQ′ .
+
+Theorem A.2. Suppose X is in general position in R3. Considering the vertices in Del k1 (X) and Del k2 (X) with 
+
+k1 < k 2 ≤ | X|, we have: 
+
+Case 1: k2 − k1 > 4, then for any vQ ∈ Del k1 (X), vQ does not belong to any cluster corresponding to the vertices in Del k2 (X).
+
+Case 2: 1 ≤ k2 − k1 ≤ 2, then for any vQ ∈ Del k1 (X), there exists vQ′ ∈ Del k2 (X) such that vQ ∈ CQ′ .
+
+Case 3: k2 − k1 = 1 , then for any Q ⊂ Q′ with vQ ∈ Del k1 (X) and vQ′ ∈ Del k2 (X), we have vQ ∈ CQ′ .
+
+Proof: 
+
+• Case 1: k2 − k1 > 4. Actually we can prove a more general case: Suppose X is in general position in Rd, then for any vertex vQ ∈ Del k1 (X) and any vertex vQ′ ∈ Del k2 (X) with k2 ≥ k1 + d + 1 , v Q /∈ CQ′ :From Theorem A.1, we know that Q ∪ Q′ − Q ∩ Q′ ⊂ Q ∪ Q′ − In X (S) ⊂ On X (S). When k2 > k 1 + d + 1 , we have 
+
+|On X (S)| ≥ | Q ∪ Q′ − Q ∩ Q′| ≥ k2 − k1 > d + 1 . This contradicts the general position assumption, which states that for any (d − 1) -dimensional sphere S ⊂ Rd, there can be at most d + 1 vertices of X exactly on S. Therefore, no such cluster exists in this case. • Case 2: 1 ≤ k2 − k1 ≤ 2. Since vQ ∈ Del k1 (X), there exists a sphere S0 ⊂ Rd such that In X (S0) ⊂ Q ⊂
+
+In X (S0) ∪ On X (S0). Our goal is to find additional points v1, . . . , v m (1 ≤ m ≤ 2) and construct a sphere Sm such that: 
+
+– S0 ⊂ Dm, here we use Dm to denote the ball bounded by the sphere Sm.
+
+– v1, . . . , v m lie exactly on Sm,
+
+– All other points in X − Q − { v1, . . . , v m} do not lie inside Sm.If such points v1, . . . , v m and sphere Sm can be found, we define Q′ = Q ∪ { v1, v 2, . . . , v m}. Then, it follows that In X (Sm) ⊂ Q ∩ Q′ and Q ∪ Q′ ⊂ In X (Sm) ∪ On X (Sm). By Theorem A.1, we can conclude that vQ ∈ CQ′ .- Subcase 2.1: m = 1 . Let O and R denote the center and radius of S0, respectively. For each point v ∈ X − Q,calculate its Euclidean distance to O. Select the point v1 that is closest to O, and define S1 as the sphere centered at O
+
+with radius |l(O, v 1)|, where l(Ov , v 1) denotes the line segment between the points Ov and v1; this notation will be used to represent the line segment between any two points throughout the proof. It is straightforward to verify that S1
+
+satisfies: 
+
+– S0 ⊂ D1,
+
+– v1 lies exactly on S1,
+
+– All other points in X − Q − { v1} do not lie inside S1.- Subcase 2.2: m = 2 . First, construct v1 and S1 as in the previous case. Next, for each v ∈ X − Q − { v1}, consider the perpendicular bisector of v1 and v, and find its intersection Ov with the line passing through O and v1. Let |l(Ov , v 1)|
+
+denote the distance between Ov and v1. Select the point v2 such that |l(Ov , v 1)| is minimized. Define S2 as the sphere centered at Ov2 with radius |l(Ov2 , v 1)|. Then: 12 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+– v1 and v2 lie exactly on S2.It is obvious by the construction of S2.
+
+– S1 is contained within D2.To demonstrate this, observe that Ov2 , O, and v1 are collinear, and the radii of the spheres S2 and S1 satisfy the inequality |l(Ov2 , v 1)| ≥ | l(O, v 1)|. This ensures that, apart from the common point v1, the sphere S1 is entirely enclosed within S2.
+
+– All other points in X − Q − { v1, v 2} do not lie inside S2.To prove this, note that by construction, for any v ∈ X − Q − { v1, v 2}, Ov lies on the perpendicular bisector of v1 and v. Hence, the angle α(Ov , v 1, v ) satisfies α(Ov , v 1, v ) = α(Ov , v, v 1) (Here α(Ov , v 1, v ) denotes the angle between the line segments v1Ov and v1v; this notation will be used to represent the angle between any two line segments throughout the proof). Since |l(Ov , v 1)| ≥ | l(Ov2 , v 1)|, we have α(Ov2 , v, v 1) ≤ α(Ov , v, v 1) = 
+
+α(Ov , v 1, v ) = α(Ov2 , v 1, v ). Since the greater side of a triangle is opposite the greater angle, |l(Ov2 , v )| ≥ |l(Ov2 , v 1)|, ensuring that v does not lie inside S2. Thus, v1, v 2, and S2 satisfy the required conditions. • Case 3: k2 − k1 = 1 . For any Q ⊂ Q′ with vQ ∈ Del k1 (X) and vQ′ ∈ Del k2 (X), we can write Q′ = Q ∪ { v}. The condition vQ ∈ Del k1 (X) implies that there exists a ball D1 ⊂ R3 containing Q, and all other points in X lie outside 
+
+D1. Similarly, vQ′ ∈ Del k2 (X) implies that there exists a ball D2 ⊂ R3 containing Q ∪ { v}, and all other points in X
+
+lie outside D2. The intersection D1 ∩ D2 is non-empty because Q ⊂ D1 ∩ D2.We aim to prove the existence of a ball D such that D1 ∩ D2 ⊂ D ⊂ D1 ∪ D2 and v lies on the boundary of D. Let 
+
+O1 and O2 be the centers of D1 and D2, respectively, and r1 and r2 their radii. We consider two subcases to complete the proof: - Subcase 3.1: D1 ⊂ D2. First, consider the distance |l(O2, v )|:- If |l(O2, v )| ≥ | l(O2, O 1)| + r1, then the ball D, centered at O2 with radius |l(O2, v )|, satisfies D1 ⊂ D ⊂ D2, and 
+
+v lies on the boundary of D.- If |l(O2, v )| < |l(O2, O 1)| + r1, consider the farthest point P on D1 along the line segment l(O2, O 1), such that 
+
+|l(O2, P )| = |l(O2, O 1)| + r1 > |l(O2, v )|. The perpendicular bisector of P and v intersects l(O2, P ) at a point O.We can prove that O lies on the line segment l(O1, O 2) because v does not lie inside D1, implying |l(O1, v )| ≥ r1 =
+
+|l(O1, P )|. Hence, the perpendicular bisector cannot intersect l(O1, P ) outside P , and O must lie on l(O1, O 2).Let D be the ball centered at O with radius |l(O, v )| = |l(O, P )|. By construction, v lies on the boundary of D, and D
+
+contains D1 because O1 ∈ l(O, P ) and |l(O1, P )| = r1. Furthermore, since O ∈ l(O2, P ) and |l(O2, P )| ≤ r2, we have D ⊂ D2. Thus, in this subcase, we can always find a ball D such that D1 ∩ D2 = D1 ⊂ D ⊂ D2 = D1 ∪ D2,and v lies on the boundary of D.- Subcase 3.2: D1̸ ⊂ D2. We first prove the following lemma: 
+
+Lemma. For two intersecting balls D1 and D2 with centers O1 and O2, respectively, let C be the circle formed by the intersection of their boundaries. For any point O3 on the line segment l(O1, O 2), the ball D centered at O3 with radius equal to the distance from O3 to any point P ∈ C satisfies D1 ∩ D2 ⊂ D ⊂ D1 ∪ D2.To prove this lemma, consider the plane Π containing P and the line segment l(O1, O 2), and establish a 3D coordinate system on Π: - Let the projection of P onto l(O1, O 2) be the origin O(0 , 0, 0) . - Take the direction of O1O2 as the 
+
+x-axis, the direction of OP as the y-axis, and the direction orthogonal to Π as the z-axis. - Let the coordinates of O1
+
+and O2 be (x1, 0, 0) and (x2, 0, 0) , respectively, and let P be at (0 , h, 0) . Then, r21 = x21 + h2 and r22 = x22 + h2.A point (x, y, z ) lies in D1 if and only if: 
+
+(x − x1)2 + y2 + z2 ≤ r21 ,
+
+which simplifies to: 
+
+x2 − 2x1x + y2 + z2 ≤ h2. (1) Similarly, a point lies in D2 if and only if: 
+
+x2 − 2x2x + y2 + z2 ≤ h2. (2) A point lies in D if and only if: 
+
+x2 − 2( tx 1 + (1 − t)x2)x + y2 + z2 ≤ h2, (3) 13 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+where O3(x3, 0, 0) with x3 = tx 1 + (1 − t)x2 is the center of D.By taking (1) ×t + (2) ×(1 − t), we obtain (3). This implies D1 ∩ D2 ⊂ D.Furthermore, the third inequality is equivalent to: 
+
+t(x2 − 2x1x + y2 + z2) + (1 − t)( x2 − 2x2x + y2 + z2) ≤ h2.
+
+Now, suppose that the third inequality holds while neither the first nor the second inequalities is satisfied. Then we have: 
+
+h2 = th 2 + (1 − t)h2 < t (x2 − 2x1x + y2 + z2) + (1 − t)( x2 − 2x2x + y2 + z2) ≤ h2,
+
+which is a contradiction. This contradiction implies that if the third inequality holds, at least one of the first or second inequalities must also hold. This ensures that D ⊂ D1 ∪ D2. And we finish the proof of the lemma. Returning to Subcase 3.2, consider a point P ∈ C on the intersection of D1 and D2. Let H be the perpendicular bisector of P and v. - Since |l(O2, v )| ≤ r2 = |l(O2, P )|, H intersects l(O2, P ). - Since |l(O1, v )| ≥ r1 = |l(O1, P )|,
+
+H does not intersect l(O1, P ) internally. By the geometric property that a line intersecting a triangle must intersect two sides and the fact that H does not intersect 
+
+l(O1, P ), H intersects the triangle O1O2P at a point O on l(O1, O 2). Let D be the ball centered at O with radius 
+
+|l(O, P )| = |l(O, v )|. By construction, v lies on the boundary of D, and the lemma ensures D1 ∩ D2 ⊂ D ⊂ D1 ∪ D2.In conclusion, we have proven the existence of a ball D such that v lies on the boundary of D, i.e., v ∈ On X (S) where 
+
+S = ∂D . Furthermore, we have Q ⊂ D1 ∩ D2 ⊂ D ⊂ D1 ∪ D2. This implies that Q = In X (S), because the interiors of D1 and D2 do not contain any points of X other than those in Q ∪ { v}. By Theorem A.1, it follows that vQ ∈ CQ′ .
+
+Theorem A.3. Suppose X is in general position in R3, and vQ1 , v Q2 ∈ Del k1 (X), v Q′ ∈ Del k2 (X). If vQ1 , v Q2 ∈ CQ′ ,then the following hold: 1. If 3 ≤ k2 − k1 ≤ 4, then Q1 ⊂ Q′ and N (Q1, Q ′) ≤ 5 − (k2 − k1).2. If Q1̸ ⊂ Q′, then N (Q1, Q ′) ≤ 3 − (k2 − k1).3. If Q1 ∩ Q′ ⊊ Q2 ∩ Q′, then N (Q1, Q ′) ≤ N (Q2, Q ′).
+
+Proof: Let n1 = |Q1| − | Q′ ∩ Q1| and n2 = |Q′| − | Q′ ∩ Q1|. Then we have: - n1 ≥ 0, n2 ≥ 0,- n2 − n1 = k2 − k1 ≤ 4, because n2 − n1 = |Q′| − | Q1| = k2 − k1, and from Case 1 of Theorem A.2, we know 
+
+k2 − k1 ≤ 4,- n2 + n1 ≤ 4, because n2 + n1 = ( |Q1| + |Q′| − | Q′ ∩ Q1|) − | Q′ ∩ Q1| = |Q′ ∪ Q1| − | Q′ ∩ Q1|. From Theorem A.1 and the fact that vQ1 ∈ C(Q′), we have |Q′ ∪ Q1| − | Q′ ∩ Q1| ≤ | In X (S) ∪ On X (S)| − | In X (S)| = |On X (S)| ≤ 4 for some sphere S ⊂ R3.From these facts, we can enumerate all possible values for the pair (n2, n 1): {(4 , 0) , (3 , 0) , (3 , 1) , (2 , 0) , (2 , 1) , (1 , 0) }.• If 3 ≤ k2 − k1 ≤ 4, then Q1 ⊂ Q′ and N (Q1, Q ′) ≤ 5 − (k2 − k1).First, consider the case k2 −k1 = 4 . In this scenario, n2 −n1 = 4 . From the above analysis, we know (n2, n 1) = (4 , 0) ,which implies |Q1| − | Q′ ∩ Q1| = 0 , i.e., Q1 ⊂ Q′. Therefore, vQ1 and vQ′ can only lie in the depth-4 rhomboid 
+
+ρX (S), where In X (S) = Q1 and On X (S) = Q′ − Q1, meaning N (Q1, Q ′) ≤ 1.Next, consider the case k2 − k1 = 3 . Similarly, we have (n2, n 1) = (3 , 0) , which implies Q1 ⊂ Q′ and the fact that the minimal rhomboid ρS (X) containing vQ1 and vQ′ could be either a depth-3 or depth-4 rhomboid with 
+
+(Q′ − Q1) ∪ (Q1 − Q′) ⊂ On X (S). If ρS (X) is a depth-4 rhomboid, then N (Q1, Q ′) ≤ 1. If ρS (X) is a depth-3 rhomboid, it can serve as a facet for at most two depth-4 rhomboids. Therefore, N (Q1, Q ′) ≤ 2.• If Q1̸ ⊂ Q′, then N (Q1, Q ′) ≤ 3 − (k2 − k1).14 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+From the above analysis, Q1̸ ⊂ Q′ implies k2 − k1 < 3 and n1 = |Q1| − | Q′ ∩ Q1| > 0. First, consider the case 
+
+k2 − k1 = 2 . Here, n2 − n1 = 2 , so (n2, n 1) = (3 , 1) . In this case, vQ1 and vQ′ can only lie in the depth-4 rhomboid 
+
+ρX (S), where In X (S) = Q1 ∩ Q′ and On X (S) = ( Q′ − Q1) ∪ (Q1 − Q′). This means N (Q1, Q ′) ≤ 1.Now, consider the case k2 − k1 = 1 . Similarly, (n2, n 1) = (2 , 1) . The minimal rhomboid ρS (X) containing vQ1 and 
+
+vQ′ can be either a depth-3 or depth-4 rhomboid. Thus, N (Q1, Q ′) ≤ 2.• If Q1 ∩ Q′ ⊊ Q2 ∩ Q′, then N (Q1, Q ′) ≤ N (Q2, Q ′).Since |Q1| = |Q2| = k1, the condition Q1 ∩ Q′ ⊊ Q2 ∩ Q′ implies Q1̸ ⊂ Q′. From the above analysis, k2 − k1 < 3,and (n2, n 1) = (3 , 1) or (2 , 1) . Let n′ 
+
+> 1
+
+= |Q2|−| Q′ ∩Q2| and n′ 
+
+> 2
+
+= |Q′|−| Q′ ∩Q2|. The condition Q1 ∩Q′ ⊊ Q2 ∩Q′
+
+implies n′ 
+
+> 1
+
+= |Q2| − | Q′ ∩ Q2| < |Q1| − | Q′ ∩ Q1| = n1 = 1 , which forces n′ 
+
+> 1
+
+= 0 . Hence, Q2 ⊂ Q′.For any rhomboid ρX (S) containing vQ1 and vQ′ , we have In X (S) ⊂ Q1 ∩ Q′ ⊊ Q2 ∩ Q′, and Q2 ∪ Q′ = Q′ ⊂
+
+Q1 ∪ Q′ ⊂ In X (S) ∪ On X (S). Therefore, ρX (S) also contains vQ2 . This implies N (Q1, Q ′) ≤ N (Q2, Q ′).
+
+Theorem A.4. Let K = ∆ k · L + 1 , where ∆k is the step size and L is the number of pooling layers. Then the total time complexity of RTPool on a point cloud in Rd of size n is 
+
+O
+
+
+
+K⌈ d+3 2 ⌉n⌊ d+1 2 ⌋ + K5n2
+
+.
+
+The first term corresponds to the cost of constructing the rhomboid tiling up to order K, and the second term accounts for the cumulative computation over all L pooling layers. Here, ⌊·⌋ and ⌈·⌉ denote the floor and ceiling functions, respectively. 
+
+Proof: The time complexity analysis of RTPool consists of two components: (1) constructing the rhomboid tiling structure from the input point cloud, and (2) performing graph pooling based on the rhomboid tiling. 
+
+1. Rhomboid Tiling Construction. According to Proposition 5 and Remark 8 in (Corbet et al., 2023), the number of rhomboid cells in the tiling up to order K for a point cloud of size n ⊂ Rd is bounded by 
+
+O
+
+
+
+K⌈ d+1 2 ⌉n⌊ d+1 2 ⌋
+
+.
+
+Furthermore, from (Corbet et al., 2023), the time complexity of constructing a single order-k rhomboid cell is O(k).Therefore, the total time complexity for generating the rhomboid tiling up to order K is 
+
+O
+
+
+
+K · K⌈ d+1 2 ⌉n⌊ d+1 2 ⌋
+
+= O
+
+
+
+K⌈ d+3 2 ⌉n⌊ d+1 2 ⌋
+
+.
+
+2. Graph Pooling via Rhomboid Tiling. According to (Lee, 1982), the number of regions in the order-k Voronoi diagram in R3 is bounded by O(k2(n − k)) , and thus the number of vertices in the corresponding order-k Delaunay complex is also 
+
+O(k2(n − k)) .This implies that the clustering matrix constructed from the rhomboid tiling at order-k has size O(k2(n−k)) ×O(k2(n−k)) ,and the associated node feature matrix has size O(k2(n − k)) × O(1) . The pooling process for each layer consists of two steps: • Matrix multiplication between the clustering matrix and the node feature matrix, with time complexity O(k4n2).• Applying a GIN layer to update the features, which has time complexity O(k2(n − k)) , assuming the graph remains sparse. As the matrix multiplication dominates, the overall complexity per layer is O(k4n2). Summing all orders up to K, the total pooling cost becomes 
+
+O(K · K4n2) = O(K5n2).
+
+Combining both parts , the total time complexity of RTPool is 
+
+O
+
+
+
+K⌈ d+3 2 ⌉n⌊ d+1 2 ⌋ + K5n2
+
+.
+
+This completes the proof. 15 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+# B. Hyperparameter Settings 
+
+The hyperparameters of our RTPool model follow a default configuration, as shown in Table 6. For different datasets, specific hyperparameters were adjusted to optimize performance, with the detailed settings presented in Table 7.  
+
+> Table 6. Default Hyperparameter Settings for RTPool
+
+batch size #epochs LR #pooling layers ∆k final dropout weight decay 16 500 0.001 2 1 0.5 0.0001 
+
+The hyperparameters in Table 6 define the key settings for the RTPool model. The batch size specifies the number of samples processed simultaneously during training, while #epochs represents the total number of complete passes through the training dataset. The LR (learning rate) controls the step size during the optimization process. The #pooling layers denotes the number of pooling layers in the RTPool model, determining the hierarchical depth of the pooling process. ∆k is the step size in the pooling process. The final dropout rate helps prevent overfitting by randomly zeroing out a fraction of neurons in the final layer. Lastly, the weight decay regularization term reduces the magnitude of model weights to improve generalization.  
+
+> Table 7. Hyperparameter Settings for Different Datasets
+
+Dataset #pooling layers LR final dropout ∆k Others COX2 1 0.001 0.5 2 Default BZR 1 0.001 0.5 1 Default PTC MR 1 0.0002 0.3 2 Default PTC MM 2 0.0002 0.3 1 Default PTC FR 2 0.0002 0.3 1 Default PTC FM 2 0.0002 0.3 1 Default MUTAG 1 0.001 0.5 1 Default In our experiments, we only tuned three hyperparameters: #pooling layers , LR , and final dropout . For hyperparameter sensitivity analysis, we predefined a range of candidate values and performed grid search to identify the best-performing configuration on each dataset. Specifically, the optimal setting for each dataset was selected based on the validation performance, while other hyperparameters were kept at their default values.   
+
+> Table 8. Hyperparameter sensitivity analysis. Best performance is highlighted in bold .
+
+(a) Learning rate sensitivity Dataset LR Accuracy 
+
+COX2 0.0002 87.23±1.50 0.0005 87.66±0.95 0.001 92.76±1.90 
+
+0.002 88.93±1.78 MUTAG 0.0002 89.47±0.00 0.0005 91.57±2.88 0.001 94.74±3.33 
+
+0.002 93.68±2.10 PTC MR 0.0001 73.72±2.39 0.0002 78.86±1.57 
+
+0.0005 72.57±1.40 0.001 70.29±1.40 
+
+(b) #pooling layers sensitivity Dataset #pooling Accuracy 
+
+layers 
+
+COX2 1 92.76±1.90 
+
+2 88.50±1.17 MUTAG 1 94.74±3.33 
+
+2 90.52±2.35 PTC MR 1 78.86±1.57 
+
+2 72.57±2.56 
+
+(c) final dropout sensitivity Dataset final Accuracy 
+
+dropout 
+
+COX2 0.4 88.51±1.91 0.5 92.76±1.90 
+
+0.6 88.93±1.78 MUTAG 0.4 92.63±2.88 0.5 94.74±3.33 
+
+0.6 93.69±2.36 PTC MR 0.2 74.86±1.27 0.3 78.86±1.57 
+
+0.4 75.43±1.56 16 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+# C. Hyperparameter Sensitivity Analysis 
+
+To evaluate the robustness of our method, we conducted a sensitivity analysis on four hyperparameters: the number of pooling layers ( #pooling layers ), learning rate ( LR ), final dropout ratio ( final dropout ), and the step size ∆k in the pooling process. While our main experiments only tuned the first three, we later performed additional evaluations of ∆k
+
+on three datasets (COX2, MUTAG, and PTC MR) to further investigate its impact. The sensitivity analysis of the step size ∆k = k2 − k1 is presented in the main text (see Table 5) along with a detailed discussion of its impact on model performance. Table 8 reports the sensitivity results for the other three hyperparameters across the same datasets. In general, we find that our model RTPool is relatively stable across a range of values, but optimal performance does depend on careful tuning. 
+
+# D. RTPool for Graph Regresssion Tasks 
+
+We demonstrate that RTPool’s applicability extends beyond graph classification to regression tasks, owing to its geometry-preserving pooling mechanism. By explicitly incorporating geometric information during pooling, RTPool generates graph-level representations that robustly capture essential structural features, making them universally applicable across diverse learning objectives. To validate this claim, we evaluate RTPool on three commonly used molecular property regression benchmarks(Wu et al., 2018) under identical experimental conditions as our main experiments. All models, including baselines, were tuned via grid search to ensure fair comparison. Table 9 presents the root mean square error (RMSE) comparisons with seven state-of-the-art graph pooling methods:   
+
+> Table 9. Performance comparison (RMSE) on molecular property regression datasets under standardized experimental conditions. Lower values indicate better performance. Best results are highlighted in bold .
+
+Model Esol FreeSolv Lipo 
+
+No. graphs 1128 642 4200 No. avg nodes 26 18 49 MinCutPool 2.1913±0.0374 4.0111±0.0170 1.3481±0.0224 StructPool 2.1749±0.0411 4.0077±0.0150 1.3422±0.1264 DiffPool 3.7699±0.2035 5.2877±0.2049 2.7431±0.0753 HaarPool 2.1035±0.0340 3.8892±0.0098 1.3361±0.0627 Wit-TopoPool 1.8783±0.1628 4.2159±0.0816 1.0916±0.5007 Hop-Pool 2.4831±0.0760 4.0030±0.0940 1.3725±0.0738 Mv-Pool 2.5691±0.0484 4.0627±0.1048 1.3746±0.0682 RTPool 2.0195±0.5318 3.6666±0.2112 1.0789±0.0496 
+
+As shown in the table, RTPool achieves the best or near-best performance across all three datasets, demonstrating its effectiveness in graph regression tasks compared to other pooling baselines. 
+
+# E. RTPool on Social Network Datasets 
+
+To extend the applicability of our RTPool model, we further explore its performance on non-geometric graphs—specifically, social network datasets such as IMDB-BINARY and IMDB-MULTI. These graphs lack explicit node features or spatial coordinates; thus, to adapt RTPool, a crucial step is embedding the nodes into a Euclidean space based on the graph structure alone. 
+
+Spectral Embedding via Graph Laplacian. Given an unweighted, undirected graph G = ( V, E ), we construct the normalized graph Laplacian L = I − D−1/2AD −1/2, where A is the adjacency matrix and D is the diagonal degree matrix. We then compute the eigen-decomposition of L and select the eigenvectors corresponding to the three smallest non-zero eigenvalues (excluding the trivial eigenvector for eigenvalue zero). These three eigenvectors form a spectral embedding that maps each node to a point in R3, capturing global structural information through diffusion geometry. This embedding serves 17 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+as a surrogate spatial coordinate input for RTPool, enabling it to perform pooling even in non-geometric graphs. We applied this Laplacian-based spectral embedding approach to the IMDB-BINARY and IMDB-MULTI datasets, which contain only graph connectivity information. We compare our model with 20 baselines, including classical graph kernels (e.g., WL, HGK) and pooling-based GNNs (e.g., DiffPool, SAGPool, Wit-TopoPool), with most results cited from (Chen & Gel, 2023). For Hop-Pool(Zhang et al., 2024) and Mv-Pool(Ma et al., 2024), which were not reported in that benchmark, we implemented them based on their original papers and tuned hyperparameters via grid search to ensure fair comparison. The performance is summarized in Table 10.  
+
+> Table 10. Comparison of classification accuracy (%) on social network datasets.
+
+Model IMDB-BINARY IMDB-MULTI 
+
+No. graphs 1000 1500 No. avg nodes 19.77 13.00 HGK-SP 73.34±0.47 51.58±0.42 HGK-WL 72.75±1.02 50.73±0.63 WL 71.15±0.47 50.25±0.72 WL-OA 74.01±0.66 49.95±0.46 DGCNN 70.00±0.90 47.80±0.90 GCN 66.53±2.33 48.93±0.88 GIN 75.10±5.10 52.30±2.80 Top-K 73.17±4.84 48.80±3.19 MinCutPool 70.77±4.89 49.00±2.83 DiffPool 68.60±3.10 45.70±3.40 EigenGCN 70.40±1.30 47.20±3.00 SAGPool 74.87±4.09 49.33±4.90 HaarPool 73.29±3.40 49.98±5.70 PersLay 71.20±0.70 48.80±0.60 FC-V 73.84±0.36 46.80±0.37 MPR 73.80±4.50 50.90±2.50 SIN 75.60±3.20 52.50±3.00 Wit-TopoPool 78.40±1.50 53.33±2.47 
+
+Hop-Pool 68.04±2.04 49.33±5.09 Mv-Pool 69.75±3.61 51.67±0.74 RTPool 73.06±3.84 53.33±1.26 
+
+As shown in Table 10, RTPool achieves competitive results across both datasets. On IMDB-MULTI, RTPool matches the best-performing baseline (Wit-TopoPool) with an accuracy of 53.33%. Notably, this is achieved despite the lack of native geometric information, highlighting the effectiveness of using spectral embeddings to generalize RTPool to abstract graph domains like social networks. 
+
+# F. Empirical Model Efficiency 
+
+To further evaluate the efficiency of RTPool, we compare it with several representative clustering-based pooling methods under controlled training conditions. Specifically, all models are trained for only 100 epochs per run (rather than the default 500), and each experiment is repeated five times to report average performance and runtime. This setup helps assess how quickly each model converges to high-quality results. 
+
+Early-Stage Performance. Table 11 shows the classification performance of different pooling methods after only 100 training epochs. Despite the reduced training time, RTPool already achieves outstanding accuracy on most datasets, often surpassing or closely matching state-of-the-art models that typically require longer training. This demonstrates the rapid convergence and high early-stage expressiveness of our model. 18 Rhomboid Tiling for Geometric Graph Deep Learning  
+
+> Table 11. Accuracy (mean ± std) after only 100 training epochs. Each model is trained 5 times. RTPool shows strong early-stage performance compared to other methods.
+
+Model BZR COX2 MUTAG PTC MR PTC MM PTC FM PTC FR 
+
+MinCutPool 76.47±2.32 79.86±2.47 69.47±2.11 66.86±2.91 72.94±1.18 56.74±5.63 62.86±1.81 StructPool 75.63±1.04 78.72±1.79 70.53±2.58 65.74±2.68 72.90±1.18 57.71±7.32 62.29±2.14 DiffPool 78.54±0.98 77.93±3.18 73.68±3.33 69.14±2.80 67.06±2.20 68.57±3.61 68.57±1.81 
+
+HaarPool 78.05±0.00 80.64±4.58 68.42±0.38 62.29±4.20 64.71±3.72 61.14±6.66 65.67±2.25 Wit-TopoPool 80.98±2.39 80.43±1.59 85.32±2.58 71.84±1.14 72.82±4.71 68.56±4.84 68.57±4.04 
+
+Hop-Pool 78.05±1.39 80.00±1.70 87.56±4.41 61.71±2.91 70.59±0.78 58.29±1.40 63.43±1.14 Mv-Pool 75.60±1.98 79.68±1.27 73.68±10.53 64.57±4.64 68.24±1.18 57.14±0.00 65.71±1.77 RTPool 84.39±1.19 85.96±1.04 83.16±5.16 72.86±3.65 72.94±3.43 68.86±8.59 67.71±7.75 
+
+Runtime Comparison. Table 12 presents the total training time (in seconds) under the same 100-epoch setup. For RTPool, we additionally break down the cost into the one-time tiling structure construction and model training time. While some methods incur large computation costs (e.g., Mv-Pool, Wit-TopoPool), RTPool maintains a reasonable runtime and even outperforms most baselines in both speed and accuracy.  
+
+> Table 12. Runtime (in seconds) over 5 trials (each with 100 epochs). For RTPool, both tiling construction time and training time are reported.
+
+Model BZR COX2 MUTAG PTC MR PTC MM PTC FM PTC FR 
+
+MinCutPool 2297.74 2554.96 1999.89 2016.22 2482.84 2470.79 2355.13 StructPool 1602.96 1647.23 1387.76 1412.16 1663.12 1623.40 1578.65 DiffPool 2507.53 2813.80 2144.75 2235.34 2637.06 2621.80 2529.79 HaarPool 3238.15 2666.93 1787.79 1412.01 1407.39 2075.04 2022.91 Wit-TopoPool 4512.64 4904.08 7475.70 7390.13 7332.05 7370.51 7357.56 Hop-Pool 1483.80 1420.63 1190.00 1171.09 1450.05 1421.54 1355.92 Mv-Pool 11244.74 9137.48 5828.78 8935.74 8327.48 8326.58 8907.54 RTPool (constructor) 1616.06 2356.41 189.59 341.39 321.39 331.57 360.00 RTPool (training) 1117.62 1053.07 1041.59 673.77 1268.01 1708.35 306.10 These results highlight RTPool’s fast convergence and favorable runtime-accuracy trade-off, making it a practical and scalable choice for large-scale or resource-constrained applications. 
+
+# G. Illustrative Examples 
+
+To provide a more intuitive understanding of RTpool and the rhomboid tiling mechanism, we include two illustrative examples in this appendix.  
+
+> Figure 2. Visualization of the hierarchical clustering process performed by RTpool on the molecular graph of Formaldehyde. The original molecular structure is shown on the left, followed by three successive clustering layers. Each cluster center (colored circle) is positioned based on the geometric realization of rhomboid tiling, and is connected to its members by dashed lines.
+
+19 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+Figure 2 demonstrates how RTpool performs hierarchical clustering on the molecular graph of Formaldehyde. The graph is progressively pooled through multiple layers, with nodes being aggregated into clusters at each level. The position of each cluster center is determined by the rhomboid tiling structure, providing geometric guidance for the pooling process. This example reveals RTpool’s strong locality-awareness, as it consistently merges spatially adjacent nodes. In this example, we observe that RTpool tends to group geometrically close nodes into the same cluster, a phenomenon particularly evident from pooling layer 1 to layer 2.        
+
+> Figure 3. An illustrative example of generating a rhomboid tiling from a point cloud. A: Molecular graph of Formaldehyde. B: Point cloud obtained by embedding the molecular graph into R2.C: Minimal circumcircles corresponding to each local point cluster in the point cloud. D: Rhomboids associated with the circumcircles. E: Rhomboid tiling structure of Formaldehyde formed by the union of all rhomboids.
+
+Figure 3 illustrates the process of constructing a rhomboid tiling from a 2D point cloud X derived from the molecular graph of Formaldehyde. We begin by identifying minimal circumcircles that pass through exactly three points. These circles are used to define the rhomboids that make up the tiling. Taking one such minimal circumcircle S1 as an example, suppose In X (S1) = ∅ and On X (S1) = v1, v 2, v 3. With (ai, b i)
+
+denoting the coordinates of vi, the associated rhomboid is formed from the convex hull of a set of lifted points: 
+
+ρX (S1) := conv {yQ | In X (S1) ⊂ Q ⊂ In X (S1) ∪ On X (S1)},yQ := 
+
+X
+
+> x∈Q
+
+x, −k
+
+
+
+In this case, we generate 8 such points corresponding to all subsets Q of {v1, v 2, v 3}, at levels ranging from 0 to 3: • y∅ = (0 , 0, 0) (origin, at level 0), 20 Rhomboid Tiling for Geometric Graph Deep Learning 
+
+• y{v1} = ( a1, b 1, −1) , y{v2} = ( a2, b 2, −1) , y{v3} = ( a3, b 3, −1) (three points at level 1), • y{v1,v 2} = ( a1 + a2, b 1 + b2, −2) , y{v1,v 3} = ( a1 + a3, b 1 + b3, −2) , y{v2,v 3} = ( a2 + a3, b 2 + b3, −2) (three points at level 2), • y{v1,v 2,v 3} = ( a1 + a2 + a3, b 1 + b2 + b3, −3) (one point at level 3). The convex hull of these 8 lifted points defines a rhomboid in R3. As shown in the figure, four such rhomboids are constructed from four distinct minimal circumcircles. Their union forms the complete rhomboid tiling structure for the Formaldehyde point cloud. 21

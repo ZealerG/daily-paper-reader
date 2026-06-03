@@ -1,0 +1,3127 @@
+Title: Learning Mean Field Control on Sparse Graphs
+
+URL Source: https://openreview.net/pdf?id=Y34a82DptF
+
+Number of Pages: 24
+
+Markdown Content:
+# Learning Mean Field Control on Sparse Graphs 
+
+Christian Fabian 1 2 Kai Cui 1 Heinz Koeppl 1 2 
+
+## Abstract 
+
+Large agent networks are abundant in applica-tions and nature and pose difficult challenges in the field of multi-agent reinforcement learning (MARL) due to their computational and theo-retical complexity. While graphon mean field games and their extensions provide efficient learn-ing algorithms for dense and moderately sparse agent networks, the case of realistic sparser graphs remains largely unsolved. Thus, we propose a novel mean field control model inspired by local weak convergence to include sparse graphs such as power law networks with coefficients above two. Besides a theoretical analysis, we design scalable learning algorithms which apply to the challenging class of graph sequences with finite first moment. We compare our model and algo-rithms for various examples on synthetic and real world networks with mean field algorithms based on Lp graphons and graphexes. As it turns out, our approach outperforms existing methods in many examples and on various networks due to the special design aiming at an important, but so far hard to solve class of MARL problems. 
+
+## 1. Introduction 
+
+Despite the rapid developments in the field of multi-agent reinforcement learning (MARL) over the last years, systems with many agents remain hard to solve in general (Canese et al., 2021; Gronauer & Diepold, 2022). Mean field games (MFGs) (Caines et al., 2006; Lasry & Lions, 2007) and mean field control (MFC) (Andersson & Djehiche, 2011; Bensoussan et al., 2013) are a promising way to model large agent problems in a computationally tractable manner and to provide a solid theoretical framework at the same time. While MFGs consider competitive agent populations, the       
+
+> 1Department of Electrical Engineering and Information Tech-nology, Technische Universit ¨at Darmstadt, Germany 2Hessian Center for Artificial Intelligence (hessian.AI). Correspondence to: Heinz Koeppl <heinz.koeppl@tu-darmstadt.de >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+focus of MFC are cooperative scenarios where agents op-timize a common goal. The idea of MFC and MFGs is to abstract large, homogeneous crowds of small agents into a single probability distribution, the mean field (MF). While MFC and MFGs have been used in various areas ranging from pedestrian flows (Bagagiolo et al., 2019; Achdou & Lauri `ere, 2020) to finance (Carmona & Delarue, 2018; Car-mona & Lauri `ere, 2023) and oil production (Bauso et al., 2016), the assumption of indistinguishable agents is not fulfilled in many applications. A particularly important class of MARL problems are those with many connected agents. Initially, these agent networks were modeled by combining the graph theoretical concept of graphons (Lov ´asz, 2012) with MFGs, resulting in graphon MFGs (GMFGs) (Caines & Huang, 2019; 2021; Cui & Koeppl, 2022; Zhang et al., 2024) and graphon MFC (Hu et al., 2023b). Since GMFGs only model often unrealis-tic dense graphs, subsequently mean field models based on Lp graphons (Borgs et al., 2018b; 2019) and graphexes (Veitch & Roy, 2015; Caron & Fox, 2017; Borgs et al., 2018a) were developed, called LPGMFGs and GXMFGs, respectively (Fabian et al., 2023; 2024). While these models facilitate learning algorithms in moderately sparse networks, they exclude sparser topologies. Formally, (LP)GMFGs and GXMFGs are designed exclusively for graphs with ex-pected average degree going to infinity which, for example, excludes power laws with a coefficient above two. The learning literature contains various approaches to find-ing optimal behavior in MFGs and MFC, see Lauri `ere et al. (2022a) for an overview. For example, Subramanian et al. (2022) develop a decentralized learning algorithm for MFGs where agents independently learn policies, while Guo et al. (2019; 2023) focus on Q-learning methods for general MFGs. Various MFC learning approaches exist (Ruthotto et al., 2020; Carmona et al., 2023; Gu et al., 2023), but we are aware of only one work by Hu et al. (2023b) which learns policies for MFC on dense networks, but not on sparse ones. Many empirical networks of high practical relevance are considerably sparser than the topologies covered by (LP)GMFGs and GXMFGs. Examples of sparse empirical networks which at least to some extent follow power laws with coefficients between two and three include the inter-net (V ´azquez et al., 2002), coauthorship graphs (Goh et al., 1Learning Mean Field Control on Sparse Graphs 
+
+2002) and biological networks (Dorogovtsev & Mendes, 2002). These topologies are particularly challenging to ana-lyze (Dorogovtsev et al., 2002), especially in combination with particle dynamics (Lacker et al., 2023). Most important in our context, the high fraction of low degree nodes in these networks renders classical mean field approximations and their LPGMFG and GXMFG extensions highly inaccurate. Both LPGMFGs and GXMFGs assume that the average expected degree diverges to infinity to ensure that the neigh-borhoods of crucial agents are accurately approximated by a mean field. Since this assumption is inaccurate for various empirical networks, we require a different modeling and learning approach. To learn policies for such very sparse networks, we employ a suitable graph theoretical conver-gence principle, local weak convergence (Van Der Hofstad, 2024). Many established graph theoretical models like the configuration model (Bollob ´as, 1980), the Barab ´asi-Albert model (Barab ´asi & Albert, 1999) and the Chung-Lu model (Chung & Lu, 2006) can model graph sequences converging in the local weak sense. Most importantly in our context, this includes graph sequences with finite average expected degree and power law networks with a coefficient above two, which are neither covered by Lp graphons nor graphexes. Leveraging local weak convergence, we formulate our new local weak mean field control (LWMFC) model. LWMFC provides a theoretically motivated framework for learning agent behavior in challenging large empirical networks where the average expected degree is finite, but the degree variance may diverge to infinity. On the algorithmic side, we provide a two systems approximation for LWMFC and corresponding learning algorithms to approximately learn optimal behaviour in these complex agent networks. Finally, we evaluate our novel LWMFC learning approach for mul-tiple problems on synthetic and real-world networks and compare it to different existing methods mentioned above. Overall, our contributions can be summarized as: • We introduce LWMFC to model large cooperative agent populations on very sparse graphs with finite expected average degree; • We give a rigorous theoretical analysis and motivation for LWMFC; • We provide a two systems approximation and scalable learning algorithms for LWMFC; • We show the capabilities of our LWMFC learning ap-proach on synthetic and real world networks for differ-ent examplary problems. 
+
+## 2. Locally Weak Converging Graphs 
+
+In the following, let (GN )N ∈N = ( VN , E N )N ∈N be a grow-ing sequence of random graphs where VN denotes the vertex set and EN is the edge set of the corresponding graph GN .In this paper, we focus on growing graph sequences where the expected average degree remains finite in the limit while the degree variance may diverge to infinity. To formalize the properties of the graph sequences we are focusing on, we first require a suitable graph convergence concept. We choose local weak convergence in probability which means that local node neighborhoods converge to neighborhoods in a limiting model. The definition below states local weak convergence, for details see e.g. Lacker et al. (2023). 
+
+Definition 2.1 (Local weak convergence in probability) . Asequence of finite graphs (GN )N converges in probability in the local weak sense to a random element G of G∗ if for all continuous and bounded functions f : G∗ → R
+
+lim  
+
+> N→∞
+
+1
+
+N
+
+X 
+
+> i∈[N]
+
+f (Cvi (GN )) = E[f (G)] in probability where Cvi (GN ) denotes the connected component of vi ∈
+
+GN with root vi and G∗ is the set of isomorphism classes of connected rooted graphs. To obtain meaningful theoretical results and hence practical approximations for large graphs in the next sections, we focus on graph sequences converging in the local weak sense, which we formalize with the next assumption. 
+
+Assumption 2.2. The sequence (GN )N ∈N converges in probability in the local weak sense to some random element 
+
+G of G∗.The class of random graph sequences fulfilling Assump-tion 2.2 covers many famous graph theoretical frameworks which are frequently used in the literature. We will briefly discuss three particularly important types of these models, namely configuration models, preferential attachment mod-els and Chung-Lu graphs. We point to Van Der Hofstad (2024) for an extensive introduction and theoretical details and for more random graph models converging in the local weak sense. 
+
+Configuration models. The configuration model (Bender & Canfield, 1978; Bollob ´as, 1980; Molloy & Reed, 1995; 1998) (CM) is arguably one of the most established ran-dom graph models. The basic mechanism of the CM is to start with a fixed and arbitrary degree sequence. Then, a multigraph is randomly generated with the prescribed de-gree distribution which means that the graph can contain self-edges and double edges between pairs of nodes. The CM is known to converge under suitable and moderate assumptions in the local weak sense in probability (Van Der Hofstad, 2024, Theorem 4.1). However, the CM gener-ates multigraphs instead of simple graphs and the number of multiedges increases drastically as the vertex degrees 2Learning Mean Field Control on Sparse Graphs 
+
+increase (Bollob ´as, 1998). Consequently, the CM is subopti-mal for generating simple graphs with a significant fraction of high degree nodes such as power law networks. 
+
+Preferential attachment models. To model random graphs with power law features, Barab ´asi & Albert (1999) introduced the famous Barab ´asi-Albert (BA) model. The original BA model was subsequently extended in various ways for different applications, see Piva et al. (2021) for an overview. The BA model depicts graphs that grow over time by adding new nodes and edges to the topology. Since new nodes are more likely to be connected to highly connected nodes in the current graph, these models are often referred to as preferential attachment models. Preferential attachment models under suitable conditions converge in the local weak sense in probability, see Van Der Hofstad (2024, Theorem 5.8) for details. The BA model, for example, generates power law networks with a coefficient of exactly three (Bollob ´as et al., 2001). In many applications, however, it is beneficial to also consider graphs with power law coefficient deviating from three to capture different empirical graph topologies. 
+
+Chung-Lu graphs. The Chung-Lu (CL) random graph model (Aiello et al., 2000; 2001; Chung & Lu, 2002; 2006) provides an efficient way to model large, sparse networks (Fasino et al., 2021). To generate a random CL graph with 
+
+N ∈ N nodes, first specify a weight vector w ∈ RN 
+
+> +
+
+with one weight wi ∈ R+ for each node i ∈ { 1, . . . , N }. Then, two nodes i and j are connected with probability wi · wj / ¯w,independently of all other node pairs and with normalization factor ¯w := P 
+
+> 1≤k≤N
+
+wk. Intuitively, a node with high weight is more likely to have many connections than a node with small weight. Sequences of CL graphs fulfill Assumption 2.2 under mild technical assumptions, see Van Der Hofstad (2024, Theorem 3.18) for a formal statement. Most importantly, the average expected degree has to converge to a finite limit, which perfectly aligns with our goal to model very sparse networks. Throughout the paper, we use the running example of power law degree distributions with coefficient γ > 2 observed in many real world networks to some extent (Newman, 2003; Kaufmann & Zweig, 2009; Newman et al., 2011). 
+
+Example 1 (Power law) . In our work, a power law is a zeta distribution with parameter γ > 2 such that P (deg( v) = 
+
+k) = k−γ /ζ (γ), where ζ(γ) is the Riemann zeta function 
+
+ζ(γ) := P∞ 
+
+> j=1
+
+j−γ . A power law degree distribution has a finite expectation E[deg( v)] = ζ(γ − 1) /ζ (γ) for γ > 2.Large, sparse power law networks of the above form can be efficiently generated by the CL framework (Fasino et al., 2021). Note that our methods apply to all distributions meet-ing Assumption 2.2 and perform well on many empirical networks, as shown in the next sections. 
+
+Advantages over graphons and graphexes. Local weak converging graph sequences such as those generated by CM, BM or CL can model sparser, and thus often more realistic topologies than those captured by Lp graphons and graphexes. Figure 1 provides an illustration of how Lp graphons, graphexes, and CL graphs compare to a real world subsampled YouTube network (Mislove, 2009; Kunegis, 2013). Mathematically, both Lp graphons and graphexes are limited to graph sequences were the average degree diverges to infinity. Locally weak converging graph sequences, on the other hand, can capture sparse and often more realis-tic topologies. The usefulness of models like the CM, BA model and CL graphs is reflected in their frequent use in various research areas. However, formulating a mean field approach based on these graph theoretical models is chal-lenging due to their high number of low degree nodes. 
+
+## 3. The Finite Model and Its Limit 
+
+Denote by P(X ) the set of probability distributions over a finite set X and define [N ] := {1, . . . , N } for any N ∈ N.
+
+Finite model. Assume some finite state space X , fi-nite action space U and finite and discrete time horizon 
+
+T := {0, . . . , T − 1} with terminal time point T are given. Furthermore, there are N ∈ N agents connected by some graph GN = ( VN , E N ) with vertex set VN and edge set 
+
+EN . Here, the random state of agent i ∈ [N ] at time t ∈ T 
+
+is denoted by XNi,t . All agents V kN ⊆ VN with degree k ∈ N
+
+share a common policy πkt at all time points t ∈ T . The empirical k-degree MF is defined as 
+
+μN,k t := 1
+
+|V kN |
+
+X  
+
+> i∈[N]: vi∈VkN
+
+δXNi,t ∈ P (X )
+
+for all t ∈ T and k ∈ N. Define the overall empirical MF sequence as μNt := ( μN, 1 
+
+> t
+
+, μ N, 2 
+
+> t
+
+, . . . ) ∈ P (X )N. Each policy πk ∈ P (U)T ×X × Gk
+
+in the policy ensemble π =(π1, π 2, . . . ) ∈ P (U)T ×X × Gk ×N takes into account the cur-rent state of the respective agent i with k neighbors and its neighborhood GNi,t ∈ Gk := {G ∈ P (X ) : k · G ∈ Nk 
+
+> 0
+
+}.Our learning algorithms also apply to other policy types, e.g., in our experiments we consider computationally ef-ficient policies only depending on the current agent state. Then, the model dynamics are 
+
+U Ni,t ∼ πkt
+
+ ·| XNi,t , GNi,t 
+
+
+
+and 
+
+XNi,t +1 ∼ P  ·| XNi,t , U Ni,t , GNi,t 
+
+
+
+for an agent i with degree k, t ∈ T , i.i.d. initial distribution 
+
+μ0 ∈ P (X ), and transition kernel P : X × U × P (X ) →
+
+3Learning Mean Field Control on Sparse Graphs    
+
+> Figure 1. Four networks, first two generated by an Lp graphon and graphex, third is a CL graph and fourth is a real subsampled YouTube (YT) network (Mislove, 2009; Kunegis, 2013), highly connected nodes are depicted larger. Each network has around 14.5k nodes and 13k edges, except graphex has around 16.5k edges; all networks are plotted in the prefuse force directed layout (software: cytoscape). While the Lp graphon graph lacks sufficiently many high degree nodes, the tail of the graphex degree distribution is too heavy. In contrast, the CL graph is qualitatively close to the real YT network.
+
+P (X ). Note that the theory and subsequent learning algo-rithms extend to degree dependent transition kernels P k.The policies are chosen to maximize the common objective 
+
+JN (π) := 
+
+> T
+
+X
+
+> t=1
+
+r(μNt )
+
+with reward function r : P(X )N 7 → R. Our model also covers reward functions with actions as inputs by using an extended state space X ∪ (X × U ) and splitting each time step t ∈ T into two. 
+
+Limiting LWMFC system. In the limiting LWMFC sys-tem, the MF for each degree k ∈ N evolves according to 
+
+μkt+1 := μkt P π,k t, μ′,W 
+
+:= X
+
+> x∈X
+
+μkt (x) X
+
+> G∈Gk
+
+Pπ
+
+ Gkt (μ′
+
+> t
+
+) = G | xt = x
+
+· X
+
+> u∈U
+
+πkt (u | x, G ) P (· | x, u, G )
+
+with i.i.d. initial distribution μk 
+
+> 0
+
+∈ P (X ) and where Gk
+
+is the set of k-neighborhood distributions as before. As in the finite system, define the limiting MF ensemble μt := (μ1 
+
+> t
+
+, μ 2 
+
+> t
+
+, . . . ) ∈ P (X )N and the corresponding reward in the limiting system is J(π) := PTt=1 r(μt).
+
+Theoretical results. Next, we show the strong theoretical connection between the finite and limiting LWMFC system. The following theoretical results built on the assumption that the underlying graph sequence converges in the local weak sense, formalized by Assumption 2.2. The proofs are in Appendix A. We first state empirical MF convergence to the limiting MFs. 
+
+Theorem 3.1 (MF convergence) . Under Assumption 2.2, for any fixed policy ensemble π, the empirical MFs converge to the limiting MFs such that for all k ∈ N and all t ∈ T 
+
+μN,k t → μkt in probability for N → ∞ .
+
+The MF convergence from Theorem 3.1 enables us to derive a corresponding convergence result for the objective func-tion under a standard continuity assumption on the reward. 
+
+Assumption 3.2. The reward function r : P(X )N 7 → R is continuous. With the above assumption in place, we establish the con-vergence of the objective function in the finite system to the one in the limiting LWMFC model. 
+
+Proposition 3.3 (Objective convergence) . Under Assump-tions 2.2 and 3.2 and for any fixed policy ensemble π, the common objective in the finite system converges to the limit-ing objective, i.e. 
+
+JN (π) → J(π) in probability for N → ∞ .
+
+We leverage these findings to show that for a finite set of policy ensembles, the optimal policy for the limiting system in the set is also optimal in all sufficiently large finite sys-tems. Therefore, if one wants to know the optimal ensemble policy for an arbitrary, large agent system, it suffices to find the optimal ensemble policy in the limiting system once which is formalized by Corollary 3.4. 
+
+Corollary 3.4 (Optimal policy) . Assume some set 
+
+{π1, . . . , π M } of M < ∞ policy ensembles is given and that w.l.o.g. J(π1) > J (πi) for all i ∈ [M ] with i̸ = 1 .Under Assumptions 2.2 and 3.2 and for some N ∗ ∈ N, π1
+
+is optimal in all finite systems of size N > N ∗ such that 
+
+JN (π1) > max   
+
+> i∈[M],i ̸=1
+
+JN (πi) .
+
+4Learning Mean Field Control on Sparse Graphs 
+
+## 4. The Two Systems Approximation 
+
+In limiting systems on sparse graphs, the state evolution and optimal policy of an agent potentially depend on the entire network (Lacker & Soret, 2022). Calculating 
+
+Pπ
+
+ Gkt (μ′
+
+> t
+
+) = G | xt = x at time t ∈ T in the limiting system requires all possible t-hop neighborhood degree-state distributions where t-hop neighborhoods include all agents with a distance of at most t edges to the initial agent. Unfortunately, by Lemma 4.1 the number of t-hop neigh-borhoods grows at least exponentially with the degree k
+
+in important classes of locally weak converging graphs se-quences, such as CL graphs with power laws above two. 
+
+Lemma 4.1. In the limiting system, the number of possible t-hop degree-state neighborhood distributions of agents with degree k ∈ N at time t ∈ T in the worst case, e.g. CL power law, is Ω  2poly( k).
+
+Just neglecting high degree nodes in the model might appear as a reasonable approximation to reduce computational com-plexity. However, the heavy tail of a degree distribution with finite expectation and infinite variance makes this approach highly inaccurate, as Example 2 illustrates. 
+
+Example 2. In a power law graph with γ = 2 .5, around 96% 
+
+of nodes have a degree of at most five. However, these 96% 
+
+of low degree nodes only account for roughly two thirds of the expected degree, formally P5 
+
+> h=1
+
+h1−γ /ζ (γ −1) < 0.68 .Nodes with a degree of at most ten still only account for around 76% of the expected degree. 
+
+Two systems approximation. For the subsequent two systems approximation, we first require a heuristic on the neighbor degree distribution for a given node. 
+
+Heuristic 1. For an arbitrary node v′ ∈ V the degree distri-bution of its neighbor v ∈ V is approximately 
+
+P (deg( v) = k | deg( v′) = k′, (v′, v ) ∈ E)
+
+≈ k · P (deg( v) = k)
+
+P 
+
+> k′′ ∈N
+
+k′′ · P (deg( v) = k′′ ) .
+
+Heuristic 1 is a good approximation for some sequences of locally weak converging graphs, such as CL graphs (Jackson et al., 2008, Chapter 4), and thus reasonable in our setup. The idea of Heuristic 1 is the following: if one fixes any node 
+
+v′ ∈ V and considers its neighbors, high degree nodes are more likely to be connected to v′ than lowly connected ones. Instead of the overall degree distribution, we thus weight each probability by its degree and normalize accordingly. The result is an approximate neighbor degree distribution accounting for the increased probability of highly connected neighbors. To address the complexity of the limiting system, we provide an approximate limiting system based on Heuristic 1 and the underlying sparse graph structure. Our two systems approximation consists of a system for small degree agents with at most k∗ neighbors and another one for agents with more than k∗ connections, where k∗ ∈ N is some arbitrary, but fixed finite threshold. Define an approximate MF ˆμk for each k ∈ [k∗] and furthermore summarize all agents with more than k∗ connections into the infinite approximate MF 
+
+ˆμ∞ and define ˆμ := (ˆ μ1, . . . , ˆμk∗
+
+, ˆμ∞). Based on Heuristic 1, we assume that all agents with more than k∗ neighbors observe the same neighborhood state distribution 
+
+ˆG∞ 
+
+> t
+
+( ˆ μ) := 1
+
+E[deg( v)] 
+
+> ∞
+
+X
+
+> k=k∗+1
+
+kP (deg( v) = k)
+
+!
+
+ˆμ∞
+
+> t
+
++ 1
+
+E[deg( v)] 
+
+> k∗
+
+X
+
+> h=1
+
+hP (deg( v) = h)ˆ μht .
+
+The unified approximate neighborhood state distribution 
+
+ˆG∞ 
+
+> t
+
+allows us to state an approximate, simplified version of the MF forward dynamics for high degree agents given by 
+
+ˆμ∞ 
+
+> t+1
+
+:= ˆ μ∞ 
+
+> t
+
+ˆP π, ∞ 
+
+> t, μ′,W
+
+:= 
+
+X
+
+> x,u
+
+ˆμ∞ 
+
+> t
+
+(x)π∞
+
+> t
+
+
+
+u | x, ˆG∞ 
+
+> t
+
+(μ′)
+
+
+
+P
+
+
+
+· | x, u, ˆG∞ 
+
+> t
+
+(μ′)
+
+
+
+where all agents with more than k∗ connections follow the same policy π∞ 
+
+> t
+
+∈ P (U)T ×X ×P (X ) and where the sum is over all (x, u ) ∈ X × U . The approximate neighborhood of an agent with degree k ∈ [k∗] at each time t ∈ T is sampled from ˆGkt ( ˆ μ) ∼ Mult( k, ˆG∞ 
+
+> t
+
+( ˆ μ)) , i.e. ˆGkt ( ˆ μ) is multinomial with k trials and probabilities ˆG∞ 
+
+> t
+
+( ˆ μ)( x) for each x ∈ X . Using Heuristic 1, the approximation yields for each k ∈ [k∗] the MF forward dynamics 
+
+ˆμkt+1 := ˆ μkt ˆP π,k t, μ′,W := 
+
+X
+
+> x,u,G
+
+ˆμkt (x)PMult 
+
+ ˆGkt = G
+
+
+
+πkt (u | x, G ) P (· | x, u, G )
+
+where the sum is over all (x, u, G ) ∈ X × U × Gk.
+
+Extensive approximation. In Appendix B we derive a second, extensive approximation 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x
+
+≈ X
+
+> G′∈Gk
+
+X
+
+> x′∈X
+
+X
+
+> c∈Ck
+
+Pπ,μ
+
+ Gkt (μt) = G′, x t = x′
+
+·
+
+"X
+
+> u∈U
+
+πk (u | x′) P (x | x′, u, G ′)
+
+#
+
+·
+
+ X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Y
+
+> j
+
+Mult p2,j (a2,j )
+
+
+
+·
+
+P 
+
+> a3∈Ak
+> 3(G,G ′,c )
+
+Q 
+
+> j,m
+
+Mult p3,jm (a3,jm )
+
+P 
+
+> a2∈Ak
+> 2(G′,c )
+
+Q 
+
+> j,m
+
+pj,m (a2) .
+
+5Learning Mean Field Control on Sparse Graphs 
+
+of the finite agent neighborhoods in the LWMFC model where we use the abbreviated notation pj,m (a2) := (P (deg( v) = m | (v′, v ) ∈ E) μmt (sj )) ajm . Here, the idea is to go beyond the previous multinomial assumption 
+
+ˆGkt ( ˆ μ) ∼ Mult( k, ˆG∞ 
+
+> t
+
+( ˆ μ)) and to use state-degree neigh-borhood distributions a2 ∈ Ak 
+
+> 2
+
+(G′, c ) and state-state-degree neighborhood distributions a3 ∈ Ak 
+
+> 3
+
+(G, G ′, c ) to capture agents changing from x ∈ X to x′ ∈ X at a time step. We provide the extensive approximation derivation and corresponding definitions of sets like Ak 
+
+> 2
+
+(G′, c ) and 
+
+Ak 
+
+> 3
+
+(G, G ′, c ) in Appendix B. As we will see in the follow-ing, the extensive approximation often shows a moderately higher accuracy than our first approximation. However, the accuracy boost entails a significantly higher computational complexity due to multiple sums over sets like Ak 
+
+> 2
+
+(G′, c )
+
+and Ak 
+
+> 3
+
+(G, G ′, c ). Thus, our first approximation is more practical since it combines reasonable accuracy with low computational complexity while the extensive approxima-tion is computationally too expensive for our purposes. 
+
+## 5. Learning Algorithms 
+
+To solve the MARL problem of finding optimal policies for each class of k-degree nodes, we propose two methods based on reducing the otherwise intractable many-agent graphical system to a single-agent MFC MDP. The first approach in Algorithm 1 is based on solving the resulting limiting MFC MDP under the parameters of the real graph, using the previously established two systems approximation. The second approach in Algorithm 2 instead directly learns according to single-agent RL that solves the MFC MDP by interacting with the real graph. 
+
+RL in MFC MDP. The two system approximation re-duces the complexity of otherwise intractable large in-teracting systems on networks to the MFs of each de-gree. The system state at any time is then given by low-degree MFs μ1 
+
+> t
+
+, μ 2 
+
+> t
+
+, . . . , μ k∗ 
+
+> t
+
+and high-degree MF μ∞ 
+
+> t
+
+,briefly μt := ( μ1 
+
+> t
+
+, μ 2 
+
+> t
+
+, . . . , μ k∗ 
+
+> t
+
+, μ ∞ 
+
+> t
+
+). Given a state μt, the possible state evolutions depend only on the analogous set of low-degree and high-degree policies at that time, 
+
+πt := ( π1 
+
+> t
+
+, π 2 
+
+> t
+
+, . . . , π k∗ 
+
+> t
+
+, π ∞ 
+
+> t
+
+). Therefore, choosing a πt
+
+fully defines the state transition of the overall system, and is thus considered as the high-level action in the MFC MDP. In-troducing a high-level policy ˆπ to output πt ∼ ˆπt(πt | μt)
+
+allows us to solve for an optimal set of policies by solving the MFC MDP for optimal ˆπ, since the limiting MF dynam-ics are deterministic. Finally, the MFC MDP is solved by applying single-agent policy gradient RL, resulting in Algo-rithm 1. In practice, we use proximal policy optimization (Schulman et al., 2017). To lower the complexity of the resulting MDP, we parametrize policies as distributions over actions given the node state, πkt ∈ P (U)X .
+
+Algorithm 1 LWMFC Policy Gradient  
+
+> 1:
+
+for iterations n = 1 , 2, . . . do  
+
+> 2:
+
+for time steps t = 0 , . . . , B len − 1 do  
+
+> 3:
+
+Sample LWMFC MDP action πt ∼ ˆπθ (πt | μt). 
+
+> 4:
+
+Compute reward r(μt), next MF μt+1 , termina-tion flag dt+1 ∈ { 0, 1}. 
+
+> 5:
+
+end for  
+
+> 6:
+
+Update policy ˆπθ on minibatches b ⊆{(μt, πt, r t, d t+1 , μt+1 )}t≥0 of length blen . 
+
+> 7:
+
+end for MARL on real networks. In addition to assuming knowl-edge of the model and computing the limiting MFC MDP equations, we may also directly learn on real network data without such model knowledge in a MARL manner. To do so, we still apply policy gradient RL to solve an assumed MFC MDP, but substitute samples from the real network into μt. At the same time, we let each node perform its actions according to the sampled πt ∼ ˆπt(πt | μt). This approach is well justified by the previous theory and ap-proximation, as for sufficiently large networks the limiting system and therefore also its limiting policy gradients are well approximated by this procedure. 
+
+Algorithm 2 LWMFMARL Policy Gradient  
+
+> 1:
+
+for iterations n = 1 , 2, . . . do  
+
+> 2:
+
+for time steps t = 0 , . . . , B len − 1 do  
+
+> 3:
+
+Sample LWMFC MDP action πt ∼ ˆπθ (πt | μt). 
+
+> 4:
+
+for node i = 1 , . . . , N do  
+
+> 5:
+
+Sample per-node action Ui,t ∼ πki 
+
+> t
+
+(Ui,t | Xi,t )
+
+with degree ki = ∞ if ki > k ∗. 
+
+> 6:
+
+end for  
+
+> 7:
+
+Perform actions, observe reward rt, next MF μt+1 ,termination flag dt+1 ∈ { 0, 1}. 
+
+> 8:
+
+end for  
+
+> 9:
+
+Update policy ˆπθ on minibatches b ⊆{(μt, πt, r t, d t+1 , μt+1 )}t≥0 of length blen . 
+
+> 10:
+
+end for 
+
+The approach results in Algorithm 2 and has advantages. Firstly, the algorithm does not assume model knowledge and is therefore a true MARL algorithm, in contrast to solving the limiting MFC MDP. Secondly, the algorithm avoids potential inaccuracies of the two systems approximation, as we will see in Section 7, since it directly interacts with a real network of interest. Lastly, in contrast to standard independent and joint learning MARL methods, the method is rigorously justified by single-agent RL theory and avoids exponential complexity in the number of agents respectively. 6Learning Mean Field Control on Sparse Graphs 
+
+Table 1. Average expected total variation ∆μ = 12T E P 
+
+> t
+
+∥ˆμt − μt∥1
+
+ ∈ [0 , 1] of MF μt and empirical MF ˆμt = P 
+
+> i
+
+δXit (± standard deviation, 50 trials), for the four models for four problems on eight real-world networks. Extensive LWMFC* not displayed for last two problems since calculations exceed maximum runtime. Best result for each network-problem combination in bold. Model Average expected total variation ∆μ in %, standard deviation in brackets CAIDA Cities Digg Friends Enron Flixster Slashdot Yahoo YouTube SIS  LPGMFG 24.02 (1.25) 28.16 (0.41) 21.98 (0.26) 24.77 (0.32) 22.48 (0.07) 23.70 (0.43) 10.11 (2.10) 22.94 (0.25) GXMFG 9.07 (1.25) 10.90 (0.41) 4.72 (0.26) 4.73 (0.32) 3.78 (0.07) 5.48 (0.43) 9.31 (2.10) 6.43 (0.25) LWMFC 2.59 (1.14) 5.00 (0.40) 3.57 (0.26) 3.39 (0.31) 1.60 (0.07) 2.41 (0.43) 3.59 (1.59) 3.53 (0.25) LWMFC* 1.75 (0.90) 4.20 (0.40) 3.02 (0.26) 2.67 (0.31) 0.90 (0.07) 1.70 (0.42) 3.81 (1.70) 2.93 (0.25) 
+
+> SIR
+
+LPGMFG 9.11 (1.40) 10.01 (0.34) 8.68 (0.31) 9.51 (0.32) 8.99 (0.09) 9.37 (0.38) 4.88 (1.82) 8.90 (0.23) GXMFG 2.81 (1.10) 2.63 (0.31) 1.27 (0.29) 0.99 (0.30) 0.99 (0.09) 1.58 (0.36) 4.60 (1.71) 1.79 (0.23) LWMFC 1.31 (0.87) 1.36 (0.27) 1.08 (0.28) 0.91 (0.30) 0.58 (0.08) 0.99 (0.33) 2.62 (1.30) 1.07 (0.23) LWMFC* 1.18 (0.82) 1.10 (0.26) 0.80 (0.27) 0.59 (0.28) 0.26 (0.08) 0.71 (0.29) 2.63 (1.30) 0.78 (0.23) 
+
+> Color
+
+LPGMFG 38.73 (0.17) 38.59 (0.09) 38.70 (0.04) 39.83 (0.06) 39.55 (0.02) 39.07 (0.06) 34.18 (0.26) 38.52 (0.04) GXMFG 11.33 (0.13) 7.90 (0.06) 7.85 (0.02) 4.91 (0.03) 6.38 (0.01) 6.81 (0.03) 32.62 (0.24) 8.76 (0.02) LWMFC 0.70 (0.12) 0.48 (0.05) 0.19 (0.02) 0.36 (0.04) 0.39 (0.02) 0.33 (0.04) 1.05 (0.19) 0.19 (0.03) 
+
+> Rumor
+
+LPGMFG 20.03 (2.15) 22.56 (0.50) 18.39 (0.55) 20.27 (0.61) 18.94 (0.16) 19.70 (0.82) 9.68 (3.76) 19.23 (0.47) GXMFG 6.98 (2.06) 7.49 (0.49) 3.33 (0.54) 2.86 (0.58) 2.65 (0.16) 3.82 (0.79) 9.01 (3.69) 4.79 (0.47) LWMFC 3.06 (1.59) 4.31 (0.48) 3.00 (0.53) 2.62 (0.57) 1.73 (0.15) 2.41 (0.75) 5.01 (2.21) 3.27 (0.46) 
+
+## 6. Examples 
+
+For a general overview of many applications, see Lauri `ere et al. (2022a). We consider four problems briefly described here. Problem details can be found in Appendix C. 
+
+Susceptible-Infected-Susceptible/Recovered (SIS/SIR). 
+
+The classical SIS model (Kermack & McKendrick, 1927; Brauer, 2005) is a benchmark in the MF learning litera-ture (Lauri `ere et al., 2022b; Zhou et al., 2024). Agents are infected or susceptible, resulting in the state space 
+
+X := {S, I }, and decide to protect themselves or not. The infection probability increases without protection, and with the number of infected neighbors. Furthermore, there is a constant probability for recovering from an infection. The SIR model (Hethcote, 2000; Doncel et al., 2022) is an ex-tension of SIS where agents can also be in a recovered state 
+
+R where they are immune to a reinfection. Consequently, the state space for the SIR model is X := {S, I, R }.
+
+Graph coloring (Color). Inspired by graph coloring (Jensen & Toft, 2011; Barenboim & Elkin, 2022), the states 0 20 40                 
+
+> Time t
+> 0.50.60.70.8
+> MF  μt(x)
+> (a) real CLC* CLC GX LP
+> 020 40
+> Time t
+> 0.10 0.15 0.20 0.25
+> (b)
+> 0510 15 20
+> Time t
+> 0.00.20.40.6
+> (c)
+> 020 40
+> Time t
+> 0.20.40.60.8
+> (d) LW LW*
+
+Figure 2. Overall MF evolution on real networks (50 trials, with two std. devs.), for our approx. (LW), our extensive approx. (LW ∗), graphex (GX), and Lp graphon (LP) models: (a) SIS on Enron, (b) SIR on Slashdot, (c) Color on CAIDA (without LW ∗), (d) Rumor on Cities (without LW ∗). 
+
+are finitely many colors on a circle and a target color distri-bution is given. Agents stay at their color or costly move to a neighboring color. The objective decreases for deviations from the target color distribution and if neighbors of an agent have neighboring colors to the agent’s color on the respective color ring. 
+
+Rumor. In the rumor model (Maki & Thompson, 1973; Gani, 2000; Cui et al., 2022), agents are either aware of a rumor and are consequently in the aware state A or they have not heard the rumor and are in the ignorant state I.Aware agents decide whether they spread the rumor to their neighbors or keep it to themselves. They are awarded for spreading the rumor to unaware agents but loose reputation for telling the rumor to already aware agents. 
+
+## 7. Simulation & Results 
+
+In this section, we numerically verify the two system ap-proximation as well as the proposed learning algorithms by comparing them with baselines from the literature. The two systems approximation is compared with previous graph ap-proximations such as graphex or Lp graphon MF equations, and the learning algorithms are verified against standard scalable independent learning methods such as IPPO (Tan, 1993; Papoudakis et al., 2021), due to the large scale of networks considered here. To generate artificial networks of different sizes we employ a CL-based graph sampling algorithm (Chung & Lu, 2002; Miller & Hagberg, 2011) from the Python NetworkX package. We compare the accuracy of our model on different empiri-cal datasets with Lp graphon and graphex based models and with our extensive approximation LWMFC ∗, where com-putationally feasible, to see how much information is lost 7Learning Mean Field Control on Sparse Graphs 
+
+Table 2. (LW)MFC policy gradient, (LW)MFMARL policy gradient, and IPPO for four problems on synthetic CL graphs of size N . Best objective after 24 hours of training on 96 CPUs. Best result for each problem-graph tuple in bold. 
+
+Problem N = 167 N = 406 N = 860 N = 1598 
+
+IPPO MFC MFMARL IPPO MFC MFMARL IPPO MFC MFMARL IPPO MFC MFMARL SIS -20.80 -14.56 -12.50 -21.40 -14.18 -11.64 -19.70 -12.42 -9.11 -22.42 -13.51 -11.13 
+
+SIR -7.45 -7.84 -6.99 -7.18 -7.42 -6.55 -10.64 -6.86 -5.15 -7.73 -7.42 -6.32 
+
+Color -8.20 -6.84 -6.74 -8.05 -7.04 -6.98 -8.48 -7.08 -5.85 -8.15 -6.97 -6.94 
+
+Rumor 0.24 1.19 0.27 0.16 1.33 0.19 0.25 1.47 1.35 0.12 1.33 0.17 
+
+in the LWMFC approximation. We use eight datasets from the KONECT database (Kunegis, 2013), where we substi-tute directed or weighted edges by simple undirected edges: CAIDA (Leskovec et al., 2007)( N ≈ 26 k), Cities (Kunegis, 2013) ( N ≈ 14 k), Digg Friends (Hogg & Lerman, 2012) (N ≈ 280 k), Enron (Klimt & Yang, 2004) ( N ≈ 87 k), Flixster (Zafarani & Liu, 2009) ( N ≈ 2.5mm ), Slashdot (G ´omez et al., 2008) ( N ≈ 50 k), Yahoo (Kunegis, 2013) (N ≈ 653 k), and YouTube (Mislove, 2009) ( N ≈ 3.2mm ). See the references for details on the respective empirical networks. 
+
+Results. First, we establish the usefulness of LWMFC and LWMFC ∗ by comparing their dynamics to those of LPGMFGs and GXMFGs (Fabian et al., 2023; 2024) on eight real-world networks, see Figure 2 for examplary dy-namics over time. As Table 1 shows, our LWMFC approach clearly outperforms the current LPGMFGs and GXMFGs methods for all empirical networks and problems. The ex-tensive approximation LWMFC ∗ moderately outperforms LWMFC across datasets, except Yahoo. Since the extensive approximation is more detailed, it is often more accurate than the LWMFC approximation. However, Table 1 lacks an evaluation for LWMFC ∗ on the Color and Rumor prob-lem because the extensive approximation is computationally too expensive for these problems. Consequently, LWMFC dynamics are the more practical choice since they are com-putationally tractable and yield a good performance across problems and datasets. 0.0 0.5 1.0                                    
+
+> Steps MF £10 7
+> °25
+> °20
+> °15
+> Episode Return
+> (a)
+> 0.00.51.0
+> Steps MF £10 7
+> °10
+> °8
+> (b)
+> CLMFC CLMFMARL IPPO
+> 0.00.51.0
+> Steps MF £10 7
+> °15
+> °12
+> °9
+> (c)
+> 0.00.51.0
+> Steps MF £10 7
+> °16
+> °12
+> °8
+> °4
+> 0
+> (d)
+> 0.00.51.0
+> Steps MF £10 7
+> °25
+> °20
+> °15
+> Episode Return
+> (a)
+> 0.00.10.2
+> Steps IPPO £10 7
+> 0.00.51.0
+> Steps MF £10 7
+> °10
+> °8
+> (b)
+> 0.00.10.2
+> Steps IPPO £10 7
+> 0.00.51.0
+> Steps MF £10 7
+> °15
+> °12
+> °9
+> (c)
+> 0.00.10.2
+> Steps IPPO £10 7
+> 0.00.51.0
+> Steps MF £10 7
+> °16
+> °12
+> °8
+> °4
+> 0
+> (d)
+> 0.00.10.2
+> Steps IPPO £10 7LWMFC LWMFMARL
+
+Figure 3. Training curves of LWMFC policy gradient, LWMF-MARL, and IPPO on a random CL graph with 406 nodes for: (a) SIS, (b) SIR, (c) Color, (d) Rumor. 
+
+The second part of our results focuses on our two learning al-gorithms LWMFC and LWMFMARL and compares them to the well-known IPPO algorithm. In Table 2, our algorithms outperform IPPO for all problems on the two larger graphs with 860 and 1598 nodes, respectively. On the two smaller graphs, LWMFC and LWMFMARL still yield an at least competitive performance compared to IPPO, where IPPO is only marginally better than LWMFC on two problem in-stances, namely SIR on N = 167 and N = 406 . We point out that LWMFC, in contrast to IPPO and LWMFMARL, is not evaluated on the empirical system, but by design on the limiting LWMFC model, which may differ from the true system behavior. These findings are complemented by the corresponding training curves in Figure 3. Finally, Figure 4 depicts how the training curves of our LWMFC and LWMF-MARL algorithms converge on different empirical networks for different problems. 0 4 8                       
+
+> Time Steps £10 6
+> °25
+> °20
+> °15
+> °10
+> Episode Return
+> (a)
+> 048
+> Time Steps £10 6
+> °10
+> °8
+> °6
+> (b)
+> CLMFC CLMFMARL
+> 048
+> Time Steps £10 6
+> °15
+> °12
+> °9
+> (c)
+> 048
+> Time Steps £10 6
+> °12
+> °8
+> °4
+> 0
+> (d)
+> 048
+> Time Steps £10 6
+> °25
+> °20
+> °15
+> °10
+> Episode Return
+> (a)
+> 048
+> Time Steps £10 6
+> °10
+> °8
+> °6
+> (b)
+> 048
+> Time Steps £10 6
+> °15
+> °12
+> °9
+> (c)
+> 048
+> Time Steps £10 6
+> °12
+> °8
+> °4
+> 0
+> (d) LWMFC LWMFMARL
+
+Figure 4. Training curves of LWMFC policy gradient and LWMF-MARL for four different examples: (a) SIS on Enron, (b) SIR on Slashdot, (c) Color on CAIDA, (d) Rumor on Cities. 
+
+## 8. Conclusion 
+
+We have introduced the novel LWMFC framework which can depict agent networks with finite expected degree and di-verging variance. After a theoretical analysis, we provided a practical two systems approximation which was then lever-aged to design scalable learning algorithms. Finally, we evaluated the performance of our model and learning algo-rithms for different problems on synthetic and real-world datasets and compared them to existing methods. For future work, one could extend the LWMFC model to various types of specific mean field models, e.g. to partial observability or agents under bounded rationality. We hope that LWMFC and the corresponding learning approaches prove to be a ver-satile and useful tool for researchers across various applied research areas. 8Learning Mean Field Control on Sparse Graphs 
+
+## Acknowledgements 
+
+This work has been co-funded by the Hessian Ministry of Science and the Arts (HMWK) within the projects ”The Third Wave of Artificial Intelligence - 3AI” and hessian.AI, and the LOEWE initiative (Hesse, Germany) within the emergenCITY center. The authors acknowledge the Licht-enberg high performance computing cluster of the TU Darm-stadt for providing computational facilities for the calcula-tions of this research. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of machine learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Achdou, Y. and Lauri `ere, M. Mean Field Games and Ap-plications: Numerical Aspects , pp. 249–307. Springer International Publishing, 2020. Aiello, W., Chung, F., and Lu, L. A random graph model for massive graphs. In Proceedings of the Annual ACM Symposium on Theory of Computing , pp. 171–180, 2000. Aiello, W., Chung, F., and Lu, L. A random graph model for power law graphs. Experimental Mathematics , 10(1): 53–66, 2001. Andersson, D. and Djehiche, B. A maximum principle for SDEs of mean-field type. Applied Mathematics & Optimization , 63:341–356, 2011. Bagagiolo, F., Faggian, S., Maggistro, R., and Pesenti, R. Optimal control of the mean field equilibrium for a pedes-trian tourists’ flow model. Networks and Spatial Eco-nomics , pp. 1–24, 2019. Barab ´asi, A.-L. and Albert, R. Emergence of scaling in random networks. Science , 286(5439):509–512, 1999. Barenboim, L. and Elkin, M. Distributed graph coloring: Fundamentals and recent developments . Springer Nature, 2022. Bauso, D., Tembine, H., and Ba s¸ ar, T. Robust mean field games. Dynamic Games and Applications , 6(3):277–303, 2016. Beck, M. and Robins, S. Computing the continuous dis-cretely: Integer-point enumeration in polyhedra , vol-ume 2. Springer, 2007. Bender, E. A. and Canfield, E. R. The asymptotic number of labeled graphs with given degree sequences. Journal of Combinatorial Theory, Series A , 24(3):296–307, 1978. Bensoussan, A., Frehse, J., Yam, P., et al. Mean field games and mean field type control theory , volume 101. Springer, 2013. Bollob ´as, B. A probabilistic proof of an asymptotic formula for the number of labelled regular graphs. European Journal of Combinatorics , 1(4):311–316, 1980. Bollob´ as, B. Random graphs . Springer, 1998. Bollob ´as, B., Riordan, O., Spencer, J., and Tusn ´ady, G. The degree sequence of a scale-free random graph process. 
+
+Random Structures & Algorithms , 18(3):279–290, 2001. Borgs, C., Chayes, J., Cohn, H., and Holden, N. Sparse ex-changeable graphs and their limits via graphon processes. 
+
+Journal of Machine Learning Research , 18(210):1–71, 2018a. Borgs, C., Chayes, J., Cohn, H., and Zhao, Y. An lp theory of sparse graph convergence ii: Ld convergence, quotients and right convergence. The Annals of Probability , 46(1): 337–396, 2018b. Borgs, C., Chayes, J., Cohn, H., and Zhao, Y. An lp theory of sparse graph convergence i: Limits, sparse random graph models, and power law distributions. Transactions of the American Mathematical Society , 372(5):3019–3062, 2019. Brauer, F. The Kermack–McKendrick epidemic model revis-ited. Mathematical Biosciences , 198(2):119–131, 2005. Caines, P. E. and Huang, M. Graphon mean field games and the GMFG equations: ε-Nash equilibria. In IEEE 58th Conference on Decision and Control (CDC) , pp. 286–292. IEEE, 2019. Caines, P. E. and Huang, M. Graphon mean field games and their equations. SIAM Journal on Control and Optimiza-tion , 59(6):4373–4399, 2021. Caines, P. E., Huang, M., and Malham ´e, R. P. Large popu-lation stochastic dynamic games: closed-loop McKean-Vlasov systems and the Nash certainty equivalence prin-ciple. Communications in Information and Systems , 6(3): 221–252, 2006. Canese, L., Cardarilli, G. C., Di Nunzio, L., Fazzolari, R., Giardino, D., Re, M., and Span `o, S. Multi-agent reinforce-ment learning: A review of challenges and applications. 
+
+Applied Sciences , 11(11):4948, 2021. Carmona, R. and Delarue, F. Probabilistic theory of mean field games with applications. i, volume 83 of probability theory and stochastic modelling, 2018. 9Learning Mean Field Control on Sparse Graphs 
+
+Carmona, R. and Lauri `ere, M. Deep learning for mean field games and mean field control with applications to finance. Machine Learning and Data Sciences for Finan-cial Markets: A Guide to Contemporary Practices , pp. 369, 2023. Carmona, R., Lauri `ere, M., and Tan, Z. Model-free mean-field reinforcement learning: mean-field MDP and mean-field Q-learning. The Annals of Applied Probability , 33 (6B):5334–5381, 2023. Caron, F. and Fox, E. B. Sparse graphs using exchangeable random measures. Journal of the Royal Statistical Soci-ety Series B: Statistical Methodology , 79(5):1295–1366, 2017. Chung, F. and Lu, L. Connected components in random graphs with given expected degree sequences. Annals of Combinatorics , 6(2):125–145, 2002. Chung, F. and Lu, L. Complex graphs and networks . Amer-ican Mathematical Soc., 2006. Cui, K. and Koeppl, H. Learning graphon mean field games and approximate Nash equilibria. In International Con-ference on Learning Representations (ICLR) , 2022. Cui, K., KhudaBukhsh, W. R., and Koeppl, H. Hyper-graphon mean field games. Chaos: An Interdisciplinary Journal of Nonlinear Science , 32(11), 2022. Doncel, J., Gast, N., and Gaujal, B. A mean field game analysis of SIR dynamics with vaccination. Probability in the Engineering and Informational Sciences , 36(2): 482–499, 2022. Dorogovtsev, S. N. and Mendes, J. F. Evolution of networks. 
+
+Advances in Physics , 51(4):1079–1187, 2002. Dorogovtsev, S. N., Goltsev, A. V., and Mendes, J. F. F. Pseudofractal scale-free web. Physical Review E , 65(6): 066122, 2002. Fabian, C., Cui, K., and Koeppl, H. Learning sparse graphon mean field games. In International Conference on Artifi-cial Intelligence and Statistics , pp. 4486–4514. PMLR, 2023. Fabian, C., Cui, K., and Koeppl, H. Learning mean field games on sparse graphs: A hybrid graphex approach. In 
+
+International Conference on Learning Representations (ICLR) , 2024. Fasino, D., Tonetto, A., and Tudisco, F. Generating large scale-free networks with the Chung–Lu random graph model. Networks , 78(2):174–187, 2021. Gani, J. The Maki–Thompson rumour model: a detailed analysis. Environmental Modelling & Software , 15(8): 721–725, 2000. Goh, K.-I., Oh, E., Jeong, H., Kahng, B., and Kim, D. Classification of scale-free networks. Proceedings of the National Academy of Sciences , 99(20):12583–12588, 2002. G ´omez, V., Kaltenbrunner, A., and L ´opez, V. Statistical analysis of the social network and discussion threads in slashdot. In Proceedings of the International Conference on World Wide Web , pp. 645–654, 2008. Gronauer, S. and Diepold, K. Multi-agent deep reinforce-ment learning: a survey. Artificial Intelligence Review ,55(2):895–943, 2022. Gu, H., Guo, X., Wei, X., and Xu, R. Dynamic program-ming principles for mean-field controls with learning. 
+
+Operations Research , 71(4):1040–1054, 2023. Guo, X., Hu, A., Xu, R., and Zhang, J. Learning mean-field games. Advances in Neural Information Processing Systems , 32, 2019. Guo, X., Hu, A., Xu, R., and Zhang, J. A general frame-work for learning mean-field games. Mathematics of Operations Research , 48(2):656–686, 2023. Hethcote, H. W. The mathematics of infectious diseases. 
+
+SIAM Review , 42(4):599–653, 2000. Hogg, T. and Lerman, K. Social dynamics of digg. EPJ Data Science , 1(1):1–26, 2012. Hu, S., Zhong, Y., Gao, M., Wang, W., Dong, H., Liang, X., Li, Z., Chang, X., and Yang, Y. MARLlib: A scalable and efficient library for multi-agent reinforcement learning. 
+
+JMLR , 24:1–23, 2023a. Hu, Y., Wei, X., Yan, J., and Zhang, H. Graphon mean-field control for cooperative multi-agent reinforcement learning. Journal of the Franklin Institute , 360(18):14783– 14805, 2023b. Jackson, M. O. et al. Social and economic networks , vol-ume 3. Princeton University Press, 2008. Jensen, T. R. and Toft, B. Graph coloring problems . John Wiley & Sons, 2011. Kaufmann, M. and Zweig, K. Modeling and designing real– world networks. In Algorithmics of Large and Complex Networks: Design, Analysis, and Simulation , pp. 359– 379. Springer, 2009. 10 Learning Mean Field Control on Sparse Graphs 
+
+Kermack, W. O. and McKendrick, A. G. A contribution to the mathematical theory of epidemics. Proceedings of the Royal Society of London. Series A, Containing papers of a mathematical and physical character , 115(772):700–721, 1927. Klimt, B. and Yang, Y. The enron corpus: A new dataset for email classification research. In European Conference on Machine Learning , pp. 217–226. Springer, 2004. Kunegis, J. Konect: the Koblenz network collection. In 
+
+Proceedings of the International Conference on World Wide Web , pp. 1343–1350, 2013. Lacker, D. and Soret, A. A case study on stochastic games on large graphs in mean field and sparse regimes. Mathe-matics of Operations Research , 47(2):1530–1565, 2022. Lacker, D., Ramanan, K., and Wu, R. Local weak conver-gence for sparse networks of interacting processes. The Annals of Applied Probability , 33(2):843–888, 2023. Lasry, J.-M. and Lions, P.-L. Mean field games. Japanese Journal of Mathematics , 2(1):229–260, 2007. Lauri `ere, M., Perrin, S., Geist, M., and Pietquin, O. Learning mean field games: A survey. arXiv preprint arXiv:2205.12944 , 2022a. Lauri `ere, M., Perrin, S., Girgin, S., Muller, P., Jain, A., Cabannes, T., Piliouras, G., P ´erolat, J., Elie, R., Pietquin, O., et al. Scalable deep reinforcement learning algorithms for mean field games. In International Conference on Machine Learning , pp. 12078–12095. PMLR, 2022b. Leskovec, J., Kleinberg, J., and Faloutsos, C. Graph evolu-tion: Densification and shrinking diameters. ACM Trans-actions on Knowledge Discovery from Data (TKDD) , 1 (1):2–es, 2007. Liang, E., Liaw, R., Nishihara, R., Moritz, P., Fox, R., Gold-berg, K., Gonzalez, J., Jordan, M., and Stoica, I. RLlib: Abstractions for distributed reinforcement learning. In 
+
+Proc. ICML , pp. 3053–3062, 2018. Lov ´asz, L. Large networks and graph limits , volume 60. American Mathematical Soc., 2012. Maki, D. P. and Thompson, M. Mathematical Models and Applications: With Emphasis on the Social, Life, and Management Sciences . Prentice Hall, 1973. Mann, H. B. and Wald, A. On stochastic limit and order relationships. The Annals of Mathematical Statistics , 14 (3):217–226, 1943. Marsaglia, G. and Marsaglia, J. C. A new derivation of Stir-ling’s approximation to n! The American Mathematical Monthly , 97(9):826–829, 1990. Miller, J. C. and Hagberg, A. Efficient generation of net-works with given expected degrees. In International Workshop on Algorithms and Models for the Web-Graph ,pp. 115–126. Springer, 2011. Mislove, A. E. Online social networks: measurement, anal-ysis, and applications to distributed information systems .Rice University, 2009. Molloy, M. and Reed, B. A critical point for random graphs with a given degree sequence. Random Structures & Algorithms , 6(2-3):161–180, 1995. Molloy, M. and Reed, B. The size of the giant component of a random graph with a given degree sequence. Com-binatorics, Probability and Computing , 7(3):295–305, 1998. Newman, M. The structure and function of complex net-works. SIAM Review , 45(2):167–256, 2003. Newman, M., Barab ´asi, A.-L., and Watts, D. J. The structure and dynamics of networks . Princeton University Press, 2011. Papoudakis, G., Christianos, F., Sch ¨afer, L., and Albrecht, S. V. Benchmarking multi-agent deep reinforcement learning algorithms in cooperative tasks. In Thirty-fifth Conference on Neural Information Processing Systems Datasets and Benchmarks Track , 2021. Piva, G. G., Ribeiro, F. L., and Mata, A. S. Networks with growth and preferential attachment: modelling and ap-plications. Journal of Complex Networks , 9(1):cnab008, 2021. Ruthotto, L., Osher, S. J., Li, W., Nurbekyan, L., and Fung, S. W. A machine learning framework for solving high-dimensional mean field game and mean field control prob-lems. Proceedings of the National Academy of Sciences ,117(17):9183–9193, 2020. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 , 2017. Subramanian, S. G., Taylor, M. E., Crowley, M., and Poupart, P. Decentralized mean field games. In Proceed-ings of the AAAI Conference on Artificial Intelligence ,volume 36, pp. 9439–9447, 2022. Tan, M. Multi-agent reinforcement learning: Independent vs. cooperative agents. In Proceedings of the International Conference on Machine Learning (ICML) , pp. 330–337, 1993. Van Der Hofstad, R. Random graphs and complex networks ,volume 54. Cambridge University Press, 2024. 11 Learning Mean Field Control on Sparse Graphs 
+
+Van der Vaart, A. W. Asymptotic statistics , volume 3. Cam-bridge University Press, 2000. V ´azquez, A., Pastor-Satorras, R., and Vespignani, A. Large-scale topological and dynamical properties of the internet. 
+
+Physical Review E , 65(6):066130, 2002. Veitch, V. and Roy, D. M. The class of random graphs aris-ing from exchangeable random measures. arXiv preprint arXiv:1512.03099 , 2015. Zafarani, R. and Liu, H. Social computing data repository at ASU, 2009. URL http://socialcomputing. asu.edu .Zhang, F., Tan, V., Wang, Z., and Yang, Z. Learning regu-larized monotone graphon mean-field games. Advances in Neural Information Processing Systems , 36, 2024. Zhou, F., Zhang, C., Chen, X., and Di, X. Graphon mean field games with a representative player: Analysis and learning algorithm. In International Conference on Ma-chine Learning (ICML) , 2024. 12 Learning Mean Field Control on Sparse Graphs 
+
+## A. Appendix: Proofs for the Theoretical Results 
+
+A.1. Proof of Theorem 3.1 
+
+Proof. We aim to eventually apply Lacker et al. (2023, Theorem 3.6) and therefore have to check that the respective conditions hold in our model. Keeping in mind Assumption 2.2 and the i.i.d. initial distribution μ0, we leverage Lacker et al. (2023, Corollary 2.16) to obtain convergence in probability in the local weak sense of the marked graphs (GN , X GN ) to the limiting marked graph (G, X G).Since the theory in Lacker et al. (2023) is only formulated in terms of particle systems without including actions in the form of policies, we provide a suitable reformulation of our LWMFC model. Thus, define an auxiliary extended state space 
+
+Xe := X ∪ (X × U ) which serves as the state space for the extended particle system for some fixed policy ensemble π. The idea behind the extended state space Xe is to define an extended particle system where the state transition in X and the choice of the next action ut+1 ∈ U are separated into two different time steps. Using the notations from Lacker et al. (2023), denote by S⊔(X ) the set of finite unordered sequences of arbitrary length with values in X and by Ξ := X X ×S ⊔(X ) × U X ×U×S ⊔(X ) the set of possible noise values. Next, specify a transition function 
+
+F τ : Xe × S ⊔(Xe) × Ξ → X e for each τ ∈ T e := {0} ∪ [2 T − 1] by 
+
+XN  
+
+> e,i,τ +1
+
+= F τ (XN 
+
+> e,i,τ
+
+, GN 
+
+> e,i,τ
+
+, ξ i,τ +1 ) := 
+
+(
+
+(XN 
+
+> e,i,τ
+
+, ξ 0 
+
+> i,τ +1
+
+(XN 
+
+> e,i,τ
+
+, GN 
+
+> e,i,τ
+
+)) if τ / 2 ∈ { 0} ∪ N
+
+ξ1 
+
+> i,τ +1
+
+(XN 
+
+> e,i,τ
+
+, GN 
+
+> e,i,τ
+
+) otherwise, where the neighborhood in the extended particle system GN 
+
+> e,i,τ
+
+corresponds to GNi, ⌊τ / 2⌋ in the original system. Here, the noise terms ξi,τ +1 = ( ξ0 
+
+> i,τ +1
+
+, ξ 1 
+
+> i,τ +1
+
+) depict the used noise depending on whether τ is an even or odd number. If τ is an even number, i.e. τ / 2 ∈ { 0} ∪ N, we use ξ0 
+
+> i,τ +1
+
+(XN 
+
+> e,i,τ
+
+, GN 
+
+> e,i,τ
+
+) which is a U-valued random variable with distribution 
+
+ξ0 
+
+> i,τ +1
+
+(x, G ) ∼ πkτ / 2 (· | x, G )
+
+for each neighborhood G and state x ∈ X , where k is the degree of agent i. If τ is odd, i.e. we have XN 
+
+> e,i,τ
+
+∈ X × U , we choose the first, X -valued entry of XN 
+
+> e,i,τ
+
+as the x in the above probability distribution. The X -valued noise component ξ1  
+
+> i,τ +1
+
+is distributed as follows: if τ is an odd number, the noise term is sampled from 
+
+ξ1 
+
+> i,τ +1
+
+(x, u, G ) ∼ P (·| x, u, G )
+
+where XN 
+
+> e,i,τ
+
+= ( x, u ). If τ is even and thus XN 
+
+> e,i,τ
+
+∈ X , we just choose some arbitrary, but fixed action u′ ∈ U instead of u
+
+in the above sampling process. Now, it remains to check that Lacker et al. (2023, Assumption A) is satisfied by the extended particle system defined above. First, the noise terms ξi,τ are i.i.d. distributed for all agents i ∈ [N ] and with respect to all time points τ ∈ T e by construction. Finally, keeping in mind that the respective spaces are discrete, the map F τ is continuous for each τ ∈ T e.Therefore, Lacker et al. (2023, Theorem 3.6) yields the desired result. 
+
+A.2. Proof of Proposition 3.3 
+
+Proof. We want to show 
+
+JN (π) → J(π) in probability for N → ∞ 
+
+which is equivalent to 
+
+> T
+
+X
+
+> t=1
+
+r(μNt ) →
+
+> T
+
+X
+
+> t=1
+
+r(μt) in probability for N → ∞ .
+
+The reward r is a continuous function by Assumption 3.2. Furthermore, by Theorem 3.1 we know that the empirical mean fields converge in probability to the limiting mean fields. Hence, we can apply the continuous mapping theorem (Mann & Wald, 1943; Van der Vaart, 2000) to obtain the desired result. 13 Learning Mean Field Control on Sparse Graphs 
+
+A.3. Proof of Corollary 3.4 
+
+Proof. Quantify the gap ∆ between the optimal and the second best solution as 
+
+∆ := J(π1) − max   
+
+> i∈[M],i ̸=1
+
+J(πi) > 0 .
+
+Keeping in mind Proposition 3.3, we know that the objectives of the finite systems eventually converge to the limiting mean field objectives as N approaches infinity. Thus, there exists some N ∗ such that 
+
+max  
+
+> i∈[M]
+
+|JN (πi) − J(πi)| < ∆2
+
+holds for all N > N ∗. Finally, the above considerations allow us to bound the difference of interest 
+
+JN (π1) − max   
+
+> i∈[M],i ̸=1
+
+JN (πi)= JN (π1) − J(π1) + J(π1) − max   
+
+> i∈[M],i ̸=1
+
+JN (πi)= JN (π1) − J(π1)
+
+| {z }
+
+> >−∆/2
+
++ J(π1) −
+
+
+
+max   
+
+> i∈[M],i ̸=1
+
+J(πi)
+
+| {z }
+
+> =∆
+
++
+
+
+
+max   
+
+> i∈[M],i ̸=1
+
+J(πi)
+
+
+
+− max   
+
+> i∈[M],i ̸=1
+
+JN (πi)
+
+> ∆2 + min   
+
+> i∈[M],i ̸=1
+
+J(πi) − JN (πi) > ∆2 − ∆2 = 0 ,
+
+for all N > N ∗ which implies the desired statement 
+
+JN (π1) > max   
+
+> i∈[M],i ̸=1
+
+JN (πi)
+
+and thereby concludes the proof. 
+
+A.4. Proof of Lemma 4.1 
+
+Proof. Since we want to lower bound the number of possible t-hop neighborhoods NG,t , we assume for simplicity that 
+
+t-hop neighbors of the initial agent have at most degree k themselves. Furthermore, we keep in mind the fact (Beck & Robins, 2007, Theorem 2.2) that in a d-dimensional simplex with edge length ℓ ∈ N, the number of integer points contained in the simplex is 
+
+d + ℓd
+
+
+
+= (d + ℓ)! 
+
+d!ℓ! . (1) Since Lemma 4.1 considers the worst case, it suffices to prove the lower bound Ω  2poly( k) for one class of CL graphs. We choose our running example of CL power law graphs with coefficient above two. It is well known that these large power law CL graphs are locally tree-like (Van Der Hofstad, 2024, Theorem 3.18) which we tacitly exploit in the following induction proof. The proof is via induction over t. We start with t = 1 and the corresponding 1-hop neighborhood. The neighborhood consists of k agents where each one has a degree in [k] and a state in X . Since the agents themselves are indistinguishable in our model, we focus on the degree-state neighborhood distributions. Then, the set of possible state-degree neighborhood distributions can be seen as the integer points in a (k + |X | − 1) -dimensional simplex with edge length k. Keeping in mind 14 Learning Mean Field Control on Sparse Graphs 
+
+Equation (1) and the well-known Stirling approximation, see e.g. Marsaglia & Marsaglia (1990), we obtain 
+
+NG,t ≥
+
+k + |X | − 1 + kk + |X | − 1
+
+
+
+= (2 k + |X | − 1)! (k + |X | − 1)! k!
+
+> Stirling
+
+∼
+
+s
+
+2π(2 k + |X | − 1) 2π(k + |X | − 1)2 πk 
+
+(2 k + |X | − 1) 2k+|X |− 1
+
+(k + |X | − 1) k+|X |− 1kk
+
+≥ 1
+
+√2πk 
+
+(2 k + |X | − 1) k
+
+kk
+
+≥ 2k
+
+√2πk 
+
+= 2 k−1/2·log 2(2 πk ) ∈ Θ
+
+
+
+2poly( k)
+
+.
+
+Now, it remains to establish the induction step from t to t + 1 where we assume that NG,t ∈ Ω  2poly( k) holds. Then, instead of looking at the (t + 1) -hop neighborhoods of the initial agent, we can equivalently look at his or her 1-hop neighborhoods where each neighbor’s ’extended state’ now consists of the neighbor’s t-hop neighborhood, where we ignore the edge between the neighbor and initial agent. Thus, the simplex edge length decreases by one from k to k − 1 which is negligible for large k. Leveraging the induction assumption, we obtain 
+
+NG,t +1 = Ω 
+
+ NG,t + kk
+
+ 
+
+= Ω 
+
+ (NG,t + k)! 
+
+k!NG,t !
+
+
+
+> Stirling
+
+= Ω
+
+s
+
+NG,t + kkN G,t 
+
+(NG,t + k)NG,t +k
+
+N NG,t  
+
+> G,t
+
+kk
+
+!
+
+= Ω 
+
+ 1
+
+√k
+
+(NG,t + k)k
+
+kk
+
+
+
+> (IA)
+
+= Ω 1
+
+√k
+
+ 2poly( k)k
+
+kk
+
+!
+
+= Ω 
+
+
+
+2k·poly( k)−(k+1 /2) log 2(k)
+
+= Ω 
+
+
+
+2poly( k)
+
+which concludes the proof. 
+
+## B. Extensive Approximation Derivation 
+
+The goal of the following section is to establish a detailed approximation of the probability 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x .
+
+First, we condition on the previous neighborhood distribution and the previous state of the agent at time tPπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x
+
+= X
+
+> x′∈X
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x, x t = x′
+
+= X
+
+> G′∈Gk
+
+X
+
+> x′∈X
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, Gkt (μt) = G′, x t+1 = x, x t = x′ .
+
+15 Learning Mean Field Control on Sparse Graphs 
+
+Now, we can decompose the above expression into three separate terms 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, Gkt (μt) = G′, x t+1 = x, x t = x′
+
+= Pπ,μ
+
+ Gkt (μt) = G′, x t = x′| {z }
+
+> (I)
+
+· Pπ,μ
+
+ xt+1 = x | Gkt (μt) = G′, x t = x′| {z }
+
+> (II)
+
+· Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′, x t+1 = x, x t = x′| {z }
+
+> (III)
+
+which allows us to handle each term individually. Since we require a recursive computation of the probability 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x, the first term (I) will not be reformulated any further. The computation of the sec-ond term (II) is straight-forward, i.e. 
+
+Pπ,μ
+
+ xt+1 = x | Gkt (μt) = G′, x t = x′ = X
+
+> u∈U
+
+πk (u | x′) P (x | x′, u, G ′) .
+
+Thus, it remains to approximate the third term (III) 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′, x t+1 = x, x t = x′
+
+= Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′, x t = x′ .
+
+To ensure a reasonable approximation complexity, we make the simplifying assumption that the neighborhood distribution does not (crucially) depend on the current state of the agent of interest, i.e. 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′, x t = x′ ≈ Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′ .
+
+Thus, we focus on 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′
+
+which requires an involved combinatorial argument to be calculated. The main difficulty in the calculation stems from the fact that the k neighbors of the initial agent in general have different degrees, different states at time t as well as different states at time t + 1 . For notational convenience, we denote by x1,t , . . . , x k,t the states of the k neighbors of the initial agent at time t and by deg 1, . . . , deg k∗ , deg ∞ ∈ { 1, . . . , k } the number of neighbors with the respective degree. Also, define 
+
+Ck := {c = ( c1, . . . , c k∗ , c ∞) ∈ Nk∗+1 0 : c1 + . . . + ck∗ + c∞ = k} for notational convenience. Then, the above probability can be expressed as 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | Gkt (μt) = G′
+
+= X
+
+> c∈Ck
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞ | Gkt (μt) = G′
+
+= X
+
+> c∈Ck
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞ | Gkt (μt) = G′
+
+· Pπ,μ
+
+ Gkt+1 (μt) = G | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′ .
+
+In the remainder of the derivation, we will frequently use for all s ∈ X , m ∈ N, and t ∈ T the approximation 
+
+P  x1 
+
+> t
+
+= s | deg( v1) = m, (v0, v 1) ∈ E ≈ P  x1 
+
+> t
+
+= s | deg( v1) = m = μmt (s) . (2) Next, we make an auxiliary calculation to calculate the degree distribution of a (uniformly at random picked) node v1
+
+16 Learning Mean Field Control on Sparse Graphs 
+
+conditional on its state x1 
+
+> t
+
+and that it is a neighbor of the initial node v0 of interest 
+
+P  deg( v1) = m | x1 
+
+> t
+
+= s, (v0, v 1) ∈ E
+
+= P  deg( v1) = m ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E
+
+P (x1 
+
+> t
+
+= s | (v0, v 1) ∈ E)= P (deg( v1) = m | (v0, v 1) ∈ E) P  x1 
+
+> t
+
+= s | deg( v1) = m, (v0, v 1) ∈ E
+
+P (deg( v1) > k ∗ ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E) + Pk∗ 
+
+> k=1
+
+P (deg( v1) = k ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E)
+
+> (2)
+> ≈
+
+P (deg( v1) = m | (v0, v 1) ∈ E) μmt (s)
+
+P (deg( v1) > k ∗ ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E) + Pk∗ 
+
+> k=1
+
+P (deg( v1) = k ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E)= P (deg( v1) = m | (v0, v 1) ∈ E) μmt (s)
+
+P (deg( v1) > k ∗ | (v0, v 1) ∈ E) μ∞ 
+
+> t
+
+(s) + Pk∗ 
+
+> k=1
+
+P (deg( v1) = k | (v0, v 1) ∈ E) μkt (s)
+
+where we exploit that 
+
+P  deg( v1) > k ∗ ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E +
+
+> k∗
+
+X
+
+> k=1
+
+P  deg( v1) = k ∩ x1 
+
+> t
+
+= s | (v0, v 1) ∈ E
+
+= P (deg( v1) > k ∗ | (v0, v 1) ∈ E) P  x1 
+
+> t
+
+= s | deg( v1) > k ∗, (v0, v 1) ∈ E
+
++
+
+> k∗
+
+X
+
+> k=1
+
+P (deg( v1) = k | (v0, v 1) ∈ E) P  x1 
+
+> t
+
+= s | deg( v1) = k, (v0, v 1) ∈ E 
+
+> (2)
+> ≈
+
+P (deg( v1) > k ∗ | (v0, v 1) ∈ E) μ∞ 
+
+> t
+
+(s) + 
+
+> k∗
+
+X
+
+> k=1
+
+P (deg( v1) = k | (v0, v 1) ∈ E) μkt (s) .
+
+For the running example of power law degree distributions with exponent γ ∈ (2 , 3) , the conditional degree distribution is approximately 
+
+P  deg( v1) = m | x1 
+
+> t
+
+= sj , (v0, v 1) ∈ E
+
+≈ 
+
+> m1−γ
+> ζ(γ−1)
+
+μmt (sj )
+
+> 1
+> ζ(γ−1)
+
+P ∞ 
+
+> ℓ=k∗+1
+
+ℓ1−γ  μ∞ 
+
+> t
+
+(sj ) + 1
+
+> ζ(γ−1)
+
+Pk∗ 
+
+> h=1
+
+h1−γ μht (sj )= m1−γ μmt (sj )
+
+P ∞ 
+
+> ℓ=k∗+1
+
+ℓ1−γ  μ∞ 
+
+> t
+
+(sj ) + Pk∗ 
+
+> h=1
+
+h1−γ μht (sj ) .
+
+Based on the above probability and by the symmetry of the model, we obtain 
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞ | Gkt (μt) = G′
+
+= X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Pπ,μ
+
+ A2 = a2, deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞ | Gkt (μt) = G′
+
+= X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Pπ,μ
+
+ A2 = a2 | Gkt (μt) = G′
+
+≈ X 
+
+> a2∈Ak
+> 2(G′,c )
+> d
+
+Y
+
+> j=1
+
+ g′
+
+> j
+
+aj1, . . . , a j∞
+
+ Y
+
+> m∈[k∗]∪{∞}
+
+(P  deg( v1) = m | x1 
+
+> t
+
+= sj , (v0, v 1) ∈ E)ajm 
+
+where we neglect dependencies between the nodes in the last line and define the matrix set Ak 
+
+> 2
+
+(G′, c ) for given G′ ∈ Gk
+
+and c ∈ Ck as 
+
+Ak 
+
+> 2
+
+(G′, c ) := 
+
+n
+
+a2 = ( ajm )j∈[d],m ∈[k∗]∪{∞} ∈ Nd×(k∗+1) 0 :
+
+X
+
+> m′∈[k∗]∪{∞}
+
+ajm ′ = g′ 
+
+> j
+
+, ∀j ∈ [d] and 
+
+> d
+
+X
+
+> ℓ=1
+
+aℓm = cm, ∀m ∈ [k∗] ∪ {∞} 
+
+ .
+
+17 Learning Mean Field Control on Sparse Graphs 
+
+Therefore, it remains to calculate the conditional probability 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′ .
+
+As a first step, we define the set of matrices Ak 
+
+> 3
+
+(G, G ′, c ) for a given triple of vectors G, G ′ ∈ Gk and c ∈ Ck as 
+
+Ak 
+
+> 3
+
+(G, G ′, c ) := 
+
+n
+
+a3 = ( aijm )i,j ∈[d],m ∈[k∗]∪{∞} ∈ Nd×d×(k∗+1) 0 :
+
+X
+
+> m′∈[k∗]∪{∞}
+> d
+
+X
+
+> ℓ=1
+
+aiℓm ′ = gi and X
+
+> m′∈[k∗]∪{∞}
+> d
+
+X
+
+> ℓ=1
+
+aℓjm ′ = g′ 
+
+> j
+
+, ∀i, j ∈ [d]
+
+and 
+
+> d
+
+X
+
+> ℓ,ℓ ′=1
+
+aℓℓ ′m = cm, ∀m ∈ [k∗] ∪ {∞} 
+
+ .
+
+where d := |X | is the finite number of states. Intuitively, the matrix set Ak 
+
+> 3
+
+(G, G ′, c ) for an agent with degree k contains all possible numbers (aijm )i,j ∈[d],m ∈[k∗]∪{∞} of neighbors whose degree is m and current state is xi and who transition to state xj in the next time step. For notational convenience, let A denote the random variable taking values in Ak 
+
+> 3
+
+(G, G ′, c )
+
+and analogously let A2 be the random variable with values in Ak 
+
+> 2
+
+(G′, c ). We continue with the reformulation 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Pπ,μ
+
+ A2 = a2 | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+· Pπ,μ
+
+ Gkt+1 (μt) = G | A2 = a2, deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Pπ,μ
+
+ A2 = a2 | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+· Pπ,μ
+
+ Gkt+1 (μt) = G | A2 = a2
+
+ .
+
+Next, we consider the two conditional probabilities separately. We start with 
+
+Pπ,μ
+
+ A2 = a2 | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= Pπ,μ
+
+ A2 = a2 ∩ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= Pπ,μ (A2 = a2)
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′ .
+
+Keeping in mind both 
+
+Pπ,μ (A2 = a2 = ( ajm )j,m ) ≈
+
+> d
+
+Y
+
+> j=1
+
+Y
+
+> m∈[k∗]∪{∞}
+
+(P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm 
+
+by neglecting dependencies between the nodes and 
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′, A 2 = a2
+
+
+
+= X 
+
+> a2∈Ak
+> 2(G′,c )
+
+Pπ,μ (A2 = a2)= X 
+
+> a2∈Ak
+> 2(G′,c )
+> d
+
+Y
+
+> j=1
+
+Y
+
+> m∈[k∗]∪{∞}
+
+(P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm 
+
+18 Learning Mean Field Control on Sparse Graphs 
+
+we obtain 
+
+Pπ,μ
+
+ A2 = a2 | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= Pπ,μ (A2 = a2)
+
+Pπ,μ
+
+ deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+≈
+
+Qdj=1 
+
+Q
+
+m∈[k∗]∪{∞} (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+Q
+
+m∈[k∗]∪{∞} (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) a′
+
+> jm
+
+and especially, for the case of a power law degree distribution with γ ∈ (2 , 3) , we have 
+
+Pπ,μ
+
+ A2 = a2 | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+=
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ aj∞ Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ a′ 
+
+> j∞
+
+Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+a′
+
+> jm
+
+≈
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+ζ(γ − 1) − Pk∗
+
+m′=1 (m′)1−γ
+
+ aj∞ Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+ζ(γ − 1) − Pk∗
+
+m′=1 (m′)1−γ
+
+ a′ 
+
+> j∞
+
+Qk∗
+
+m=1 (m1−γ μmt (sj )) a′
+
+> jm
+
+.
+
+Now, it remains to calculate the second probability term, namely 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | A2 = a2
+
+ .
+
+Exploiting the symmetry of the problem, we obtain 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | A2 = a2
+
+
+
+≈ X
+
+a3∈Ak (G,G ′,c )
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+
+
+1{P 
+
+> i
+
+aijm =ajm }
+
+·
+
+dY
+
+i=1 
+
+ Pπ,μ
+
+ x1
+
+t+1 = xi | x1
+
+t = xj , deg( v1) = m aijm 
+
+≈ X
+
+a3∈Ak (G,G ′,c )
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+
+
+1{P 
+
+> i
+
+aijm =ajm }
+
+·
+
+dY
+
+i=1 
+
+X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ )
+
+!aijm 
+
+where 1{... } denotes the indicator function and where we neglect the potential dependencies between the neighbors of the 19 Learning Mean Field Control on Sparse Graphs 
+
+initial node in the second line. Finally, we arrive at 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+= X
+
+a2∈Ak 
+
+> 2
+
+(G′,c )
+
+Pπ,μ
+
+ A2 = a2 | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+· Pπ,μ
+
+ Gkt+1 (μt) = G | A2 = a2
+
+
+
+≈ X
+
+a2∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+Q
+
+m∈[k∗]∪{∞} (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+Q
+
+m∈[k∗]∪{∞} (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) a′
+
+> jm
+
+· Pπ,μ
+
+ Gkt+1 (μt) = G | A2 = a2
+
+
+
+≈ X
+
+a2∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+Q
+
+m∈[k∗]∪{∞} (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+Q
+
+m∈[k∗]∪{∞} (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) a′
+
+> jm
+
+X
+
+a3∈Ak 
+
+> 3
+
+(G,G ′,c )
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+
+
+1{P 
+
+> i
+
+aijm =ajm }
+
+·
+
+dY
+
+i=1 
+
+X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ )
+
+!aijm 
+
+and for the running example of power law graphs we especially obtain 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G | deg 1 = c1, . . . , deg k∗ = ck∗ , deg ∞ = c∞, Gkt (μt) = G′
+
+≈ X
+
+a2∈Ak 
+
+> 2
+
+(G′,c )
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ aj∞ Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Q
+
+j
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ a′ 
+
+> j∞
+
+Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+a′
+
+> jm
+
+X
+
+a3∈Ak 
+
+> 3
+
+(G,G ′,c )
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+
+
+1{P 
+
+> i
+
+aijm =ajm }
+
+·
+
+dY
+
+i=1 
+
+X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ )
+
+!aijm 
+
+= X
+
+a3∈Ak 
+
+> 3
+
+(G,G ′,c )
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ aj∞ Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Q
+
+j
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ a′ 
+
+> j∞
+
+Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+a′
+
+> jm
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+
+
+·
+
+dY
+
+i=1 
+
+X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ )
+
+!aijm 
+
+.
+
+20 Learning Mean Field Control on Sparse Graphs 
+
+Resulting Approximation Eventually, we obtain the approximation 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x
+
+≈ X
+
+G′∈Gk
+
+X
+
+x′∈X 
+
+Pπ,μ
+
+ Gkt (μt) = G′, x t = x′ "X
+
+u∈U 
+
+πk (u | x′) P (x | x′, u, G ′)
+
+#
+
+· X
+
+c∈Ck
+
+ X
+
+a2∈Ak (G′,c )
+
+dY
+
+j=1 
+
+ g′
+
+j
+
+aj1, . . . , a j∞
+
+ Y
+
+m∈[k∗]∪{∞} 
+
+· P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )
+
+P (deg( v1) > k ∗ | (v0, v 1) ∈ E) μ∞
+
+t (sj ) + Pk∗
+
+k=1 P (deg( v1) = k | (v0, v 1) ∈ E) μkt (sj )
+
+!ajm #
+
+· 1
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Q
+
+j,m (P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) a′
+
+> jm
+
+X
+
+a3∈Ak 
+
+> 3
+
+(G,G ′,c )
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+ dY
+
+i=1 
+
+(P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) aijm 
+
+· X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ )
+
+!aijm 
+
+which, for the power law running example, can be reformulated as 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x
+
+≈ X
+
+G′∈Gk
+
+X
+
+x′∈X 
+
+Pπ,μ
+
+ Gkt (μt) = G′, x t = x′ "X
+
+u∈U 
+
+πk (u | x′) P (x | x′, u, G ′)
+
+#
+
+· X
+
+c∈Ck
+
+ X
+
+a2∈Ak (G′,c )
+
+dY
+
+j=1 
+
+ g′
+
+j
+
+aj1, . . . , a j∞
+
+
+
+· Y
+
+m∈[k∗]∪{∞} 
+
+m1−γ μmt (sj )
+
+P ∞
+
+ℓ=k∗+1 ℓ1−γ  μ∞
+
+t (sj ) + Pk∗
+
+h=1 h1−γ μht (sj )
+
+!ajm 
+
+
+
+· X
+
+a3∈Ak 
+
+> 3
+
+(G,G ′,c )
+
+Qdj=1 
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ aj∞ Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+ajm 
+
+P
+
+a′
+
+> 2
+
+∈Ak 
+
+> 2
+
+(G′,c )
+
+Q
+
+j
+
+
+
+μ∞
+
+t (sj )
+
+
+
+1 − Pk∗
+
+m′=1 (m′)1−γ
+
+ζ(γ−1) 
+
+ a′ 
+
+> j∞
+
+Qk∗
+
+m=1 
+
+ m1−γ μmt (sj )
+
+ζ(γ−1) 
+
+a′
+
+> jm
+
+dY
+
+j=1 
+
+Y
+
+m∈[k∗]∪{∞} 
+
+ P
+
+i aijm 
+
+a1jm , . . . , a djm 
+
+
+
+·
+
+dY
+
+i=1 
+
+X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ )
+
+!aijm 
+
+For notational convenience, define for each j ∈ [d] and m ∈ [k∗] ∪ {∞} 
+
+pjm := P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )
+
+P (deg( v1) > k ∗ | (v0, v 1) ∈ E) μ∞
+
+t (sj ) + Pk∗
+
+k=1 P (deg( v1) = k | (v0, v 1) ∈ E) μkt (sj )
+
+and for each i, j ∈ [d] and m ∈ [k∗] ∪ {∞} 
+
+pijm := P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )
+
+· X
+
+G′′ ∈Gm
+
+Pπ (Gmt (μt) = G′′ | x′′ 
+
+t = sj ) X
+
+u∈U 
+
+πmt (u | sj ) · P (si | sj , u, G ′′ ) .
+
+21 Learning Mean Field Control on Sparse Graphs 
+
+Then, the extensive approximation can be rewritten more compactly as 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x
+
+≈ X
+
+> G′∈Gk
+
+X
+
+> x′∈X
+
+Pπ,μ
+
+ Gkt (μt) = G′, x t = x′ "X
+
+> u∈U
+
+πk (u | x′) P (x | x′, u, G ′)
+
+#
+
+· X
+
+> c∈Ck
+
+ X 
+
+> a2∈Ak
+> 2(G′,c )
+> d
+
+Y
+
+> j=1
+
+ g′
+
+> j
+
+aj1, . . . , a j∞
+
+ Y
+
+> m∈[k∗]∪{∞}
+
+pajm 
+
+> jm
+
+
+
+·
+
+P 
+
+> a3∈Ak
+> 3(G,G ′,c )
+
+Qdj=1 
+
+Q
+
+> m∈[k∗]∪{∞}
+
+  P 
+
+> iaijm
+> a1jm ,...,a djm
+
+ Q di=1 paijm 
+
+> ijm
+
+P 
+
+> a2∈Ak
+> 2(G′,c )
+
+Q 
+
+> j,m
+
+(P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm .
+
+Furthermore, we introduce 
+
+p2,j := ( pj1, . . . , p jk ∗ , p j∞) and a2,j := ( aj1, . . . , a jk ∗ , a j∞)
+
+for every j ∈ [d] and similarly we define 
+
+p3,jm := ( p1jm , . . . , p djm ) and a3,jm := ( a1jm , . . . , a djm )
+
+for every tuple (j, m ) ∈ [d] × ([ k∗] ∪ {∞} ). Then, the extensive approximation can be formulated as 
+
+Pπ,μ
+
+ Gkt+1 (μt) = G, x t+1 = x
+
+≈ X
+
+> G′∈Gk
+
+X
+
+> x′∈X
+
+X
+
+> c∈Ck
+
+Pπ,μ
+
+ Gkt (μt) = G′, x t = x′ "X
+
+> u∈U
+
+πk (u | x′) P (x | x′, u, G ′)
+
+#
+
+·
+
+hP 
+
+> a2∈Ak
+> 2(G′,c )
+
+Q 
+
+> j
+
+Mult p2,j (a2,j )
+
+i P 
+
+> a3∈Ak
+> 3(G,G ′,c )
+
+Q 
+
+> j,m
+
+Mult p3,jm (a3,jm )
+
+P 
+
+> a2∈Ak
+> 2(G′,c )
+
+Q 
+
+> j,m
+
+(P (deg( v1) = m | (v0, v 1) ∈ E) μmt (sj )) ajm .
+
+## C. Simulation Details 
+
+We use MARLlib 1.0.0 (Hu et al., 2023a) building on RLlib 1.8.0 (Apache-2.0 license) (Liang et al., 2018) and its PPO implementation (Schulman et al., 2017) for IPPO and our algorithms. For our experiments, we used around 80 000 core hours on CPUs, and each training run usually took a single day of training on up to 96 parallel CPU cores. For the policies we used two hidden layers of 256 nodes with tanh activations. We used a discount factor of γ = 0 .99 with GAE λ = 1 .0,and training and minibatch sizes of 4000 and 1000 , performing 5 updates per training batch. The KL coefficient and clip parameter were set to 0.2, with a KL target of 0.03 . The learning rate was set to 0.00005 . The problem details are found in the following. 
+
+Susceptible-Infected-Susceptible (SIS). In the SIS model with state space X := {S, I }, agents are either infected ( I) or susceptible to a virus ( S). At each time step t ∈ T , agents either protect themselves ( P ) or not ( ¯P ) which is formalized by the action space U := {P, ¯P }. As usual, the game terminates at finite terminal time T ∈ N which can be interpreted as the time when a cure for the virus is found. Therefore, it remains to specify the transition dynamics. Susceptible agents who protect themselves at time t also remain susceptible at time t + 1 , i.e. 
+
+P k(S | S, P, G ) = 1 and P k(I | S, P, G ) = 0 ,
+
+irrespective of their degree k and neighborhood G. On the other hand, if a susceptible agent chooses action ¯P , the transition dynamics are 
+
+P k(I | S, ¯P , G ) = ρI · G(I) ·
+
+ 21 + exp( −k/ 2) − 1
+
+
+
+22 Learning Mean Field Control on Sparse Graphs 
+
+and P k(S | S, ¯P , G ) = 1 − P k(I | S, ¯P , G ), correspondingly, and where ρI > 0 is a fixed infection rate. Apart from that, infected agents recover with some fixed recovery rate 1 ≥ ρR ≥ 0, independent of their action and degree, which means that 
+
+P k(S | I, ¯P , G ) = P k(S | I, P, G ) = ρR .
+
+To complete the model, the reward per agent taking action u ∈ U in state x ∈ X at each time t is 
+
+r(x, u ) = −cP · 1P (u) − cI · 1I (x),
+
+where the cooperative objective J is obtained by talking the average reward over all agents and summing up over all time points. Here, cP and cI denote the constant costs of protecting oneself and being infected, respectively. In our experiments from the main text, the chosen parameter values are μ0(I) = 0 .4, μ 0(S) = 0 .6, T = 50 , ρ I = 0 .4, ρ R = 0 .1, c P = 0 .5, and 
+
+cI = 1 .
+
+Susceptible-Infected-Recovered (SIR). In the SIR model, we extend the state space from the SIS by the recovered state 
+
+R and obtain X := {S, I, R }. As only infected agents can recover, the transition dynamics of the SIS model are modified by 
+
+P k(R | I, ¯P , G ) = P k(R | I, P, G ) = ρR
+
+and 
+
+P k(R | R, ¯P , G ) = P k(R | R, P, G ) = 1 ,
+
+to formalize that recovered agents cannot become susceptible or infected again. The rewards and hence objective remain the same as in the SIS model. In the experiments, we set the parameter values μ0(I) = 0 .1, μ 0(S) = 0 .9, T = 50 , ρ I =0.1, ρ R = 0 .02 , c P = 0 .25 , and cI = 1 .
+
+Graph coloring (Color). In this problem, the state space consists of five colors X := {x1, x 2, x 3, x 4, x 5} allocated on a circle. Agents can move from the current color to the next color on the left ( ℓ), to the next one on the right ( r), or stay at their current color ( s) such that the action space is U := {ℓ, r, s }. The group of agents is also supposed to come close to a target distribution ν ∈ P (X ). To keep notations manageable, we make the auxiliary definition 
+
+˜Gk := min(1 , G 2 · ρd · exp( −2/k )) ,
+
+where ρd > 0 is a constant noise factor. The following three matrices specify the transition dynamics, where the row is the current agent color and the column is the next agent color: 
+
+P k(· | · , ℓ, G ) = 
+
+
+
+˜Gk(x1)/2 0 0 ˜Gk(x1)/2 1 − ˜Gk(x1)1 − ˜Gk(x2) ˜Gk(x2)/2 0 0 ˜Gk(x2)/2˜Gk(x3)/2 1 − ˜Gk(x3) ˜Gk(x3)/2 0 00 ˜Gk(x4)/2 1 − ˜Gk(x4) ˜Gk(x4)/2 00 0 ˜Gk(x5)/2 1 − ˜Gk(x5) ˜Gk(x5)/2
+
+
+
+and 
+
+P k(· | · , s, G ) = 
+
+
+
+1 − ˜Gk(x1) ˜Gk(x1)/2 0 0 ˜Gk(x1)/2˜Gk(x2)/2 1 − ˜Gk(x2) ˜Gk(x2)/2 0 00 ˜Gk(x3)/2 1 − ˜Gk(x3) ˜Gk(x3)/2 00 0 ˜Gk(x4)/2 1 − ˜Gk(x4) ˜Gk(x4)/2˜Gk(x5)/2 0 0 ˜Gk(x5)/2 1 − ˜Gk(x5)
+
+
+
+and 
+
+P k(· | · , r, G ) = 
+
+
+
+˜Gk(x1)/2 1 − ˜Gk(x1) ˜Gk(x1)/2 0 00 ˜Gk(x2)/2 1 − ˜Gk(x2) ˜Gk(x2)/2 00 0 ˜Gk(x3)/2 1 − ˜Gk(x3) ˜Gk(x3)/2˜Gk(x4)/2 0 0 ˜Gk(x4)/2 1 − ˜Gk(x4)1 − ˜Gk(x5) ˜Gk(x5)/2 0 0 ˜Gk(x5)/2
+
+ .
+
+23 Learning Mean Field Control on Sparse Graphs 
+
+The reward in our graph coloring model is defined as 
+
+r(xj , u, G ) := − (1ℓ(u) + 1r (u)) · cm − (G(xj−1) + G(xj+1 )) · cd −
+
+> 5
+
+X
+
+> i=1
+
+|μ(xi) − ν(xi)| · cν ,
+
+where cm, c d, c ν > 0 are the costs of moving, having neighbors with neighboring colors, and deviating from the target distri-bution ν, respectively. In our experiments, we choose the parameters μ0 = (1 , 0, 0, 0, 0) , ν = (0 .1, 0.2, 0.4, 0.2, 0.1) , T =20 , ρ d = 0 .9, c m = 0 .1, c d = 0 .5, and cν = 1 .
+
+Rumor. The state space X := {I, A } in the rumor model consists of the state A where an agent is aware of a rumor and state I where the agent does not know the rumor and is therefore ignorant of the rumor. Agents either spread the rumor S or decide not to do so ¯S which results in the action space U := {S, ¯S}. Since the rumor spreading probability increases with the number of aware numbers who decide to spread the rumor, we work with the extended state space X ′ := X ∪ (X × U ).Then, the transition dynamics are 
+
+P k(( A, u ) | A, u, G ) = P k(A | (A, u ), u, G ) = 1 , ∀u ∈ U , G ∈ Gk, k ∈ N
+
+meaning that aware agents remain aware, and furthermore 
+
+P k(( I, u ) | I, u, G ) = 1 , ∀u ∈ U , G ∈ Gk, k ∈ N
+
+and 
+
+P k(A | (I, u ), u, G ) = min 
+
+
+
+1, ρ A · G(( A, S )) ·
+
+ 21 + exp( −k/ 2) − 1
+
+ 
+
+P k(I | (I, u ), u, G ) = 1 − P k(A | (I, u ), u, G ) .
+
+To complete the rumor model, the reward is given by 
+
+r(x, u, G ) = 1(A,S )(x) ·  rS · G(( I, S )) + rS · G(( I, ¯S)) − cS · G(( A, S )) − cS · G(( A, ¯S)) 
+
+for each agent, where we obtain the overall objective by averaging over the individual rewards. In our experiments, the parameters are chosen as μ0(A) = 0 .1, μ 0(I) = 0 .9, T = 50 , ρ A = 0 .3, c S = 16 , and rS = 4 .24

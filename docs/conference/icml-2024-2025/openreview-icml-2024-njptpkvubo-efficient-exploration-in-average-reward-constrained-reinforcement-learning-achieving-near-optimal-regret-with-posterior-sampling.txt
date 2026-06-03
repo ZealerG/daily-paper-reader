@@ -1,0 +1,1919 @@
+Title: Efficient Exploration in Average-Reward Constrained Reinforcement Learning:  Achieving Near-Optimal Regret With Posterior Sampling
+
+URL Source: https://openreview.net/pdf?id=njpTpkvUbO
+
+Number of Pages: 19
+
+Markdown Content:
+# Efficient Exploration in Average-Reward Constrained Reinforcement Learning: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Danil Provodin 1 2 Maurits Kaptein 1 Mykola Pechenizkiy 1 3 
+
+# Abstract 
+
+We present a new algorithm based on posterior sampling for learning in Constrained Markov De-cision Processes (CMDP) in the infinite-horizon undiscounted setting. The algorithm achieves near-optimal regret bounds while being advan-tageous empirically compared to the existing algorithms. Our main theoretical result is a Bayesian regret bound for each cost component of ˜O(DS √AT ) for any communicating CMDP with S states, A actions, and diameter D. This regret bound matches the lower bound in order of time horizon T and is the best-known regret bound for communicating CMDPs achieved by a computationally tractable algorithm. Empiri-cal results show that our posterior sampling al-gorithm outperforms the existing algorithms for constrained reinforcement learning. 
+
+# 1. Introduction 
+
+Reinforcement learning (RL) refers to the problem of learn-ing by trial and error in sequential decision-making systems based on the scalar signal aiming to minimize the total cost accumulated over time. In many situations, however, the desired properties of the agent behavior are better described using constraints, as a single objective might not suffice to explain the real-life setting. For example, a robot should not only fulfill its task but should also control its wear and tear by limiting the torque exerted on its motors (Tessler et al., 2019); for telecommunication networks, it is neces-sary that the average end-to-end delay be limited, especially for voice traffic, while maximizing the throughput of the system (Altman, 1999); and autonomous driving vehicles should reach the destination in a time and fuel-efficient man-          
+
+> 1Eindhoven University of Technology, Eindhoven, The Nether-lands 2Jheronimus Academy of Data Science, ‘s-Hertogenbosch, The Netherlands 3University of Jyv ¨askyl ¨a, Jyv ¨askyl ¨a, Finland. Correspondence to: Danil Provodin <d.provodin@tue.nl >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+ner while obeying traffic rules (Le et al., 2019). A natural approach for handling such cases is specifying the problem using multiple objectives, where one objective is optimized subject to constraints on the others. A typical way of formulating the constrained RL problem is a Constrained Markov Decision Process (CMDP) (Altman, 1999), which proceeds in discrete time steps. At each time step, the system occupies a state , and the decision maker chooses an action from the set of allowable actions. As a result of choosing the action, the decision maker receives a (possibly stochastic) vector of costs , and the system then transitions to the next state according to a fixed state transi-tion distribution . In the reinforcement learning problem, the underlying state transition distributions and/or cost distribu-tions are unknown and need to be learned from observations while aiming to minimize the total cost. Learning in CMDPs has been a recurrent topic in the rein-forcement learning literature, with numerous works address-ing this challenge in episodic and discounted settings (see, e.g., Efroni et al. (2020); Brantley et al. (2020); Qiu et al. (2020); Liu et al. (2021); Kalagarla et al. (2023)). We con-sider the reinforcement learning problem in a more general 
+
+infinite-horizon average reward setting. When decisions are made frequently so that the discount rate is very close to 1, the decision-makers may prefer to compare policies on the basis of their expected infinite-horizon average re-ward instead of the expected total discounted reward, and the objective becomes to achieve optimal long-term average performance under constraints. This criterion is especially relevant for inventory systems with frequent restocking deci-sions or queueing control theory, particularly when applied to controlling computer systems (Puterman, 1994). Learning in CMDP in the infinite-horizon average reward 
+
+setting appears to be more challenging because it depends on the limiting behavior of the underlying stochastic process, and approaches for analyzing this setting vary with the class structure of CMDPs. For instance, Singh et al. (2023) and Zheng & Ratliff (2020) consider a restricted class of ergodic 
+
+CMDPs. In ergodic CMDPs, any policy will reach every state after a sufficient number of steps, making them self-explorative and easier to learn than general cases. Neverthe-less, achieving near-optimal regret bounds is still non-trivial 1Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling                                                                                  
+
+> Table 1. Summary of work on provably efficient constrained RL in the infinite-horizon average reward setting. Sand Arepresent the number of states and actions, mis the number of constraints, Tis the total horizon, TMis the mixing time, Dis the diameter of CMDP, p
+> represents transitions, and sp (p)is the span of CMDP (defined in Section 2). ˜Ohides logarithmic factors. The “Required knowledge” column denotes the information an algorithm requires as an input. The “Computation” column roughly denotes the time complexity with “Efficient” meaning an algorithm is designed to solve a problem using minimal resources, “Inefficient” – an algorithm consumes more time than necessary, and “Intractable” – an algorithm for which no known polynomial-time solution exists.
+> Constraint Required Algorithm Main Regret violation CMDP class knowledge Computation C-UCRL safe policy π
+> (Zheng & Ratliff, 2020) ˜O(mSAT 3/4)0ergodic and pefficient UCRL-CMDP (Singh et al., 2023) ˜O(TM
+> √SAT 2/3)˜O(TM
+> √SAT 2/3)ergodic Tinefficient Alg. 3 weakly (Chen et al., 2022) ˜O(sp (p)( S2AT 2)1/3)˜O(sp (p)( S2AT 2)1/3)communicating sp (p),Tinefficient frequentist Alg. 4 weakly (Chen et al., 2022) ˜O(sp (p)S√AT )˜O(sp (p)S√AT )communicating sp (p),Tintractable CMDP-PSRL (Agarwal et al., 2022) ˜O(TMS√AT )˜O(TMS√AT )ergodic -efficient Bayesian PSC ON RL (this paper) ˜O(DS √AT )˜O(DS √AT )communicating -efficient lower bound (Singh et al., 2023) Ω( √DSAT )Ω( √DSAT )---
+
+under constraints, and the proposed algorithms only achieve suboptimal regret bounds: with UCRL-CMDP (Singh et al., 2023) achieving ˜O(T 2/3) regret and cost violation bound and C-UCRL (Zheng & Ratliff, 2020) achieving ˜O(T 3/4)
+
+regret bound with no cost violations. In contrast, Chen et al. (2022) consider a broad class of weakly communicating 
+
+CMDPs, which allows more interesting practical scenarios. They propose two algorithms in this more general setting, albeit imposing impractical assumptions about knowledge of some problem-specific parameters. The first algorithm is computationally tractable but theoretically suboptimal, only achieving ˜O(T 2/3) regret and cost violation bounds; the second is an intractable algorithm with near-optimal regret and cost violation bounds of ˜O(√T ). The main theoretical results for this setting are summarized in Table 1. In this paper, we propose a practical and efficient algorithm based on the posterior sampling principle (Thompson, 1933). This principle involves maintaining a posterior distribution for the unknown parameters and guides the exploration by the variance of the distribution. The posterior sampling prin-ciple underpins many algorithms in reinforcement learning (Osband et al., 2013; Abbasi-Yadkori & Szepesv ´ari, 2015; Agrawal & Jia, 2017; Ouyang et al., 2017). 
+
+Our main contribution is a posterior sampling-based algo-rithm (PSC ON RL), which achieves near-optimal Bayesian regret bounds while being computationally efficient. Draw-ing inspiration from the algorithmic design structure of Ouyang et al. (2017), the algorithm proceeds in episodes with two stopping criteria. At the beginning of every episode, it samples transition probability vectors from a posterior distribution for every state-action pair. The key idea of the algorithm is to switch to efficient exploration whenever the sampled transitions are infeasible, which we show to be necessary for communicating CMDPs. When sampled transitions are feasible, the algorithm solves for the optimal policy by utilizing a linear program (LP) in the space of occupancy measures that incorporates constraints directly (Altman, 1999). The optimal policy computed for the sampled CMDP is used throughout the episode. Under a Bayesian framework, we show that the expected regret and cost violation of our algorithm accumulated up to time T is bounded by ˜O(DS √AT ) for any communicating CMDP with S states, A actions, and diameter D.A closely related study by Agarwal et al. (2022) analyzes the long-term average Bellman error in constrained opti-mization to address potential infeasibility issues of posterior sampling. They achieve the Bayesian regret and cost vio-lation bounds of ˜O(TM S√AT ), where TM is the mixing time. 1 However, they focus on the ergodic CMDP structure, and, as detailed in Sections 3.2, their method cannot be applied to communicating CMDPs. Thus, the main result of the paper shows that near-optimal Bayesian regret bounds are achievable in constrained rein-forcement learning. To the best of our knowledge, this is the first work to obtain a computationally tractable algorithm with near-optimal regret bounds for the infinite-horizon av-erage reward setting when underlying CMDP is communi-cating. Additionally, simulation results demonstrate that our algorithm significantly outperforms existing approaches for three CMDP benchmarks.      
+
+> 1Mixing time can be arbitrarily loose compared to the diameter, e.g., TM∼O(DS)for some problem instances (Bartlett & Tewari, 2009).
+
+2Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+The rest of the paper is organized as follows. Section 2 is devoted to the methodological setup and contains the prob-lem formulation. The PSC ON RL algorithm is introduced in Section 3. Analysis of the algorithm is presented in Section 4, which is followed by numerical experiments in Section 5. Section 6 briefly reviews the previous related work. Finally, we conclude with Section 7. 
+
+# 2. Problem formulation 
+
+2.1. Constrained Markov Decision Processes 
+
+A constrained MDP model is defined as a tuple M =(S, A, p, c, τ ) where S is the state space, A is the action space, p : S × A − → ∆S is the transition function, with 
+
+∆S indicating simplex over S, c : S × A − → [0 , 1] m+1 is the cost vector function, and τ ∈ [0 , 1] m is a cost threshold. In general, CMDP is an MDP with multiple cost functions (c0, c 1, . . . , c m), one of which, c0, is used to set the opti-mization objective, while the others, ( c1, . . . , c m), are used to restrict what policies can do. A stationary policy π is a mapping from state space S to a probability distribution on the action space A, π : S − → ∆A, which does not change over time. Let S = |S| and A = |A| , where | · | denotes the cardinality. For transitions p and a scalar cost function c, a stationary policy π induces a Markov chain, and the expected infinite-horizon average cost ( loss ) for state s ∈ S is defined as 
+
+Jπ (s; c, p ) = lim T →∞ 
+
+1
+
+T
+
+> T
+
+X
+
+> t=1
+
+Eπp [c(st, a t)|s0 = s] , (1) where Eπp is the expectation under the probability mea-sure Pπp over the set of infinitely long state-action trajec-tories. Pπp is induced by policy π, transition function p,and the initial state s. Given some fixed initial state s and 
+
+τ1, . . . , τ m ∈ R , the CMDP optimization problem is to find a policy π that minimizes Jπ (s; c0, p ) subject to the constraints Jπ (s; ci, p ) ≤ τi, i = 1 , . . . , m :
+
+min  
+
+> π
+
+Jπ (s; c0, p ) s.t. Jπ (s; ci, p ) ≤ τi, i = 1 , . . . , m . (2) 
+
+Communicating CMDPs. To control the regret vector (defined below), we consider the subclass of communicating CMDPs. Formally, define the diameter of CMDP with transitions p as the minimum time required to go from one state to another in the CMDP using some stationary policy: 
+
+D(p) = max  
+
+> s̸=s′
+
+min 
+
+> π:S→ ∆A
+
+T πs→s′ ,
+
+where T πs→s′ is the expected number of steps to reach state 
+
+s′ when starting from state s and using policy π. CMDP is communicating if and only if it has a finite diameter, that is to say, for every pair of states s and s′ there exists a stationary policy under which s′ is accessible from s in at most D(p) steps, for some finite D(p) ≥ 0.We define Ω∗ to be the set of all transitions p such that the CMDP with transition probabilities p is communicating, and there exists a number D such that D(p) ≤ D. We will focus on CMDPs with transition probabilities in set Ω∗.Next, by (Puterman, 1994)[Theorem 8.2.6], for scalar cost function c, transitions p that corresponds to communicating CMDP, and stationary policy π, there exists a bias function 
+
+v(s; c, p ) satisfying the Bellman equation for all s ∈ S :
+
+Jπ (s; c, p ) + vπ (s; c, p ) (3) 
+
+= X
+
+> a∈A
+
+π(a|s)
+
+"
+
+c(s, a ) + X
+
+> s′∈S
+
+p(s′|s, a )vπ (s′; c, p )
+
+#
+
+.
+
+If v satisfies the Bellman equation, v plus any constant also satisfies the Bellman equation. Furthermore, the loss of the optimal stationary policy π∗ does not de-pend on the initial state, i.e., Jπ∗ (s; c, p ) = Jπ∗ (c, p ),as presented in (Puterman, 1994)[Theorem 8.3.2]. With-out loss of generality, let min s∈S vπ∗ (s; ci, p ) = 0 , for 
+
+i = 1 , . . . m , and define the span of the MDP as sp (p) = max 1≤i≤m max s∈S vπ∗ (s; ci, p ). Note, if D(p) ≤ D, then 
+
+sp (p) ≤ D as well (Bartlett & Tewari, 2009). 
+
+Linear programming for solving CMDPs. When CMDP is known, an optimal policy for (2) can be obtained by solving the following linear program (LP)(Altman, 1999): 
+
+min 
+
+> μ
+
+X
+
+> s,a
+
+μ(s, a )c0(s, a ), (4) 
+
+s.t. X
+
+> s,a
+
+μ(s, a )ci(s, a ) ≤ τi, i = 1 , . . . , m, (5) 
+
+X
+
+> a
+
+μ(s, a ) = X
+
+> s′,a
+
+μ(s′, a )p(s′, a, s ), ∀s ∈ S , (6) 
+
+μ(s, a ) ≥ 0, ∀(s, a ) ∈ S × A , X
+
+> s,a
+
+μ(s, a ) = 1 , (7) where the decision variable μ(s, a ) is occupancy measure (fraction of visits to (s, a )). Given the optimal solution for LP (4) - (7) , μ∗(s, a ), one can construct the optimal station-ary policy π∗(a|s) for (2) by choosing action a in state s
+
+with probability μ∗(s,a )P  
+
+> a′μ∗(s,a ′)
+
+.Given the above definitions and results, we can now define the reinforcement learning problem studied in this paper. 
+
+2.2. The reinforcement learning problem 
+
+We study the reinforcement learning problem where an agent interacts with a communicating CMDP M =(S, A, p ∗, c, τ ). We assume that the agent has complete knowledge of S, A, and the cost function c, but not the tran-sitions p∗ or the diameter D. This assumption is common 3Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+for RL literature (Bartlett & Tewari, 2009; Agrawal & Jia, 2017; Osband & Van Roy, 2017; Kalagarla et al., 2023) and is without loss of generality because the complexity of learning the cost and reward functions is dominated by the complexity of learning the transition probability. We focus on a Bayesian framework for the unknown parame-ter p∗. That is, at the beginning of the interaction, the actual transition probabilities p∗ are randomly generated from the prior distribution f1. The agent can use past observations to learn the underlying CMDP model and decide future actions. The goal is to minimize the total cost PTt=1 c0(st, a t) while violating constraints as little as possible, or equivalently, minimize the total regret for the main cost component and auxiliary cost components over a time horizon T , defined as 
+
+BR +(T ; c0) = E
+
+" TX
+
+> t=1
+
+ c0(st, a t) − Jπ∗ (c0; p∗)
+
+> +
+
+#
+
+,BR +(T ; ci) = E
+
+" TX
+
+> t=1
+
+ ci(st, a t) − τi
+
+
+
+> +
+
+#
+
+, i = 1 , . . . , m, 
+
+where st, a t, t = 1, . . . , T , are generated by the agent, 
+
+Jπ∗ (c0; p∗) is the optimal loss of the CMDP M , and 
+
+[x]+ := max {0, x }. The above expectation is with re-spect to the prior distribution f1, the randomness in the state transitions, and the randomized policy. 
+
+2.3. Assumptions 
+
+We introduce two mild assumptions that are common in reinforcement learning literature. 
+
+Assumption 2.1. The support of the prior distribution f1
+
+is a subset of Ω∗. That is, the CMDP M is communicating and D(p∗) ≤ D.This type of assumption is common for the Bayesian frame-work (see, e.g., (Ouyang et al., 2017; Agarwal et al., 2022)) and is not overly restrictive (Bartlett & Tewari, 2009; Chen et al., 2022). In the experiments section, we provide a prac-tical justification for this assumption and show that it can be supported by choosing Dirichlet distribution as a prior. 
+
+Assumption 2.2. There exists γ > 0 and unknown policy 
+
+¯π(·| s) ∈ ∆A such that J ¯π (ci, p ∗) ≤ τi − γ for all i ∈{1, . . . , m }, and without loss of generality, we assume under such policy ¯π, the Markov chain resulting from the CMDP is irreducible and aperiodic. The first part of the assumption is standard in constrained reinforcement learning (see, e.g., (Efroni et al., 2020; Ding et al., 2021)) and is mild as we do not require the knowledge of such policy. The second part is without loss of generality due to Puterman (1994)[Proposition 8.3.1] and Puterman (1994)[Proposition 8.5.8]. By imposing this assumption, we can control the sensitivity of problem (2) to the deviation between the true and sampled transitions. Later, we will use this assumption to guarantee that the minimization problem in Eq. (2) becomes feasible under the sampled transitions. 
+
+# 3. PSC ON RL: Learning algorithm for constrained reinforcement learning 
+
+In this section, we propose the Posterior Sampling for Con-strained Reinforcement Learning (PSC ON RL) algorithm. Our algorithm is based on an intuitive idea of constructing an adaptive exploration mechanism to address the feasibility issues. It maintains posteriors for the transition function and combines the steps of solving LP through the lens of occupancy measure with the construction of exploration MDPs (whenever LP is infeasible). Below, we describe the main components of our algorithm, which is summarized in Algorithm 1. 
+
+Bayes rule. At each timestep t, given history ht, the agent can compute posterior distribution ft given by ft(P) = 
+
+P(p∗ ∈ P| ht) for any set P. Upon applying action at and observing a new state st+1 , the posterior distribution at t + 1 
+
+can be updated according to Bayes’ rule as 
+
+ft+1 (dp ) = p(st+1 |st, a t)ft(dp )
+
+R p′(st+1 |st, a t)ft(dp ′) . (8) The key challenge of posterior sampling is that neither prob-lem in Eq. (2) nor LP (4) -(7) are guaranteed to be feasible under the sampled transitions pt ∼ ft, and it is unclear how the agent should proceed if LP (4) - (7) is infeasible. As we show in Lemma 4.4, after sufficient exploration, LP (4) -(7) becomes feasible with high probability (when each state-action pair is visited pT /A times). Therefore, whenever LP (4) - (7) is infeasible, the agent switches to efficient ex-ploration by constructing shortest path policies for a set of MDPs described below. 
+
+Reduction to a set of exploration MDPs. To facilitate efficient exploration, we introduce a set of MDPs, denoted as {(S, A, p t, c s)}s∈S . Each MDP in this set retains the original state and action spaces, with the transition function 
+
+pt ∼ ft and a state-dependent cost function cs, defined as 
+
+cs(s′, a ) = 
+
+(
+
+1, if s′̸ = s;
+
+0, otherwise. Consider a specific target state ¯s and its corresponding MDP 
+
+M t 
+
+> ¯s
+
+= ( S, A, p t, c ¯s). Note, MDP M t 
+
+> ¯s
+
+is communicating with a scalar cost function, and, from MDP theory, we know that there exists an optimal policy πt 
+
+> ¯s
+
+that satisfies the Bellman optimality equation: 
+
+J∗(c¯s, p t) + v∗(s; c¯s, p t) (9) 
+
+= min 
+
+> a∈A
+
+(
+
+c¯s(s, a ) + X
+
+> s′∈S
+
+pt(s′|s, a )v∗(s′; c¯s, p t)
+
+)
+
+, ∀s ∈ S .
+
+4Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+In essence, the optimal policy πt 
+
+> ¯s
+
+corresponds to a policy that efficiently guides the agent through the MDP toward the target state ¯s, thereby enabling efficient exploration. The formalization of this intuitive concept will be presented in Section 4. 
+
+3.1. Algorithm description 
+
+PSC ON RL begins with a prior distribution over transitions 
+
+f1 and proceeds in episodes. Let Nt(s, a ) denote the num-ber of visits to (s, a ) before time t and Nt(s) denote the number of visits to s. We use two stopping criteria of Ouyang et al. (2017) for episode construction. The rounds 
+
+t = 1 , ..., T are broken into consecutive episodes as follows: the k-th episode begins at the round tk immediately after the end of (k − 1) -th episode and ends at the first round t
+
+such that (i) Nt(s, a ) ≥ 2Ntk (s, a ) or (ii) t ≤ tk +Tk−1 for some state-action pair (s, a ), where Tk = tk+1 − tk is the length of episode k. The first criterion is the doubling trick of Jaksch et al. (2010) and ensures the algorithm has visited some state-action pair (s, a ) at least the same number of times it had visited this pair (s, a ) before episodes k started. The second criterion controls the growth rate of episode length and is believed to be necessary under the Bayesian setting (Ouyang et al., 2017). At the beginning of episode k, a parameter pk is sampled from the posterior distribution ftk , where tk is the start of the k-th episode. During each episode k, actions are gener-ated from the optimal stationary policy πk for the sampled parameter pk, which is observed either by solving LP (4) -(7) (if it is feasible) or by recovering the shortest path policy for a state with minimum visitations to it. Using Assumption 2.2, we will show that eventually, after O(√T ) steps, the sampled CMDP becomes feasible, and the algorithm will effectively compute πk by solving LP (4)-(7). 
+
+Remark 3.1 . Note that PSC ON RL only requires the knowl-edge of S, A, c, and the prior distribution f1. It does not require the knowledge of the horizon T , or the bias span 
+
+sp (p) as in Singh et al. (2023) and Chen et al. (2022). 
+
+3.2. Importance of additional exploration for communicating CMDPs 
+
+In this subsection, we highlight the importance of reducing the problem to the exploration MDPs within our algorithm. In contrast to our approach, PSRL-CMDP (Agarwal et al., 2022) exclusively solves LP (4) - (7) for the optimal solu-tion, and in cases when the optimal solution is infeasible, they opt to disregard constraints and proceed with the un-constrained problem. They argue that, eventually, the LP becomes feasible due to the self-exploratory properties of ergodic CMDPs. Unfortunately, this argument does not hold for communicating CMDPs, as demonstrated by the following example. 
+
+Algorithm 1 Posterior Sampling for Constrained Reinforce-ment Learning (PSC ON RL)  
+
+> 1:
+
+Input: f1 
+
+> 2:
+
+Initialization: t ← 1, tk ← 0, π0(·) ← 1 
+
+> |A|
+> 3:
+
+for episodes k = 1 , 2, . . . do  
+
+> 4:
+
+Tk−1 ← t − tk 
+
+> 5:
+
+tk ← t 
+
+> 6:
+
+Generate pk(·| s, a ) ∼ ftk 
+
+> 7:
+
+if LP (4)-(7) is feasible under pk(·| s, a ) then  
+
+> 8:
+
+Compute πk(·) by solving LP (4)-(7)  
+
+> 9:
+
+else  
+
+> 10:
+
+Select s with minimum number of visits Ntk (s) 
+
+> 11:
+
+Compute πk(·) by solving Eq. (9) for MDP Ms 
+
+> 12:
+
+end if  
+
+> 13:
+
+repeat  
+
+> 14:
+
+Apply action at = πk(st) 
+
+> 15:
+
+Observe new state st+1  
+
+> 16:
+
+Update counter Nt(st, a t) 
+
+> 17:
+
+Update ft+1 according to Eq. (8)  
+
+> 18:
+
+t ← t + 1  
+
+> 19:
+
+until t ≤ tk + Tk−1 and Nt(s, a ) ≤ 2Ntk (s, a ) for some (s, a ) ∈ S × A  
+
+> 20:
+
+end for 
+
+Example 3.2 . Consider a two-state S = {s0, s 1}, two-action A = {a0, a 1} CMDP in which the controlled tran-sition probabilities p∗(s0, a 1, s 1) = θ and p∗(s0, a 1, s 0) = 1 − θ are unknown, while remaining probabilities are 
+
+p∗(s0, a 0, s 1) = 1 , p∗(s1, ·, s 1) = 1 and known. See Figure 1(a) for illustration. Assume that r(s0, ·) = 1 , c(s0, ·) = 1 
+
+and r(s1, ·) = 0 , c(s1, ·) = 0 , i.e., reward and cost depend only upon the current state. Further, let θ = 0 .9 and the average cost threshold τ = 0 .5275 (the lowest possible bud-get that corresponds to a feasible problem). Note that this CMDP is not ergodic because starting from s0 and utiliz-ing a policy that chooses action a0 will never visit state s1.Also, such a policy would clearly correspond to an optimal solution in case there is no budget constraint. For two algorithms, PSC ON RL (ours) and PSRL-CMDP (Agarwal et al., 2022), we demonstrate their performance through simulations on this toy CMDP. For both algorithms, we set the prior distribution to Beta (1 , 1) with the param-eters of the distribution being the number of visitations to 
+
+(s0, a 0) and (s0, a 1) state-action pairs. At each timestep, we sample the plausible parameter ˜θ. Whenever the sampled CMDP is infeasible, we utilize the optimal policy for the un-constrained problem for PSRL-CMDP (policy that chooses action a0 all the time) and the shortest path policy according to Eq. (9) for PSC ON RL (policy that chooses action a1 all the time). Note that the sampled CMDP is infeasible every time ˜θ < θ , due to the choice of cost threshold. Figure 1(b) demonstrates the results of the experiment. 5Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling          
+
+> (a) Symbolic illustration of Example 3.2. (b) Simulation results for Example 3.2.
+> Figure 1. CMDP illustration and results of the experiments for Example 3.2, with θ= 0 .9and the average cost threshold τ= 0 .5275 .Figure 1(a) represents the CMDP in symbolic form. Figure 1(b) presents average cost (left), and realizations of ˜θ(right). Results are averaged over 5 runs.
+
+Specifically, we present the average cost (left) and real-izations of ˜θ (right). Taking a closer look at the average cost subplot (left), we can see that PSC ON RL consistently fluctuates around the cost threshold and, overall, satisfies the constraint of the problem, whereas PSRL-CMDP severely violates the constraint. Moving to the right subplot, it is evident that PSC ON RL successfully learns the true value of parameter θ, while PSRL-CMDP fails to do so. A series of assumptions in (Agarwal et al., 2022) makes a Markov chain induced by any policy aperiodic, recurrent, and irreducible. Such favorable properties make any CMDP self-exploratory, meaning that for a sampled CMDP, a policy that solely maximizes the main reward (regardless of con-straints) will sufficiently explore the environment and, even-tually, collect enough information to find the true optimal solution. However, this does not hold for communicating CMDPs and necessitates additional exploration to ensure feasibility. As such, a more involved theoretical analysis is required to address this issue for communicating CMDPs. 
+
+# 4. Regret bound 
+
+We now provide our main result for the PSC ON RL algo-rithm for learning in CMDPs. 
+
+Theorem 4.1. For any communicating CMDP M with S
+
+states, A actions, under Assumptions 2.1 and 2.2, for T ≥
+
+Ω(( D/γ )4S2A log 2(2 AT )) , the Bayesian regret for main and auxiliary cost components of Algorithm 1 are bounded: 
+
+BR +(T ; ci) ≤ O
+
+
+
+DS pAT log( AT )
+
+
+
+, i = 0 , . . . , m. 
+
+Here O(·) notation hides only the absolute constant.E Remark 4.2 . The regret bound closely matches the theoreti-cal lower bound of Ω( √DSAT ). Also, the provided bound matches the best bound for the undiscounted setting without constraints. We emphasize that the O(√DS ) gap between lower and upper bounds remains an open question for the undiscounted setting with and without constraints. The full proof of Theorem 4.1 is presented in the Appendix A.1. In the remainder of this section, we introduce three lemmas that are pivotal to our analysis and present a proof sketch for Theorem 4.1. 
+
+4.1. Key lemmas 
+
+A key property of posterior sampling is that conditioned on the information at time t, the transition functions p∗
+
+and pt have the same distribution if pt is sampled from the posterior distribution at time t (Osband et al., 2013). Since the PSC ON RL algorithm samples pk at the stopping time tk,we use the stopping time version of the posterior sampling property stated as follows. 
+
+Lemma 4.3 (Posterior sampling lemma; adapted from Lemma 1 of (Jafarnia-Jahromi et al., 2021)) . Let tk be a stopping time with respect to the filtration (Ft)∞
+
+> t=1
+
+, and 
+
+pk be the sample drawn from the posterior distribution at time tk. Then, for any measurable function g and any Ftk -measurable random variable X, we have 
+
+E [g(pk, X )] = E [g(p∗, X )] .
+
+Recall that in every episode k, PSC ON RL runs either an optimal loss policy by solving LP (4) - (7) for the sampled transitions or computes the optimal stationary policy for a fixed finite MDP. In Lemma 4.4, we show that problem (2) becomes feasible under sampled transitions after sufficient exploration of every state-action pair, i.e., there exists a pol-icy that satisfies constraints in problem (2) and Algorithm 1 will effectively find an optimal solution for LP (4)-(7). We address the feasibility issues by using the deviation bound between sampled and true transitions and the limiting matrix properties of the resulting Markov chains. Unlike optimistic algorithms (Singh et al., 2023; Chen et al., 2022), which optimize over a confidence set of plausible transitions, Lemma 4.4 introduces a computationally efficient approach to deal with feasibility issues. 
+
+Lemma 4.4 (Feasibility lemma) . If Ntk (s, a ) ≥ pT /A ,
+
+∥pk(·| s, a ) − p∗(·| s, a )∥1 ≤
+
+q 14 S log(2 AT t k )max {1,N tk (s,a )} for all 
+
+(s, a ), and γ ≥ D
+
+q 14 SA 1/2 log(2 AT 2) 
+
+> √T
+
+there exists policy 
+
+π, which satisfies Jπ (ci, p k) ≤ τi for all i ∈ { 1, . . . , m }.
+
+6Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Next, in Lemma 4.5, we prove that PSC ON RL explores the environment efficiently, whenever LP (4) - (7) is infeasible, and requires O(DS √AT ) to visit each state-action pair pT /A times. 
+
+Lemma 4.5 (Exploration lemma) . Define set 
+
+G = {p ∈ Ω∗ : ∃π s.t. Jπ (ci; p) ≤ τi, ∀i ∈ { 1, . . . , m }} .Whenever πk is computed as an optimal policy for Eq. (9) ,i.e., pk /∈ G , the average number of timesteps to visit each state-action pair pT /A times is bounded by 2DS √AT +1 .Formally, 
+
+X 
+
+> k:tk≤T
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+I
+
+n
+
+∃(s, a ) : Ntk (s, a ) < √T
+
+o
+
+| pk /∈ G 
+
+#
+
+≤ 2DS √AT + 1 .
+
+Lemma 4.5 plays a crucial role in facilitating efficient ex-ploration. It ensures that the deviation between sampled and true transitions becomes sufficiently small, thereby sat-isfying the conditions outlined in Lemma 4.4. Importantly, our exploration mechanism requires overall O(√T ) steps, whereas the existing approaches designate O(T 2/3) steps for exploration in constrained problems and only achieve suboptimal regret of ˜O(T 2/3), e.g., UCRL-CMDP (Singh et al., 2023) and Alg. 3 (Chen et al., 2022). Only Alg. 4 (Chen et al., 2022) allocates O(√T ) steps for exploration, leading to near-optimal regret bound. However, this explo-ration scheme renders their algorithm intractable. The Feasibility and Exploration lemmas form one of the main novel components of the analysis of Theorem 4.1. 
+
+4.2. Proof Sketch of Theorem 4.1 
+
+Below, we show a proof sketch of the main theorem for the main regret component. The proof for auxiliary cost components is deferred to the Appendix A.1. We decompose the total regret into the sum of episodic regrets conditioned on the event that the sampled CMDP is feasible: 
+
+BR +(T ; c0) = E
+
+" TX
+
+> t=1
+
+(c0(st, a t) − Jπ∗ )+
+
+#
+
+=
+
+> KT
+
+X
+
+> k=1
+
+E
+
+"X
+
+> t
+
+[c0(st, a t) − Jπ∗ ] |pk ∈ G 
+
+#
+
+P (pk ∈ G )+
+
+> KT
+
+X
+
+> k=1
+
+E
+
+"X
+
+> t
+
+[c0(st, a t) − Jπ∗ | pk /∈ G 
+
+#
+
+P (pk /∈ G ) ,
+
+where Jπ∗ = Jπ∗ (c0; p∗) is the optimal loss of CMDP 
+
+M , KT is the number of episodes, and G is defined in the statement of Lemma 4.5. For the first term, conditioned on the good event, {pk ∈ G} ,the sampled CMDP is feasible, and the standard analysis of Ouyang et al. (2017) can be applied. Lemma A.2 shows that this term can be bounded by (D + 1) p2SAT log( T ) + 49 DS pAT log( AT ).As for the second term, we further decompose it conditioned on two events: A1 = {pk /∈ G∧ Ntk (s, a ) ≥ pT /A, ∀s, a }
+
+and A2 = {pk /∈ G ∧ ∃ (s, a ) : Ntk (s, a ) < pT /A }. Using the Feasibility lemma, we then show that P(A1) is bounded by 2/15 T t k for each k, and the total regret corresponding to event A1 is negligible. Next, conditioned on A2, we can uti-lize the Exploration lemma and show that P 
+
+> k
+
+E [P 
+
+> t
+
+[c0(st, a t) − Jπ∗ | A2] P (A2) < 2DS √AT + 1 ,due to the efficient exploration property of our algorithm. Putting all bounds together, we obtain the resulting regret bound of: 
+
+BR +(T ; c0) ≤ O
+
+
+
+DS pAT log( AT )
+
+
+
+.
+
+# 5. Simulation results 
+
+In this section, we evaluate the performance of PSC ON RL. The source code of the experiments can be found at https: //github.com/danilprov/cmdp .We present PSC ON RL using Dirichlet priors with parame-ters [0 .1, . . . , 0.1] . The Dirichlet distribution is a convenient choice for maintaining posteriors for the transition probabil-ity vectors p(s, a ) since it is a conjugate prior for categorical and multinomial distributions. Moreover, Dirichlet prior is proven to be highly effective for any underlying MDP in unconstrained problems (Osband & Van Roy, 2017). We employ three algorithms as baselines: C-UCRL (Zheng & Ratliff, 2020), UCRL-CMDP (Singh et al., 2023), and FHA (Alg. 3) from (Chen et al., 2022). Both Alg. 4 of (Chen et al., 2022) and PSRL-CMDP of (Agarwal et al., 2022) are omitted from the empirical analysis due to their practical inapplicability. For additional information about the baselines, see Appendix B.1. We run our experiments on three gridworld environments: Marsrover 4x4, Marsrover 8x8 (Zheng & Ratliff, 2020), and Box (Leike et al., 2017). To enable fair comparison, all algorithms were extended to the unknown reward/costs and unknown probability transitions setting (see Appendix B for more experimental details). Figure 2 illustrates the simulation results of all algorithms across three benchmark environments. The top row shows the cumulative regret of the main cost component. The bottom row presents the cumulative constraint violation. We first analyze the behavior of the algorithm on Marsrover environments (left and middle columns). The cumulative regret (top row) shows that PSC ON RL consistently out-performs all three algorithms. Looking at the cumulative 7Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling      
+
+> Figure 2. The main regret and constraint violation of the algorithms as a function of the horizon for Marsrover 4x4 (left column), Marsrover 8x8 (middle column), and Box (right column). (Top row) shows the cumulative regret of the main cost component. (Bottom row) shows the cumulative constraint violation. Results are averaged over 50 runs for Marsrover 4x4 and over 30 runs for Marsrover 8x8 and Box. Results for UCRL-CMDP and FHA (Alg. 3) are averaged over 10 runs for Marsrover 4x4.
+
+constraint violation (bottom row), we see that PSC ON RL is comparable with C-UCRL, the only algorithm that ad-dresses safe exploration. In the Box example (right column), PSC ON RL significantly outperforms C-UCRL, which in-curs near-linear regret. We note that exploration is relatively costly in this benchmark compared to Marsrover environ-ments (see the difference on the x and y-axes in the top row), which suggests that C-UCRL might be impractical in (at least some) problems where exploration is non-trivial. In Figure 5, we further elaborate on the average performance of the algorithms interpreting regret behavior. We note the pronounced computational inefficiency of UCRL-CMDP and FHA (Alg. 3) algorithms. UCRL-CMDP involves optimization not only across the space of occupancy measures but also across the set of plausi-ble CMDPs, resulting in an exhausting non-linear program. In the most favorable scenario, it requires O(( S2A)4) op-erations per episode. On the other hand, FHA (Alg. 3) maintains linearity in its main optimization program but necessitates solving it at each timestep, leading to time com-plexity of O(( SAT 1/3)2) per episode. Although both algo-rithms enjoy polynomial time complexity, the undesirable dependence on problem parameters makes them impractical even for moderate-sized problems. Due to these substan-tial drawbacks, we have limited their implementation to the Marsrover 4x4 environment. Additionally, we would like to point out that in these exam-ples, CMDPs are fixed and not generated from the Dirichlet prior. Therefore, we conjecture that PSC ON RL has the same regret bounds under a non-Bayesian setting. 
+
+# 6. Related work 
+
+Several algorithms based on the optimism in the face of uncertainty (OFU) principle have been proposed for con-strained RL problems. For the episodic setting, both Efroni et al. (2020) and Brantley et al. (2020) consider sample effi-cient exploration utilizing a double optimism principle. As previously mentioned, Singh et al. (2023) and Chen et al. (2022) study OFU-based algorithms in the infinite-horizon average reward setting. It is worth mentioning that OFU-based algorithms often involve optimization across a set of plausible models (see, e.g., (Efroni et al., 2020; Singh et al., 2023)), which makes them computationally less appealing. Another line of closely related works investigates safe RL, addressing constrained reinforcement learning problems with constant or zero constrain violation guarantees. Sev-eral algorithms were proposed in episodic setting (Liu et al., 2021; Wei et al., 2022; Kalagarla et al., 2023), with Kala-garla et al. (2023) focusing on posterior sampling algorithm for safe reinforcement learning. In the infinite-horizon av-erage reward setting, the safe RL problem was previously 8Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+analyzed in (Zheng & Ratliff, 2020; Chen et al., 2022). No-tably, safe RL algorithms often assume that the transition model and/or safe policy are known. Among other related work, Lagrangian relaxation is a widely adopted technique for solving CMDPs. The works of (Achiam et al., 2017; Tessler et al., 2019) present con-strained policy optimization approaches that demonstrate prominent successes in artificial environments. However, these approaches are notoriously sample-inefficient and lack theoretical guarantees. More scalable versions of the Lagrangian-based methods were proposed in (Chow et al., 2018; Qiu et al., 2020; Chen et al., 2021; Provodin et al., 2022). In general, the Lagrangian relaxation method can achieve high performance, but it is sensitive to the initializa-tion of the Lagrangian multipliers and learning rate. 
+
+# 7. Conclusion 
+
+In this paper, we introduced the PSC ON RL algorithm for ef-ficient exploration in constrained reinforcement learning un-der the infinite-horizon average reward criterion. Our algo-rithm achieves near-optimal Bayesian regret bounds for each cost component while being computationally efficient and easy to implement. By addressing these aspects, PSC ON RL fills a crucial gap in provably efficient constrained RL. PSC ON RL leverages LP solutions to determine optimal policies and incorporates efficient exploration whenever the sampled CMDP is infeasible. As demonstrated in Sec-tion 3.2, the empirical comparison between PSC ON RL and CMDP-PSLR highlights that the exploration step is not merely a technical requirement for proofs but is indeed es-sential for effective learning in communicating CMDPs. Finally, we validated our approach using simulations on three gridworld domains and showed that PSC ON RL quickly converges to the optimal policy even when CMDPs are not sampled from Dirichlet priors, consistently outper-forming existing algorithms. Our insights suggest that the use of posterior sampling might be of great value for design-ing a computationally efficient algorithm with near-optimal frequentist regret bounds. Exploring this direction further is a promising avenue for future work. We also believe that this superior performance extends beyond the scope of gridworld domains to real-life applications. 
+
+# Acknowledgements 
+
+This project is partially financed by the Dutch Research Council (NWO) and the ICAI initiative in collaboration with KPN, the Netherlands. The authors thank Pratik Gajane and Thiago D. Sim ˜ao for discussions on earlier drafts of the paper. 
+
+# Impact Statement 
+
+Our work focuses on the theoretical foundations of con-strained reinforcement learning, emphasizing practical rele-vance and applicability. We believe that understanding the theoretical foundations is essential and, when coupled with addressing practically relevant issues, can directly guide the principled and effective application of these methods to real-life problems. We believe that constraints represent a pivotal limitation in extending RL to real-life problems, such as nuclear fu-sion, medical treatment, and advertising. Consequently, the potential impact of our work extends to developing the foundations contributing to safe and responsible AI in the context of constrained reinforcement leanring. 
+
+# References 
+
+Abbasi-Yadkori, Y. and Szepesv ´ari, C. Bayesian optimal control of smoothly parameterized systems. In Proceed-ings of the Thirty-First Conference on Uncertainty in Artificial Intelligence , 2015. Achiam, J., Held, D., Tamar, A., and Abbeel, P. Constrained policy optimization. In Proceedings of the 34th Interna-tional Conference on Machine Learning , 2017. Agarwal, M., Bai, Q., and Aggarwal, V. Regret guaran-tees for model-based reinforcement learning with long-term average constraints. In Proceedings of the Thirty-Eighth Conference on Uncertainty in Artificial Intelli-gence , 2022. Agrawal, S. and Jia, R. Optimistic posterior sampling for reinforcement learning: worst-case regret bounds. In Ad-vances in Neural Information Processing Systems , 2017. Altman, E. Constrained markov decision processes, 1999. Bartlett, P. L. and Tewari, A. Regal: A regularization based algorithm for reinforcement learning in weakly commu-nicating mdps. In Proceedings of the Twenty-Fifth Con-ference on Uncertainty in Artificial Intelligence , 2009. Brantley, K., Dudik, M., Lykouris, T., Miryoosefi, S., Sim-chowitz, M., Slivkins, A., and Sun, W. Constrained episodic reinforcement learning in concave-convex and knapsack settings. In Advances in Neural Information Processing Systems , 2020. Chen, L., Jain, R., and Luo, H. Learning infinite-horizon average-reward Markov decision process with constraints. In Proceedings of the 39th International Conference on Machine Learning , 2022. Chen, Y., Dong, J., and Wang, Z. A primal-dual approach to constrained markov decision processes, 2021. 9Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Chow, Y., Nachum, O., Duenez-Guzman, E., and Ghavamzadeh, M. A lyapunov-based approach to safe reinforcement learning. In Proceedings of the 32nd Inter-national Conference on Neural Information Processing Systems , 2018. Ding, D., Wei, X., Yang, Z., Wang, Z., and Jovanovic, M. R. Provably efficient safe exploration via primal-dual policy optimization. In The 24th International Conference on Artificial Intelligence and Statistics , 2021. Efroni, Y., Mannor, S., and Pirotta, M. Exploration-exploitation in constrained mdps, 2020. Jafarnia-Jahromi, M., Chen, L., Jain, R., and Luo, H. Online learning for stochastic shortest path model via posterior sampling, 2021. Jaksch, T., Ortner, R., and Auer, P. Near-optimal regret bounds for reinforcement learning. Journal of Machine Learning Research , 2010. Kalagarla, K. C., Jain, R., and Nuzzo, P. Safe posterior sampling for constrained mdps with bounded constraint violation, 2023. Le, H., Voloshin, C., and Yue, Y. Batch policy learning un-der constraints. In Proceedings of the 36th International Conference on Machine Learning , 2019. Leike, J., Martic, M., Krakovna, V., Ortega, P. A., Everitt, T., Lefrancq, A., Orseau, L., and Legg, S. Ai safety gridworlds, 2017. Liu, T., Zhou, R., Kalathil, D., Kumar, P., and Tian, C. Learning policies with zero or bounded constraint vi-olation for constrained mdps. In Advances in Neural Information Processing Systems , 2021. Osband, I. and Van Roy, B. Why is posterior sampling better than optimism for reinforcement learning? In Proceed-ings of the 34th International Conference on Machine Learning , 2017. Osband, I., Russo, D., and Van Roy, B. (more) efficient reinforcement learning via posterior sampling. In Pro-ceedings of the 26th International Conference on Neural Information Processing Systems , 2013. Ouyang, Y., Gagrani, M., Nayyar, A., and Jain, R. Learning unknown markov decision processes: A thompson sam-pling approach. In Proceedings of the 31st International Conference on Neural Information Processing Systems ,2017. Provodin, D., Gajane, P., Pechenizkiy, M., and Kaptein, M. An empirical evaluation of posterior sampling for constrained reinforcement learning, 2022. Puterman, M. L. Markov decision processes: Discrete stochastic dynamic programming, 1994. Qiu, S., Wei, X., Yang, Z., Ye, J., and Wang, Z. Upper confidence primal-dual reinforcement learning for cmdp with adversarial loss. In Advances in Neural Information Processing Systems , 2020. Singh, R., Gupta, A., and Shroff, N. B. Learning in con-strained markov decision processes. IEEE Transactions on Control of Network Systems , 2023. Tessler, C., Mankowitz, D. J., and Mannor, S. Reward con-strained policy optimization. In International Conference on Learning Representations , 2019. Thompson, W. R. On the likelihood that one unknown probability exceeds another in view of the evidence of two samples. Biometrika , 1933. Wei, H., Liu, X., and Ying, L. A provably-efficient model-free algorithm for infinite-horizon average-reward con-strained markov decision processes. Proceedings of the AAAI Conference on Artificial Intelligence , 2022. Zheng, L. and Ratliff, L. Constrained upper confidence rein-forcement learning. In Proceedings of the 2nd Conference on Learning for Dynamics and Control , 2020. 10 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+# A. Omitted details for Section 4 
+
+A.1. Proof of Theorem 4.1 Bounding regret of the main cost component. To analyze the performance of PSC ON RL over T time steps, define 
+
+KT = arg max {k : tk ≤ T }, number of episodes of PSC ON RL until time T . By Ouyang et al. (2017)[Lemma 1], KT
+
+is upper-bounded by p2SAT log( T ). Using the tower rule, we can decompose the total regret into the sum of episodic regrets conditioned on the good event that the sampled CMDP is feasible: 
+
+BR +(T ; c0) = E
+
+" TX
+
+> t=1
+
+(c0(st, a t) − Jπ∗ (c0; p∗)) +
+
+#
+
+=
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k ]=
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |pk /∈ G ] P (pk /∈ G ) + 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |pk ∈ G ] P (pk ∈ G ) , (10) where R0,k = Ptk+1 −1 
+
+> t=tk
+
+[c0(st, a t) − Jπ∗ (c0; p∗)] +, Jπ∗ (c0; p∗) is the optimal loss of CMDP M , and G is defined in the statement of Lemma 4.5. Define two events A1 = {pk /∈ G ∧ Ntk (s, a ) ≥ pT /A, ∀s, a } and A2 = {pk /∈ G ∧ ∃ (s, a ) : Ntk (s, a ) < pT /A }. Then, the first term of (10) can be further decomposed as 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |pk /∈ G ] P (pk /∈ G ) = 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |A1] P (A1) + 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |A2] P (A2) .
+
+First, we bound PKT 
+
+> k=1
+
+E [R0,k |A1] P (A1). Let ¯pk(s′|s, a ) = Ntk (s,a,s ′)  
+
+> Ntk(s,a )
+
+be the empirical mean for the transition probability at the beginning of episode k, where Ntk (s, a, s ′) is the number of visits to (s, a, s ′). Define the confidence set 
+
+Bk = {p : ∥¯pk(·| s, a ) − p(·| s, a )∥1 ≤ βk} ,
+
+where βk =
+
+q 14 S log(2 AT t k )max {1,N tk (s,a )} .Now, we observe that {A1} ⊆ {∥ pk(·| s, a ) − p∗(·| s, a )∥1 > β k}, otherwise, by Lemma 4.4, problem (2) would be feasible under pk, and therefore pk ∈ G which contradicts to pk /∈ G . Next, we note that Bk is Ftk -measurable which allows us to use Lemma 4.3. Setting δ = 1 /T in Lemma A.7 implies that P (∥pk(·| s, a ) − p∗(·| s, a )∥1 > β k) can be bounded by 215 T t 6
+
+> k
+
+.Indeed, 
+
+P (∥pk(·| s, a ) − p∗(·| s, a )∥1 > β k) ≤ P (p∗ /∈ Bk) + P (pk /∈ Bk) = 2 P (p∗ /∈ Bk) ≤ 215 T t 6
+
+> k
+
+,
+
+where the last equality follows from Lemma 4.3 and the last inequality is due to Lemma A.7. Finally, we have 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |A1] P (A1) ≤
+
+> KT
+
+X
+
+> k=1
+
+2( tk+1 − tk)15 T t 6
+
+> k
+
+≤ 215 
+
+> ∞
+
+X
+
+> k=1
+
+k−6 ≤ 1.
+
+To bound the term PKT 
+
+> k=1
+
+E [R0,k |A2] P (A2), we rewrite it as 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k | A2] P (A2) = 
+
+> KT
+
+X
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+E [( c0(st, a t) − Jπ∗ (c0; p∗)|A2] P (A2)
+
+≤
+
+> KT
+
+X
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+P (A2) ≤
+
+> KT
+
+X
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
+,
+
+11 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+where the first inequality holds because |(c0(st, a t)−Jπ∗ (c0; p∗)|≤ 1 and the last inequality is by P(A∧B) = P(A|B)P(B).Then, by Lemma 4.5, we obtain 
+
+> KT
+
+X
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
+≤ 2DS √AT + 1 .
+
+For the second term of (10) , conditioned on the good event, {pk ∈ G} , the sampled CMDP is feasible, and the standard analysis of Ouyang et al. (2017) can be applied. Lemma A.2 shows that this term can be bounded by (D+1) p2SAT log( T )+ 49 DS pAT log( AT ).Putting all bounds together, we obtain the resulting regret bound of: 
+
+BR +(T ; c0) ≤ O
+
+
+
+DS pAT log( AT )
+
+
+
+.
+
+Bounding regret of auxiliary cost components. Without loss of generality, fix the cost component ci and its threshold τi
+
+for some i and focus on analyzing the i-th component regret. Similarly to the decomposition of the main component, we obtain: 
+
+BR +(T ; ci) = E
+
+" TX
+
+> t=0
+
+(ci(st, a t) − τi)+
+
+#
+
+=
+
+> KT
+
+X
+
+> k=1
+
+E [Ri,k ]=
+
+> KT
+
+X
+
+> k=1
+
+E [Ri,k |pk /∈ G ] P (pk /∈ G ) + 
+
+> KT
+
+X
+
+> k=1
+
+E [Ri,k |pk ∈ G ] P (pk ∈ G )
+
+where Ri,k = Ptk+1 −1 
+
+> t=tk
+
+[ci(st, a t) − τi]+.The first term can be analyzed similarly to the main cost component and bounded by 2DS √AT + 2 . The regret bound of the second term is the same as the regret bound of the analogous term of the main cost component. Its analysis is marginally different and provided in Lemma A.3. 
+
+A.2. Proof of Feasibility lemma (Lemma 4.4) 
+
+Proof. Fix some i ∈ { 1, . . . , m }. Further, we will omit index i and write c and τ instead of ci and τi.With slight abuse of notation, we rewrite the equation (3) in vector form: 
+
+Jπ,p,c + vπ,p = cπ + Pπ vπ,p . (11) Above, Jπ,p,c , vπ,p , and cπ are S dimensional vectors of Jπ,p,c s , vπ,p s , and cs,π (s) with Jπ,p,c s = Jπ (s; c, p ), vπ,p s = vπ (s; p),and cs,π (s) = P 
+
+> a∈A
+
+π(a|s)c(s, a ); and Pπ is the transition matrix whose rows formed by the vectors ps,π (s), where 
+
+ps,π (s) = P 
+
+> a∈A
+
+π(a|s)p(·| s, a ).Let P k 
+
+> ¯π
+
+be the transition matrix whose rows are formed by the vectors pks, ¯π(s), and P ∗ 
+
+> ¯π
+
+be the transition matrix whose rows are formed by the vectors p∗
+
+> s, ¯π(s)
+
+. Since Ntk (s, a ) ≥ pT /A for all (s, a ), ∥pk(·| s, a ) − p∗(·| s, a )∥1 ≤
+
+q 14 S log(2 AT t k )max {1,N tk (s,a )} ,and the span of the bias function v¯π,p ∗ is at most D (by Assumption 2.1), we observe 
+
+(pk(·| s, a ) − p∗(·| s, a )) ⊺ v¯π,p ∗ ≤ ∥ pk(·| s, a ) − p∗(·| s, a )∥1 v¯π,p ∗ 
+
+> ∞
+
+≤ δD 
+
+where δ =
+
+q 14 SA 1/2 log(2 AT t k ) 
+
+> √T
+
+. Above implies 
+
+ P k 
+
+> ¯π
+
+− P ∗
+
+> ¯π
+
+ v¯π,p ∗ ≤ δD 1 (12) where 1 is the vector of all 1s. Following (Agrawal & Jia, 2017), let (P k 
+
+> ¯π
+
+)∗ denote the limiting matrix for Markov chain with transition matrix P k 
+
+> ¯π
+
+. Observe that P k 
+
+> ¯π
+
+is aperiodic and irreducible because of Assumption 2.2. This implies that (P k 
+
+> ¯π
+
+)∗ is of the form 1q⊺ where q is the stationary distribution of P k 
+
+> ¯π
+
+(refer to (A.4) in (Puterman, 1994)). Also, (P k 
+
+> ¯π
+
+)∗P k 
+
+> ¯π
+
+= ( P k 
+
+> ¯π
+
+)∗ and (P k 
+
+> ¯π
+
+)∗1 = 1.12 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Therefore, the gain of policy ¯πJ ¯π,p k ,c 1 = ( c⊺ 
+
+> ¯π
+
+q)1 = ( P k 
+
+> ¯π
+
+)∗c¯π
+
+Now, 
+
+J ¯π,p k ,c 1 − J ¯π,p ∗,c 1 = ( P k 
+
+> ¯π
+
+)∗c¯π − J ¯π,p ∗,c 1
+
+= ( P k 
+
+> ¯π
+
+)∗c¯π − J ¯π,p ∗,c  (P k 
+
+> ¯π
+
+)∗1 (using (P k 
+
+> ¯π
+
+)∗1 = 1)
+
+= ( P k 
+
+> ¯π
+
+)∗  c¯π − J ¯π,p ∗,c 1
+
+= ( P k 
+
+> ¯π
+
+)∗ (I − P ∗ 
+
+> ¯π
+
+) v¯π,p ∗ (using (11)) 
+
+= ( P k 
+
+> ¯π
+
+)∗  P k 
+
+> ¯π
+
+− P ∗
+
+> ¯π
+
+ v¯π,p ∗ (using (P k 
+
+> ¯π
+
+)∗P k 
+
+> ¯π
+
+= ( P k 
+
+> ¯π
+
+)∗)
+
+≤ Dδ 1. (using (12) and (P k 
+
+> ¯π
+
+)∗1 = 1)Then observing that Dδ ≤ γ, we obtain 
+
+J ¯π (c, p k) − J ¯π (c, p ∗) ≤ Dδ ≤ γ. 
+
+Using Assumption 2.2 and rearranging the terms in the inequality above, it follows 
+
+J ¯π (c, p k) ≤ J ¯π (c, p ∗) + γ ≤ τ − γ + γ ≤ τ. 
+
+A.3. Proof of Exploration lemma (Lemma 4.5) 
+
+Before providing the proof for the Exploration lemma, we first show that PSC ON RL requires at most D timesteps to reach a target state when LP (4)-(7) is infeasible. 
+
+Lemma A.1. Fix some target state ¯s and its corresponding MDP M¯s and let π¯s be a solution of Eq. (9) . Then T π¯s 
+
+> s→¯s
+
+≤ D.Proof. For simplicity, assume that MDP M¯s is aperiodic (we will consider the general case later). In such MDP, value iteration is known to converge, and we can find (J∗, v ∗) that satisfy Eq. (9) and the corresponding optimal policy π∗ 
+
+> ¯s
+
+.Assume that there exists some policy π and state s such that T π∗ 
+
+> ¯s
+> s→¯s
+
+> T πs→¯s. Consider the following policy π′: follow π
+
+starting from s and wait until ¯s is reached (suppose that this happens in τ steps), then follow the optimal policy π∗ 
+
+> ¯s
+
+. Note that τ is a random variable and, by definition, 
+
+E[τ ] = T π′
+
+> s→¯s
+
+.
+
+Let (Jπ′
+
+, v π′
+
+) be the average cost and the bias function of policy π′. First, note that J∗ = Jπ′
+
+, since π′ is constructed the way that some policy π is utilized for a finite number of steps and the same policy π∗ 
+
+> ¯s
+
+is used in the long term. Next, if v is a bias vector, v plus any constant is also a bias vector. Therefore, without loss of generality, we can apply the following transformation to v∗ and vπ′
+
+:
+
+v∗ = v∗ − min  
+
+> s∈S
+
+v∗(s),vπ′
+
+= vπ′
+
+− min  
+
+> s∈S
+
+vπ′
+
+(s). (13) Observe that by definition of the cost function c¯s, after transformation (13) , v∗(s) = T π∗ 
+
+> ¯s
+> s→¯s
+
+and vπ′
+
+(s) = T π′
+
+> s→¯s
+
+. Thus, for state s, we obtain 
+
+J∗ + v∗(s) > J π′
+
++ vπ′
+
+(s),
+
+which contradicts the optimality of (J∗, v ∗).Now, if the MDP M¯s is periodic, we apply the aperiodicity transformation from Puterman (1994) to get a new MDP ˜M¯s:choose θ satisfying 0 < θ < 1 and define ˜S = S, ˜A = A, and 
+
+˜c¯s = θc ¯s,
+
+˜p(·| s, a ) = (1 − θ)es + θp (·| s, a ).
+
+13 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Note that ˜M¯s is communicating and aperiodic, and the previous reasoning applies to ˜M¯s. Let ˜Jπ , ˜vπ , ˜T πs→¯s denote the quantities associated with ˜M¯s for some policy π. Then, by Puterman (1994)[Proposition 8.5.8], these are related to the corresponding quantities for M¯s as follows: 
+
+˜Jπ = Jπ ,
+
+˜vπ = vπ ,
+
+˜T πs→¯s = T πs→¯s
+
+θ .
+
+Using these relations and the fact that we proved the result for ˜M¯s gives us the result for periodic MDPs. Since min π T πs→¯s ≤
+
+max s,s ′ min π T πs→s′ , it immediately follows that T π∗ 
+
+> ¯s
+> s→¯s
+
+≤ D.
+
+Proof of Lemma 4.5. Let Te be the first time when every (s, a )-pair is visited at least pT /A times given {pk /∈ G} ,
+
+Te = min {t : Nt(s, a ) ≥ pT /A ∀(s, a ) | pk /∈ G} .Since Tk ≤ Tk−1 + 1 and P
+
+
+
+∃(s, a ) : Nt(s, a ) < pT /A | pk /∈ G 
+
+
+
+is non-increasing in t, i.e., 
+
+P
+
+
+
+∃(s, a ) : Nt(s, a ) < pT /A | pk /∈ G 
+
+
+
+≤ P
+
+
+
+∃(s, a ) : Nt−1(s, a ) < pT /A | pk /∈ G 
+
+
+
+, for k > 1, we observe 
+
+> tk+1 −1
+
+X
+
+> t=tk
+
+P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
+≤ P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
++ 
+
+> tk−1
+
+X
+
+> t=tk−1
+
+P
+
+
+
+∃(s, a ) : Nt(s, a ) < pT /A | pk /∈ G 
+
+
+
+.
+
+Next, by noting that P
+
+
+
+∃(s, a ) : Nt(s, a ) < pT /A | pk /∈ G 
+
+
+
+= P (Te > t ), we have 
+
+X 
+
+> k:tk≤T
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+I
+
+n
+
+∃(s, a ) : Ntk (s, a ) < pT /A 
+
+o
+
+| pk /∈ G 
+
+#
+
+=
+
+> KT
+
+X
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
+≤ 1 + 
+
+> KT
+
+X
+
+> k=2
+> tk+1 −1
+
+X
+
+> t=tk
+
+P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
+≤ 1 + 
+
+> KT
+
+X
+
+> k=2
+
+P
+
+
+
+∃(s, a ) : Ntk (s, a ) < pT /A | pk /∈ G 
+
+
+
++ 
+
+> tk−1
+
+X
+
+> t=tk−1
+
+P
+
+
+
+∃(s, a ) : Nt(s, a ) < pT /A | pk /∈ G 
+
+
+
+= 1 + 
+
+> KT
+
+X
+
+> k=2
+
+P (Te > t k) +  
+
+> tk−1
+
+X
+
+> t=tk−1
+
+P (Te > t )
+
+ = 1 + 
+
+> KT
+
+X
+
+> k=2
+
+P (Te > t k) + 
+
+> T
+
+X
+
+> t=1
+
+P (Te > t ) ≤ 1 + 2 E[Te],
+
+where the last inequality follows from the tail sum formula E[Te] = P∞ 
+
+> t=0
+
+P(Te > t ). Finally, by Lemma A.1, we have 
+
+E[Te] ≤ DS √AT , which gives 
+
+X 
+
+> k:tk≤T
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+I
+
+n
+
+∃(s, a ) : Ntk (s, a ) < pT /A 
+
+o
+
+| pk /∈ G 
+
+#
+
+≤ 2DS √AT + 1 .
+
+A.4. Auxiliary lemmas Lemma A.2 (Regret of the main cost on the good event) . Under Assumption 2.1, conditioned on the good event {pk ∈ G} ,
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |pk ∈ G ] P (pk ∈ G ) ≤ (D + 1) p2SAT log( T ) + 49 DS pAT log( AT ).
+
+14 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Most of the analysis here recovers the analysis of Ouyang et al. (2017). Nonetheless, for the sake of clarity, we provide the complete proof of Lemma A.2. 
+
+Proof. First, we rewrite equation (3) in terms of the state-action pair (Chen et al., 2022): 
+
+Jπ (s; c, p ) + qπ (s, a ; p) = c(s, a ) + X
+
+> s′
+
+p(s′|s, a )vπ (s′; p), (14) where vπ (s; p) and qπ (s, a ; p) are connected by vπ (s; p) = P 
+
+> a
+
+π(a|s)qπ (s, a ; p).Conditioned on the good event {pk ∈ G} , every policy πk is the solution of LP (4) - (7) , and we can apply the Bellman equation (14) to c0(st, a t), and decompose R0,k into the following terms. 
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |pk ∈ G ] P (pk ∈ G ) ≤
+
+> KT
+
+X
+
+> k=1
+
+E [R0,k |pk ∈ G ] = 
+
+> KT
+
+X
+
+> k=1
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+ c0(st, a t) − Jπ∗ (c0; p∗)#
+
+=
+
+> KT
+
+X
+
+> k=1
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+Jπk (c0; pk) − Jπ∗ (c0; p∗) + qπk (st, a t; pk) − X
+
+> s′∈S
+
+pk(s′|st, a t)vπk (s′, p k)
+
+!# 
+
+= X
+
+> k
+
+E
+
+"X
+
+> t
+
+ Jπk (c0; pk) − Jπ∗ (c0; p∗)#| {z }
+
+> R0
+
++ X
+
+> k
+
+E
+
+"X
+
+> t
+
+(qπk (st, a t; pk) − vπk (st; pk)) 
+
+#| {z }
+
+> R1
+
++ X
+
+> k
+
+E
+
+"X
+
+> t
+
+[vπk (st; pk) − vπk (st+1 ; pk)] 
+
+#| {z }
+
+> R2
+
++ X
+
+> k
+
+E
+
+"X
+
+> t
+
+"
+
+vπk (st+1 ; pk) − X
+
+> s′
+
+pk(s′|st, a t)vπk (s′; pk)
+
+## | {z }
+
+> R3
+
+.
+
+Now, we note that R1 = 0 as 
+
+E[qπk (st, a t; pk) − vπk (st; pk)] = E[qπk (st, a t; pk) − X
+
+> a
+
+πk(a|st)qπ (st, a ; pk)] = 0 . (15) Next, applying lemmas A.4, A.5, A.6 to R0, R2, R3, correspondingly, gives us the result. 
+
+Lemma A.3 (Regret of the auxiliary costs on the good event) . Under Assumption 2.1, conditioned on the good event 
+
+{pk ∈ G} , KTX
+
+> k=1
+
+E [Ri,k |pk ∈ G ] P (pk ∈ G ) ≤ (D + 1) p2SAT log( T ) + 49 DS pAT log( AT ).
+
+Proof. Similarly to Lemma A.2, conditioned on the good event {pk ∈ G} , we can decompose Ri,k as follows: 
+
+> KT
+
+X
+
+> k=1
+
+E [Ri,k |pk ∈ G ] P (pk ∈ G ) ≤
+
+> KT
+
+X
+
+> k=1
+
+E [Ri,k |pk ∈ G ] = 
+
+> KT
+
+X
+
+> k=1
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+ ci(st, a t) − τi
+
+#
+
+=
+
+> KT
+
+X
+
+> k=1
+
+E
+
+"tk+1 −1
+
+X
+
+> t=tk
+
+Jπk (ci; pk) − τi + qπk (st, a t; pk) − X
+
+> s′∈S
+
+pk(s′|st, a t)vπk (s′, p k)
+
+!# 
+
+= X
+
+> k
+
+E
+
+"X
+
+> t
+
+ Jπk (ci; pk) − τi
+
+#| {z }
+
+> R0
+
++ X
+
+> k
+
+E
+
+"X
+
+> t
+
+(qπk (st, a t; pk) − vπk (st; pk)) 
+
+#| {z }
+
+> R1
+
++ X
+
+> k
+
+E
+
+"X
+
+> t
+
+[vπk (st; pk) − vπk (st+1 ; pk)] 
+
+#| {z }
+
+> R2
+
++ X
+
+> k
+
+E
+
+"X
+
+> t
+
+"
+
+vπk (st+1 ; pk) − X
+
+> s′
+
+pk(s′|st, a t)vπk (s′; pk)
+
+## | {z }
+
+> R3
+
+.
+
+15 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+Now, we note that (Jπk (ci; pk) − τi) is negative on the good event {pk ∈ G} for all k, and term R0 can be dismissed. 
+
+R1 = 0 because of (15), and R2 and R3 regret terms can be bounded by Lemmas A.5 and A.6 correspondingly. 
+
+Lemma A.4 (Lemma 3 from (Ouyang et al., 2017)) . For any cost function c : S × A − → [0 , 1] ,
+
+E
+
+" KTX
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+ Jπk (c; pk) − Jπ∗ (c; p∗)#
+
+≤ KT ≤ p2SAT log( T ).
+
+Lemma A.5 (Lemma 4 from (Ouyang et al., 2017)) .
+
+E
+
+" KTX
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+ vπk (st; pk) − vπk (st+1 ; pk)#
+
+≤ DK T ≤ Dp2SAT log( T ).
+
+Lemma A.6 (Lemma 5 from (Ouyang et al., 2017)) .
+
+E
+
+" KTX
+
+> k=1
+> tk+1 −1
+
+X
+
+> t=tk
+
+ vπk (st+1 ; pk) − X
+
+> s′∈S
+
+pk(s′|st, a t)vπk (s′; pk)#
+
+≤ 49 DS pAT log( AT ).
+
+Lemma A.7 (Lemma 17 from (Jaksch et al., 2010)) . For any t ≥ 1, the probability that the true MDP M is not contained in the set of plausible MDPs M(t) = 
+
+n
+
+(S, A, p ′, c, τ, ρ ) : ∥p′(·| s, a ) − pk(·| s, a )∥1 ≤
+
+q 14 S log(2 At k /δ )max {1,N tk (s,a )}
+
+o
+
+at time t is at most δ 
+
+> 15 t
+
+, that is 
+
+P {M / ∈ M (t)} < δ
+
+15 t6 .
+
+# B. Experimental details 
+
+B.1. Baselines: OFU-based algorithms 
+
+We use three OFU-based algorithms from the existing literature for comparison: C-UCRL (Zheng & Ratliff, 2020), UCRL-CMDP (Singh et al., 2023), and FHA (Alg. 3) (Chen et al., 2022). These algorithms rely on the knowledge of different CMDP components, e.g., UCRL-CMDP relies on knowledge of rewards r, whereas C-UCRL uses the knowledge of transitions p. To enable fair comparison, all algorithms were extended to the unknown reward/costs and unknown probability transitions setting. Specifically, we assume that each algorithm knows only the states space S and the action space A, substituting the unknown elements with their empirical estimates: 
+
+¯rt(s, a ) = 
+
+Pt−1 
+
+> j=1
+
+I{st = s, a t = a}rt
+
+Nt(s, a ) ∨ 1 , ∀s ∈ S , a ∈ A , (16) 
+
+¯ci,t (s, a ) = 
+
+Pt−1 
+
+> j=1
+
+I{st = s, a t = a}ci,t 
+
+Nt(s, a ) ∨ 1 , ∀s ∈ S , a ∈ A , i = 1 . . . , m, (17) 
+
+¯pt(s, a, s ′) = Nt(s, a, s ′)
+
+Nt(s, a ) ∨ 1 , ∀s, s ′ ∈ S , a ∈ A . (18) where r is the reward function (inverse main cost c0) and Nt(s, a ) and Nt(s, a, s ′) denote the number of visits to (s, a ) and 
+
+(s, a, s ′) respectively. Further, we provide algorithmic-specific details separately for each baseline: 1. C-UCRL follows a principle of “optimism in the face of reward uncertainty; pessimism in the face of cost uncertainty.” This algorithm, which was developed in (Zheng & Ratliff, 2020), considers conservative (safe) exploration by overestimating both rewards and costs: 16 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+ˆrt(s, a ) = ¯ rt(s, a ) + bt(s, a ) and ˆct(s, a ) = ¯ rt(s, a ) + bt(s, a ).
+
+C-UCRL proceeds in episodes of linearly increasing number of rounds kh , where k is the episode index and h is the fixed duration given as an input. In each epoch, the random policy 2 is executed for h steps for additional exploration, and then policy πk is applied for (k − 1) h number of steps, making kh the total duration of episode k.2. Unlike the previous algorithm, where uncertainty was taken into account by enhancing rewards and costs, UCRL-CMDP (Singh et al., 2023) constructs confidence set Ct over ¯pt:
+
+Ct = {p : |p(s, a, s ′) − ¯pt(s, a, s ′)| ≤ bt(s, a ) ∀(s, a )} .
+
+UCRL-CMDP algorithm proceeds in episodes of fixed duration of ⌈T α⌉, where α is an input of the algorithm. At the beginning of each round, the agent solves the following constrained optimization problem in which the decision variables are (i) Occupation measure μ(s, a ), and (ii) “Candidate” transition p′:
+
+max 
+
+> μ,p ′∈C t
+
+X
+
+> s,a
+
+μ(s, a )r(s, a ), (19) 
+
+s.t. X
+
+> s,a
+
+μ(s, a )ci(s, a ) ≤ τi, i = 1 , . . . , m, (20) 
+
+X
+
+> a
+
+μ(s, a ) = X
+
+> s′,a
+
+μ(s′, a )p′(s′, a, s ), ∀s ∈ S , (21) 
+
+μ(s, a ) ≥ 0, ∀(s, a ) ∈ S × A , X
+
+> s,a
+
+μ(s, a ) = 1 , (22) Note that program (19)-(22) is not linear anymore as μ(s′, a ) is being multiplied by p′(s′, a, s ) in equation (21). This is a serious drawback of UCRL-CMDP algorithm because, as we show in the experiments, program (19)-(22) becomes computationally inefficient for even moderate problems. 3. FHA (Finite Horizon Approximation for CMDP) divides the T timesteps into K rounds and treats each episode as an episodic finite-horizon CMDP. Fix some episode k. Through the lens of occupancy measure that is defined on 
+
+S × A × H × S space (where H is the length of the episode), FHA optimizes the following linear program: 
+
+max 
+
+> μ
+
+X
+
+> h
+
+X
+
+> s,a
+
+r(s, a ) X
+
+> s′
+
+μ(s, a, h, s ′), (23) 
+
+s.t. X
+
+> h
+
+X
+
+> s,a
+
+ci(s, a ) X
+
+> s′
+
+μ(s, a, h, s ′) ≤ Hτ i + sp (p∗), (24) 
+
+Pμ ∈ { p : |p(s, a, s ′) − ¯pk(s, a, s ′)| ≤ bk(s, a ) ∀(s, a )} , , (25) where Pμ(s, a, s ′) = μ(s,a,h,s ′)P  
+
+> s′μ(s,a,h,s ′)
+
+∀h = 1 , . . . H .Although program (23)-(25) is linear, we emphasize that this algorithm requires finding an optimal occupancy measure for each H and each K, resulting in O(S2AT ) decision variables. As we mentioned in the experiments, this is prohibitive even for moderate-sized CMDPs.   
+
+> 2Original algorithm utilizes a safe baseline during the first hrounds in each epoch, which is assumed to be known. However, to make the comparison as fair as possible, we assume that a random policy is applied instead.
+
+17 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling   
+
+> (a) Marsrover 4x4 (b) Marsrover 8x8
+> Figure 3. Marsrover gridworlds. The initial position is light green, the goal is dark green, the walls are gray, and risky states are purple. Figure 3(a) illustrates 4x4 Marsrover environment. Figure 3(b) illustrates 8x8 Marsrover environment. In both cases, the agent’s task is to get from the initial state to the goal state, and the optimal policy combines with some probabilities fast and safe ways, which are indicated by arrows on the pictures.
+
+B.2. Environments 
+
+To demonstrate the performance of the algorithms, we consider three gridworld environments in our analysis. There are four actions possible in each state, A = {up, down, right, lef t }, which cause the corresponding state transitions, except that actions that would take the agent to the wall leave the state unchanged. Due to the stochastic environment, transitions are stochastic (i.e., even if the agent’s action is to go up , the environment can send the agent with a small probability left ). Typically, the gridworld is an episodic task where the agent receives cost 1 (equivalently reward -1) on all transitions until the terminal state is reached. We reduce the episodic setting to the infinite-horizon setting by connecting terminal states to the initial state. Since there is no terminal state in the infinite-horizon setting, we call it the goal state instead. Thus, every time the agent reaches the goal, it receives a cost of 0 (or reward of 0), and every action from the goal state sends the agent to the initial state. We introduce constraints by considering the following specifications of a gridworld environment: Marsrover and Box environments. 
+
+Marsrover. This environment was used in (Tessler et al., 2019; Zheng & Ratliff, 2020; Brantley et al., 2020). The agent must move from the initial position to the goal avoiding risky states. Figure (3) illustrates the CMDP structure: the initial position is light green, the goal is dark green, the walls are gray, and risky states are purple. ”In the Mars exploration problem, those darker states are the states with a large slope that the agents want to avoid. The constraint we enforce is the upper bound of the per-step probability of stepping into those states with large slope – i.e., the more risky or potentially unsafe states to explore” (Zheng & Ratliff, 2020). Each time the agent appears in a purple state incurs an auxiliary cost of 1. Other states incur no auxiliary costs. Without constraints, the optimal policy is obviously to always go up from the initial state. However, with constraints, the optimal policy is a randomized policy that goes left and up with some probabilities, as illustrated in Figure 3(a). In experiments, we consider two marsrover gridworlds: 4x4, as shown in Figure 3(a), and 8x8, depicted in Figure 3(b). 
+
+Box. Another conceptually different specification of a gridworld is Box environment from (Leike et al., 2017). Unlike the Marsrover example, there are no static risky states; instead, there is an obstacle, a box, which is only ”pushable” (see Figure 4(a)). Moving onto the blue tile (the box) pushes the box one tile into the same direction if that tile is empty; otherwise, the move fails as if the tile were a wall. The main idea of Box environment is ”to minimize effects unrelated to their main objectives, especially those that are irreversible or difficult to reverse” (Leike et al., 2017). If the agent takes the fast way (i.e., goes down from its initial state; see Figure 4(c)) and pushes the box into the corner, the agent will never be able to get it back, and the initial configuration would be irreversible. In contrast, if the agent chooses the safe way (i.e., approaches the box from the left side), it pushes the box to the reversible state (see Figure 4(b)). This example illustrates situations of performing the task without breaking a vase in its path, scratching the furniture, bumping into humans, etc. Each action incurs an auxiliary cost of 1 if the box is in a corner (cells adjacent to at least two walls) and no auxiliary costs otherwise. Similarly to the Marsrover example, without safety constraints, the optimal policy is to take a fast way (go down from the initial state). However, with constraints, the optimal policy is a randomized policy that goes down and left from the initial state. 18 Efficient Exploration in Average-Reward Constrained RL: Achieving Near-Optimal Regret With Posterior Sampling 
+
+(a) Box (Main) (b) Box (Safe) (c) Box (Fast) 
+
+Figure 4. Box gridworld. The initial position is light green, the goal is dark green, the walls are gray, and risky states are purple. Figure 4(a) illustrates the initial configuration. The agent’s task is to get from the initial state to the goal state, and the optimal policy combines with some probabilities fast and safe ways, which are indicated by arrows on the pictures. Figure 4(b)-4(c) illustrates safe and fast ways. 
+
+B.3. Simulation results 
+
+Figure 5 shows the reward (inverse main cost) and average consumption (auxiliary cost) behavior of PSC ON RL, C-UCRL, UCRL-CMDP, and FHA (Alg. 3) illustrating how the regret from Figure 2 is accumulated. The top row shows the reward performance. The bottom row presents the average consumption of the auxiliary cost. Taking a closer look at Marsrover environments (left and middle columns), we see that all algorithms converge to the optimal solution (top row), and their average consumption (middle row) satisfies the constraints in the long run. In the Box example (right column), we see that C-UCRL is stuck with the suboptimal solution. The algorithm exploits safe policy once it is learned, which corresponds to the near-linear regret behavior in Figure 2. Alternatively, PSC ON RL converges to the optimal solution relatively quickly (middle and bottom graphs). 
+
+Figure 5. (Top row) shows the average reward (inverse average main cost); the dashed line shows the optimal behavior, and the dotted lines depict the reward level of safe and fast policies. (Bottom row) shows the average consumption of the auxiliary cost; the constraint thresholds are 0.2 for Marsrover 4x4, 0.1 for Marsrover 8x8, and 0.6 for Box. Results are averaged over 100 runs for Marsrover 4x4 and over 30 runs for Marsrover 8x8 and Box. 
+
+19

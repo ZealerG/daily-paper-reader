@@ -1,0 +1,1164 @@
+Title: M3HF: Multi-agent Reinforcement Learning from  Multi-phase Human Feedback of Mixed Quality
+
+URL Source: https://openreview.net/pdf?id=2Sl6Ex7Vmo
+
+Number of Pages: 20
+
+Markdown Content:
+# M3HF: Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Ziyan Wang 1 * Zhicheng Zhang 2 Fei Fang 2 Yali Du 1
+
+## Abstract 
+
+Designing effective reward functions in multi-agent reinforcement learning (MARL) is a sig-nificant challenge, often leading to suboptimal or misaligned behaviors in complex, coordinated en-vironments. We introduce Multi-agent Reinforce-ment Learning from Multi-phase Human Feed-back of Mixed Quality ( M3HF ), a novel frame-work that integrates multi-phase human feedback of mixed quality into the MARL training pro-cess. By involving humans with diverse exper-tise levels to provide iterative guidance, M3HF leverages both expert and non-expert feedback to continuously refine agents’ policies. Dur-ing training, we strategically pause agent learn-ing for human evaluation, parse feedback us-ing large language models to assign it appropri-ately and update reward functions through pre-defined templates and adaptive weights by us-ing weight decay and performance-based adjust-ments. Our approach enables the integration of nuanced human insights across various levels of quality, enhancing the interpretability and robust-ness of multi-agent cooperation. Empirical re-sults in challenging environments demonstrate that M3HF significantly outperforms state-of-the-art methods, effectively addressing the complex-ities of reward design in MARL and enabling broader human participation in the training pro-cess. Code is available at https://github. com/cooperativex/M3HF     
+
+> *Work done during a visit to CMU. 1Department of In-formatics, King’s College London, London, United Kingdom
+> 2Software and Societal Systems Department, Carnegie Mellon University, Pittsburgh, PA, USA. Correspondence to: Ziyan Wang
+> <ziyan.wang@kcl.ac.uk >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+## 1. Introduction 
+
+Designing effective reward functions for reinforcement learning (RL) agents is a well-known challenge, particu-larly in complex environments where the desired behaviors are intricate or the rewards are sparse (Singh et al., 2009; Ng et al., 2000). This difficulty is magnified in multi-agent reinforcement learning (MARL) settings, where agents must not only learn optimal individual behaviors but also coordi-nate with others, leading to an exponential increase in task complexity (Zhang et al., 2021; Oroojlooy & Hajinezhad, 2023; Du et al., 2023). Sparse or hard-to-learn rewards can severely hinder the learning process, causing agents to con-verge slowly or settle on suboptimal policies (Andrychowicz et al., 2017; Pathak et al., 2017). In such scenarios, relying solely on environmental rewards may be insufficient for effective learning. Incorporating human feedback has thus emerged as a promising approach (Christiano et al., 2017; Knox & Stone, 2009; Ho & Ermon, 2016), since human guidance can provide additional, informative signals that help agents navigate complex tasks more efficiently when intrinsic rewards are inadequate. To leverage human expertise in accelerating the learning process of MARL agents, we propose the Multi-phase Hu-man Feedback Markov Game (MHF-MG), an extension of the Markov Game that incorporates human feedback across multiple generations of learning. At each generation, agents gather experiences using their current policies but may still struggle under the original reward function. Humans then observe the agents’ behaviors, offering feedback that re-flects the discrepancy between their own (potentially more expert) policy and the agents’ policies. Building on the MHF-MG, we develop Multi-agent Reinforcement Learn-ing from Multi-phase Human Feedback of Mixed Quality (M3HF ), which operationalizes the MHF-MG by directly integrating feedback into the agents’ reward functions. This framework utilizes large language models (LLMs) to parse human feedback of various quality levels, employs prede-fined templates for structured reward shaping, and applies adaptive weight adjustments to accommodate mixed-quality signals. In summary, we make the following contributions: (1) We propose the MHF-MG to address reward sparsity and com-1Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality " The r ose chef shoul d get t he t om at o                            
+
+> f i r st , t hen t he gr een chef can t ake i t
+> and cut i t as qui ckl y as possi bl e. The
+> bl ue chef can t ake t he pl at e and put
+> t he cut s on i t . "
+> Hum an Feedback
+> Rol l out Vi deo Mul t i - agent RL
+
+## ...                                      
+
+> l am bda obs, act : ( 1 i f act
+> == 5el se 0) + ( 1 i f obs[ 9]
+> == obs[ 0] and obs[ 10] ==
+> obs[ 1] el se 0)
+> l am bda obs, act : ( 1 i f act
+> == 5el se 0) + ( 1 i f obs[ 2]
+> == 1el se 0)
+> Funct i on
+> Wei ght s
+> Adj ust m ent
+> l am bda obs, act :
+> ( - sqr t ( ( obs[ 19] -obs[ 0] ) * * 2
+> + ( obs[ 20] -obs[ 1] ) * * 2) )
+> Rewar d
+> Funct i on
+> Pool s
+
+## ...          
+
+> Rewar d Tem pl at es
+> Act i on- based St at e- based
+> Di st ance- based Ti m e- based
+> Pr ox- based Success- based
+> New Rewar d Funct i ons
+> f or Each Agent
+> LLM
+> Rewar d Funct i ons Updat e
+> Di st ance- based
+> Act i on- based
+> St at e- based
+
+Figure 1. Workflow of the M 3HF method. Each generation k ∈ (0 , .., K − 1) begins with Multi-agent RL training. Agents generate rollout videos τk for human evaluation. Human feedback uk is parsed by a Large Language Model (LLM) into agent-specific instructions. The LLM then selects appropriate reward function templates f ∈ F and parameterizes them based on the parsed feedback. New reward functions Rik (s, a ) are added to each agent’s reward function pool Pi, with weights wi,m adjusted using performance-based criteria. The updated reward functions ˆRik+1 (s, a ) guide the next generation of agents’ training, creating a loop of agents learning from feedback. 
+
+plexity in MARL through iterative human guidance; (2) We develop the M3HF framework, which leverages LLMs to parse diverse human feedback and dynamically incorporates it into agents’ reward functions; (3) We provide a theoretical analysis justifying the use of rollout-based performance esti-mates and offering a weight decay mechanism that mitigates the impact of low-quality feedback. Extensive experiments in Overcooked demonstrate that M3HF consistently out-performs strong baselines, ultimately providing a robust and flexible method for enhancing multi-agent cooperation under challenging reward structures. 
+
+## 2. Related Work 
+
+Multi-Agent Reinforcement Learning (MARL) has been extensively studied to enable agents to learn coordinated behaviors in shared environments (Du et al., 2023; Yu et al., 2022). Traditional MARL approaches often rely on pre-defined reward functions and suffer from scalability and stability issues arising from the non-stationarity introduced by multiple learning agents (Busoniu et al., 2008; Canese et al., 2021). However, designing appropriate reward func-tions in MARL remains a significant challenge due to the complexity of agent interactions and the potential for con-flicting objectives. To address this, researchers have ex-plored various techniques for reward design. These include credit assignment methods (Nguyen et al., 2018; Zhou et al., 2020), reward shaping (Mannion et al., 2018), and the use of intrinsic rewards (Du et al., 2019). Furthermore, reward decomposition approaches have been proposed to balance individual and team objectives, such as separating rewards into contributions from self and nearby agents (Zhang et al., 2020), or combining dense individual rewards with sparse team rewards (Wang et al., 2022). 
+
+Reinforcement Learning from Human Feedback (RLHF) 
+
+has emerged as a promising avenue to address the limitations of handcrafted reward functions. Christiano et al. (2017) introduced methods for training agents using human pref-erences to shape the reward function, demonstrating that human feedback can significantly enhance policy learning. Building on this, Lee et al. (2021) proposed PEBBLE, lever-aging unsupervised pre-training and experience relabeling to improve feedback efficiency in interactive RL settings. While RLHF has been successfully applied to train Large Language Models (LLMs) (Ouyang et al., 2022; Shani et al., 2024; Wang et al., 2025; Hu et al., 2025; Liu et al., 2024), these approaches primarily focus on aligning LLM outputs with human preferences through single-turn interactions and scalar reward signals. Recently, PbMARL (Zhang et al., 2024) applied RLHF to MARL by utilizing offline pairwise preference comparisons extracted from pre-collected simu-lated policy data, but remained limited to an offline single-phase feedback scenario without dynamic, iterative human interactions. In contrast, our work incorporates multi-phase, mixed-quality human feedback directly into the reinforce-ment learning loop during online training in a multi-agent environment, enabling more flexible and scalable reward shaping. 
+
+Language Models in Reward Design and Policy Learn-ing. Recent advancements in LLMs have created oppor-2Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+tunities for incorporating natural language guidance into reinforcement learning (RL) (Liu et al., 2022; Chen et al., 2024). For instance, Ma et al. (2024) introduced EUREKA, a method employing code-generating LLMs to craft sophis-ticated reward functions at a human-expert level. However, extending methods such as EUREKA to multi-agent settings remains non-trivial, as independently performing rollouts to optimize rewards for each agent can become prohibitively expensive and computationally intensive. Similarly, Liang et al. (2023) proposed Code as Policies, where language model programs are used for embodied control, allowing agents to interpret and execute high-level instructions. Other recent works have further leveraged LLMs to trans-late linguistic instructions into reward functions and policies. Yu et al. (2023) utilized language instructions to shape re-wards for robotic skills, effectively aligning robot behaviors with human guidance. Kwon et al. (2023) highlighted the capacity of language models to capture nuanced human preferences during reward design. In human-AI collabora-tion (Zou et al., 2025), Hu & Sadigh (2023) demonstrated how language-instructed RL could foster improved coordi-nation between humans and agents, Wang et al. (2024) uses LLMs to convert language constraints into cost signals for agents. Additionally, Liang et al. (2024) proposed leverag-ing language model predictive control to iteratively refine RL policy learning from human feedback more quickly. Relatedly, Klissarov et al. (2023) presented MOTIF, adopt-ing LLM-generated intrinsic rewards from textual task spec-ifications to promote effective exploration in single-agent environments. Although MOTIF effectively leverages lan-guage grounding, it is inherently limited to single-agent contexts and does not incorporate iterative human inter-actions or complex multi-agent cooperation scenarios. In contrast, our approach specifically employs LLMs to parse multi-phase, mixed-quality human feedback dynamically to iteratively refine reward functions in complex multi-agent coordination problems. 
+
+Multi-phase Human Feedback. Prior works have consid-ered the role of iterative and multi-phase human feedback in reinforcement learning. Yuan et al. (2022) and Sumers et al. (2022) explored multi-phase bidirectional interactions between humans and agents through predefined communica-tion protocols, which, while structured, limit the flexibility of feedback. Zhi-Xuan et al. (2024) examined the use of human demonstrations via trajectories to convey intentions, requiring humans to perform the task themselves, which can be resource-intensive. Early attempts by Chen et al. (2021) and Zhang et al. (2023) delved into language for task generalization and policy explanation but were constrained to single-agent domains. 
+
+## 3. Preliminaries 
+
+We consider a Markov Game (Littman, 1994), defined by the tuple ⟨N , S, A, P, R, γ ⟩, in multi-agent reinforcement learning (MARL). Here, N = {1, 2, . . . , N } represents the set of agents. The state space S encompasses all possible configurations of the environment, while the action space 
+
+A denotes the set of actions available to each agent. At each time step t, the environment is in a state st ∈ S . Each agent i ∈ N selects an action ait ∈ A according to its policy πi(ait|st). The joint action at = ( a1 
+
+> t
+
+, a 2 
+
+> t
+
+, . . . , a Nt )
+
+leads to a state transition to st+1 according to the transition function P (st+1 |st, at). The agents receive a shared reward 
+
+rt = R(st, at), where R : S × A N → R is the reward function, and γ ∈ [0 , 1) is the discount factor. The objective for each agent is to learn a policy πi that maximizes the expected cumulative discounted reward: 
+
+Ji(πi) = E
+
+" ∞X
+
+> t=0
+
+γtrt πi, π −i
+
+#
+
+, (1) where π−i denotes the policies of all agents other than agent 
+
+i, and the expectation is over the trajectories induced by the policies and the environment dynamics. In our setting, although the reward function R is known (denoted as original reward function Rori ), it is challenging for agents to learn optimal policies due to its sparsity or complexity. This difficulty can lead to slow convergence or suboptimal performance for traditional reinforcement learning algorithms. 
+
+## 4. Method 
+
+To address the challenges posed by sparse or complex re-ward functions in multi-agent environments, we introduce the Multi-phase Human Feedback Markov Game (MHF-MG) as a tuple, ⟨N , S, A, P, R, γ, U, π h⟩. Compared to a standard Markov Game, the added U denotes the set of possible human utterances or feedback messages. πh rep-resents the human’s policy. In this framework, the agents interact with both the environment and a human over dis-crete generations indexed by k = 0 , 1, . . . , K − 1. At each generation k, agents collect experiences by interacting with the environment using their current policies πik.Each generation k consists of hundreds of iterations; each iteration comprises tens of episodes, and each episode spans on the order of hundreds of environment time steps t, de-pending on the specific environment. This setup allows agents to gain substantial experience within a generation before receiving human feedback. The human possesses a policy πh, which may be sub-optimal but is assumed to be initially superior to the agents’ policies. This human policy provides valuable guidance that can accelerate the agents’ learning. The human observes the agents’ behaviors and 3Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality       
+
+> (a) Overcooked-A (b) Overcooked-B (c) Overcooked-C (d) Lettuce-Tomato salad recipe
+> (e) Lettuce-Onion-Tomato salad recipe
+> Figure 2. The Overcooked Environment. (a)-(c) The three different kitchen layouts with increasing difficulty: (a) Overcooked-A offers ample movable space; (b) Overcooked-B forces agents divided on both sides to cooperate due to the partitioned kitchen; (c) Overcooked-C has less movable space compared to A. (d)-(e) The two salad recipes: In both recipes, the corresponding chopped foods must be combined on a single plate and delivered. To facilitate training, we use macro-actions based on (Xiao et al., 2022), where the agents’ actions are simplified. More details refer to Section 5.
+
+generates utterances uk ∈ U at each generation k, offering feedback based on the discrepancy between their own policy and the agents’ current policies. We model the human’s utterances as a mapping f from the human’s policy and the agents’ policies to the set of possible utterances: 
+
+uk = f  πh, π 1
+
+> k
+
+, π 2
+
+> k
+
+, . . . , π Nk
+
+ , (2) where f captures how the human generates feedback by comparing their policy with those of the agents. The utter-ances may include specific action recommendations, strate-gic advice, or corrections aimed at guiding the agents toward better performance. The agents parse the human’s utterance 
+
+uk to extract actionable information. This process may involve natural language understanding techniques, poten-tially leveraging large language models (LLMs) to interpret the feedback accurately. Based on the parsed feedback, each agent adjusts its reward function to incorporate the human’s guidance. For agent i, the updated reward function at generation k + 1 becomes: 
+
+Rik+1 (s, a) = R(s, a) + Rhf ik(s, a, u k), (3) where Rhf ik represents the reward adjustment derived from the human’s feedback uk at generation k. This adjustment modifies the reward signal to encourage behaviors aligned with the human’s guidance, effectively reshaping the agents’ learning objectives. The agents then update their policies for the next generation by optimizing the expected cumulative reward under the new reward function Ri,k +1 . Formally, the policy update for agent i is given by: 
+
+πik+1 = arg max  
+
+> πi
+
+E
+
+" ∞X
+
+> t=0
+
+γtRik+1 (st, at) πi, π −ik
+
+#
+
+, (4) where π−ik denotes the policies of all other agents at genera-tion k, and the expectation is taken over the distribution of trajectories induced by the policies and the environment dy-namics. This iterative process continues across generations, with agents repeatedly interacting with the environment, receiving human feedback, and updating their reward func-tions and policies accordingly. The inclusion of human feedback helps agents navigate the challenges of sparse or complex reward functions by providing additional signals that highlight desirable behaviors and strategies. In this pa-per, to minimize human involvement, we limit agent-human interactions to at most five times throughout the entire train-ing process, enabling efficient learning with minimal guid-ance. 
+
+4.1. Agent to Human Interaction 
+
+In the MHF-MG, agents periodically interact with the hu-man to receive feedback that guides their learning process. This interaction is initiated by the agents, who decide when to seek human input based on specific criteria. The primary mechanism for this interaction is through the generation of rollout trajectories, which approximate the agents’ current policy performance. 
+
+Rollouts Generation and Communication. During each generation k, agents interact with the environment using their current policies πik, collecting substantial experience over multiple iterations. However, due to the complexity or sparsity of the original reward function R, agents may still face difficulties in identifying efficient strategies or converging quickly to optimal policies. To address these challenges, agents periodically seek human feedback based on predefined criteria. Specifically, after every fixed number of training episodes, agents temporarily pause their training and generate evaluation rollouts. These rollouts consist of X independent trajectories collected un-der the fixed joint policy πk, defined formally as: 
+
+τ (x) 
+
+> k
+
+=
+
+n 
+
+s(x) 
+
+> t
+
+, a(x) 
+
+> t
+
+, r (x)
+
+> t
+
+o H−1
+
+> t=0
+
+, x = 1 , . . . , X, (5) 4Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+where H is the time horizon, s(x) 
+
+> t
+
+denotes the state at time 
+
+t, a(x) 
+
+> t
+
+is the joint action chosen by all agents in trajectory 
+
+x, and r(x) 
+
+> t
+
+is the resulting environmental reward. These rollouts allow human observers to assess current agent be-haviors and provide structured, actionable feedback for sub-sequent policy improvements. 
+
+Approximation of Policy Performance via Rollouts. Con-sider a stochastic game in which all agents follow stationary joint policies. At generation k, the joint policy πk com-bined with the environment dynamics induces a distribution over state-action-reward trajectories. Our goal is to formally justify that empirical estimates obtained from multiple col-lected rollouts reliably approximate the true performance 
+
+J(πk). Given the empirical trajectories τ (m) 
+
+> k
+
+defined previ-ously, we define each rollout’s discounted return as: 
+
+G(x) 
+
+> H
+
+= (1 − γ)
+
+> H−1
+
+X
+
+> t=0
+
+γtr(x) 
+
+> t
+
+, x = 1 , . . . , X, (6) and consider the empirical performance estimator: 
+
+ˆJX,H (πk) = 1
+
+X
+
+> X
+
+X
+
+> x=1
+
+G(x) 
+
+> H
+
+. (7) Under the Strong Law of Large Numbers (Kolmogorov, 1933; Durrett, 2010), as M → ∞ , this estimator converges almost surely to the finite-horizon expected discounted re-turn: 
+
+ˆJX,H (πk) a.s. 
+
+−−−−→ 
+
+> X→∞
+
+JH (πk),
+
+where JH (πk) = (1 − γ)
+
+> H−1
+
+X
+
+> t=0
+
+γt E[rt].
+
+(8) Furthermore, when horizon length H grows towards infinity, the finite-horizon discounted return JH (πk) converges to the true discounted return J(πk). Thus, we have: 
+
+Proposition 4.1 (Performance Estimation) . Under Assump-tion A.1 and Assumption A.4, assuming bounded rewards and given X independent rollouts of length H collected under policy πk, the empirical estimator converges almost surely to the true discounted expected return: 
+
+ˆJX,H (πk) −−−−→
+
+> X→∞
+> H→∞
+
+J(πk) (a.s.) (9) Leveraging Proposition 4.1, the multiple rollout trajectories serve as reliable empirical estimates of the policy perfor-mance J(πk). Human evaluators use these rollouts to effec-tively assess agent behavior and provide targeted feedback 
+
+uk = f (τk; πh). This assumption that empirical rollout data accurately reflects policy-induced distributions is analogous to common practices in offline reinforcement learning and policy evaluation contexts (Levine et al., 2020; Kumar et al., 2019). 
+
+4.2. Human to Agents Feedback Parsing. Our method employs a Large Language Model (LLM), denoted as M, to parse the human feedback 
+
+uk received at generation k and assign it either to specific agents or to all agents collectively. This parsing process is mathematically represented as uik, u all  
+
+> k
+
+= M(uk, N ), where 
+
+N is the number of agents, uik is the feedback assigned to agent i, and uall  
+
+> k
+
+is the feedback applicable to all agents. This approach ensures that each agent receives relevant instructions or corrections based on the human input. The detailed prompts used for guiding the LLM in this parsing process are provided in the Appendix D.4. 
+
+Generating New Reward Function The new reward func-tion Rik for the current generation involves selecting and parameterizing predefined function templates based on hu-man feedback. For each agent i, the new reward function for the current generation k is generated as follows: 
+
+Rik(s, a ) = M(F, u ik, u all  
+
+> k
+
+, e), (10) where F is a set of predefined function templates, uik is the parsed feedback for agent i at generation k, and e are the entities based on the environment states. 
+
+Predefined Function Templates. In our framework, we define a set of predefined reward function templates F that can be parameterized based on human feedback and the specific entities within the environment, as shown in Fig-ure 1. These templates enable the system to systematically generate reward functions aligned with human intentions, facilitating efficient policy updates in response to feedback. The templates capture common interaction patterns such as distance-based rewards that encourage agents to minimize their distance to target entities, action-based rewards that incentivize specific actions, and status-based rewards that reward agents for achieving certain states of the environ-ment. For instance, given the human feedback “I think the red chef needs to be responsible for getting the onion” and the LLM will select the distance-based reward template and parameterize it as: 
+
+Rik(s, a ) = −∥ s[Agent1 .pos ] − s[Onion .pos ]∥2. (11) Here, the s[Agent1 .pos ] and s[Onion .pos ] are the relevant entities of the observation vector, which encourages Agent 1 (The red chef in the rollout video) to minimize its distance to the onion, thus aligning its behavior with the desired ob-jective. This structured approach allows agents to interpret and act upon multi-fidelity human feedback effectively. De-tailed formulations of these reward templates and additional examples are provided in the Appendix D.2. 
+
+Reward Function for the next generation. At the end of the processing of the human feedback in generation k,we conclude the final reward function for each agent to a 5Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 0 200 400 600 800 1000  
+
+> Iteration
+> 50
+> 0
+> 50
+> 100
+> 150
+> Episode Return Mean
+> Gen 0 Gen 1
+> Mac-Based Baseline
+> IPPO (Baseline) MAPPO Gen 0 Gen 1
+
+(a) Overcooked-A: Lettuce-Tomato Salad 0 200 400 600 800 1000    
+
+> Iteration
+> 50
+> 0
+> 50
+> 100
+> 150
+> Episode Return Mean
+> Gen 0 Gen 1 Gen 2
+> Mac-Based Baseline
+> IPPO (Baseline) MAPPO Gen 0 Gen 1 Gen 2
+
+(b) Overcooked-B: Lettuce-Tomato Salad 0 200 400 600 800 1000     
+
+> Iteration
+> 50
+> 0
+> 50
+> 100
+> 150
+> Episode Return Mean
+> Gen 0 Gen 1 Gen 2 Gen 3
+> Mac-Based Baseline
+> IPPO (Baseline) MAPPO Gen 0 Gen 1 Gen 2 Gen 3
+
+(c) Overcooked-C: Lettuce-Tomato Salad 0 200 400 600 800 1000     
+
+> Iteration
+> 25
+> 0
+> 25
+> 50
+> 75
+> 100
+> 125
+> 150
+> Episode Return Mean
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Mac-Based Baseline
+> IPPO MAPPO Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+
+(d) Overcooked-A : Lettuce-Onion-Tomato 0 200 400 600 800 1000      
+
+> Iteration
+> 25
+> 0
+> 25
+> 50
+> 75
+> 100
+> 125
+> Episode Return Mean
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Mac-Based Baseline
+> IPPO (Baseline) MAPPO Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+
+(e) Overcooked-B : Lettuce-Onion-Tomato 0 200 400 600 800 1000      
+
+> Iteration
+> 60
+> 40
+> 20
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Episode Return Mean
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Mac-Based Baseline
+> IPPO (Baseline) MAPPO Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+
+(f) Overcooked-C : Lettuce-Onion-Tomato 
+
+Figure 3. Performance comparison of M3HF against baseline methods across different Overcooked environments and recipes. The plots show the mean episode return over 1000 training iterations (approximately 25k episodes) for (a-c) Lettuce-Tomato salad recipe and (d-f) Lettuce-Onion-Tomato salad recipe in Overcooked layouts A, B, and C, respectively. M3HF consistently outperforms the baseline methods (Mac-based Baseline, IPPO, MAPPO) across all scenarios, with performance improvements becoming more pronounced in more complex environments and recipes. Vertical lines indicate the start of each generation where human feedback is incorporated. All experiments are run with three random seeds, and the shaded areas represent the standard deviation. 
+
+weighted combination of the base reward and the consis-tency weight: 
+
+ˆRik+1 (s, a ) = X
+
+j wi,j · Rij (s, a ) , ∀Rij ∈ Pi (12) Here, ˆRik+1 (s, a ) denotes the final reward function for agent 
+
+i after processing the k-th generation of human feedback, and it will be used for the next generation k + 1 for the policy training and await the subsequent rollout generation and human interaction, as outlined in Algorithm 1. One main challenge is how to set the weights wi,j which can effectively balance different reward components and adapt to changing human feedback. To address this challenge, we employ weight decay and performance-based adjustment to optimize the weights wi,j .
+
+4.3. Weight Decay and Performance-based Adjustment 
+
+The straightforward way to adjust weights is based on a simple weight decay mechanism and performance feedback. When generating a new reward function, we add it to the pool Pi, then set an initial weight, wi,m = 1
+
+|Pi|+1 . Then, we apply a decay to existing weights of the former reward functions: 
+
+wi,m = wi,m · αM −m, ∀m ∈ 1, . . . , M − 1, (13) where α ∈ (0 , 1) is a constant decay factor. We then nor-malize all weights by using 
+
+wi,m = wi,m 
+
+P wi,m 
+
+, ∀m ∈ 1, . . . , M . (14) Additionally, we introduce a performance-based adjustment rule that compares the agent’s performance under the origi-nal reward function Ri
+
+ori across consecutive generations. We calculate rori ik+1 −rori ik, where rori ik+1 is the performance of the policy trained using the new reward function ˆRik+1 (s, a )
+
+(after processing human feedback in generation k) when evaluated on Ri
+
+ori , and rori ik is the performance of the policy trained using the previous reward function Rik(s, a ) (before processing human feedback in generation k) when evaluated on Ri
+
+ori . If this difference is positive, it indicates that the new reward function leads to improved performance on the original task. Otherwise, it suggests that the new reward function may be detrimental to the agent’s performance on the original task. We then adjust the weight of the newest 6Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+reward function component wi,m as follows: 
+
+wi,m =
+
+(
+
+wi,m + β, if rori ik+1 − rori ik > 0,
+
+max(0 , w i,m − β), otherwise, (15) where β is a small adjustment factor. This approach allows for the dynamic adjustment of the reward function pool, emphasizing recent human feedback while maintaining a di-verse set of reward components and adapting to performance changes. 
+
+4.4. Analysis of the Low-Quality Feedback 
+
+We now examine the robustness of our proposed M3HF framework under the scenario where human feedback of mixed quality—including noisy, irrelevant, or erroneous instructions—is provided to the agents. Such situations naturally arise due to confusion, limited human domain expertise, misinterpretation of agent behaviors, or misun-derstanding of the task objectives. Under these conditions, it is crucial for a robust algorithm to clearly mitigate the negative impact from low-quality feedback signals, while consistently leveraging high-quality feedback to enhance learning. Formally, at each generation k, we integrate re-wards by forming a weighted combination of the original task-based reward and the accumulated human-derived feed-back rewards: 
+
+bRk =
+
+> k
+
+X
+
+> m=0
+
+wkmRm, (16) where we define R0 = Rori as the original reward func-tion and Rm> 0 = Rhuman as human-generated feedback rewards. Correspondingly, the weights wkm are dynamically adjusted as described in Equation 15, explicitly accounting for observable agent performance improvements or degra-dations. Due to the design of our weighting mechanism, negative or unhelpful feedback rapidly loses influence, as their corre-sponding weights decrease after any observed dip or stag-nation of performance improvements. Conversely, helpful feedback continuously guides performance upwards, main-taining substantial influence through increased weighting in the combined reward function. We formalize this intuition into the following robustness result: 
+
+Proposition 4.2 (Robustness to Low-Quality Human Feed-back) . Under Assumption A.3 (Performance Estimation Ac-curacy) and Assumption A.2 (Learning Algorithm Conver-gence), for any given integer K ≥ 1 and any arbitrary sequence of human feedback rewards (Rk)k=1 ,2,...,K , the performance improvement satisfies: 
+
+Jori (πK ) − Jori (π0) ≥
+
+> n(K)
+
+X
+
+> j=1
+
+∆rij − (δ − ϵ), (17) 
+
+where δ is a bounded, positive constant independent of K,and each ij denotes a generation index at which the received human feedback reward is beneficial (i.e., yields a positive increment ∆rij > 0). 
+
+Intuitively, Proposition 4.2 formalizes the notion that our algorithm accumulates the positive contributions of helpful feedback over multiple rounds of interaction. In contrast, its performance can suffer at most a single bounded degra-dation, reflecting the limited and transient influence of the most recent faulty feedback. Importantly, this robustness property ensures stable long-term learning dynamics even when human inputs are imperfect or mixed quality. We provide a detailed proof of this proposition in Appendix B. 
+
+## 5. Experiment 
+
+In our experiment, we aim to address three key questions: 
+
+Q1. What is the overall performance of M3HF compared to current state-of-the-art methods? Q2. To what extent does multi-quality human feedback impact the performance of M3HF within the same environment? Q3. Can Vision-Language Models (VLMs) serve as a scalable and effective alternative to human feedback in M3HF ? In all experiments involving language-driven feedback parsing, we use the LLM gpt-4o-2024-11-20 (OpenAI, 2024). 
+
+Environment - Macro-Action-Based Overcooked , as shown in Figure 2. In our experiments, we utilize a chal-lenging multi-agent environment based on the Overcooked game (Wu et al., 2021; Xiao et al., 2022), where three agents must learn to cooperatively prepare a correct salad and de-liver it to a designated delivery cell. We followed the work of Xiao et al. (2022), where agents operate using macro-actions derived from primitive actions. These macro-actions facilitate effective navigation and interaction within the envi-ronment but also introduce complexities in learning optimal policies due to the increased action space. Each agent ob-serves only the positions and statuses of entities within a 
+
+5 × 5 square centered on itself, introducing partial observ-ability and heightening the coordination challenge. The agents will only receive a significant reward for delivering the correct salad (+200) and punishment if they deliver the wrong salad or food (-50). During training, each generation consists of 200 iterations; each iteration runs 25 episodes of up to 200 timesteps. For more details about the environment setting, please refer to the Appendix C. 
+
+Baselines. We evaluate against three strong multi-agent reinforcement learning approaches: The MAPPO (Yu et al., 2022), IPPO (De Witt et al., 2020), and a Macro-Action-Based Baseline from Xiao et al. (2022). Our own frame-work adopts IPPO as the backbone algorithm, while the macro-action baseline is the average performance of the two best-performing methods in Xiao et al. (2022), namely Mac-7Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 1.  Game Start : The red agent     
+
+> needs to pass the vegetables
+> from right to left.
+> 2. Mid-game: The red agent
+> successfully passes on the
+> onion and tomato.
+> 4. Endgame: The blue agent
+> delivered the wrong salad , the
+> lettuce was not sliced ? ?and
+> blended into the salad.
+> 3. Important: Blue Agent mixes
+> onion and tomato salad, but
+> also needs to mix sliced ? ?lettuce.
+
+(a) Example rollout in Generation 3 " The agent s successf ul l y com pl et e t he t ask of         
+
+> cr eat i ng t wo l et t uce, oni on, and t om at o
+> sal ads. Not hi ng t o i m pr ove"
+
+Low Qual i t y Feedback                                      
+
+> " Rose agent , you coul d consi der br i ngi ng t he
+> kni f e t o t he i ngr edi ent s and choppi ng t hem
+> near t hei r sour ce t o save t i m e. Bot h gr een
+> agent s, you can i m pr ove coor di nat i on. Whi l e
+> one agent chops, t he ot her coul d al r eady be
+> r et r i evi ng apl at e or pr epar i ng t he next
+> i ngr edi ent . "
+
+VLM Feedback                                          
+
+> " The bl ue and gr een chef s shoul d not ser ve t he
+> t om at o and oni on sal ad, whi ch i s t he wr ong
+> var i et y. Af t er r ecei vi ng t he l et t uce, t hey
+> shoul d cut i t and mi x i t bef or e ser vi ng i t .
+> The r ed agent shoul d not t ouch t he veget abl es
+> af t er pl aci ng t hem on t he mi ddl e t abl e. "
+
+Hum an Feedback  (b) Feedback example from different source 0 200 400 600 800 1000      
+
+> Iteration
+> 25
+> 0
+> 25
+> 50
+> 75
+> 100
+> 125
+> Episode Return Mean
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Mac-Based Baseline
+> IPPO (Baseline) MAPPO M3HF (w/ Low Quality Feedback) M3HF (w/ VLM Feedback) M3HF (w/ Ideal Human Feedback)
+
+(c) Overcooked-B : Lettuce-Onion-Tomato Salad 
+
+Figure 4. Impact of Mixed-Quality Feedback on Agent Performance. (a) An example is the rollout in Generation 3, where agents exhibit suboptimal behavior due to poor coordination and inefficient task execution. (b) Low-quality feedback provided to the agents, inaccurately stating that they successfully completed the task and offering no constructive guidance for improvement. (c) Performance comparison on Overcooked-B with the Lettuce-Onion-Tomato salad recipe under mixed quality feedback conditions. 
+
+IAICC and Mac-CAC, over 25,000 training episodes. Fur-ther details on these baselines can be found in Appendix D. 
+
+Experiment Results for Question 1: Overall Perfor-mance of M3HF Figure 3 demonstrates the superior per-formance of M3HF compared to SOTA baselines across various Overcooked environments and recipes. Our method consistently outperforms Mac-based Baseline, IPPO, and MAPPO in all scenarios, maintaining a substantial perfor-mance advantage across different levels of task complexity. The method exhibits accelerated learning, particularly in early training stages, and achieves higher asymptotic per-formance levels. Notably, in the simpler recipe setting, Figure 3a, 3b and 3c, M3HF converges to the optimal per-formance less than five rounds of interaction, showcasing the method’s exceptional efficiency in more straightforward settings. The method’s robustness is evident as we move to more complex environments. In the challenging Layout C (Figure 3c and 3f), M3HF maintains its effective perfor-mance advantage, particularly outperforming its backbone algorithm IPPO. This consistent superiority across varying complexity levels underscores M3HF ’s effectiveness and adaptability in diverse multi-agent scenarios. In addition, it is important to note that the baseline MAPPO employs a shared policy among agents alongside a cen-tralized value function, while IPPO utilizes independent policies. We have observed that IPPO often achieves better results in highly coordination-intensive scenarios such as Overcooked, potentially due to reduced interference among agents during policy training. Prior studies (De Witt et al., 2020; Yu et al., 2022) similarly report that IPPO can match or outperform MAPPO even without centralized critics. 
+
+Experiment Results for Question 2: Impact of Mixed-Quality Human Feedback We evaluated our method when facing low-quality feedback by simulating such feedback at each generation. For example, in the rollout shown in Figure 4a, agents exhibited suboptimal behavior due to poor coordination. Despite this, the low-quality feedback inaccu-rately stated, “The agents successfully complete the task of creating two lettuce, onion, and tomato salads. Nothing to improve,” as depicted in Figure 4b. When training with this irrelevant or erroneous feedback, the agents’ performance, illustrated in Figure 4c, remained only slightly below that of the baseline IPPO algorithm and did not degrade signifi-cantly. This outcome supports Proposition 4.2, demonstrat-ing that M3HF effectively mitigates the impact of unhelpful feedback through its weight adjustment mechanisms. Even with mixed-quality human input, the framework maintains performance close to the backbone algorithm, showcasing its resilience to low-quality guidance. 
+
+Experiment Results for Question 3: VLM-based Feed-back Generation We explore the potential of VLMs as an alternative to human feedback. The VLM is given the same video rollouts that humans would observe, sampled at a rate of 1 frame per second. Using all sampled frames and a prompt asking for feedback (detailed in Appendix D.4), the VLM generates feedback to the training agents. In our imple-mentation, we leverage Gemini-1.5-Pro-002 (Reid et al., 2024), which is chosen for its multimodal under-standing capability across a long context. We showcase an example of VLM feedback in Figure 4b alongside the human feedback. Here, the feedback provided by the VLM resembles human-like style but lacks specificity on critical issues, which, in this case, are “wrong variety”, “cut it and 8Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Table 1. Ablation results comparing feedback parsing and weight adjustments. Overcooked-B: Lettuce-Onion- Tomato Salad sce-nario.     
+
+> Method Average Return (Mean ± Std)
+> Raw Feedback (w/o parsing) 45.3 ± 5.2 LLM Parsing Only (no weight adj.) 68.7 ± 4.1 Full M 3HF (LLM parsing + weight adj.) 102.7 ± 10.8
+
+Table 2. Performance comparison between single-phase and multi-phase feedback methods. Overcooked-B: Lettuce-Onion- Tomato Salad scenario.    
+
+> Method Average Return (Mean ± Std)
+> Single-phase feedback (initial only) 43.1 ± 10.3 Multi-phase feedback (M 3HF) 102.7 ± 10.8
+
+mix it before serving it”. Instead it offers vague suggestions like “improve coordination”, which is hard to translate into reward design. This limitation is indicative of the VLM’s current inability to perform complex reasoning across im-ages. As a result, when plugged into our M3HF framework, the VLM feedback method does not yield much benefit, as shown in Figure 4c. Nonetheless, we expect improved performance with future advancements in VLM. 
+
+Ablation 1: Impact of Feedback Parsing and Weight Adjustment. We compare our complete proposed feedback integration pipeline (“Full M3HF ”) against two variants: 
+
+Raw Feedback , which directly translates human instructions into rewards without parsing or structured adjustment, and 
+
+LLM Parsing Only , which parses human feedback into struc-tured reward functions without performance-based weight adjustment. The results are summarized in Table 1. The results indicate that structured parsing of feedback impacts considerably performance, increasing average returns sig-nificantly compared to raw human feedback. Furthermore, adding weight adjustment mechanisms based on agent per-formance improvements further amplifies policy learning efficiency, underscoring the importance of combining struc-tured parsing and dynamic reward weighting. 
+
+Ablation 2: Single-phase vs. Multi-phase Feedback. We compared our proposed multi-phase feedback collection methodology against a single-phase scenario (feedback pro-vided only once at the start of training). Results are summa-rized in Table 2. Table 2 demonstrates superior performance for our multi-phase framework over single-phase feedback, highlighting the effectiveness of iterative, incremental feed-back in enabling agents’ policy refinement across multiple training stages. 
+
+Ablation 3: Comparison to Intrinsic Reward Methods. 
+
+We further evaluated the effectiveness of M3HF relative to intrinsic reward-based methods, specifically comparing against the IRAT method (Wang et al., 2022). As Over-cooked lacks built-in intrinsic rewards, we manually con-structed three variants of intrinsic reward functions (denoted 
+
+Table 3. Comparison of intrinsic reward-based methods with our M3HF on Overcooked-B: Lettuce-Onion- Tomato Salad task. Eval-uation at training iterations 400, 600, 800, and 1000 (corresponding to Generations 1–4 in M3HF). Mean and standard deviation re-ported over three seeds.                         
+
+> Algorithm Iter. 400 Iter. 600 Iter. 800 Iter. 1000 IPPO (base) 19.2 ± 4.5 23.1 ± 2.7 23.2 ± 3.3 27.4 ± 4.9 IRAT-rw 1 68.9 ± 10.1 52.5 ± 11.3 78.2 ± 14.5 94.9 ± 10.7 IRAT-rw 2 1.1 ± 2.1 9.3 ± 11.4 16.0 ± 8.1 34.5 ± 14.0 IRAT-rw 3 10.8 ± 9.1 17.3 ± 10.6 21.3 ± 8.7 33.8 ± 9.9 M3HF (Ours) 164.8 ± 1.2 ———
+
+as rw 1 , rw 2 , rw 3 ) reflecting progressively stronger co-ordination requirements: • rw 1 : Rewards an agent whenever it picks up or chops any ingredient. • rw 2 : Rewards the agent upon successfully reaching the knife after picking up an ingredient. • rw 3 : Rewards the agent only upon successfully chop-ping an ingredient after reaching the knife, approximat-ing an optimal coordination strategy. The results summarized in Table 3 show that while intrinsic reward methods (IRAT variants) typically enhance perfor-mance over vanilla IPPO, they still remain significantly inferior to M3HF , especially in the early stages of train-ing. This is largely due to IRAT’s reliance on predefined reward structures generated prior to observing actual pol-icy behaviors, resulting in suboptimal coordination patterns (e.g., multiple agents crowding the same object). In con-trast, M3HF utilizes human feedback derived from observed rollouts, precisely identifying and targeting coordination failures, enabling agents to quickly improve policy behav-iors and achieve superior cooperative results. 
+
+## 6. Conclusion 
+
+In this paper, we introduced M3HF , a novel framework for MARL that incorporates multi-phase human feedback of mixed quality to address the challenges of sparse or complex reward signals. By extending the Markov Game to include human input and leveraging LLMs to parse and integrate human feedback, our approach enables agents to learn more effectively. Empirically, M3HF outperforms strong base-lines, particularly in scenarios with increasing complexity. Our findings highlight the potential of integrating diverse human insights to enhance multi-agent policy learning in a more accessible way. 9Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+## Impact Statement 
+
+This research introduces M3HF , a framework that enables multi-agent reinforcement learning systems to learn effec-tively from human feedback of varying quality. By allowing non-expert humans to provide meaningful feedback to AI systems, M3HF democratizes the development of multi-agent systems while making them more robust to real-world situations where perfect expert guidance may not be avail-able. This could accelerate the deployment of collaborative AI systems in areas such as healthcare, manufacturing, and emergency response, where multiple agents need to coordi-nate while incorporating human domain knowledge. While this increased accessibility could lead to broader adoption, we acknowledge the importance of appropriate oversight and encourage future work to explore necessary safeguards for such systems. 
+
+## Acknowledgment 
+
+This work was supported by the Engineering and Physical Sciences Research Council [grant number EP/Y003187/1, UKRI849]. This work was also supported in part by NSF grant IIS-2046640 (CAREER). 
+
+## References 
+
+Andrychowicz, M., Wolski, F., Ray, A., Schneider, J., Fong, R., Welinder, P., McGrew, B., Tobin, J., Pieter Abbeel, O., and Zaremba, W. Hindsight experience replay. In 
+
+Advances in Neural Information Processing Systems , vol-ume 30, 2017. Bertsekas, D. P. and Tsitsiklis, J. N. Neuro-Dynamic Pro-gramming . Athena Scientific, 1996. Busoniu, L., Babuska, R., and De Schutter, B. A comprehen-sive survey of multiagent reinforcement learning. IEEE Transactions on Systems, Man, and Cybernetics, Part C (Applications and Reviews) , 38(2):156–172, 2008. Canese, L., Cardarilli, G. C., Di Nunzio, L., Fazzolari, R., Giardino, D., Re, M., and Span `o, S. Multi-agent reinforce-ment learning: A review of challenges and applications. In Applied Sciences , volume 11, 2021. Chen, V., Gupta, A., and Marino, K. Ask your humans: Using human instructions to improve generalization in reinforcement learning. In International Conference on Learning Representations , 2021. Chen, X.-H., Wang, Z., Du, Y., Jiang, S., Fang, M., Yu, Y., and Wang, J. Policy learning from tutorial books via understanding, rehearsing and introspecting. In Advances in Neural Information Processing Systems , volume 37, 2024. Christiano, P. F., Leike, J., Brown, T., Martic, M., Legg, S., and Amodei, D. Deep reinforcement learning from human preferences. In Advances in Neural Information Processing Systems , volume 30, 2017. De Witt, C. S., Gupta, T., Makoviichuk, D., Makoviychuk, V., Torr, P. H., Sun, M., and Whiteson, S. Is indepen-dent learning all you need in the starcraft multi-agent challenge? arXiv preprint arXiv:2011.09533 , 2020. Du, Y., Han, L., Fang, M., Liu, J., Dai, T., and Tao, D. Liir: Learning individual intrinsic reward in multi-agent rein-forcement learning. In Advances in Neural Information Processing Systems , volume 32, 2019. Du, Y., Leibo, J. Z., Islam, U., Willis, R., and Sunehag, P. A review of cooperation in multi-agent learning. arXiv preprint arXiv:2312.05162 , 2023. Durrett, R. Probability: Theory and Examples . Cambridge University Press, 4th edition, 2010. Ho, J. and Ermon, S. Generative adversarial imitation learn-ing. In Advances in Neural Information Processing Sys-tems , volume 29, 2016. Hu, H. and Sadigh, D. Language instructed reinforcement learning for human-ai coordination. In International Con-ference on Machine Learning , pp. 13584–13598. PMLR, 2023. Hu, Y., Goel, K., Killiakov, V., and Yang, Y. Eigenspectrum analysis of neural networks without aspect ratio bias. In 
+
+International Conference on Machine Learning , 2025. Klissarov, M., D’Oro, P., Sodhani, S., Raileanu, R., Bacon, P.-L., Vincent, P., Zhang, A., and Henaff, M. Motif: Intrinsic motivation from artificial intelligence feedback. 
+
+arXiv preprint arXiv:2310.00166 , 2023. Knox, W. B. and Stone, P. Interactively shaping agents via human reinforcement: The tamer framework. In Proceed-ings of the fifth international conference on Knowledge capture , pp. 9–16, 2009. Kolmogorov, A. N. Sulla determinazione empirica di una legge di distribuzione. Giornale dell’Istituto Italiano degli Attuari , 4:83–91, 1933. Kumar, A., Fu, J., Soh, M., Tucker, G., and Levine, S. Stabilizing off-policy q-learning via bootstrapping error reduction. In Advances in Neural Information Processing Systems , volume 32, 2019. Kurach, K., Raichuk, A., Sta ´nczyk, P., Zajac, M., Bachem, O., Espeholt, L., Riquelme, C., Vincent, D., Michalski, M., Bousquet, O., et al. Google research football: A novel reinforcement learning environment. In Proceedings of 
+
+10 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+the AAAI conference on artificial intelligence , volume 34, pp. 4501–4510, 2020. Kwon, M., Xie, S. M., Bullard, K., and Sadigh, D. Reward design with language models. In The Eleventh Interna-tional Conference on Learning Representations , 2023. Lee, K., Smith, L., and Abbeel, P. Pebble: Feedback-efficient interactive reinforcement learning via relabeling experience and unsupervised pre-training. In Interna-tional Conference on Machine Learning , 2021. Levine, S., Kumar, A., Tucker, G., and Fu, J. Offline rein-forcement learning: Tutorial, review, and perspectives on open problems. arXiv preprint arXiv:2005.01643 , 2020. Liang, J., Huang, W., Xia, F., Xu, P., Hausman, K., Ichter, B., Florence, P., and Zeng, A. Code as policies: Language model programs for embodied control. In 2023 IEEE International Conference on Robotics and Automation ,2023. Liang, J., Xia, F., Yu, W., Zeng, A., Arenas, M. G., Attarian, M., Bauza, M., Bennice, M., Bewley, A., Dostmohamed, A., et al. Learning to learn faster from human feedback with language model predictive control. arXiv preprint arXiv:2402.11450 , 2024. Littman, M. L. Markov games as a framework for multi-agent reinforcement learning. In Machine learning pro-ceedings 1994 , pp. 157–163. Elsevier, 1994. Liu, R., Bai, F., Du, Y., and Yang, Y. Meta-reward-net: Implicitly differentiable reward learning for preference-based reinforcement learning. In Advances in Neural Information Processing Systems , volume 35, 2022. Liu, Z., Hu, Y., Pang, T., Zhou, Y., Ren, P., and Yang, Y. Model balancing helps low-data training and fine-tuning. In Al-Onaizan, Y., Bansal, M., and Chen, Y.-N. (eds.), Empirical Methods in Natural Language Process-ing , 2024. Ma, Y. J., Liang, W., Wang, G., Huang, D.-A., Bastani, O., Jayaraman, D., Zhu, Y., Fan, L., and Anandkumar, A. Eureka: Human-level reward design via coding large lan-guage models. In The Twelfth International Conference on Learning Representations , 2024. Mannion, P., Devlin, S., Duggan, J., and Howley, E. Reward shaping for knowledge-based multi-objective multi-agent reinforcement learning. In The Knowledge Engineering Review , volume 33, 2018. Ng, A. Y., Russell, S., et al. Algorithms for inverse reinforce-ment learning. In International Conference on Machine Learning , 2000. Nguyen, D. T., Kumar, A., and Lau, H. C. Credit assign-ment for collective multiagent rl with global rewards. In Advances in Neural Information Processing Systems ,volume 31, 2018. OpenAI. GPT-4o (gpt-4o-2024-11-20). https: //platform.openai.com/models/ gpt-4o-2024-11-20 , 2024. Large language model. Oroojlooy, A. and Hajinezhad, D. A review of coopera-tive multi-agent deep reinforcement learning. Applied Intelligence , 53(11):13677–13722, 2023. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., Zhang, C., Agarwal, S., Slama, K., Ray, A., et al. Training language models to follow instructions with human feedback. In Advances in Neural Information Processing Systems , volume 35, 2022. Pathak, D., Agrawal, P., Efros, A. A., and Darrell, T. Curiosity-driven exploration by self-supervised predic-tion. In International Conference on Machine Learning ,2017. Puterman, M. L. Markov decision processes. Handbooks in Operations Research and Management Science , 2:331– 434, 1990. Reid, M., Savinov, N., Teplyashin, D., Lepikhin, D., Lilli-crap, T., Alayrac, J.-b., Soricut, R., Lazaridou, A., Firat, O., Schrittwieser, J., et al. Gemini 1.5: Unlocking multi-modal understanding across millions of tokens of context. 
+
+arXiv preprint arXiv:2403.05530 , 2024. Shani, L., Rosenberg, A., Cassel, A., Lang, O., Calandriello, D., Zipori, A., Noga, H., Keller, O., Piot, B., Szpektor, I., Hassidim, A., Matias, Y., and Munos, R. Multi-turn reinforcement learning from preference human feedback. In Advances in Neural Information Processing Systems ,volume 37, 2024. Singh, S., Lewis, R. L., and Barto, A. G. Where do re-wards come from. In Conference of the Cognitive Science Society , 2009. Song, Y., Jiang, H., Tian, Z., Zhang, H., Zhang, Y., Zhu, J., Dai, Z., Zhang, W., and Wang, J. An empirical study on google research football multi-agent scenarios. Machine Intelligence Research , 21(3):549–570, 2024. Sumers, T., Hawkins, R., Ho, M. K., Griffiths, T., and Hadfield-Menell, D. How to talk so ai will learn: Instruc-tions, descriptions, and autonomy. In Advances in Neural Information Processing Systems , volume 35, 2022. Sutton, R. S. Reinforcement learning: An introduction. ABradford Book , 2018. 11 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Wang, L., Zhang, Y., Hu, Y., Wang, W., Zhang, C., Gao, Y., Hao, J., Lv, T., and Fan, C. Individual reward assisted multi-agent reinforcement learning. In International Con-ference on Machine Learning , 2022. Wang, Y., Krotov, D., Hu, Y., Gao, Y., Zhou, W., McAuley, J., Gutfreund, D., Feris, R., and He, Z. M+: Extend-ing memoryllm with scalable long-term memory. In The Twelfth International Conference on Learning Represen-tations , 2025. Wang, Z., Fang, M., Tomilin, T., Fang, F., and Du, Y. Safe multi-agent reinforcement learning with natural language constraints. arXiv preprint arXiv:2405.20018 , 2024. Wu, S. A., Wang, R. E., Evans, J. A., Tenenbaum, J. B., Parkes, D. C., and Kleiman-Weiner, M. Too many cooks: Bayesian inference for coordinating multi-agent collabo-ration. In Topics in Cognitive Science , volume 13, 2021. Xiao, Y., Tan, W., and Amato, C. Asynchronous actor-critic for multi-agent reinforcement learning. In Advances in Neural Information Processing Systems , volume 35, 2022. Yu, C., Velu, A., Vinitsky, E., Gao, J., Wang, Y., Bayen, A., and Wu, Y. The surprising effectiveness of ppo in cooperative multi-agent games. In Advances in Neural Information Processing Systems , volume 35, 2022. Yu, W., Gileadi, N., Fu, C., Kirmani, S., Lee, K.-H., Are-nas, M. G., Chiang, H.-T. L., Erez, T., Hasenclever, L., Humplik, J., et al. Language to rewards for robotic skill synthesis. In Conference on Robot Learning , 2023. Yuan, L., Gao, X., Zheng, Z., Edmonds, M., Wu, Y. N., Rossano, F., Lu, H., Zhu, Y., and Zhu, S.-C. In situ bidirectional human-robot value alignment. In Science robotics , volume 7, 2022. Zhang, K., Yang, Z., and Ba s¸ ar, T. Multi-agent reinforce-ment learning: A selective overview of theories and al-gorithms. In Handbook of Reinforcement Learning and Control , pp. 321–384. Springer, 2021. Zhang, N., Wang, X., Cui, Q., Zhou, R., Kakade, S. M., and Du, S. S. Multi-agent reinforcement learning from hu-man feedback: Data coverage and algorithmic techniques. 
+
+arXiv preprint arXiv:2409.00717 , 2024. Zhang, T., Xu, H., Wang, X., Wu, Y., Keutzer, K., Gon-zalez, J. E., and Tian, Y. Multi-agent collaboration via reward attribution decomposition. arXiv preprint arXiv:2010.08531 , 2020. Zhang, X., Guo, Y., Stepputtis, S., Sycara, K., and Camp-bell, J. Understanding your agent: Leveraging large language models for behavior explanation. arXiv preprint arXiv:2311.18062 , 2023. Zhi-Xuan, T., Ying, L., Mansinghka, V., and Tenenbaum, J. B. Pragmatic instruction following and goal assis-tance via cooperative language-guided inverse planning. In International Conference on Autonomous Agents and Multiagent Systems , 2024. Zhou, M., Liu, Z., Sui, P., Li, Y., and Chung, Y. Y. Learning implicit credit assignment for cooperative multi-agent re-inforcement learning. In Advances in Neural Information Processing Systems , volume 33, 2020. Zou, H. P., Huang, W.-C., Wu, Y., Chen, Y., Miao, C., Nguyen, H., Zhou, Y., Zhang, W., Fang, L., He, L., et al. A survey on large language model based human-agent systems. arXiv preprint arXiv:2505.00753 , 2025. 12 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+## A. Assumptions 
+
+We make the following assumptions to facilitate the analy-sis: 
+
+Assumption A.1 (Bounded Rewards) . All reward functions, including the original reward Ri
+
+> ori
+
+, the true human feedback reward Rtrue ik, and the noisy human feedback reward Rhf ik,are uniformly bounded: 
+
+|R(s, a )| ≤ Rmax , ∀s, a. (18) This assumption is standard in reinforcement learning to ensure stability and convergence (Sutton, 2018). 
+
+Assumption A.2 (Learning Algorithm Convergence) .
+
+Given a fixed reward function, the learning algorithm con-verges to a policy that is ϵ-optimal with respect to the ex-pected cumulative reward under that reward function: 
+
+lim  
+
+> t→∞
+
+E[JiR(πit)] ≥ JRi (πi
+
+> ∗
+
+) − ϵ, (19) where JiR(π) is the expected cumulative reward for agent i
+
+under policy π and reward function R, and πi 
+
+> ∗
+
+is the optimal policy for agent i under R.
+
+Assumption A.3 (Performance Estimation Accuracy) . The estimate of the performance difference ∆rik = Ji
+
+> ori
+
+(πik+1 )−
+
+Ji
+
+> ori
+
+(πik) accurately reflects the true change in expected cu-mulative reward under the original reward function Ri
+
+> ori
+
+between generations k and k + 1 .This assumption relies on having sufficient samples to esti-mate the performance difference accurately, which can be ensured through appropriate exploration and sample size. 
+
+Assumption A.4 (Independent Roll-outs) . The X rollout trajectories {τ (x) 
+
+> k
+
+}Xx=1 collected under the fixed joint policy 
+
+πk are independent and identically distributed (i.i.d.). 
+
+## B. Proof of Proposition 4.2 
+
+In this section, we provide a complete and structured proof for Proposition 4.2. Let ij denote the generation index at which the incorpora-tion of human feedback explicitly yields a positive policy improvement for the j-th time, and let n(K) represent the number of times positive improvements (helpful human feedback) occur until timestep K. Formally, each ij sat-isfies ∆rij > 0, and indices between ij−1 and ij denote interactions with low-quality or unhelpful feedback where 
+
+∆rk < 0.The proposition explicitly states that for any generation k in the interval ij−1 ≤ k < i j , the performance satisfies: 
+
+J(πk) − J(π0) = 
+
+> j−1
+
+X
+
+> l=1
+
+∆ril , for k = ij−1,
+
+and 
+
+J(πk) − J(π0) ≥
+
+> j−1
+
+X
+
+> l=1
+
+∆ril − δ, for all ij−1 < k < i j ,
+
+where δ is a small bounded positive constant defined explic-itly later. The proof proceeds in three steps: 
+
+Step 1: Performance at positive improvement milestones (k = ij−1). By definition of ij , we clearly have: 
+
+J(πij−1 ) − J(π0) = 
+
+> j−1
+
+X
+
+> l=1
+
+ J(πil ) − J(πil−1 ) =
+
+> j−1
+
+X
+
+> l=1
+
+∆ril .
+
+Step 2: Performance between positive milestones ( ij−1 <k < i j ). For indices between ij−1 and ij , human feed-back results in negative or zero performance improvement (∆rk ≤ 0). According to our algorithm and Eq. (15) , the weight assigned to any unhelpful feedback reward func-tion is adjusted (reduced), and eventually clipped to zero. Specifically, whenever this negative improvement occurs, the adaptive weighting mechanism significantly reduces or eliminates the influence of this poor-quality feedback. Thus, the previously established optimal policy at timestep ij−1
+
+remains largely unchanged. The largest possible degrada-tion from the previous high-performance point is therefore bounded by a constant δ > 0, independent of the total interaction length K:
+
+J(πk) − J(πij−1 ) ≥ − δ, ∀ij−1 < k < i j .
+
+Step 3: Combining two results. Combining the two pre-ceding steps directly, we establish the performance lower bound at any time step k within the interval: 
+
+J(πk) − J(π0)= ( J(πk) − J(πij−1 )) + ( J(πij−1 ) − J(π0)) 
+
+≥ − δ +
+
+> j−1
+
+X
+
+> l=1
+
+∆ril .
+
+Since this holds for all intervals of indices, applying it specif-ically to the final interval (after the last helpful feedback index n(K)), we obtain the desired inequality: 
+
+J(πK ) − J(π0) ≥
+
+> n(K)
+
+X
+
+> j=1
+
+∆rij − δ. 
+
+Thus, Proposition 4.2 follows directly. 13 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Explicit bound on the constant δ. We next explicitly quantify the bounded constant δ appearing due to one step of degraded performance. Consider the following general lemma: 
+
+Lemma B.1. Refer to Puterman (1990) and Lemma 6.2 in Bertsekas & Tsitsiklis (1996), Let r1, r 2, r 3 be three bounded reward functions. Define combined rewards: 
+
+(R = (1 − p) r1 + p r 2,R′ = (1 − p′ − q) r1 + p′ r2 + q r 3.
+
+Let π and π′ be the optimal policies corresponding respec-tively to R and R′. Then the following performance bound holds, for a discount factor γ ∈ (0 , 1) :
+
+V πr1 − V π′ 
+
+> r1
+
+≤ 21 − γ ∥ R − R′∥∞
+
+≤ 21 − γ
+
+|p′ + q − p| ∥ r1 − r3∥∞ + |p − p′| ∥ r2 − r3∥∞
+
+.
+
+We now explicitly apply this lemma in our scenario. Con-sider the timestep k immediately after the last beneficial feedback index ij , with: • r1 = Rori , the original environment reward. • r2 = weighted combination of previously beneficial feedback. • r3 = Rk, the current negative feedback reward. Then, we have:                      
+
+> Vπk
+> Rori −Vπij
+> Rori ≤21−γ[|p′+q−p|∥ Rori −Rk∥∞+|p−p′|∥ r2−Rk∥∞]
+
+(20) By the current weight updating scheme (Eqs. 15), we ex-plicitly have: • q = 1/(2+ j)1+1 /(2+ j) = 13+ j , and • 0 ≤ p − p′ ≤ p − αj p = p(1 − αj ).Noting that the feedback probability p is bounded (e.g. 0 ≤
+
+p ≤ 1) and that all reward functions satisfy ∥r∥∞ ≤ Rmax ,we obtain a uniform upper bound for δ. In particular,                       
+
+> δ≤21−γ
+> h13+ j−(1 −αj)p∥Rori −Rk∥∞+p(1 −αj)∥r2−Rk∥∞
+> i
+> .
+
+(21) Since p ≤ 1 and ∥Rori − Rk∥∞, ∥r2 − Rk∥∞ ≤ Rmax ,the right-hand side is a finite constant independent of the total iteration count K. This uniform bound on δ highlights the robustness of our feedback-integration mechanism even when occasional poor-quality feedback occurs. This completes the full proof. 
+
+## C. Environment Details 
+
+In this section, we will introduce the details of the environ-ments we are using. We follow the setting from 
+
+Goal . Three agents need to learn cooperating with each other to prepare a Tomato-Lettuce-Onion salad and deliver it to the ‘star’ counter cell as soon as possible. The challenge is that the recipe of making a tomato-lettuce-onion salad is unknown to agents. Agents have to learn the correct procedure in terms of picking up raw vegetables, chopping, and merging in a plate before delivering. 
+
+State Space . The environment is a 7×7 grid world involving three agents, one tomato, one lettuce, one onion, two plates, two cutting boards and one delivery cell. The global state information consists of the positions of each agent and above items, and the status of each vegetable: chopped, unchopped, or the progress under chopping. 
+
+Primitive-Action Space . Each agent has five primitive-actions: up , down , left , right and stay . Agents can move around and achieve picking, placing, chopping and delivering by standing next to the corresponding cell and moving against it (e.g., in Figure 2a, the pink agent can 
+
+move right and then move up to pick up the tomato). 
+
+Macro-Action Space . Here, we first describe the main func-tion of each macro-action and then list the corresponding termination conditions. • Five one-step macro-actions that are the same as the primitive ones; • Chop , cuts a raw vegetable into pieces (taking three time steps) when the agent stands next to a cutting board and an unchopped vegetable is on the board, otherwise it does nothing; and it terminates when: 
+
+– The vegetable on the cutting board has been chopped into pieces; 
+
+– The agent is not next to a cutting board; 
+
+– There is no unchopped vegetable on the cutting board; 
+
+– The agent holds something in hand. • Get-Lettuce , Get-Tomato , and Get-Onion , navigate the agent to the latest observed position of the vegetable, and pick the vegetable up if it is there; otherwise, the agent moves to check the initial position of the veg-etable. The corresponding termination conditions are listed below: 
+
+– The agent successfully picks up a chopped or un-chopped vegetable; 14 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+– The agent observes the target vegetable is held by another agent or itself; 
+
+– The agent is holding something else in hand; 
+
+– The agent’s path to the vegetable is blocked by another agent; 
+
+– The agent does not find the vegetable either at the latest observed location or the initial location; 
+
+– The agent attempts to enter the same cell with an-other agent, but has a lower priority than another agent. • Get-Plate-1/2 , navigates the agent to the latest ob-served position of the plate, and picks the vegetable up if it is there; otherwise, the agent moves to check the initial position of the vegetable. The corresponding termination conditions are listed below: 
+
+– The agent successfully picks up a plate; 
+
+– The agent observes the target plate is held by an-other agent or itself; 
+
+– The agent is holding something else in hand; 
+
+– The agent’s path to the plate is blocked by another agent; 
+
+– The agent does not find the plate either at the latest observed location or at the initial location; 
+
+– The agent attempts to enter the same cell with another agent but has a lower priority than another agent. • Go-Cut-Board-1/2 , navigates the agent to the corre-sponding cutting board with the following termination conditions: 
+
+– The agent stops in front of the corresponding cut-ting board, and places an in-hand item on it if the cutting board is not occupied; 
+
+– If any other agent is using the target cutting board, the agent stops next to the teammate; 
+
+– The agent attempts to enter the same cell with another agent but has a lower priority than another agent. • Go-Counter (only available in Overcook-B, Figure 2 b), navigates the agent to the center cell in the middle of the map when the cell is not occupied, otherwise it moves to an adjacent cell. If the agent is holding an object the object will be placed. If an object is in the cell, the object will be picked up. • Deliver , navigates the agent to the ‘star’ cell for deliv-ering with several possible termination conditions: 
+
+– The agent places the in-hand item on the cell if it is holding any item; 
+
+– If any other agent is standing in front of the ‘star’ cell, the agent stops next to the teammate; 
+
+– The agent attempts to enter the same cell with an-other agent, but has a lower priority than another agent. 
+
+Observation Space : The macro-observation space for each agent is the same as the primitive observation space. Agents are only allowed to observe the positions and status of the entities within a 5 × 5 view centered on the agent. The initial position of all the items are known to agents. 
+
+Dynamics : The transition in this task is deterministic. If an agent delivers any wrong item, the item will be reset to its initial position. From the low-level perspective, to chop a vegetable into pieces on a cutting board, the agent needs to stand next to the cutting board and executes left three times. Only the chopped vegetable can be put on a plate. 
+
+Original Reward Function : +10 for chopping a vegetable, 
+
++200 terminal reward for delivering a correct salad (like tomato-lettuce-onion or tomato-lettuce salad), −5
+
+for delivering any wrong entity, and −0.1 for every timestep. 
+
+Episode Termination : Each episode terminates either when agents successfully deliver a tomato-lettuce-onion salad or reaching the maximal time steps, 200. 
+
+## D. Implementation Details 
+
+D.1. Algorithm 
+
+In here, we list the complete algorithm, as shown in Algo-rithm.1. 
+
+D.2. Predefined Reward Function Templates 
+
+To effectively incorporate human feedback into the learning process, we define a set of predefined reward function tem-plates F that can be parameterized based on the feedback and entities present in the environment. These templates capture common interaction patterns between agents and their environment, facilitating automatic reward function generation aligned with human intentions. Firstly, the distance-based reward function penalizes the agent proportionally to the Euclidean distance between two entities e1 and e2 within the environment: 
+
+fdist (s, a, e 1, e 2) = −∥ s[e1.pos ] − s[e2.pos ]∥2, (22) where s[ei.pos ] denotes the position vector of entity ei in state s, and ∥ · ∥ 2 represents the Euclidean norm. Secondly, the action-based reward function provides a 15 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Algorithm 1 M3HF : Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Require: Number of agents N , Original Reward Functions 
+
+{Rori  
+
+> i
+
+}Ni=1 , Predefined Reward Templates F , Environ-ment E, Initial Policies {πi, 0}Ni=1 , Total Generations 
+
+K
+
+Ensure: Trained Policies {πi,K }Ni=1 
+
+1: Initialize Reward Function Pools Pi = {Rori  
+
+> i
+
+} for each agent i
+
+2: for generation k = 0 to K − 1 do 
+
+3: Multi-agent Training Phase ▷ Eq. 4 
+
+4: for each agent i do 
+
+5: Train policy πi,k using current reward function 
+
+ˆRki (s, a ) (Eq. 12) 
+
+6: end for 
+
+7: Rollout Generation ▷ Sec. 4.1 
+
+8: if Periodic evaluation or performance stagnation detected then 
+
+9: Generate rollout trajectories τk =
+
+{(st, at, r t)}H−1
+
+> t=0
+
+10: end if 
+
+11: Human Feedback Phase ▷ Sec. 4.2 
+
+12: Human observes τk and provides feedback uk
+
+13: Feedback Parsing: 
+
+14: Use LLM M to parse uk and assign feedback to agents: 
+
+uik, u all  
+
+> k
+
+= M(uk, N )
+
+15: Reward Function Update ▷ Sec. 4.3 
+
+16: for each agent i do 
+
+17: Generate new reward function from feedback (Eq. 10): 
+
+Ri, new = M(F, u ik, u all  
+
+> k
+
+, e)
+
+18: Add Ri, new to reward function pool Pi
+
+19: end for 
+
+20: Weight Update: 
+
+21: for each agent i do 
+
+22: Initialize weight for new reward function: 
+
+wi,M = 1
+
+> |Pi|
+
+23: Apply weight decay to existing weights (Eq. 15): 
+
+wi,m = wi,m · αM −m, ∀m ∈ { 1, . . . , M − 1}
+
+24: Normalize weights: 
+
+wi,m = wi,m  
+
+> PMj=1 wi,j
+
+, ∀m ∈ { 1, . . . , M }
+
+25: Compute performance difference: 
+
+∆ri = rori  
+
+> i,k +1
+
+− rori 
+
+> i,k
+
+26: Adjust weight of newest reward function: 
+
+wi,M =
+
+(
+
+wi,M + β, if ∆ri > 0max(0 , w i,M − β), otherwise 
+
+27: Update final reward function (Eq. 12): 
+
+ˆRk+1  
+
+> i
+
+(s, a ) = PMm=1 wi,m · Ri,m (s, a )
+
+28: end for 
+
+29: end for 
+
+reward when the agent performs a specific desired action 
+
+adesired :
+
+faction (s, a, a desired ) = I(a = adesired ), (23) where a is the action taken by the agent, and I(·) is the indicator function, returning 1 if the condition is true and 0 otherwise. Thirdly, the status-based reward function rewards the agent when an entity e attains a particular desired status status desired :
+
+fstatus (s, a, e, status desired ) = I(s[e. status ] = status desired ),
+
+(24) where s[e. status ] represents the current status of entity e in state s.Additionally, we define a composite reward function that allows for more nuanced feedback by combining multiple reward components: 
+
+fcomp (s, a ) = X
+
+> i
+
+λifi(s, a ), (25) where fi(s, a ) are individual reward components (e.g., 
+
+fdist , f status ), and λi are weighting coefficients that deter-mine the relative importance of each component. For instance, given the human feedback “Agent 1 needs to get the onion,” we might select the distance-based reward template and parameterize it as: 
+
+Ri(s, a ) = −∥ s[Agent1 .pos ] − s[Onion .pos ]∥2. (26) This reward function encourages Agent 1 to minimize its distance to the onion, thus aligning its behavior with the desired objective. Furthermore, other templates can be incorporated depending on the environmental context and task requirements. For example, a proximity-based reward function provides a reward when an agent is within a certain distance d of a target entity: 
+
+fprox (s, a, e 1, e 2, d ) = 
+
+(
+
+rprox , if ∥s[e1.pos ] − s[e2.pos ]∥2 ≤ d, 
+
+0, otherwise ,
+
+(27) where rprox is the reward assigned for being within distance 
+
+d.16 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+A time-based penalty can be introduced to encourage effi-cient task completion: 
+
+ftime (s, a, t ) = −β · t, (28) where t is the current time step, and β is a penalty coefficient reflecting the cost of time. A success-based reward provides a reward upon achieving a specific goal condition: 
+
+fsuccess (s, a ) = I(goal condition met ) · rsuccess , (29) where rsuccess is the reward value assigned when the goal condition is met. An energy-based penalty discourages unnecessary expen-diture of resources: 
+
+fenergy (s, a ) = −γ · energy (a), (30) where energy (a) represents the energy cost associated with action a, and γ is a scaling factor. By leveraging these templates, the system can systematically generate reward functions that align with human feedback, enabling agents to adapt their behavior effectively in re-sponse to diverse instructions. This approach allows for the incorporation of mixed-quality human feedback into the learning process, enhancing the agents’ ability to perform complex tasks in multi-agent environments. 
+
+D.3. Training Details 
+
+Our experiments were conducted on a heterogeneous com-puting cluster running Ubuntu Linux. The hardware configu-ration included a variety of CPU models, such as Dual Intel Xeon E5-2650, Dual Intel Xeon E5-2680 v2, and Dual Intel Xeon E5-2690 v3. For accelerated computing, we utilized 3 NVIDIA A30 GPUs. The total computational resources comprised 180 CPU cores and 500GB of system memory. We performed hyperparameter tuning for all baselines to ensure fair comparison. Specifically, for IPPO and MAPPO, we tuned learning rates, batch sizes, and gradient clip-ping values. For example, we systematically searched over learning rates in {3e-4, 1e-4 }, #sgd iters in {5, 10 },sgd batch size in {1024, 5120 }, and entropy coefficient in 
+
+{0.01, 0.05 }, ultimately selecting the configurations with the best validation performance. For the macro-action based baseline, we directly adopted the best-performing hyper-parameters reported in Mac-based method (Xiao et al., 2022). We will explicitly include these details in our re-vised manuscript. 
+
+Table 4. Hyperparameters used in Overcooked-A, B, and C.                                              
+
+> Hyperparameter M3HF-IPPO Baseline-IPPO Baseline-MAPPO Training Generation 5--Training Iterations 1000 1000 1000 Training Episodes 25k 25k 25k Learning Rate 0.0003 0.0003 0.0003 Training Batch Size 5120 5120 5120 Minibatch Size 1024 1024 1024 Epochs 10 10 10 Discount Factor ( γ)0.99 0.99 0.99 GAE Lambda ( λ)0.95 0.95 0.95 Clip Parameter 0.2 0.2 0.2 Value Function Clip Parameter 10.0 10.0 -Entropy Coefficient 0.01 0.01 0.01 KL Coefficient 0.2 0.2 -Gradient Clipping 0.5 0.5 0.5
+
+D.4. Prompts Prompt 1: FEEDBACK PARSING PROMPT 
+
+Given the following feedback for a multi-agent system in an Overcooked environment, as-sign the feedback to appropriate agents or to all agents. The system has {num agents }
+
+agents. Feedback: {Human Feedback }
+
+The agent 1 is the chef in Green, agent 2 is the chef in Rose, agent 3 is the chef in Blue. Return your response in the following JSON format: 
+
+{{ 
+
+”agent 0”: ”feedback for agent 0”, ”agent 1”: ”feedback for agent 1”, ... ”all”: ”feedback for all agents” 
+
+}} 
+
+Only include keys for agents that receive spe-cific feedback and ’all’ if there’s general feed-back. 
+
+Prompt 2: REWARD FUNCTION BUILD PROMPT 
+
+Given the parsed feedback for an agent in an Overcooked environment, select and parame-terize a reward function template. 
+
+17 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+The observation space is a 32-length vector as described in the task description. Parsed Feedback: {feedback for this agent }
+
+Observation Space (32-length vector for each agent): - Tomato: position (2), status (1) (obs[0:2]) - Lettuce: position (2), status (1) (obs[3:5]) - Onion: position (2), status (1) (obs[6:8]) - Plate 1: position (2) (obs[9:10]) - Plate 2: position (2) (obs[11:12]) - Knife 1: position (2) (obs[13:14]) - Knife 2: position (2) (obs[15:16]) - Delivery: position (2) (obs[17:18]) - Agent 1: position (2) (obs[19:20]) - Agent 2: position (2) (obs[21:22]) - Agent 3: position (2) (obs[23:24]) - Order: one-hot encoded (7) (obs[25:32]) Available function templates: 1. Distance-based: -sqrt((agent x - target x)**2 + (agent y - target y)**2) 2. Action-based: reward for specific actions (e.g., chopping, picking up) 3. State-based: reward for achieving specific states (e.g., holding an item) 4. Time-based: penalty for time taken 5. Combination of the above Select a template and parameterize it based on the feedback. Return your response as a Python lambda function that takes the observa-tion vector (obs) and action (act) as input. For example, Distance between agent 1 and tomato : lambda obs, act: -sqrt((obs[19] - obs[0])**2 + (obs[20] - obs[1])**2) # Distance between agent 1 and tomato Ensure that your function uses the correct in-dices from the observation vector as described in the task description. 
+
+Prompt 3: VLM FEEDBACK PROMPT 
+
+You are an AI assistant helping to manage an Overcooked environment with multiple agents. The task is to prepare and deliver a
+
+{task name }.The environment is a 7x7 grid with various objects and {num agents } agents. Observation Space (32-length vector for each agent): - Tomato: position (2), status (1) - Lettuce: position (2), status (1) - Onion: position (2), status (1) - Plate 1: position (2) - Plate 2: position (2) - Knife 1: position (2) - Knife 2: position (2) - Delivery: position (2) - Agent 1: position (2) - Agent 2: position (2) - Agent 3: position (2) - Order: one-hot encoded (7) MA-V1 Actions (index indicates macro action): 0: No operation 1: Move Up 2: Move Right 3: Move Down 4: Move Left 5: Interact (pick up, put down, chop) You will be provided with a video of the agents’ gameplay, which may be lengthy. Your task is to: 1. Identify and summarize the key actions and strategies employed by the agents throughout the gameplay. 2. Provide constructive feedback based on your observations in a single paragraph. Mark this paragraph with [SUGGESTION]. When generating feedback: - Address specific agents by their color (e.g., Green agent, Rose agent) or position (e.g., agent on the left, agent near the cutting board). - Focus on aspects of gameplay that could be significantly improved for any or all agents. - Offer specific, actionable suggestions that can be immediately applied. - Relate your feedback to the Overcooked environment, tasks, and overall efficiency. - Prioritize improvements in teamwork, task allocation, or resource management. - Consider how the suggestions could impact the agents’ performance metrics. 
+
+18 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+Avoid: - Using overly technical jargon or complex explanations. - Giving vague or general advice not specific to their gameplay. - Mentioning anything outside the scope of the Overcooked game. - Using excessive praise or encouragement. Provide a brief summary of the agents’ actions, followed by a single paragraph of feed-back marked with [SUGGESTION], addressing the agents directly about their gameplay in the Overcooked environment. Focus on concrete improvements for any or all agents rather than motivational language. 
+
+## E. Regarding the Scalability of Our Method 
+
+We extended our evaluation to Google Football 5v5 (Ku-rach et al., 2020; Song et al., 2024), a complex multi-agent benchmark. M3HF continues to outperform standard MARL baselines with the multi-phased human feedback. Full en-vironment details are provided in the Figure 5,6 and their captions. 19 Multi-agent Reinforcement Learning from Multi-phase Human Feedback of Mixed Quality 
+
+(a) Rollout Screenshot (b) Start Point 
+
+Total Player Number 10 Training Iteration 100 Training Episodes 8000 Episode Length 3000 Training Timesteps 2.4e7 Deterministic False Offsides True End Episode on Score False end episode on out of play False end episode on possession change False Bot Level 1.0 
+
+(c) 5-vs-5 full-game (5v5) configuration 
+
+Figure 5. Google Research Football Environment (5-vs-5 Full Game) : We evaluate M3HF in the GRF 5-vs-5 HARD Built-in AI scenario, a complex multi-agent benchmark widely used in prior work (Kurach et al., 2020; Song et al., 2024). Each team controls 5 players (10 agents total); we always control the yellow-shirt (left) team , which initiates the kickoff. Each episode lasts 3000 steps, with the second half beginning at step 1501. The simulation is accelerated: 1 in-game minute equals 3 real-world seconds , so a full 90-minute match takes 4.5 minutes. For human feedback collection, we typically present the first attacking phase (60s rollout), corresponding to 
+
+20 in-game minutes . (a) shows a rollout snapshot during the opening phase. (b) depicts the initial player formation around the center circle. (c) presents the full environment configuration. Observations follow a dictionary structure with keys "obs" (state features) and 
+
+"controlled player index" (agent IDs: 0–4 for yellow team, 5–9 for blue). The action space is [Discrete(19)] , where each agent selects one of 19 discrete actions (e.g., pass, sprint, tackle) represented as a one-hot 19D vector. 0 20 40 60 80 100                                                  
+
+> Iteration
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> Value
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Good Shot
+> 020 40 60 80 100
+> Iteration
+> 6.0
+> 6.5
+> 7.0
+> 7.5
+> 8.0
+> 8.5
+> Value
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Interception
+> 020 40 60 80 100
+> Iteration
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> Value
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Score
+> 020 40 60 80 100
+> Iteration
+> 20
+> 40
+> 60
+> 80
+> Value
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Total Move
+> 020 40 60 80 100
+> Iteration
+> 400
+> 500
+> 600
+> 700
+> 800
+> 900
+> 1000
+> Value
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Total Possession
+> 020 40 60 80 100
+> Iteration
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> Value
+> Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+> Win Rate
+
+Performance Metrics Comparison in Google Research Football       
+
+> IPPO (Baseline) MAPPO Gen 0 Gen 1 Gen 2 Gen 3 Gen 4
+
+Figure 6. Performance Comparison of M3HF vs. Baselines in GRF 5-vs-5 Full Game. We evaluate M³HF in the GRF 5v5-HARD setting, a challenging multi-agent benchmark; Baselines include IPPO, MAPPO, and macro-action-based MACCS; Metrics include Win Rate, Goal Difference, Total Move (indicating spatial coordination), Good Shot (quality shot attempts), and Interception (defensive awareness); M³HF outperforms all baselines in most metrics, particularly in Win Rate and coordination-related metrics like Total Move and Good Shot; this is due to multi-phase human feedback that encourages off-ball movement, proactive attacking, and cooperative behavior (e.g., “agents should run into space”); these behaviors result in better scoring opportunities and team coordination; Conclusion: 
+
+M³HF scales effectively to GRF and enables efficient, high-quality policy learning with minimal human input. 
+
+20

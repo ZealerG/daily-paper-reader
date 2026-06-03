@@ -1,0 +1,5045 @@
+Title: Consensus Based Stochastic Optimal Control
+
+URL Source: https://openreview.net/pdf?id=W7dN3SQKkH
+
+Number of Pages: 34
+
+Markdown Content:
+# Consensus Based Stochastic Optimal Control 
+
+Liyao Lyu 1 Jingrun Chen 2
+
+## Abstract 
+
+We propose a gradient-free deep reinforcement learning algorithm to solve high-dimensional ,finite-horizon stochastic control problems. Al-though the recently developed deep reinforce-ment learning framework has achieved great suc-cess in solving these problems, direct estimation of policy gradients from Monte Carlo sampling often suffers from high variance. To address this, we introduce the Momentum Consensus-Based Optimization (M-CBO) and Adaptive Mo-mentum Consensus-Based Optimization (Adam-CBO) frameworks. These methods optimize poli-cies using Monte Carlo estimates of the value function, rather than its gradients. Adjustable Gaussian noise supports efficient exploration, helping the algorithm converge to optimal policies in complex, nonconvex environments. Numeri-cal results confirm the accuracy and scalability of our approach across various problem dimensions and show the potential for extension to mean-field control problems. Theoretically, we prove that M-CBO can converge to the optimal policy under some assumptions. 
+
+## 1. Introduction 
+
+Stochastic optimal control (SOC) problems (Stengel, 1986; Fleming & Rishel, 2012), along with their mean-field vari-ants, have been extensively studied throughout the twentieth century and have had a wide range of applications in vari-ous areas, such as finance (Pham, 2009; Fleming & Stein, 2004; Carmona & Durrleman, 2003; Cousin et al., 2011;                     
+
+> 1Department of Computational Mathematics, Science & Engineering, Michigan State University, MI 48824, USA
+> 2School of Mathematical Sciences and Suzhou Institute for Advanced Research, University of Science and Technology of China, and Suzhou Big Data & AI Research and Engi-neering Center, Suzhou 215127, China . Correspondence to: Liyao Lyu <lyuliyao@msu.edu >,Jingrun Chen <jin-grunchen@ustc.edu.cn >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+Lachapelle et al., 2016; Cardaliaguet & Lehalle, 2018), eco-nomics (Gu ´eant, 2009; Gomes et al., 2015; Gu ´eant et al., 2010; Achdou et al., 2014; 2022), chemistry (Welch et al., 2019; Holdijk et al., 2024), and biology (Lachapelle & Wol-fram, 2011; Aurell & Djehiche, 2018; Achdou & Lasry, 2019). Readers seeking an overview of these developments may refer to the recent review (Hu & Lauri `ere, 2024). Tra-ditional methods for solving the SOC problem, such as the finite-volume method (Richardson & Wang, 2006; Wang et al., 2003), the Galerkin method (Beard et al., 1997; Beard, 1998), and the monotone approximation method (Forsyth & Labahn, 2007), aim to solve the corresponding Hamilton-Jacobi-Bellman (HJB) equations. However, these meth-ods struggle to scale in high-dimensional spaces due to the curse of dimensionality, where the computational complex-ity grows exponentially with the dimension of state and action variables. This limitation hinders their application in large-scale systems where efficiency is critical. Significant advances have been made in addressing the high-dimensional SOC problem by modeling control strategies using deep neural networks, leveraging their capability to approximate functions in high-dimensional spaces. One prominent approach is the value-based method (Li et al., 2024; Lien et al., 2024; Obando Ceron et al., 2024; Zhang et al., 2024; Mou & Zhu, 2024), such as the deep-backward stochastic differential equation (BSDE) method (E et al., 2017; Han et al., 2018; N ¨usken & Richter, 2021; Pham et al., 2021). Based on the Bellman principle, the optimal control can be modeled as a function of the value function and its gradient. Therefore, solving the value function from the BSDE that it satisfies can automatically give the optimal control of the SOC. These methodologies are commonly referred to as model-based methods because they need an explicit connection between the optimal control and the value function. This kind of connection usually depends on accurate modeling of the transition kernel between different states. However, modeling the (mean-field) transition kernel for a real-world process in practical applications can be extremely challenging (Lyu & Lei, 2023; Lu et al., 2019). Recently, model-free methods have gained attention in con-trol and reinforcement learning (Agrawal et al., 2024; Chen et al., 2024; Chen & Zhang, 2024; Dai et al., 2024; Hisaki & Ono, 2024; Hong et al., 2024; Hu et al., 2024; Park et al., 2024; Tang et al., 2024), such as Deep Q Networks 1Consensus Based Stochastic Optimal Control 
+
+(DQN) (Mnih et al., 2015), Proximal Policy Optimization (PPO) (Heess et al., 2017; Schulman et al., 2015b; 2017), Trust Region Policy Optimization (TRPO) (Schulman et al., 2015a), Deep Deterministic Policy Gradient (DDPG) (Sil-ver et al., 2014; Lillicrap, 2015) and Soft Actor-Critic (SAC) (Haarnoja et al., 2018b;a). These approaches address this issue by directly optimizing the policy without explicit transition kernel modeling. Nevertheless, these methods rely on the evaluation of policy gradients (Jia & Zhou, 2022a;b) or depend on the action and state space discretization (Gu et al., 2021; Carmona et al., 2023). The evaluation of policy gradients often has high variance and is computationally intensive (Hua et al., 2024), and the discretization of action and state space reintroduces dimensionality constraints. To address this, current methods like PPO, TRPO, and SAC are constrained to a time-independent problem, i.e., an infinite time horizon problem, which allows the reward gradient to be computed iteratively. However, our work tackles a more general and challeng-ing setting: finite time horizon and model-free stochastic control. In this regime, the assumptions typically required by gradient-based methods—such as model knowledge or discount-based recursion—are not available. Consequently, current approaches face a trade-off between model fidelity and scalability, motivating the need for a method that can achieve robust performance without gradient estimation and state-action discretization. In this work, we introduce a novel approach to overcome the limitations of both model-based and model-free reinforce-ment learning methods by applying the Adam-CBO (Chen et al., 2022) framework to high-dimensional SOC prob-lems. Unlike value-based methods, our approach is entirely model-free, directly optimizing the policy without requiring an explicit formulation of the transition kernel. In addition, it is gradient-free, avoiding the high-variance issue associ-ated with policy gradients, and mesh-free, eliminating the need to discretize state and action spaces. These features allow our method to scale efficiently in high-dimensional en-vironments, making it particularly suited for finite-horizon problems where the optimal control is time-dependent. Con-trary to concerns that direct policy optimization may lead to local optima, our method demonstrates superior accuracy in handling nonconvex issues, as evidenced by extensive numerical results. Beyond numerical validation, our study contributes a rig-orous theoretical foundation by providing the convergence analysis for the M-CBO method, a simplified version of Adam-CBO without adaptive timestep. This proof estab-lishes that, under certain assumptions, our algorithm reliably converges to the optimal policy, addressing a crucial gap in reinforcement learning for the SOC problem, where theoret-ical guarantees are often challenging to obtain. 
+
+## 2. Problem Formulation 
+
+Consider a control problem over a finite time horizon t ∈
+
+[0 , T ] for some T < ∞. The state space is denoted by S ⊂ 
+
+Rd, and the action space by A ⊂ Rm. An agent governs its state process xt through an action process αt with a transition kernel p(x′|t, x, α) that describes the evolution from state x to state x′ under the action α at time t. The agent’s goal is to minimize the combined terminal cost 
+
+g(xT ) and the running cost f (t, x, α) incurred during the process. The total cost function is generally represented by 
+
+J[α] = E
+
+"Z T
+
+> 0
+
+f (t, xt, αt)d t + g(xT )
+
+#
+
+.
+
+In this work, we model the policy α(t, x; θ) as a fully con-nected neural network parameterized by θ. The rest of the paper will focus on finding the optimal θ ∈ RD such that it minimizes the cost function J (θ) = J[α[( t, x; θ)] .
+
+## 3. Gradient-free Policy Update 
+
+We propose two algorithms to find the optimal policy: M-CBO and Adam-CBO. The Adam-CBO algorithm improves on M-CBO by adaptively adjusting the timestep, resulting in better numerical performance. 
+
+3.1. Momentum Consensus-Based Optimization 
+
+In M-CBO, we begin by initializing a population of N
+
+agents represented by (Θ, Ω) = (Θ 1, Ω1, · · · , ΘN , ΩN ) ∈
+
+R2N D . Here Θi ∈ RD denotes the policy parameterization of the i-th agent, and Ωi ∈ RD represents its momentum. To exploit the current group of policies, we estimate a con-sensus policy as 
+
+Mβ (Θ) = 
+
+> N
+
+X
+
+> i=1
+
+Θiwβ
+
+ ΘiPNj=1 wβ (Θ j ) ,
+
+where wβ (Θ) = exp ( −βJ (Θ)) . Here β ≥ 0 is an in-verse temperature parameter, controlling how strongly each agent’s performance (determined by the objective function 
+
+J (Θ) ) influences the consensus. Using the consensus pol-icy, we define the following dynamics to guide each policy toward consensus: 
+
+dΘ it =Ω itdt − γ1
+
+ Θit − M β (Θ) + σ(t)d W iθ,t ,
+
+dΩ it = − m  Θit − M β (Θ) dt
+
+− γ2Ωitdt + √mσ (t)d W iω,t ,
+
+(1) where m, γ 1, and γ2 are positive constants and W iθ,t , W iω,t 
+
+are D dimensional Wiener processes that introduce stochas-ticity into the dynamics. This facilitates the exploration of unknown regions, with a parameter σ(t) regulating the ex-ploration strength. Using the Euler-Maruyama (EM) scheme 2Consensus Based Stochastic Optimal Control 
+
+Algorithm 1 Consensus Based Optimization with Momen-tum 
+
+Input: time step λ, Number of player N , Batch size M ,total time tN , parameters β, γ1, γ2, m
+
+Initialize Θi 
+
+> 0
+
+∼ N (0 , ID ), i = 1 , . . . , N 
+
+Initialize Ωi 
+
+> 0
+
+= 0 , i = 1 , . . . , N ;
+
+for t = 0 to tN do 
+
+Partition the indices {1, 2, . . . , N } into batches 
+
+B1, . . . , B NM , each containing M particles 
+
+for j = 1 to NM do 
+
+J i = J (Θ it), where i ∈ Bj
+
+M = P  
+
+> k∈Bj
+> Θktwk
+> P
+> i∈Bj
+> wi
+
+, where wi = exp  −βJ i
+
+Update the policies and their momentum: 
+
+Θit+1 = Θ it + λΩit − γ1λ(Θ it − M ) + √λξ iθ ,
+
+Ωit+1 = Ω it − λm (Θ it − M ) − λγ 2Ωit + σ(t)√λmξ iω ,
+
+where ξiθ , ξ iω ∼ N (0 , ID )
+
+end for end for Output: ΘitN , i = 1 , . . . , N 
+
+for Equation (1) , we get the M-CBO algorithm, as detailed in Algorithm 1. The original CBO method (Fornasier et al., 2024) aims to achieve a monotonic reduction in the distance be-tween the optimal policy ˜θ and the policies of agents. Specifically, this is represented as: 1
+
+> N
+
+PNi=1 ∥Θit −
+
+˜θ∥2 ≃ R ∥θ − ˜θ∥2dμt(θ), where μt represents the law of agents Θt. Our method minimizes a combined expres-sion 1
+
+> N
+
+PNi=1 
+
+
+
+∥Θit − ˜θ∥2 + m−1∥Ωit∥
+
+
+
+≃ R ∥θ − ˜θ∥2 +
+
+m−1∥ω∥2dρt(θ, ω ), where ρt represents the joint distribu-tion of policies Θ and Ω at time t. In particular, the M-CBO method does not force the monotonic reduction of 
+
+> 1
+> N
+
+PNi=1 ∥Θit − ˜θ∥2, allowing for the additional momentum term ω to enhance the exploration capability. It provides greater flexibility and reduces the risk of becoming trapped in local minima; see Section 4 for a more detailed analysis. 
+
+3.2. Adaptive Momentum Consensus-Based Optimization 
+
+In the Adam-CBO method, we extend M-CBO by replacing the constant momentum term m with an adaptive term based on the inverse of the second moment of the agents’ policies. Specifically, we replace m with (Vβ [Θ] + ϵI)−1 , where 
+
+Vβ [Θ] is the second moment defined as: 
+
+Vβ [Θ] = 
+
+> N
+
+X
+
+> i=1
+
+(Θ i − M β [Θ]) 2wβ (Θ i)
+
+PNj=1 wβ (Θ j ) .
+
+Algorithm 2 Consensus-based Optimization with Adaptive Momentum 
+
+Input: time step λ, Number of player N , Batch size M ,total time tN , parameters β, β1, β2
+
+Initialize Θi 
+
+> 0
+
+∼ N (0 , ID ), i = 1 , . . . , N 
+
+Initialize Ωi 
+
+> 0
+
+= 0 , i = 1 , . . . , N 
+
+Initialize M0, V 0 = 0 
+
+for t = 0 to tN do 
+
+Partition the indices {1, 2, . . . , N } into batches 
+
+B1, . . . , B NM , each containing M particles 
+
+for j = 1 to NM do 
+
+J i := J (Θ it), where i ∈ Bj
+
+M = P 
+
+> k∈Bj
+> Θktwk
+> P
+> i∈Bj
+> wi
+
+V = P  
+
+> k∈Bj
+> (Θ kt−M)2wk
+> P
+> i∈Bj
+> wi
+
+Update the moving average moment estimate: 
+
+Mt+1 = β1Mt + (1 − β1)M, ˆMt+1 = Mt+1 
+
+1 − βt
+
+> 1
+
+,Vt+1 = β2Vt + (1 − β2)V, ˆVt+1 = Vt+1 
+
+1 − βt
+
+> 2
+
+Update the policies and their momentum: 
+
+Θit+1 =Θ it + λV it ,
+
+Ωit+1 =Ω it − λ Diag( ˆV it + ϵ)−1(Θ it − ˆMt)+ γλ Ωit + σ(t)√λξ i,
+
+where ξi ∼ N (0 , ID )
+
+end for end for Output: ΘitN , i = 1 , . . . , N 
+
+In particular, ϵ = 1 × 10 −8 is used to keep the positivity. This adaptive adjustment introduces a mechanism similar to the Adam optimizer, where updates are scaled by a normal-ized second moment, allowing for faster convergence and improved numerical performance. The detailed algorithm is shown in Algorithm 2. 
+
+## 4. Convergence Analysis 
+
+In Section 3, we propose two dynamics that converge to the consensus policies. A natural question we want to answer here is whether policies can converge to the optimal policies. From the theoretical perspective, for simplicity, we focus on proving the convergence of the M-CBO method in this work. We begin by establishing the well-posedness of the M-CBO method, ensuring the uniqueness and existence of solutions under certain regularity conditions on the cost function J .
+
+Assumption 4.1. The following assumptions are imposed 3Consensus Based Stochastic Optimal Control 
+
+on the cost function J
+
+1. There exist ˜θ such that J (˜θ) = inf θ J (θ) =: J. Also, it is bounded from above by sup J ≤ J.2. The cost function J is locally Lipschitz continuous 
+
+∥J [θ1] − J [θ2]∥ ≤ LJ (∥θ1∥ + ∥θ2∥)∥θ1 − θ2∥.3. There exists a constant cJ > 0 such that J (θ) − J ≤
+
+cJ (1 + ∥θ∥2).4. There exist δJ , R 0, η, μ > 0 such that 
+
+∥θ − ˜θ∥ ≤ (J − J)μ 
+
+> η
+
+, for all θ ∈ Bθ,R 0 (˜θ) =
+
+{θ : ∥θ − ˜θ∥ ≤ R0}, and J (θ) − J > δ J for all 
+
+θ ∈
+
+
+
+Bθ,R 0 (˜θ)
+
+c
+
+.5. The parameters we choose σ(t) has upper and lower bound σ ≤ σ(t) ≤ σ.
+
+Theorem 4.2. Under the Assumption 4.1, for each N ∈ N,the stochastic differential equation (1) has a unique strong solution 
+
+n 
+
+Θ(N ) 
+
+> t
+
+, Ω(N ) 
+
+> t
+
+)
+
+
+
+|t > 0
+
+o
+
+for any initial condition 
+
+
+
+Θ(N )0 , Ω(N )0
+
+
+
+satisfying E
+
+
+
+∥Θ(N )0 ∥ + ∥Ω(N )0 ∥
+
+
+
+≤ ∞ .Proof. See Appendix A. By letting the number of agents N → ∞ in Equation (1) ,the mean-field limit of the model is formally given by the following McKean–Vlasov stochastic differential equation 
+
+d ¯Θt = ¯Ωtdt − γ1
+
+  ¯Θt − M β [μt] dt + σ(t)d Wθ,t ,
+
+d ¯Ωt = − m   ¯Θt − M β [μt] dt
+
+− γ2 ¯Ωtdt + √mσ (t)d Wω,t ,
+
+(2) where Mβ [μ] =       
+
+> Rθexp( −βJ(θ)μ(d θ)Rexp( −βJ(θ)μ(d θ)
+
+, μt(θ) = R ρt(θ, dω),and ρt = Law ( ¯Θt, ¯Ωt). Then the corresponding Fokker-Planck equation is 
+
+∂tρt = − ∇ θ · (( ω − γ1(θ − M β [μt])) ρt)+ ∇ω · (( m (θ − M β [μt]) + γ2ω) ρt)+ σ(t)2m
+
+2 ∆ω ρt + σ(t)2
+
+2 ∆θ ρt.
+
+(3) Next, we will prove the above equation (2) and (3) are well-posed. 
+
+Theorem 4.3. Let J satisfy the Assumption 4.1 and ρ0 ∈P4(RD ×RD ). Then there exists a unique nonlinear process 
+
+( ¯Θ, ¯Ω) ∈ C  [0 , T ], RD × RD  , T > 0, satisfying (2) with initial distribution ( ¯Θ, ¯Ω) ∼ ρ0 in the strong sense, and 
+
+ρt = Law ( ¯Θ, ¯Ω) ∈ C  [0 , T ], P4(RD × RD ) satisfies the corresponding Fokker-Planck equation (3) in the weak sense with lim t→∞ ρt = ρ0 .Proof. See Appendix B. Then we present the result showing that (2) and (3) model the mean-field limit of Equation (1). 
+
+Theorem 4.4. Let J satisfy Assumption 4.1 and ρ0 ∈P4(RD × RD ). For any N ≥ 2, assume that 
+
+{(Θ (i,N ) 
+
+> t
+
+, Ω(i,N ) 
+
+> t
+
+)t∈[0 ,T ]}Ni=1 is the unique solution to the particle system (1) with ρ⊗N 
+
+> 0
+
+-distributed initial data 
+
+{(Θ (i,N )0 , Ω(i,N )0 )}Ni=1 . Then the limit (denoted by ρ)of the sequence of the empirical measure ρN =
+
+> 1
+> N
+
+PNi=1 δ(Θ(i,N ),Ω(i,N )) exists. Moreover, ρ is determin-istic and it is the unique weak solution to PDE (3) .Proof. See in Appendix C. To prove the global convergence of the M-CBO method, we define the energy functional as 
+
+E[ρ] = 12
+
+Z
+
+∥θ − ˜θ∥2 + m−1∥ω∥2dρ. (4) The above definition E[ρ] provides a measure of the dis-tance between the distribution of the agents ρ and the Dirac measure at (˜θ, 0) , denoted as δ(˜θ, 0) . Specifically, we have the relationship 2E[ρt] = W 22 (ρt, δ (˜θ, 0) ).
+
+Theorem 4.5. Let J satisfy the Assumption 4.1. More-over, let ρ0 ∈ P4(R2D ) and (˜θ, 0) ∈ supp (ρ0). By choosing parameters σ(t) is exponentially decaying as 
+
+σ(t) = σ1 exp( −σ2t) with σ1 > 0 and σ2 > 1 and 
+
+λ = max {m, γ 1} ≥ 2σ2 and γ = min {γ1, γ 2} > 0. Fix any ϵ ∈ (0 , E [ρ0]) and τ ∈ (0 , 1 − 2σ2 
+
+> λ
+
+), and define the time horizon 
+
+T ∗ := 1(1 − τ )λ log 
+
+ E[ρT0 ]) 
+
+ϵ
+
+
+
+(5) 
+
+Then there exists β > 0 such that for all β > β0, if 
+
+ρ ∈ C ([0 , T ∗], P4(R2D )) is a weak solution to the Fokker-Planck equation in the time interval [0 , T ∗] with initial con-dition ρ0, we have 
+
+min   
+
+> t∈[0 ,T ∗]
+
+E[ρt] ≤ ϵ. 
+
+Furthermore, until E[ρt] reaches the prescribed accuracy ϵ,we have the exponential decay 
+
+E[ρt] ≤ E[ρ0] exp( −(1 − τ )λt ) (6) 
+
+and, up to a constant, the same behavior for W 22 (ρt, δ (˜θ, 0) ).Proof. See Appendix D. 4Consensus Based Stochastic Optimal Control 
+
+## 5. Numerical Results 
+
+We evaluate the performance of the Adam-CBO method across various problem settings, including the linear quadratic control problem in 1, 2, 4, 8, and 16 dimensions, the Ginzburg-Landau model, and the systemic risk mean-field control problem with 50 , 100 , 200 , 400 , 800 agents. Even though our method is model-free, which means it does not depend on the known explicit knowledge of the transi-tion kernel as well as the precise dependency of the value function u(t, x) on the optimal control α(t, x, ∇u, Hess u).The value function is expressed as: 
+
+u(t, x) = inf  
+
+> α∈A
+
+E
+
+"Z Tt
+
+f (s, xs, αs)d s + g(XT ) |x(t) = x
+
+#
+
+.
+
+To measure the accuracy of our method, we compare 
+
+u(t, x) or the ∥α(t, x, ∇u, Hess u) − α(t, x; θ)∥ as a met-ric. Our code is available at https://github.com/ Lyuliyao/ADAM_CBO_control .
+
+Linear Quadratic Control Problem 
+
+We begin by considering a classical linear quadratic Gaus-sian (LQG) control problem. The value function is known as u(t, x) = − ln  E exp  −g  x + √2WT −t
+
+ , which we refer to Appendix E for details. The numeric value of 
+
+u(t, x) can be computed by Monte Carlo (MC) estimation directly as a reference to measure the accuracy. We investigate the LQG problem in dimension d =1, 2, 4, 8, and 16 , with a terminal time of T = 1 and a timestep of T 
+
+> 20
+
+. We compare our method with the BSDE method in (Han et al., 2018). In both methods, the number of SDE to compute the value function is 64 and the learning rate is 1 × 10 −2. In M-CBO and Adam-CBO methods, the number of agents is specified as N = 5000 , and M = 50 
+
+agents are randomly selected to update in each step. The value function u(t = 0 , x = (0 , . . . , 0)) for two dif-ferent terminal costs - a convex cost: g(x) = ln 1+ ∥x∥2
+
+> 2
+
+and a double-well terminal cost: g(x) = ln 1+( ∥x∥2−1) 2 
+
+> 2
+
+is illustrated in Figure 1 across varying dimensions. The value function from MC estimation is worked as a reference. The value function of Adam-CBO and M-CBO methods is com-puted from the expectation of 5000 controlled dynamics. The value function of the BSDE method is a direct output of the neural network. In the convex terminal cost, we can see that both the M-CBO method and the Adam-CBO method outperform the BSDE method in a low-dimensional setting. As the dimensionality increases, Adam-CBO continues to outperform the BSDE method, demonstrating its scalability. Consequently, in the remaining examples, we focus exclusively on the Adam-CBO method because of its superior performance in high dimensions. In the case of the double-well terminal cost, which is non-convex, our method shows significantly improved accuracy over the BSDE approach. This enhancement can be at-tributed to several factors. First, CBO-based methods have a higher likelihood of converging to global minima in non-convex settings. Secondly, although both methodologies utilize a discretization of the 20 time steps during the train-ing phase, our approach facilitates additional refinement of the time steps when assessing the cost function, thereby improving precision. In contrast, the structure of the neu-ral network of the BSDE method is inherently tied to the chosen discretization, necessitating the same time step for both training and evaluation, thus limiting flexibility. We 1 2 4 8 16 Dimension 01234Value Function                               
+
+> −3.7×10 −1
+> −5.3×10 −3
+> −2.4×10 −2
+> 4.0×10 −2
+> 2.6×10 −3
+> 3.8×10 −2
+> 1.9×10 −2
+> 1.6×10 −3
+> 2.5×10 −2
+> 8.9×10 −3
+> 3.0×10 −3
+> 5.9×10 −2
+> 8.2×10 −3
+> 3.5×10 −3
+> 3.0×10 −2
+> BSDE M-CBO Adam-CBO MC Estimation
+
+1 2 4 8 16 Dimension 0246Value Function                     
+
+> 8.4×10 −2
+> 2.6×10 −2
+> 7.0×10 −2
+> 3.3×10 −2
+> 9.7×10 −2
+> 2.1×10 −2
+> 6.7×10 −2
+> 1.0×10 −2
+> 2.0×10 −2
+> 8.2×10 −3
+> BSDE Adam-CBO MC Estimation
+
+Figure 1. The value function u(t = 0 , x = (0 , . . . , 0)) evalu-ated using BSDE method, M-CBO method, Adam-CBO method (our method ), and MC estimation ( reference ) for problems in 
+
+1, 2, 4, 8, and 16 dimensions. (a) The terminal cost function 
+
+g(x) = ln 1+ ∥x∥2 
+
+> 2
+
+. (b) The terminal cost function g(x) =ln 1+( ∥x∥2−1) 2 
+
+> 2
+
+.
+
+also visualize the function u(t, x ) in the one-dimensional case for both types of terminal costs in Figure 2 and Figure 3. It is evident that our method aligns more closely with the exact solution than the BSDE-based method. We further investigate the influence of batch size (the num-ber of control processes to compute the cost function) on the problem. We consider a 4 dimensional problem with a nonconvex terminal cost given by g(x) = ln 1+( ∥x∥2−5) 2 
+
+> 2
+
+.Figure 4 illustrates the value function u(t = 0 , 0, 0, 0, 0) 
+
+evaluated under varying batch sizes during training and compared with a precise estimation of the MC that uses a sufficiently large sample size. The first insight is that the accuracy of training is sensitive to batch size in the training process, which inspired us to develop an improved sampling method to enhance the efficiency of the sampling process in the future. Additionally, our method consistently demonstrates greater accuracy than the BSDE-based ap-proach, confirming its robustness in higher-dimensional and nonconvex settings. 5Consensus Based Stochastic Optimal Control −2 −1 0 1 20.30.60.9BSDE 
+
+−2 −1 0 1 2MC Estimation 
+
+−2 −1 0 1 2Adam-CBO 
+
+−1.0
+
+−0.20.61.4
+
+> t
+
+x
+
+Figure 2. The value function u(t, x ) in the one-dimensional case, computed using BSDE method, MC Estimation ( reference ), and Adam-CBO ( our method ), with terminal cost g(x) = ln 1+ ∥x∥2 
+
+> 2
+
+.−2 −1 0 1 20.30.60.9BSDE 
+
+−2 −1 0 1 2MC Estimation 
+
+−2 −1 0 1 2Adam-CBO 
+
+0123
+
+> t
+
+x
+
+Figure 3. The value function u(t, x ) in one-dimensional case, computed using BSDE method, MC Estimation ( reference ), and Adam-CBO (our method ), with terminal cost g(x) = ln 1+( ∥x∥2−1) 2 
+
+> 2
+
+.64 128 256 512 1024 2048 Training Batchsize 1.45 1.55 1.65 1.75 Value Function 
+
+> BSDE Adam-CBO MC Estimation
+
+Figure 4. The value function u(t = 0, 0, 0, 0, 0) of 4D LQC problem, computed using BSDE method, MC Estimation ( ref-erence ), and Adam-CBO ( our method ), with terminal cost g(x) = ln 1+( ∥x∥2−5) 2 
+
+> 2
+
+, evaluated under varying sample sizes per step.”. 
+
+Ginzburg-Landau Model 
+
+We also consider the problem of controlling superconduc-tors in an external electromagnetic field, modeled using the stochastic Ginzburg-Landau theory. The dynamics are given by 
+
+dxt = b(xt, α t)d t + √2d Wt, (7) where the drift term is defined as 
+
+b(x, a ) = −∇ xU (x) + 2 αω.U here is the Ginzburg-Landau free energy, while ω ∈ Rd
+
+specifies the spatial domain of the external field. For further implementation specifics, see Appendix E. Since this problem lacks an exact analytical solution, we assess the performance of our trained control α(t, x; θ)
+
+by comparing it to the theoretically optimal control −ω ·∇xu(t, x, ), where u(x, t ) is the value function. Notably, this value function is different from the last case with an an-alytical solution; it was computed by taking the expectation of running controlled dynamics and its gradient is computed by taking the finite difference of two starting states. There-fore, this comparison is not intended as a true error metric. Instead, it serves to evaluate the consistency between our trained control and the theoretically optimal control, which many value-based methods use to define the loss. We start with a simple case with d = 2 , μ = 10 , λ = 0 .2.We compare the distribution of x1 before and after the con-trol in Figure 5. One can find that before the control the particles will stay in a stable state −1, 1, while after control 6Consensus Based Stochastic Optimal Control 
+
+the particles will stay near 0. Additionally, a comparative −2 −1 0 1 2x0.00.51.01.5density 
+
+> After control Before control
+
+Figure 5. Distribution of x1 before and after control in the 1D Ginzburg-Landau model. 
+
+analysis between α(t, x) and −ω · ∇ xu(t, x) is conducted, as illustrated in Figure 6. The results demonstrate the consis-tency between these two functions. We also test our method on d = 4 , 8, 16 , 32 . The comparison between α(t, x; θ)
+
+and −ω · ∇ xu(t, x) is shown in Figure 7. Here (t, x) is randomly sampled from 1000 control dynamics. −0.5 0.0 0.5  
+
+> −0.50.00.5
+> −0.50.00.5
+> −0.8
+> −0.40.00.40.8
+> x1
+> x2
+
+Figure 6. The left figure shows the α(0 .5, x; θ) and the right figure shows the −ω · ∇ xu(0 .5, x) computed by our method for the 2D Ginzburg-Landau model. 
+
+Systemic Risk Mean Field Control 
+
+In practical applications, there are scenarios where numer-ous indistinguishable agents, such as multiple traders en-gaged in buying and selling stocks within financial markets, create a complex, multi-dimensional problem. However, when these traders share similar risk preferences, analyzing the behavior of a single representative trader can suffice to understand the dynamics of the entire group. For example, for a problem with n agents, the control can be modeled as αi(xi, μ ; θ), where μ is the empirical measure of the 
+
+{xi}ni=1 and θ are parameters in the neural network. For further details on the network construction used in this setup, refer to Appendix F. Consider the systemic risk mean field control problem, −2 −1 0 1 2                
+
+> α(t, x)
+> −2
+> −1012
+> −ω · ∇ xu(t,  x) 4D −2−1012
+> α(t, x)
+> −2
+> −1012
+> −ω · ∇ xu(t,  x) 8D −2−1012
+> α(t, x)
+> −2
+> −1012
+> −ω · ∇ xu(t,  x) 16D −2−1012
+> α(t, x)
+> −2
+> −1012
+> −ω · ∇ xu(t,  x) 32D
+
+Figure 7. Ginzburg-Landau model with d = 4 , 8, 16 , 32 respec-tively. The x-axis shows the α(0 .5, x) and y-axis shows the 
+
+−ω · ∇ xu(0 .5, x)
+
+detailed in Appendix E. The control policy is initially trained using a delta distribution centered on x0 and 
+
+n = 100 and then tested against different values of n =50 , 100 , 200 , 400 , 800 . Furthermore, the value function is evaluated by taking the expectation of controlled dynam-ics starting from different initial distributions μ0, including Gaussian random variable x0 = N (0 , 0.1) , mixture of two Gaussian random variables x0 = p(−k + θy ) + (1 − P )( k +
+
+θz ) with P a Bernoulli random variable with parameter 12 ,
+
+k = √310 , θ = 0 .1, y, z ∼ N (0 , 1) and mixture of three Gaussian random variables: x0 = [ −k⌊3U ⌋=0 + k⌊3U ⌋=1 ] + 
+
+θy with k = 0 .3, θ = 0 .07 , y ∼ N (0 , 1) . The correspond-ing value functions for each scenario are shown in Table 1, 2, 3, respectively. Our method demonstrates robust gen-eralization across these diverse conditions, in contrast to value-function-based approaches where the control strategy is tied to the specific value function. Since value functions are highly sensitive to initial conditions, traditional methods require retraining for each new initial scenario, limiting their ability to generalize effectively. 
+
+Multi-Agent Robotic Systems 
+
+We present numerical results for a multi-agent robotic sys-tem consisting of n agents. Each agent i computes an opti-mal policy αi to navigate from a predefined starting point to a target while avoiding obstacles in the environment. The original problem is formulated as an open-loop control prob-lem with constraints (Abdul et al., 2024). However, we reformulate it as a feedback control problem by incorporat-ing penalty terms to handle constraints. For further details 7Consensus Based Stochastic Optimal Control 0 2 4
+
+−202
+
+> start target
+
+0 4 8 12 16 
+
+−6
+
+−226
+
+> start target
+
+0 2 4
+
+−202
+
+> start target
+
+0123                                                                     
+
+> Figure 8. Learned trajectories for multi-agent navigation from initial configurations to target destinations while avoiding obstacles. Results are shown for systems with 2, 4, and 50 agents.
+> Table 1. The value function u(t, μ )evaluated by Adam-CBO method with μ=N(0 ,1) in the mean filed control problem.
+> TIME n= 50 n= 100 n= 200 n= 400 EXACT
+> 0.0 0.607 0.614 0.618 0.619 0.616 0.1 0.553 0.559 0.563 0.564 0.561 0.2 0.498 0.504 0.507 0.508 0.506 0.3 0.442 0.447 0.450 0.451 0.449 0.4 0.384 0.388 0.391 0.391 0.390 0.5 0.323 0.326 0.329 0.329 0.329 0.6 0.258 0.260 0.262 0.263 0.262 0.7 0.187 0.188 0.190 0.190 0.190 0.8 0.106 0.107 0.108 0.108 0.108 0.9 0.010 0.010 0.010 0.010 0.010
+
+on this transformation, we refer the reader to Appendix E.3. The numerical results, presented in Figure 8, demonstrate the performance of our method for systems with 2, 4, and 50 agents. Figure 8 demonstrates successful trajectory gen-eration between initial and target states for systems with 2, 4, and 50 agents, while ensuring collision-free navigation through obstacle-rich environments. These results validate our method’s capability to solve high-dimensional optimal control problems that lack explicit analytical solutions. 
+
+Reinforcement Learning Task 
+
+We also compare our method with DDPG, PPO, SAC, TD3, TQC, and CrossQ (using the stable-baselines3 im-plement https://github.com/araffin/sbx ) on Pendulum-v1 as well as PPO and DQN on CartPole-v1. The numerical results can be found in Figure 9 and the com-putational cost is shown in Table 4. While Adam-CBO has higher runtime, it converges to the optimal policy much faster in terms of learning efficiency. However, we would like to stress that these results are not directly compara-ble in a strict sense. Most of the baseline methods opti-mize multiple components—for example, PPO jointly op-                                                                
+
+> Table 2. The value function u(t, μ )with μbeing a mixture of two Gaussian random variables in the mean filed control problem.
+> TIME n= 50 n= 100 n= 200 n= 400 EXACT
+> 0.0 0.621 0.628 0.633 0.634 0.630 0.1 0.567 0.574 0.578 0.579 0.576 0.2 0.513 0.518 0.522 0.523 0.521 0.3 0.457 0.462 0.465 0.466 0.465 0.4 0.399 0.404 0.407 0.408 0.407 0.5 0.339 0.343 0.346 0.346 0.346 0.6 0.276 0.279 0.281 0.281 0.281 0.7 0.207 0.209 0.211 0.211 0.211 0.8 0.129 0.131 0.132 0.132 0.132 0.9 0.039 0.040 0.040 0.040 0.040
+
+timizes a policy and a value function, and SAC optimizes two Q-functions and a policy. In contrast, our method op-timizes only the policy. If we were to directly replace the gradient-based optimizer within an existing method like PPO with Adam-CBO, we do not expect it to outperform the full method in that specific setup. The main advantage of Adam-CBO lies in its applicability to broader, more gen-eral settings, particularly when gradients are unavailable or unreliable. 
+
+## 6. Conclusion 
+
+In this work, we present a framework for solving high-dimensional stochastic optimal control problems. Compared with the existing method, our method is gradient-free, which eliminates the high variance in the Monte Carlo estimation of the policy gradient. Also, our method does not depend on solving the high-dimensional Hamiltonian-Jacobi-Bellman equation or on any mesh discretization in the state and action space. These enable us to get rid of the curse of dimension-ality and use this method in high-dimensional problems. Theoretically, we show that, under some assumptions, the M-CBO method can converge to the optimal control. In 8Consensus Based Stochastic Optimal Control 
+
+Table 3. The value function u(t, μ ) with μ being a mixture of three Gaussian random variables in the mean filed control problem.  
+
+> TIME
+
+n = 50 n = 100 n = 200 n = 400 EXACT 
+
+0.0 0.633 0.640 0.645 0.646 0.642 0.1 0.579 0.586 0.590 0.591 0.588 0.2 0.524 0.531 0.535 0.536 0.534 0.3 0.469 0.475 0.478 0.47 0.478 0.4 0.412 0.417 0.421 0.421 0.420 0.5 0.353 0.357 0.360 0.361 0.360 0.6 0.290 0.294 0.297 0.297 0.297 0.7 0.223 0.226 0.228 0.228 0.228 0.8 0.148 0.151 0.152 0.152 0.152 0.9 0.063 0.064 0.064 0.065 0.065 0 40000 80000   
+
+> −1600
+> −1200
+> −800
+> −400
+> DDPG PPO SAC TD3 TQC CrossQ Adam-CBO
+> 040000 80000 0100 200 300 400 500
+> PPO DQN Adam-CBO
+> Training Iteration Value Function
+
+Figure 9. Comparison of value function convergence across meth-ods. (Left) Performance on the Pendulum-v1 environment showing the evolution of the value function during training. (Right) Cor-responding results for the CartPole-v1 environment. Our method demonstrates superior convergence in both cases. 
+
+the future, we are interested in applying our method to mean-field game problems and control problems with par-tial information and constraints (Ganapathi Subramanian et al., 2024; Hong & Tewari, 2024; Qiao & Wang, 2024; Sun et al., 2024; Wang et al., 2024). 
+
+## Acknowledgements 
+
+This work is partially supported by NSFC grant 12425113 and the Key Laboratory of the Ministry of Education for Mathematical Foundations and Applications of Digital Tech-nology, University of Science and Technology of China. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none of which we feel must be specifically highlighted here. 
+
+Table 4. The computational time for each method over 100,000 steps METHOD PENDULUM -V1 CART POLE -V1DDPG 288.83 PPO 145.19 150.58 SAC 355.01 TD3 291.26 TQC 576.35 CROSS Q 708.73 DQN 186.13 ADAM -CBO 1124.88 3444 
+
+## References 
+
+Abdul, A. T., Saravanos, A. D., and Theodorou, E. A. Scaling robust optimization for multi-agent robotic systems: A distributed perspective. arXiv preprint arXiv:2402.16227 , 2024. Achdou, Y. and Lasry, J.-M. Mean field games for model-ing crowd motion. Contributions to partial differential equations and applications , pp. 17–42, 2019. Achdou, Y., Buera, F. J., Lasry, J.-M., Lions, P.-L., and Moll, B. Partial differential equation models in macroeco-nomics. Philosophical Transactions of the Royal Society A: Mathematical, Physical and Engineering Sciences ,372(2028):20130397, 2014. Achdou, Y., Han, J., Lasry, J.-M., Lions, P.-L., and Moll, B. Income and wealth distribution in macroeconomics: A continuous-time approach. The review of economic studies , 89(1):45–86, 2022. Agrawal, S., Prashanth, L., and Maguluri, S. T. Policy evaluation for variance in average reward reinforcement learning. In Forty-first International Conference on Ma-chine Learning , 2024. Arnold, L. Stochastic differential equations: Theory and applications, 1976. Aurell, A. and Djehiche, B. Mean-field type modeling of nonlocal crowd aversion in pedestrian crowd dynamics. 
+
+SIAM Journal on Control and Optimization , 56(1):434– 455, 2018. Bass, R. F. Stochastic processes , volume 33. Cambridge University Press, 2011. Beard, R. W. Successive galerkin approximation algorithms for nonlinear optimal and robust control. International Journal of Control , 71(5):717–743, 1998. Beard, R. W., Saridis, G. N., and Wen, J. T. Galerkin approx-imations of the generalized Hamilton-Jacobi-Bellman equation. Automatica , 33(12):2159–2177, 1997. 9Consensus Based Stochastic Optimal Control 
+
+Billingsley, P. Convergence of probability measures . John Wiley & Sons, 2013. Cardaliaguet, P. and Lehalle, C.-A. Mean field game of con-trols and an application to trade crowding. Mathematics and Financial Economics , 12:335–363, 2018. Carmona, R. and Durrleman, V. Pricing and hedging spread options. Siam Review , 45(4):627–685, 2003. Carmona, R., Lauri `ere, M., and Tan, Z. Model-free mean-field reinforcement learning: mean-field mdp and mean-field q-learning. The Annals of Applied Probability , 33 (6B):5334–5381, 2023. Carrillo, J. A., Choi, Y.-P., Totzeck, C., and Tse, O. An analytical framework for consensus-based global opti-mization method. Mathematical Models and Methods in Applied Sciences , 28(06):1037–1066, 2018. Chen, D. and Zhang, Q. e(3) -equivariant actor-critic meth-ods for cooperative multi-agent reinforcement learning. In Proceedings of the 41st International Conference on Machine Learning , 2024. Chen, J., Jin, S., and Lyu, L. A consensus-based global optimization method with adaptive momentum estimation. 
+
+Communications in Computational Physics , 31(4):1296– 1316, 2022. Chen, Y.-J., Huang, N.-C., Lee, C.-p., and Hsieh, P.-C. Ac-celerated policy gradient: On the convergence rates of the nesterov momentum for reinforcement learning. In 
+
+Forty-first International Conference on Machine Learn-ing , 2024. Cousin, A., Cr ´epey, S., Gu ´eant, O., Hobson, D., Jeanblanc, M., Lasry, J.-M., Laurent, J.-P., Lions, P.-L., Tankov, P., Gu ´eant, O., et al. Mean field games and applications. 
+
+Paris-Princeton lectures on mathematical finance 2010 ,pp. 205–266, 2011. Dai, J., Yang, Y., Zheng, Q., and Pan, G. Safe reinforcement learning using finite-horizon gradient-based estimation. In Proceedings of the 41st International Conference on Machine Learning , 2024. Durrett, R. Stochastic calculus: a practical introduction .CRC press, 2018. E, W., Han, J., and Jentzen, A. Deep learning-based nu-merical methods for high-dimensional parabolic partial differential equations and backward stochastic differential equations. Communications in mathematics and statistics ,5(4):349–380, 2017. Fleming, W. H. and Rishel, R. W. Deterministic and stochas-tic optimal control , volume 1. Springer Science & Busi-ness Media, 2012. Fleming, W. H. and Stein, J. L. Stochastic optimal control, international finance and debt. Journal of Banking & Finance , 28(5):979–996, 2004. Fornasier, M., Klock, T., and Riedl, K. Consensus-based optimization methods converge globally. SIAM Journal on Optimization , 34(3):2973–3004, 2024. doi: 10.1137/ 22M1527805. Forsyth, P. A. and Labahn, G. Numerical methods for con-trolled hamilton-jacobi-bellman pdes in finance. Journal of Computational Finance , 11(2):1, 2007. Ganapathi Subramanian, S., Liu, G., Elmahgiubi, M., Rezaee, K., and Poupart, P. Confidence aware inverse constrained reinforcement learning. In Proceedings of the 41st International Conference on Machine Learning ,pp. 14491–14512, 2024. Gilbarg, D., Trudinger, N. S., Gilbarg, D., and Trudinger, N. Elliptic partial differential equations of second order ,volume 224. Springer, 2001. Gomes, D. A., Nurbekyan, L., and Pimentel, E. A. Eco-nomic models and mean-field games theory. Publicaoes Matematicas, IMPA, Rio, Brazil , 2015. Gu, H., Guo, X., Wei, X., and Xu, R. Mean-field controls with q-learning for cooperative marl: convergence and complexity analysis. SIAM Journal on Mathematics of Data Science , 3(4):1168–1196, 2021. Gu ´eant, O. Mean field games and applications to economics, 2009. Gu ´eant, O., Lasry, J., and Lions, P. Mean field games and applications. paris-princeton lectures on mathematical finance. Lect. Notes Math , 2011:205–266, 2010. Haarnoja, T., Ha, S., Zhou, A., Tan, J., Tucker, G., and Levine, S. Learning to walk via deep reinforcement learning. arXiv preprint arXiv:1812.11103 , 2018a. Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. Soft actor-critic: Off-policy maximum entropy deep reinforce-ment learning with a stochastic actor. In International conference on machine learning , pp. 1861–1870. PMLR, 2018b. Han, J., Jentzen, A., and E, W. Solving high-dimensional partial differential equations using deep learning. Pro-ceedings of the National Academy of Sciences , 115(34): 8505–8510, 2018. Heess, N., Tb, D., Sriram, S., Lemmon, J., Merel, J., Wayne, G., Tassa, Y., Erez, T., Wang, Z., Eslami, S., et al. Emer-gence of locomotion behaviours in rich environments. 
+
+arXiv preprint arXiv:1707.02286 , 2017. 10 Consensus Based Stochastic Optimal Control 
+
+Hisaki, Y. and Ono, I. RVI-SAC: Average reward off-policy deep reinforcement learning. In Proceedings of the 41st International Conference on Machine Learning ,pp. 18352–18373, 2024. Holdijk, L., Du, Y., Hooft, F., Jaini, P., Ensing, B., and Welling, M. Stochastic optimal control for collective variable free sampling of molecular transition paths. Ad-vances in Neural Information Processing Systems , 36, 2024. Hong, K. and Tewari, A. A primal-dual algorithm for offline constrained reinforcement learning with linear MDPs. In Proceedings of the 41st International Conference on Machine Learning , pp. 18711–18737, 2024. Hong, M., Qi, Z., and Xu, Y. Model-based reinforcement learning for confounded POMDPs. In Proceedings of the 41st International Conference on Machine Learning , pp. 18668–18710, 2024. Hu, R. and Lauri `ere, M. Recent developments in machine learning methods for stochastic control and games. Nu-merical Algebra, Control and Optimization , 14(3):435– 525, 2024. ISSN 2155-3289. Hu, S., Fan, Z., Huang, C., Shen, L., Zhang, Y., Wang, Y., and Tao, D. Q-value regularized transformer for offline reinforcement learning. In Proceedings of the 41st Inter-national Conference on Machine Learning , pp. 19165– 19181, 2024. Hua, M., Lauri `ere, M., and Vanden-Eijnden, E. Asimulation-free deep learning approach to stochastic opti-mal control. arXiv preprint arXiv:2410.05163 , 2024. Huang, H. and Qiu, J. On the mean-field limit for the consensus-based optimization. Mathematical Methods in the Applied Sciences , 45(12):7814–7831, 2022. Jia, Y. and Zhou, X. Y. Policy gradient and actor-critic learn-ing in continuous time and space: Theory and algorithms. 
+
+Journal of Machine Learning Research , 23(275):1–50, 2022a. Jia, Y. and Zhou, X. Y. Policy evaluation and temporal-difference learning in continuous time and space: A mar-tingale approach. Journal of Machine Learning Research ,23(154):1–55, 2022b. Lachapelle, A. and Wolfram, M.-T. On a mean field game approach modeling congestion and aversion in pedestrian crowds. Transportation research part B: methodological ,45(10):1572–1589, 2011. Lachapelle, A., Lasry, J.-M., Lehalle, C.-A., and Lions, P.-L. Efficiency of the price formation process in presence of high frequency participants: a mean field game analy-sis. Mathematics and Financial Economics , 10:223–262, 2016. Li, P., Hao, J., Tang, H., Zheng, Y., and Barez, F. Value-evolutionary-based reinforcement learning. In Proceed-ings of the 41st International Conference on Machine Learning , pp. 27875–27889, 2024. Lien, Y.-H., Hsieh, P.-C., Li, T.-M., and Wang, Y.-S. Enhanc-ing value function estimation through first-order state-action dynamics in offline reinforcement learning. In 
+
+Proceedings of the 41st International Conference on Ma-chine Learning , pp. 29782–29794, 2024. Lillicrap, T. Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971 , 2015. Lu, F., Zhong, M., Tang, S., and Maggioni, M. Nonparamet-ric inference of interaction laws in systems of agents from trajectory data. Proceedings of the National Academy of Sciences , 116(29):14424–14433, 2019. Lyu, L. and Lei, H. Construction of coarse-grained molec-ular dynamics with many-body non-markovian memory. 
+
+Physical Review Letters , 131(17):177301, 2023. Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., Graves, A., Riedmiller, M., Fidje-land, A. K., Ostrovski, G., et al. Human-level control through deep reinforcement learning. nature , 518(7540): 529–533, 2015. Mou, W. and Zhu, Y. On bellman equations for continuous-time policy evaluation i: discretization and approximation. 
+
+arXiv preprint arXiv:2407.05966 , 2024. N ¨usken, N. and Richter, L. Solving high-dimensional hamilton–jacobi–bellman pdes using neural networks: perspectives from the theory of controlled diffusions and measures on path space. Partial differential equations and applications , 2(4):48, 2021. Obando Ceron, J. S., Courville, A., and Castro, P. S. In value-based deep reinforcement learning, a pruned net-work is a good network. In Proceedings of the 41st In-ternational Conference on Machine Learning , pp. 38495– 38519, 2024. Park, G., Byeon, W., Kim, S., Havakuk, E., Leshem, A., and Sung, Y. The max-min formulation of multi-objective reinforcement learning: From theory to a model-free algorithm. In Proceedings of the 41st International Con-ference on Machine Learning , pp. 39616–39642, 2024. Pham, H. Continuous-time stochastic control and optimiza-tion with financial applications , volume 61. Springer Science & Business Media, 2009. 11 Consensus Based Stochastic Optimal Control 
+
+Pham, H. and Warin, X. Mean-field neural networks-based algorithms for mckean-vlasov control problems. Journal of Machine Learning , 3(2):176–214, 2024. ISSN 2790-2048. Pham, H., Warin, X., and Germain, M. Neural networks-based backward scheme for fully nonlinear pdes. SN Partial Differential Equations and Applications , 2(1):16, 2021. Qiao, D. and Wang, Y.-X. Near-optimal reinforcement learning with self-play under adaptivity constraints. In 
+
+Proceedings of the 41st International Conference on Ma-chine Learning , pp. 41430–41455, 2024. Richardson, S. and Wang, S. Numerical solution of hamilton–jacobi–bellman equations by an exponentially fitted finite volume method. Optimization , 55(1-2):121– 140, 2006. Schulman, J., Levine, S., Abbeel, P., Jordan, M., and Moritz, P. Trust region policy optimization. In Bach, F. and Blei, D. (eds.), Proceedings of the 32nd International Confer-ence on Machine Learning , volume 37 of Proceedings of Machine Learning Research , pp. 1889–1897, Lille, France, 07–09 Jul 2015a. Schulman, J., Moritz, P., Levine, S., Jordan, M., and Abbeel, P. High-dimensional continuous control using generalized advantage estimation. arXiv preprint arXiv:1506.02438 ,2015b. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 , 2017. Silver, D., Lever, G., Heess, N., Degris, T., Wierstra, D., and Riedmiller, M. Deterministic policy gradient algorithms. In International conference on machine learning , pp. 387– 395. Pmlr, 2014. Stengel, R. F. Stochastic optimal control: theory and appli-cation . John Wiley & Sons, Inc., 1986. Sun, Z., He, S., Miao, F., and Zou, S. Constrained reinforce-ment learning under model mismatch. In Proceedings of the 41st International Conference on Machine Learning ,pp. 47017–47032, 2024. Tang, X., Collis, L., and Ying, L. Solving high-dimensional Kolmogorov backward equations with operator-valued functional hierarchical tensor for markov operators. arXiv preprint arXiv:2404.08823 , 2024. Wang, S., Jennings, L. S., and Teo, K. L. Numerical solution of hamilton-jacobi-bellman equations by an upwind finite volume method. Journal of Global Optimization , 27: 177–192, 2003. Wang, Y., Qian, Q., and Boyle, D. Probabilistic constrained reinforcement learning with formal interpretability. In 
+
+Proceedings of the 41st International Conference on Ma-chine Learning , pp. 51303–51327, 2024. Welch, P., Rasmussen, K., and Welch, C. F. Describing nonequilibrium soft matter with mean field game theory. 
+
+The Journal of Chemical Physics , 150(17), 2019. Zhang, R., Fu, H., Miao, Y., and Konidaris, G. Model-based reinforcement learning for parameterized action spaces. In Proceedings of the 41st International Conference on Machine Learning , pp. 58935–58954, 2024. 12 Consensus Based Stochastic Optimal Control 
+
+## A. Well-posedness of the M-CBO method 
+
+In this section, we prove that the dynamics of the M-CBO method are well-posed. For an arbitrary but fixed N , we begin by studying the existence of a unique process 
+
+
+
+Θ(N ) 
+
+> t
+
+, Ω(N )
+
+> t
+
+
+
+=  Θ(1 ,N ), · · · , Θ(N,N ), Ω(1 ,N ), · · · , Ω(N,N ) that satisfies the M-CBO scheme (1) 
+
+dΘ(N ) 
+
+> t
+
+= FN, Θ
+
+
+
+Θ(N ) 
+
+> t
+
+, Ω(N )
+
+> t
+
+
+
+dt + σ(t)d W(N ) 
+
+> θ,t
+
+,
+
+dΩ(N ) 
+
+> t
+
+= FN, Ω
+
+
+
+Θ(N ) 
+
+> t
+
+, Ω(N )
+
+> t
+
+
+
+dt + √mσ (t)d W(N ) 
+
+> ω,t
+
+,
+
+(8) where W(N ) 
+
+> θ,t
+
+, W(N ) 
+
+> ω,t
+
+is the standard Wiener process in RN D , and 
+
+FN, Θ(Θ, Ω) =  F 1
+
+> N, Θ
+
+(Θ, Ω), · · · F NN, Θ(Θ, Ω) ∈ RN D ,
+
+FN, Ω(Θ, Ω) =  F 1
+
+> N, Ω
+
+(Θ, Ω), · · · F NN, Ω(Θ, Ω) ∈ RN D ,F iN, Θ(Θ, Ω) = Ω i − γ1
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) ,F iN, Ω(Θ, Ω) = −m
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) + γ2Ωi.
+
+Under the Assumption 4.1, we can easily deduce that F iN, Θ and F iN, Ω are locally Lipschitz continuous and have linear growth. Consequently, (FN, Θ, FN, Ω) is locally Lipschitz continuous and has linear growth. More precisely, we have the following lemma. 
+
+Lemma A.1. Let N ∈ N, β, R > 0 be arbitrary. Then for any (Θ, Ω), ( ˆΘ, ˆΩ) ∈ RD ×RD with ∥Θ∥+∥Ω∥, ∥ ˆΘ∥+∥ ˆΩ∥ ≤ 
+
+R and all i = 1 , · · · , N , it holds 
+
+∥F iN, Θ(Θ, Ω) − F iN, Θ( ˆΘ, ˆΩ)∥ ≤ γ1∥Θi − ˆΘi∥ + ∥Ωi − ˆΩi∥ + γ1
+
+
+
+1 + 2 cR
+
+N
+
+q
+
+N ∥ ˆΘi∥2 + ∥ ˆΘ∥2
+
+
+
+∥Θ − ˆΘ∥,
+
+∥F iN, Ω(Θ, Ω) − F iN, Ω( ˆΘ, ˆΩ)∥ ≤ ∥ Θi − ˆΘi∥ + γ2∥Ωi − ˆΩi∥ + m
+
+
+
+1 + 2 cR
+
+N
+
+q
+
+N ∥ ˆΘi∥2 + ∥ ˆΘ∥2
+
+
+
+∥Θ − ˆΘ∥,
+
+∥F iN, Θ(Θ, Ω)∥ ≤ γ1∥Θi∥ + ∥Ωi∥ + γ1∥Θ∥,
+
+∥F iN, Ω(Θ, Ω)∥ ≤ m∥Θi∥ + γ2∥Ωi∥ + m∥Θ∥,
+
+where cR = α∥∇J ∥ L∞(Bθ,R (0)) exp  β∥J − J ∥ L∞(Bθ,R (0)) 
+
+.Proof. From Lemma 2.1 (Carrillo et al., 2018), we have 
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) −
+
+P 
+
+> j̸=i
+
+( ˆΘi − ˆΘj )wβ ( ˆΘj )
+
+P 
+
+> j
+
+wβ ( ˆΘj ) ≤ ∥ Θi − ˆΘi∥ +
+
+
+
+1 + 2 cR
+
+N
+
+q
+
+N ∥ ˆΘi∥2 + ∥ ˆΘ|2
+
+
+
+∥Θ − ˆΘ∥,
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) ≤ ∥ Θi∥ + ∥Θ∥.
+
+By the triangle inequality, the required estimation is proved. Based on Lemma A.1, we may invoke standard existence results of strong solutions for Equation (1). 
+
+Proof of Theorem 4.2. We make use of the standard result on the existence of a unique strong solution here. To this end, we show the existence bN > 0, such that 
+
+Θ · FN, Θ(Θ, Ω) + Ω · FN, Ω(Θ, Ω) + N (m + 1) Dσ (t)2 ≤ bN (∥Θ∥2 + ∥Ω∥2 + 1) .
+
+13 Consensus Based Stochastic Optimal Control 
+
+Notice that 
+
+−Θi
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) ≤ −∥ Θi∥2 + ∥Θi∥∥ Θ∥,
+
+−Ωi
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) ≤ ∥ Ωi∥∥ Θi∥ + ∥Ωi∥∥ Θ∥,
+
+we have the following inequalities 
+
+ΘiF iN, Θ(Θ, Ω) = Θ iΩi − γ1Θi
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j )
+
+≤ 12 ∥Θi∥2 + 12 ∥Ωi∥2 − γ1∥Θi∥2 + γ1∥Θi∥∥ Θ∥≤ 12 ∥Θi∥2 + 12 ∥Ωi∥2 + γ1∥Θi∥∥ Θ∥≤
+
+ 12 + γ1
+
+2
+
+
+
+∥Θi∥2 + γ1
+
+2 ∥Θ∥2 + 12 ∥Ωi∥2,
+
+and 
+
+ΩiF iN, Ω(Θ, Ω) = −mΩi
+
+P 
+
+> j̸=i
+
+(Θ i − Θj )wβ (Θ j )
+
+P 
+
+> j
+
+wβ (Θ j ) + γ2∥Ωi∥2
+
+≤ m∥Ωi∥∥ Θi∥ + m∥Ωi∥∥ Θ∥ + γ2∥Ωi∥2
+
+≤ (m + γ2)∥Ωi∥2 + m
+
+2 ∥Θi∥2 + m
+
+2 ∥Θ∥2.
+
+Therefore, we conclude that 
+
+Θ · FN, Θ(Θ, Ω) + Ω · FN, Ω(Θ, Ω) + ( m + 1) Dσ (t)2
+
+≤ N (m + 1) Dσ (t)2 +
+
+> N
+
+X
+
+> i=1
+
+ Θi · F iN, Θ(Θ, Ω) + Ω i · F iN, Ω(Θ, Ω)
+
+≤ N (m + 1) Dσ (t)2 +
+
+> N
+
+X
+
+> i=1
+
+ 12 + γ1
+
+2
+
+
+
+∥Θi∥2 + γ1
+
+2 ∥Θ∥2 + 12 ∥Ωi∥2 + ( m + γ2)∥Ωi∥2 + m
+
+2 ∥Θi∥2 + m
+
+2 ∥Θ∥2
+
+
+
+≤ N (m + 1) Dσ (t)2 +
+
+ 1 + γ1 + m
+
+2 + γ1 + N
+
+2
+
+
+
+∥Θ∥2 +
+
+
+
+m + γ2 + 12
+
+
+
+∥Ω∥2
+
+≤ bN (∥Θ∥2 + ∥Ω∥2 + 1) ,
+
+(9) where bN = max {N (m + 1) D¯σ2, 1+ γ1+m 
+
+> 2
+
++ γ1+N 
+
+> 2
+
+, m + γ2 + 12 } > 0. Then we apply Theorem 3.1 in (Durrett, 2018) to finish the existence and uniqueness proof. 
+
+## B. Well-posedness of the Mean Field Equations 
+
+Definition B.1. We say ρt ∈ C  [0 , T ], P4(RD × RD ) is a weak solution to the Fokker-Planck equation (3) with initial condition ρ0, if ∀ϕ ∈ C  RD × RD , we have 
+
+ddt
+
+Z
+
+ϕ(θ, ω )d ρt =
+
+Z
+
+⟨ω − γ1(θ − M β [μt]) , ∇θ ϕ⟩dρt
+
+−
+
+Z
+
+⟨m(θ − M β [μt]) + γ2ω, ∇ω ϕ⟩dρt
+
++ mσ (t)2
+
+2
+
+Z
+
+∆ω ϕdρt + σ(t)2
+
+2
+
+Z
+
+∆θ ϕdρt,
+
+(10) and lim t→∞ ρt = ρ0 in a pointwise sense. To prove Theorem 4.3, we start with the following lemma. 14 Consensus Based Stochastic Optimal Control 
+
+Lemma B.2. If J satisfies Assumption 4.1 and ρ, ˆρ ∈ P 2(RD × RD ) with 
+
+Z
+
+∥θ∥4 + ∥ω∥4dρ, 
+
+Z
+
+∥ˆθ∥4 + ∥ˆω∥4dˆ ρ ≤ K, 
+
+then the following stability estimate holds 
+
+|M β [μ] − M β [ˆ μ]| ≤ c0W2(ρ, ˆρ)
+
+for a constant c0 > 0 depending on β, L J and K, where μ(θ) = R 
+
+> RD
+
+ρ(θ, dω), ˆμ(ˆθ) = R 
+
+> RD
+
+ˆρ(ˆθ, dˆ ω).Proof. By Lemma 3.2 in (Carrillo et al., 2018), we have |M β [μ] − M β [ˆ μ]| ≤ c0W2(μ, ˆμ) = c0 inf E(μ, ˆμ)[∥θ − ˆθ∥2].Therefore, we have inf E(μ, ˆμ)[∥θ − ˆθ∥2] ≤ inf E(ρ, ˆρ)[∥θ − ˆθ∥2] + inf E(ρ, ˆρ)[∥ω − ˆω∥2] ≤ inf E(ρ, ˆρ)[∥θ − ˆθ∥2 + ∥ω − ˆω∥2] = 
+
+W2(ρ, ˆρ). We prove the boundedness here. To prove the existence and uniqueness, we recall the Leray-Schauder fixed point theorem (Theorem 11.3 in (Gilbarg et al., 2001)). 
+
+Theorem B.3. Let T be a compact mapping of a Banach space B into itself, and suppose there exists a constant M such that ∥x∥B ≤ M for all x ∈ B and η ∈ (0 , 1) satisfying x = ηT x . Then T has a fixed point. Proof of Theorem 4.3. Step 1 (Construction of map T )
+
+Let us fix ut ∈ C ([0 , T ]) . By Theorem 6.2.2 in (Arnold, 1976), there is a unique solution to 
+
+dθt = ωtdt − γ1(θt − ut)d t + σ(t)d Wθ,t ,
+
+dωt = −m(θt − ut)d t − γ2ωtdt + √mσ (t)d Wω,t ,
+
+where (θ0, ω 0) ∼ ρ0. We use ρt to denote the corresponding law of the unique solution. Using ρt, one can compute 
+
+μt(θ) = R ρt(θ, dω) and Mβ [μt], which is uniquely determined by ut and is in C ([0 , T ]) . Thus, one can construct a map from C ([0 , T ]) to C ([0 , T ]) , which maps ut to Mβ [μt].
+
+Step 2 (Compactness) First, by referencing Chapter 7 in (Arnold, 1976), we obtain the inequality for the solution θt, ω t to Equation (B): 
+
+E[∥θt∥ + ∥ωt∥]4 ≤  1 + E[∥θ0∥ + ∥ω0∥]4 exp( ct ),
+
+where c > 0. Thus one can deduce E[∥θt∥4 + ∥ωt∥4] ≲ 1 and E[∥θt∥2 + ∥ωt∥2] ≲ 1.By Lemma B.2, we have ∥M β (μt) − M β (μs)∥ ≤ c0W2(ρt, ρ s). For W2(ρt, ρ s), it holds that W2(ρt, ρ s) ≤ E[∥θt −
+
+θs∥ + ∥ωt − ωs∥] ≤ p2E[∥θt − θs∥2 + 2 ∥ωt − ωs∥2]. Further, we can deduce 
+
+θt − θs =
+
+Z ts
+
+ωτ − γ1(θτ − uτ )d τ +
+
+Z ts
+
+σ(τ )d Wθ,τ ,ωt − ωs =
+
+Z ts
+
+−m(θτ − uτ ) − γ2ωτ dτ + √m
+
+Z ts
+
+σ(τ )d Wω,τ .
+
+Thus 
+
+E[∥θt − θs∥2 + ∥ωt − ωs∥2] ≲E
+
+" Z ts
+
+ωτ dτ
+
+> 2
+
+#
+
++ E
+
+" Z ts
+
+(θτ − uτ )d τ
+
+> 2
+
+#
+
++ E
+
+" Z ts
+
+σ(τ )d Wθ,τ 
+
+> 2
+
+#
+
++ mE
+
+" Z ts
+
+σ(τ )d Wω,τ 
+
+> 2
+
+#
+
+.
+
+Let us proceed to bound the four terms on the right-hand side individually. Consider the first term, where we establish 
+
+E
+
+" Z ts
+
+ωτ dτ
+
+> 2
+
+#
+
+≤ E
+
+"Z ts
+
+∥ωτ ∥ dτ
+
+2#
+
+≤ | t − s|E
+
+Z ts
+
+∥ωτ ∥2 dτ
+
+
+
+≲ |t − s|.
+
+15 Consensus Based Stochastic Optimal Control 
+
+The first inequality in this sequence is derived from the Cauchy-Schwarz inequality, followed by an application of Jensen’s inequality for the second inequality. The final inequality is attributed to the boundedness property of the solution. Similarly, for the second term, we have 
+
+E
+
+" Z ts
+
+(θτ − uτ )d τ
+
+> 2
+
+#
+
+≤ E
+
+"Z ts
+
+∥θτ − uτ ∥ dτ
+
+2#
+
+≤ | t − s|E
+
+Z ts
+
+∥θτ − uτ ∥2 dτ
+
+
+
+≲ |t − s|
+
+
+
+E
+
+Z ts
+
+∥θτ ∥2 dτ +
+
+Z ts
+
+∥uτ ∥2 dτ
+
+ 
+
+≲ |t − s|.
+
+For the third and fourth terms, we use the Itˆ o Isometry, 
+
+E
+
+" Z ts
+
+σ(τ )d Wω,τ 
+
+> 2
+
+#
+
+= E
+
+" Z ts
+
+σ(τ )d Wθ,τ 
+
+> 2
+
+#
+
+= E
+
+Z ts
+
+σ(τ )2dτ
+
+
+
+≤ ¯σ2|t − s|.
+
+Finially, we combine the inequiality to deduce that ∥M β [μt] − M β [μs]∥ ≲ |t − s|1/2, which implies that Mβ (μt) ∈C0,1/2[0 , T ]. Thus T is compact. 
+
+Step 3 (Existence) We make use of Theorem B.3. Take ut = ηT u t for η ∈ [0 , 1] . We now try to prove ∥ut∥∞ ≤ q for some finite q > 0. First, one has 
+
+∥ut∥2 = η2∥M β (μt)∥2 ≤ η2 exp( β(J − J)) 
+
+Z
+
+∥θ∥2dρt ≤ η2 exp( β(J − J)) 
+
+Z
+
+|θ∥2 + m−1∥ω∥2dρt.
+
+Then we try to prove the boundedness of R ∥θ∥2 + m−1∥ω∥2dρt. Since ρt is a weak solution of the Fokker-Planck equation, one has 
+
+ddt
+
+Z  ∥θ∥2 + m−1∥ω∥2 dρt =
+
+Z
+
+ω · θ − γ1(θ − ut) · θ − (θ − ut) · ω − γm −1ω · ωdρt
+
+=
+
+Z
+
+−γ1(θ − ut) · θ + ut · ω − γm −1ω · ωdρt
+
+Since Z
+
+θ · utdρt ≲
+
+Z
+
+∥θ∥2 + ∥ut∥2dρt ≲
+
+Z
+
+∥θ∥2dρt +
+
+Z
+
+(∥θ∥2 + m−1∥ω∥2)d ρt,
+
+and Z
+
+ω · utdρt ≲
+
+Z
+
+∥ω∥2 + ∥ut∥2dρt ≲
+
+Z
+
+∥ω∥2dρt +
+
+Z
+
+(∥θ∥2 + m−1∥ω∥2)d ρt,
+
+we can deduce that 
+
+ddt
+
+Z  ∥θ∥2 + m−1∥ω∥2 dρt ≲  ∥θ∥2 + m−1∥ω∥2 dρt.
+
+Applying Gronwall’s inequality yields that R   ∥θ∥2 + m−1∥ω∥2 dρt is bounded and the above inequality is independent of ut. Thus we have shown that ∥ut∥∞ is bounded by a uniform constant q. Theorem B.3 then gives the existence. 
+
+Step 4(Uniqueness): Suppose we are given two fixed points of T : ut and ˆut with ∥u∥∞, ∥ˆu∥∞ ≤ q and sup t∈[0 ,T ]
+
+R ∥θ∥4 +
+
+∥ω∥4dρt, sup t∈[0 ,T ]
+
+R ∥ˆθ∥4 + ∥ˆω∥4dˆ ρt ≤ K and their corresponding process (Θ , Ω) , ( ˆΘ, ˆΩ) satisfying respectively. Then take the difference δΘ := Θ − ˆΘ and δΩ := Ω − ˆΩ. One has 
+
+δΘt = δΘ0 +
+
+Z t
+
+> 0
+
+δΩτ dτ − γ1
+
+Z t
+
+> 0
+
+δΘτ dτ + γ1
+
+Z t
+
+> 0
+
+(uτ − ˆuτ )d τ, δΩt = δΩ0 − γ2
+
+Z t
+
+> 0
+
+δΩτ dτ − m
+
+Z t
+
+> 0
+
+δΘτ dτ + m
+
+Z t
+
+> 0
+
+(uτ − ˆuτ )d τ. 
+
+16 Consensus Based Stochastic Optimal Control 
+
+Thus 
+
+E[∥δΘt∥2 + ∥δΩt∥2] ≲E[∥δΘ0∥2 + ∥δΩ0∥2] + E
+
+"Z t
+
+> 0
+
+∥δΩτ ∥ dτ
+
+2#
+
++ E
+
+"Z t
+
+> 0
+
+∥δΘτ ∥ dτ
+
+2#
+
++ E
+
+"Z t
+
+> 0
+
+∥uτ − ˆuτ ∥ dτ
+
+2#
+
+.
+
+For the E
+
+R t 
+
+> 0
+
+∥uτ − ˆuτ ∥ dτ
+
+2
+
+, we have that 
+
+E
+
+"Z t
+
+> 0
+
+∥uτ − ˆuτ ∥ dτ
+
+2#
+
+= E
+
+"Z t
+
+> 0
+
+∥M β [μτ ] − M β [ˆ μτ ]∥ dτ
+
+2#
+
+≤ tE
+
+Z t
+
+> 0
+
+∥M β [μτ ] − M β [ˆ μτ ]∥2 dτ
+
+
+
+.
+
+Thus we have 
+
+E[∥δΘt∥2 + ∥Ωt∥2] ≲E[∥δΘ0∥2 + ∥δΩ0∥2] + E
+
+"Z t
+
+> 0
+
+∥δΩτ ∥ dτ
+
+2#
+
++ E
+
+"Z t
+
+> 0
+
+∥δΘτ ∥ dτ
+
+2#
+
++ E
+
+Z t
+
+> 0
+
+∥M β [μτ ] − M β [ˆ μτ ]∥2 dτ
+
+
+
+.
+
+Notice that by Lemma B.2, ∥M β [μτ ] − M β [ˆ μτ ]∥ ≲ W2(ρτ , ˆρτ ) ≤ pE [∥δΘτ ∥2 + ∥δΩτ ∥2]. So we can deduce 
+
+E ∥δΘτ ∥2 + ∥δΩτ ∥2 ≲ E ∥δΘ0∥2 + ∥δΩ0∥2 + E
+
+Z t
+
+> 0
+
+∥δΩτ ∥2 + ∥δΘτ ∥2 dτ
+
+
+
+.
+
+By the Gronwall’sinequality with the fact that E[∥δΘ0∥2 + ∥δΩ0∥2] = 0 gives that uniqueness result. 
+
+## C. Mean Field Limit 
+
+In this section, we prove the connection between the solution to Equation (1) and the solution of the Fokker-Planck equation (3). We begin with the following boundedness result. 
+
+Lemma C.1. Let J satisfy Assumption 4.1 and ρ0 ∈ P4(RD × RD ). For any N ≥ 2, assume that 
+
+{(Θ (i,N ) 
+
+> t
+
+, Ω(i,N ) 
+
+> t
+
+)t∈[0 ,T ]}Ni=1 is the unique solution to Equation (8) with ρ⊗N 
+
+> 0
+
+-distributed initial data {(Θ (i,N )0 , Ω(i,N )0 )}Ni=1 .Then there exists a constant K > 0 independent of N such that 
+
+sup 
+
+> i=1 ··· N
+
+(
+
+sup  
+
+> t∈[0 ,T ]
+
+E
+
+h
+
+∥Θ(i,N ) 
+
+> t
+
+∥2 + ∥Ω(i,N ) 
+
+> t
+
+∥2i)
+
+≤ K, 
+
+sup 
+
+> i=1 ··· N
+
+(
+
+sup  
+
+> t∈[0 ,T ]
+
+E
+
+h
+
+∥Θ(i,N ) 
+
+> t
+
+∥4 + ∥Ω(i,N ) 
+
+> t
+
+∥4i)
+
+≤ K, 
+
+sup 
+
+> i=1 ··· N
+
+(
+
+sup  
+
+> t∈[0 ,T ]
+
+E ∥M β [ˆ μNt ]∥2)
+
+≤ K, 
+
+sup 
+
+> i=1 ··· N
+
+(
+
+sup  
+
+> t∈[0 ,T ]
+
+E ∥M β [ˆ μNt ]∥4)
+
+≤ K, 
+
+where ˆμNt = 1
+
+> N
+
+PNi=1 δΘ(i,N )
+
+> t
+
+is the empirical measure. Proof. For each i, we have 
+
+dΘ (i,N ) 
+
+> t
+
+= − Ω(i,N ) 
+
+> t
+
+dt − γ1(Θ (i,N ) 
+
+> t
+
+− M β [ˆ μNt ])d t + σ(t)d W iθ,t ,
+
+dΩ (i,N ) 
+
+> t
+
+= − m(Θ (i,N ) 
+
+> t
+
+− M β [ˆ μNt ])d t − γ2Ω(i,N ) 
+
+> t
+
+dt + √mσ (t)d W iω,t .
+
+17 Consensus Based Stochastic Optimal Control 
+
+Now we pick p = 1 or p = 2 . Then 
+
+E
+
+
+
+Ω(i,N )
+
+> t
+> 2p
+
+
+
++ E
+
+
+
+Θ(i,N )
+
+> t
+> 2p
+
+
+
+≲E
+
+
+
+Θ(i,N )0
+
+> 2p
+
+
+
++ E
+
+
+
+Ω(i,N )0
+
+> 2p
+
+
+
++ E
+
+Z t
+
+> 0
+
+Θ(i,N ) 
+
+> τ
+
+dτ
+
+2p
+
++ E
+
+Z t
+
+> 0
+
+Ω(i,N ) 
+
+> τ
+
+dτ
+
+2p
+
++ E
+
+Z t
+
+> 0
+
+Mβ [ˆ μNτ ] dτ
+
+2p
+
++ E
+
+Z t
+
+> 0
+
+σ(τ )d Wθ,τ 
+
+2p
+
+.
+
+Now apply the Cauchy’s inequality, 
+
+E
+
+Z t
+
+> 0
+
+∥Θ(i,N ) 
+
+> τ
+
+∥dτ
+
+2p
+
+≤ tp · E
+
+Z t
+
+> 0
+
+∥Θ(i,N ) 
+
+> τ
+
+∥2dτ
+
+p
+
+, E
+
+Z t
+
+> 0
+
+∥Ω(i,N ) 
+
+> τ
+
+∥dτ
+
+2p
+
+≤ tp · E
+
+Z t
+
+> 0
+
+∥Ω(i,N ) 
+
+> τ
+
+∥2dτ
+
+p
+
+,
+
+and 
+
+E
+
+Z t
+
+> 0
+
+∥M β [ˆ μNτ ]∥dτ
+
+2p
+
+≤ tpE
+
+Z t
+
+> 0
+
+∥M β [ˆ μNτ ]∥2dτ
+
+p
+
+.
+
+Also, by Itˆ o Isometry, 
+
+E
+
+Z t
+
+> 0
+
+σ(τ )d Wθ,τ 
+
+2p
+
+= E
+
+Z t
+
+> 0
+
+σ(τ )2dτ
+
+p
+
+.
+
+Thus 
+
+E
+
+
+
+Ω(i,N )
+
+> t
+> 2p
+
++ Θ(i,N )
+
+> t
+> 2p
+
+
+
+≲E
+
+
+
+Ω(i,N )0
+
+> 2p
+
+
+
++ E
+
+
+
+Θ(i,N )0
+
+> 2p
+
+
+
++ E
+
+Z t
+
+> 0
+
+Θ(i,N )
+
+> τ
+> 2
+
+dτ
+
+p
+
++ E
+
+Z t
+
+> 0
+
+Ω(i,N )
+
+> τ
+> 2
+
+dτ
+
+p
+
++ E
+
+Z t
+
+> 0
+
+∥M β [ˆ μτ ]∥2 dτ
+
+p
+
++ 1 .
+
+Further, by H¨ older inequality, 
+
+E
+
+Z t
+
+> 0
+
+Θ(i,N )
+
+> τ
+> 2
+
+dτ
+
+p
+
+≤ E
+
+Z t
+
+> 0
+
+Θ(i,N )
+
+> τ
+> 2p
+
+dτ
+
+
+
+, E
+
+Z t
+
+> 0
+
+∥Ω(i,N ) 
+
+> τ
+
+∥2dτ
+
+p
+
+≤ E
+
+Z t
+
+> 0
+
+∥Ω(i,N ) 
+
+> τ
+
+∥2pdτ
+
+
+
+and 
+
+E
+
+Z t
+
+> 0
+
+Mβ [ˆ μNt ] 2 dτ
+
+p
+
+≤ E
+
+Z t
+
+> 0
+
+Mβ [ˆ μNt ] 2p dτ
+
+
+
+.
+
+So we can deduce 
+
+E
+
+
+
+Ω(i,N )
+
+> t
+> 2p
+
++ Θ(i,N )
+
+> t
+> 2p
+
+
+
+≲E
+
+
+
+Ω(i,N )0
+
+> 2p
+
+
+
++ E
+
+
+
+Θ(i,N )0
+
+> 2p
+
+
+
++ E
+
+Z t
+
+> 0
+
+Θ(i,N )
+
+> τ
+> 2p
+
+dτ
+
+
+
++ E
+
+Z t
+
+> 0
+
+Ω(i,N )
+
+> τ
+> 2p
+
+dτ
+
+
+
++ E
+
+Z t
+
+> 0
+
+∥M β [ˆ μNτ ]∥2pdτ
+
+
+
++ 1 .
+
+Thus 
+
+E
+
+Z  ∥θ∥2p + ∥ω∥2p dˆ ρNt
+
+
+
+≲E
+
+Z  ∥θ∥2p + ∥ω∥2p dˆ ρN
+
+> 0
+
+
+
++
+
+Z t
+
+> 0
+
+
+
+E
+
+Z  ∥θ∥2p + ∥ω∥2p dˆ ρNτ
+
+ 
+
+dτ
+
++
+
+Z t
+
+> 0
+
+E ∥M β [ˆ μNτ ]∥2p dτ + 1 .
+
+18 Consensus Based Stochastic Optimal Control 
+
+It follows from Lemma 3.1 in (Carrillo et al., 2018), we have 
+
+Z
+
+∥θ∥2 wβ (θ)
+
+∥wβ ∥L1( ˆ ρNτ )
+
+dˆ ρNτ ≤ b1 + b2
+
+Z
+
+∥θ∥2dˆ ρNτ ≤ b1 + b2
+
+Z
+
+(∥θ∥2 + ∥ω∥2)dˆ ρNτ .
+
+Then we can calculate 
+
+∥Mβ [ˆ μNt ]∥2p =
+
+Z
+
+θ · wβ (θ)
+
+∥wβ ∥L1( ˆ ρNτ )
+
+dˆ ρNτ
+
+> 2p
+
+≤
+
+Z
+
+∥θ∥ wβ (θ)
+
+∥wβ ∥L1( ˆ ρNτ )
+
+dˆ ρNτ
+
+!2p
+
+≤
+
+Z
+
+∥θ∥2 wβ (θ)
+
+∥wβ ∥L1( ˆ ρNτ )
+
+wβ (θ)
+
+∥wβ ∥L1( ˆ ρNτ )
+
+dˆ ρNτ
+
+!p
+
+≲
+
+Z
+
+∥θ∥2 wβ (θ)
+
+∥wβ ∥L1( ˆ ρNτ )
+
+dˆ ρNτ
+
+!p
+
+≤
+
+
+
+b1 + b2
+
+Z
+
+(∥θ∥2 + ∥ω∥2)dˆ ρNτ
+
+2p
+
+≲1 + 
+
+Z
+
+(∥θ∥2p + ∥ω∥2p)dˆ ρNτ .
+
+Combining the above inequality leads to 
+
+E
+
+Z 
+
+(∥θ∥2p + ∥ω∥2p)dˆ ρNt
+
+
+
+≲E
+
+Z  ∥θ∥2p + ∥ω∥2p dˆ ρN
+
+> 0
+
+
+
++
+
+Z t
+
+> 0
+
+
+
+E
+
+Z  ∥θ∥2p + ∥ω∥2p dˆ ρNτ
+
+ 
+
+dτ + 1 .
+
+By applying Gronwall’s inequality, it follows that E R   ∥θ∥2p + ∥ω∥2p dˆ ρNt
+
+ is bounded for t ∈ [0 , T ] and the bound does not depend on N . Also, we know that 
+
+∥Mβ [ˆ μNt ρt]∥2p ≲ 1 + 
+
+Z
+
+(∥θ∥2p + ∥ω∥2p)dˆ ρNτ ,
+
+which implies that 
+
+E ∥Mβ [ˆ μNt ]∥2p ≲ 1 + E
+
+Z 
+
+(∥θ∥2p + ∥ω∥2p)dˆ ρNτ
+
+
+
+.
+
+So E ∥Mβ [ˆ μNt ]∥2p is bounded for t ∈ [0 , T ] and the bound does not depend on N .Now we treat  Θ(i,N ), Ω(i,N ) as a random variable defined on (Ω , F, P) and taking values in C  [0 , T ]; RD × RD .Then ˆρN = 1
+
+> N
+
+PNi=1 δ(Θ (i,N ),Ω(i,N )) is a random measure. Let us denote L(ˆ ρN ) := Law (ρN ) ∈P  P  C([0 , T ], RD ) × C  [0 , T ], RD  as a sequence of probability distributions. We can prove that L(ρN ) N ≥2
+
+is tight. Next, we use the Aldous criteria ((Bass, 2011), Section 34.3), which could prove the tightness of a sequence of distributions. 
+
+Theorem C.2. Let J satisfy Assumptions 4.1 and ρ0 ∈ P4(RD × RD ). For any N ≥ 2, we as-sume that 
+
+
+
+Θ(i,N ) 
+
+> t
+
+, Ω(i,N )
+
+> t
+
+ 
+
+> t∈[0 ,T ]
+
+Ni=1 
+
+is a unique solution to Equation (8) with ρ⊗N 
+
+> 0
+
+-distributed initial data 
+
+n 
+
+Θ(i,N )0 , Ω(i,N )0
+
+o Ni=1 
+
+. Then the sequence L(ˆ ρN ) N ≥2 is tight in P  P  C([0 , T ], RD ) × C  [0 , T ], RD  .Proof. Because of the exchangeability of the particle system, we only prove the 
+
+n
+
+L
+
+
+
+Θ1,N t , Ω1,N t
+
+o  
+
+> N≥2
+
+is tight. It is sufficient to justify two conditions in Aldous criteria. 19 Consensus Based Stochastic Optimal Control 
+
+Condtion 1: For any ϵ > 0, there exist a compact subset Uϵ := (θ, ω ) : ∥θ∥2 + ∥ω∥2] ≤ Kϵ such that by Markov’s inequality 
+
+L
+
+
+
+Θ1,N t , Ω1,N t
+
+
+
+(( Uϵ)c) = P
+
+
+
+Θ1,N t + Ω1,N t > Kϵ
+
+
+
+≤ ϵE[∥Θ1,N t ∥ + ∥Ω1,N t ∥]
+
+K ≤ ϵ, ∀N ≥ 2,
+
+where we have used Lemma C.1 in the last inequality. This means that for each t ∈ [0 , T ], the sequence 
+
+n
+
+L
+
+
+
+Θ1,N t , Ω1,N t
+
+o 
+
+is tight. 
+
+Condition 2: We have to show, for any ϵ, η > 0, there exist δ0 > 0 and n0 ∈ N such that for all N ≥ n0. Let ˜τ be a 
+
+σ((Θ 1,N s , Ω1,N s ); s ∈ [0 , T ]) -stopping time with discrete values such that ˜τ + δ0 ≤ T , it holds that 
+
+sup 
+
+> δ∈[0 ,δ 0]
+
+P
+
+
+
+Θ1,N t+δ − Θ1,N t ≥ η
+
+
+
+≤ ϵ
+
+and 
+
+sup 
+
+> δ∈[0 ,δ 0]
+
+P
+
+
+
+Ω1,N t+δ − Ω1,N t ≥ η
+
+
+
+≤ ϵ. 
+
+Recalling Equation (1), we have 
+
+Θ1,N   
+
+> ˜τ+δ
+
+− Θ1,N  
+
+> ˜τ
+
+=
+
+Z ˜τ +δ
+
+> ˜τ
+
+Ω1,N s ds − γ1
+
+Z ˜τ +δ
+
+> ˜τ
+
+(Θ 1,N s − M β [ˆ μNs ])d s +
+
+Z ˜τ +δ
+
+> ˜τ
+
+σ(s)d Wθ,t ,
+
+Ω1,N   
+
+> ˜τ+δ
+
+− Ω1,N  
+
+> ˜τ
+
+= −m
+
+Z ˜τ +δ
+
+> ˜τ
+
+(Θ 1,N s − M β [ˆ μNs ])d s − γ2
+
+Z ˜τ +δ
+
+> ˜τ
+
+Ω1,N s ds + √m
+
+Z ˜τ +δ
+
+> ˜τ
+
+σ(s)d Wω,t .
+
+From Theorem 2.1 in (Huang & Qiu, 2022), we have 
+
+E
+
+Z ˜τ +δ
+
+> ˜τ
+
+(Θ 1,N s − M β [ˆ μNs ])d s
+
+> 2
+
+ ≤ 2T Kδ. 
+
+Furthermore, we apply Itˆ o’s Isometry 
+
+E
+
+"Z ˜τ +δ
+
+> ˜τ
+
+σ(s)d Wθ,s 
+
+#
+
+, E
+
+"Z ˜τ +δ
+
+> ˜τ
+
+σ(s)d Wω,s 
+
+#
+
+≤ E
+
+"Z ˜τ +δ
+
+> ˜τ
+
+σ(s)2ds
+
+#! 12
+
+≤ σ2δ 12 T 12 .
+
+Combining the above estimation, one has 
+
+E
+
+
+
+Θ1,N   
+
+> ˜τ+δ
+
+− Θ1,N 
+
+> ˜τ
+> 2
+
++ Ω1,N   
+
+> ˜τ+δ
+
+− Ω1,N 
+
+> ˜τ
+> 2
+
+
+
+≲ √δ. 
+
+Hence, for any ϵ, η > 0, there exist δ0 > 0 such that for all N > 2 it holds that 
+
+sup 
+
+> δ∈[0 ,δ 0]
+
+P
+
+
+
+Θ1,N t+δ − Θ1,N t
+
+> 2
+
+≥ η
+
+
+
+, sup 
+
+> δ∈[0 ,δ 0]
+
+P
+
+
+
+Ω1,N t+δ − Ω1,N t
+
+> 2
+
+≥ η
+
+
+
+≤ sup 
+
+> δ∈[0 ,δ 0]
+
+P
+
+
+
+Θ1,N t+δ − Θ1,N t
+
+> 2
+
++ ∥Ω1,N t+δ − Ω1,N t ∥2 ≥ η
+
+
+
+≤ sup 
+
+> δ∈[0 ,δ 0]
+
+E
+
+
+
+Θ1,N   
+
+> ˜τ+δ
+
+− Θ1,N 
+
+> ˜τ
+> 2
+
++ Ω1,N   
+
+> ˜τ+δ
+
+− Ω1,N 
+
+> ˜τ
+> 2
+
+
+
+η ≤ ϵ. 
+
+20 Consensus Based Stochastic Optimal Control 
+
+By Skorokhod’s lemma (see (Billingsley, 2013)) and Lemma C.3, we may find a common probability space 
+
+(Ω , F, P) on which the process {ˆρN }N ∈N converges to some process ρ as a random variable valued in 
+
+P  C  [0 , T ]; RD  × C  [0 , T ]; RD  almost surely. In particular, we have that ∀t ∈ [0 , T ] and ϕ ∈ C b(RD × RD ),
+
+lim   
+
+> N→∞
+
+ϕ, ˆρNt − ρt + Mβ [ˆ μNt ] − M β [μt] = 0 a.s. , (11) and we can have a direct result 
+
+lim   
+
+> N→∞
+
+E  ϕ, ˆρNt − ρt + Mβ [ˆ μNt ] − M β [μt]  = 0 . (12) 
+
+Lemma C.3. 1. There exist a subsequence of {ˆρN }N ≥2 and a random measure ρ : Ω →P  C  [0 , T ]; RD  × C  [0 , T ]; RD  such that ˆρN ⇀ ρ in law as N → ∞ which is equivalently to say 
+
+L  ˆρN  converges weakly to L (ρ) in P  P  C  [0 , T ]; RD  × C  [0 , T ]; RD  ;2. For the subsequence in 1, the time marginal ˆρNt of ˆρN , as P  RD × RD  valued random measure converges in law to 
+
+ρt ∈ P (RD × RD ), the time marginal of ρ. Namely L(ˆ ρNt ) converges weakly to L(ρt) in P  P  RD × RD  .
+
+Definition C.4. Fix ϕ ∈ C 2
+
+> c
+
+ RD × RD , define functional Fϕ : P  C  [0 , T ]; RD  × C  [0 , T ]; RD  → R:
+
+Fϕ(ρt) := ⟨ϕ(θt, ω t), ρ (d θ, dω)⟩ − ⟨ φ(θ0, ω 0), ρ (d θ, dω)⟩−
+
+Z t
+
+> 0
+
+⟨(ωs − γ1(θs − M β [μs])) · ∇ θ ϕ, ρ (d θ, dω)⟩ ds
+
+−
+
+Z t
+
+> 0
+
+⟨(−m(θs − M β [μs]) − γ2ωs) · ∇ ω ϕ, ρ (d θ, dω)⟩ ds
+
+− (m + 1) D
+
+2
+
+Z t
+
+> 0
+
+σ2(s)d s
+
+(13) for all ρ ∈ P  C  [0 , T ]; RD  × C  [0 , T ]; RD  and θ, ω ∈ C  [0 , T ]; RD , where μ(θ) = R 
+
+> RD
+
+ρ(θ, dω).
+
+Lemma C.5. Let J satisfy Assumption 4.1 and ρ0 ∈ P4(RD × RD ). For all N ≥ 2, assume that 
+
+
+
+Θ(i,N ) 
+
+> t
+
+, Ω(i,N )
+
+> t
+
+ 
+
+> t∈[0 ,T ]
+
+Ni=1 
+
+is the unique solution to Equation (8) with ρ⊗N 
+
+> 0
+
+-distributed initial data 
+
+n 
+
+Θ(i,N )0 , Ω(i,N )0
+
+o Ni=1 
+
+. There exists a constant C > 0, such that 
+
+E
+
+h
+
+Fϕ(ˆ ρN ) 2i
+
+≤ CN ,
+
+where ˆρN = 1
+
+> N
+
+PNi=1 δ(Θ (i,N ),Ω(i,N )) is the empirical measure. Proof. Using the definition of Fϕ, one has 
+
+Fϕ(ˆ ρN ) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+ϕ(Θ (i,N ) 
+
+> t
+
+, Ω(i,N ) 
+
+> t
+
+) − 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+ϕ(Θ (i,N )0 , Ω(i,N )0 )
+
+− 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Z t
+
+> 0
+
+
+
+Ω(i,N ) 
+
+> s
+
+− γ1
+
+
+
+Θ(i,N )0 − M β [ˆ μNs ]
+
+ 
+
+· ∇ θ ϕ(Θ (i,N ) 
+
+> s
+
+, Ω(i,N ) 
+
+> s
+
+)d s
+
+− 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Z t
+
+> 0
+
+
+
+−m
+
+
+
+Θ(i,N ) 
+
+> s
+
+− M β [ˆ μNs ]
+
+
+
+− γ2Ω(i,N )
+
+> s
+
+
+
+· ∇ ω ϕ(Θ (i,N ) 
+
+> s
+
+, Ω(i,N ) 
+
+> s
+
+)d s
+
+− (m + 1) D
+
+2
+
+Z t
+
+> 0
+
+σ2(s)d s. 
+
+21 Consensus Based Stochastic Optimal Control 
+
+One the other hand, the Itˆ o-Doeblin formula gives 
+
+ϕ
+
+
+
+Θ(i,N ) 
+
+> t
+
+, Ω(i,N )
+
+> t
+
+
+
+− ϕ
+
+
+
+Θ(i,N )0 , Ω(i,N )0
+
+
+
+=
+
+Z t
+
+> 0
+
+
+
+Ω(i,N ) 
+
+> s
+
+− γ1
+
+
+
+Θ(i,N ) 
+
+> s
+
+− M β [ˆ μNs ]
+
+ 
+
+· ∇ θ ϕ(Θ (i,N ) 
+
+> s
+
+, Ω(i,N ) 
+
+> s
+
+)d s
+
++
+
+Z t
+
+> 0
+
+
+
+−m
+
+
+
+Θ(i,N ) 
+
+> s
+
+− M β [ˆ μNs ]
+
+
+
+− γ2Ω(i,N )
+
+> s
+
+
+
+· ∇ ω ϕ(Θ (i,N ) 
+
+> s
+
+, Ω(i,N ) 
+
+> s
+
+)d s
+
++
+
+Z t
+
+> 0
+
+σ(s)d W iθ,s + √m
+
+Z t
+
+> 0
+
+σ(s)d W iω,s 
+
++ (m + 1) D
+
+2
+
+Z t
+
+> 0
+
+σ2(s)d s. 
+
+Then one gets 
+
+Fϕ(ˆ ρN ) = 1
+
+N
+
+> N
+
+X
+
+> i=1
+
+Z t
+
+> 0
+
+σ(s)d W iθ,s + √m
+
+Z t
+
+> 0
+
+σ(s)d W iω,s 
+
+
+
+.
+
+Finally, we can compute 
+
+E
+
+h
+
+Fϕ(ˆ ρN ) 2i
+
+= 1
+
+N 2
+
+> N
+
+X
+
+> i=1
+
+E
+
+ Z t
+
+> 0
+
+σ(s)d W iθ,s + √m
+
+Z t
+
+> 0
+
+σ(s)d W iω,s 
+
+2
+
+≤T σ2(m + 1) 
+
+N 2 ,
+
+where we use the assumption that the σ(t) we choose has an upper bound. 
+
+Proof of Theorem 4.4. Now suppose that we have a convergent subsequence of {ˆρN }N ∈N, which is denoted by the sequence itself for simplicity and has ρt as the limit. We want to prove that ρ is a solution of (3) . For any ϕ ∈ C 2
+
+> c
+
+ RD × RD , using the convergence result in (12), we have 
+
+lim   
+
+> N→∞
+
+E  ϕ(θ, ω ), ˆρNt (d θ, dω) − ⟨ ϕ(θ, ω ), ρ t(d θ, dω)⟩  = 0 ,
+
+and 
+
+lim   
+
+> N→∞
+
+E  ϕ(θ, ω ), ˆρN 
+
+> 0
+
+(d θ, dω) − ⟨ ϕ(θ, ω ), ρ 0(d θ, dω)⟩  = 0 .
+
+Further, we notice that 
+
+Z t
+
+> 0
+
+ θ − M β [ˆ μNs ] · ∇ θ ϕ, ˆρNs (d θ, dω) ds −
+
+Z t
+
+> 0
+
+⟨(θ − M β [μs]) · ∇ θ ϕ, ρ s(d θ, dω)⟩ ds
+
+≤
+
+Z t
+
+> 0
+
+ θ − M β [ˆ μNs ] · ∇ θ ϕ, ˆρNs (d θ, dω) − ρs(d θ, dω) ds
+
++
+
+Z t
+
+> 0
+
+ Mβ [μs] − M β [ˆ μNs ] · ∇ θ ϕ, ρ s(d θ, dω) ds
+
+:= 
+
+Z t
+
+> 0
+
+IN 
+
+> 1
+
+(s) ds +
+
+Z t
+
+> 0
+
+IN 
+
+> 2
+
+(s) ds. 
+
+For IN 
+
+> 1
+
+(s) , we have 
+
+E ∥IN 
+
+> 1
+
+(s)∥ =E  θ · ∇ θ ϕ, ρ Ns (d θ, dω) − ρs(d θ, dω)  + E   Mβ [μNs ] · ∇ θ ϕ, ρ Ns (d θ, dω) − ρs(d θ, dω) 
+
+≤E  θ · ∇ θ ϕ, ρ Ns (d θ, dω) − ρs(d θ, dω)  + K 12 E  ∇θ ϕ, ρ Ns (d θ, dω) − ρs(d θ, dω)  .
+
+(14) Since ϕ has a compact support, applying (12) leads to lim N →∞ E ∥IN 
+
+> 1
+
+(s)∥ = 0 . Moreover, by the uniform boundedness of E IN 
+
+> 1
+
+(s) = 0 and applying the domained convergence theorem implies 
+
+lim  
+
+> N→∞
+
+Z t
+
+> 0
+
+E ∥IN 
+
+> 1
+
+(s)∥ ds = 0 .
+
+22 Consensus Based Stochastic Optimal Control 
+
+As for IN 
+
+> 2
+
+, we know that 
+
+(Mβ (μs) − M β (ˆ μNs )) · ∇ ϕ(x), μ s(dx ) ≤ ∥∇ ϕ∥∞∥M β (μs) − M β (ˆ μNs )∥ .
+
+Hence by Equation (12), we have lim N →∞ E ∥IN 
+
+> 2
+
+(s)∥ = 0 . Again, by the dominated convergence theorem, we have 
+
+lim  
+
+> N→∞
+
+Z t
+
+> 0
+
+E ∥IN 
+
+> 2
+
+(s)∥ ds = 0 .
+
+Thus we can get the boundedness 
+
+lim   
+
+> N→∞
+
+E
+
+ Z t
+
+> 0
+
+ θ − M β [ˆ μNs ] · ∇ θ ϕ, ρ Ns (d θ, dω) ds −
+
+Z t
+
+> 0
+
+⟨(θ − M β [ˆ μs]) · ∇ θ ϕ, ρ s(d θ, dω)⟩ ds
+
+
+
+= 0 .
+
+Similarly, we can also have 
+
+lim   
+
+> N→∞
+
+E
+
+ Z t
+
+> 0
+
+ θ − M β [ˆ μNs ] · ∇ ω ϕ, ρ Ns (d θ, dω) ds −
+
+Z t
+
+> 0
+
+⟨(θ − M β [ˆ μs]) · ∇ ω ϕ, ρ s(d θ, dω)⟩ ds
+
+
+
+= 0 .
+
+Combining the above results, we get 
+
+E  Fϕ(ˆ ρN ) − Fϕ(ρ)  = 0 ,
+
+which is a direct result of (12) and the dominated convergence theorem. We can deduce 
+
+E [|Fϕ(ρ)|] ≤E  Fϕ(ˆ ρN ) − Fϕ(ρ)  + E  Fϕ(ˆ ρN ) 
+
+≤ E  Fϕ(ˆ ρN ) − Fϕ(ρ)  +
+
+r CN → 0, as N → ∞ .
+
+Thus Fϕ(ρt) = 0 almost surely, which implies that ρt is a solution to the corresponding Fokker-Planck equation. Combined with the uniqueness of the solution, proved in Lemma C.7, we complete the proof. 
+
+Lemma C.6. ∀T > 0, let ft ∈ C  [0 , T ]; RD  and ρ0 ∈ P 2(RD × RD ). The following linear PDE 
+
+∂tρt = −∇ θ (( ω − γ1(θ − ft)) ρt) + ∇ω (m(θ − ft) + γ2ωρ t) + σ(t)2m
+
+2 ∆ω ρt + σ(t)2
+
+2 ∆θ ρt
+
+has a unique solution ρt ∈ C  [0 , T ]; P2(RD × RD ).Proof. The existence is obvious, which can be obtained as the law of the solution to the associated linear SDE. To show the uniqueness, let us fix t0 ∈ [0 , T ] and ϕ ∈ C ∞
+
+> c
+
+ RD × RD , we then can solve the following backward PDE: 
+
+∂tht = − (ω − γ1(θ − ft)) · ∇ θ ht + ( m(θ − ft) + γ2ω) · ∇ ω ht − σ(t)2
+
+2 (m∆ω ht + ∆ θ ht) ,
+
+where (t, θ, ω ) ∈ [0 , t 0] × RD × RD with terminal condition ht0 = ϕ. It has a classical solution: 
+
+ht = E
+
+h
+
+ϕ(Θ t, (θ,ω ) 
+
+> t0
+
+, Ωt, (θ,ω ) 
+
+> t0
+
+)
+
+i
+
+,
+
+where 
+
+
+
+Θt, (θ,ω ) 
+
+> s
+
+, Ωt, (θ,ω )
+
+> s
+
+
+
+> 0≤t≤s≤t0
+
+is the strong solution to the following linear SDE: 
+
+dΘ t, (θ,ω ) 
+
+> s
+
+=
+
+
+
+Ωt, (θ,ω ) 
+
+> s
+
+− γ1(Θ t, (θ,ω ) 
+
+> s
+
+− fs)
+
+
+
+ds + σ(s)d Wθ,s ,
+
+dΩ t, (θ,ω ) 
+
+> s
+
+= −
+
+
+
+m(Θ t, (θ,ω ) 
+
+> s
+
+− fs) + γ2Ωt, (θ,ω )
+
+> s
+
+
+
+ds + σ(s)√mdWω,s 
+
+with terminal condition 
+
+
+
+Θt, (θ,ω ) 
+
+> t
+
+, Ωt, (θ,ω )
+
+> t
+
+
+
+= ( θ, ω ).23 Consensus Based Stochastic Optimal Control 
+
+Now, suppose ρ1 and ρ2 are two weak solutions of the PDE with the same initial condition ρ10 = ρ20. Let δρ = ρ1 − ρ2. To show uniqueness, we need to demonstrate that δρ t = 0 for all t ∈ [0 , T ].Using the backward PDE solution ht as a test function, we have: 
+
+⟨ht0 , δρ t0 ⟩ =
+
+Z t0
+
+> 0
+
+⟨∂shs, δρ s⟩ + ⟨hs, ∂ sδρ s⟩ds. 
+
+By substituting the equation for ∂shs from the backward PDE and integrating by parts, we get 
+
+⟨ht0 , δρ t0 ⟩ = 0 .
+
+The arbitrariness of ψ ∈ C ∞ 
+
+> c
+
+(RD × RD ) implies δρ t0 = 0 , and thus ρ1 = ρ2.
+
+Lemma C.7. Assume that ρ1, ρ 2 ∈ C  [0 , T ]; P2
+
+ RD × RD  are two weak solutions to Equation (3) with the same initial data ρ0. Then it holds that 
+
+sup  
+
+> t∈[0 ,T ]
+
+W2
+
+ ρ1 
+
+> t
+
+, ρ 2
+
+> t
+
+ = 0 ,
+
+where W2 is the 2-Wasserstein distance. Proof. Given ρ1 and ρ2, let us first consider the following two coupled linear SDEs: 
+
+d ¯Θit =   ¯Ωit − γ1
+
+  ¯Θit − M β [μit] dt + σ(t)d Wθ,t ,
+
+d ¯Ωit = −  m   ¯Θit − M β [μit] + γ2 ¯Ωit
+
+ ds + σ(t)√mdWω,t ,
+
+for i = 1 , 2, where ( ¯Θit, ¯Ωit) are driven by independent Brownian motions Wθ,s and Wω,s , with the same initial condition 
+
+(Θ i,t  
+
+> 0
+
+, Ωi,t  
+
+> 0
+
+) ∼ ρ0.Let ˜ρit denote the law of (Θ it, Ωit) for i = 1 , 2. By construction, the laws ˜ρit satisfy the same Fokker-Planck equation: 
+
+∂t ˜ρit = −∇ θ ·   ω − γ1(θ − M β [μit])  ˜ρit
+
+ + ∇ω ·   m(θ − M β [μit]) + γ2ω ˜ρit
+
+
+
++ σ(t)2m
+
+2 ∆ω ˜ρit + σ(t)2
+
+2 ∆θ ˜ρit,
+
+in the weak sense, with initial condition ˜ρi 
+
+> 0
+
+= ρ0. Since both ρit solve this Fokker-Planck equation and we assumed 
+
+ρ10 = ρ20 = ρ0, by the uniqueness of solutions to this PDE in the last lemma, we have ˜ρit = ρt for i = 1 , 2. As a result, 
+
+(Θ 1,t t , Ω1,t t ) and (Θ 2,t t , Ω2,t t ) both solve Equation (2). By Theorem 4.3, we have 
+
+sup  
+
+> t∈[0 ,T ]
+
+E
+
+
+
+Θ1,t t − Θ2,t t
+
+> 2
+
++ Ω1,t t − Ω2,t t
+
+> 2
+
+
+
+= 0 .
+
+This implies: 
+
+sup  
+
+> t∈[0 ,T ]
+
+W2
+
+ ˜ρ1 
+
+> t
+
+, ˜ρ2
+
+> t
+
+ ≤ sup  
+
+> t∈[0 ,T ]
+
+E
+
+
+
+¯Θ1,t t − ¯Θ2,t t
+
+> 2
+
++ ¯Ω1,t t − ¯Ω2,t t
+
+> 2
+
+
+
+= 0 .
+
+## D. Global Convergence in the Mean Field Law 
+
+Lemma D.1. Let E[ρt] be the energy functional defined in (4) . Under Assumption 4.1, 
+
+ddt E[ρt] ≤ − γE [ρt] + λpE[ρt]∥M β [μt] − ˜θ∥ + σ2(t)D(m + 1) 2 ,
+
+where γ = min {γ1, γ 2} and λ = max {m, γ 1} are positive numbers. 
+
+24 Consensus Based Stochastic Optimal Control 
+
+Proof. From the definition of weak solution of Fokker-Planck equation (3) , we define ϕ(θ, ω ) = 12 ∥θ − ˜θ∥2 + 12m ∥ω∥2,then 
+
+ddt E[ρt] = ddt
+
+Z
+
+ϕ(θ, ω )d ρt
+
+=
+
+Z
+
+⟨ω − γ1(θ − M β [μt]) , θ − ˜θ⟩dρt +
+
+Z
+
+⟨− m(θ − M β [μt]) − γ2ω, 1
+
+m ω⟩dρt + σ2D(m + 1) 2=
+
+Z
+
+⟨ω, Mβ [μt] − ˜θ⟩dρt − γ1
+
+Z
+
+⟨θ − M β [μt], θ − ˜θ⟩dρt − γ2
+
+m
+
+Z
+
+⟨ω, ω ⟩dρt + σ2D(m + 1) 2=
+
+Z
+
+⟨ω, Mβ [μt] − ˜θ⟩dρt − γ1
+
+Z
+
+⟨θ − ˜θ, θ − ˜θ⟩dρt
+
+− γ1
+
+Z
+
+⟨˜θ − M β [μt], θ − ˜θ⟩dρt − γ2
+
+m
+
+Z
+
+⟨ω, ω ⟩dρt + σ2D(m + 1) 2
+
+≤∥ ω∥∥M β [μt] − ˜θ∥ + γ1∥θ − ˜θ∥∥M β [μt] − ˜θ∥ − γ1∥θ − ˜θ∥2 − γ2
+
+m ∥ω∥2 + σ2D(m + 1) 2
+
+≤ − γE [ρt] + λpE[ρt]∥M β [μt] − ˜θ∥ + σ2D(m + 1) 2 ,
+
+(15) where in the last equility we take γ = min {γ1, γ 2} and λ = max {m, γ 1}.Next, we will show that ∥M β [μt] − ˜θ∥ can be bounded by a suitable scalar multiple of pE[ρt], we can apply Gronwall’s inequality to bound the energy function. 
+
+Lemma D.2. Under Assumption 4.1, ∀r > 0, we define Jr := sup θ∈Bθ,r (˜θ) J (θ). Then ∀r ∈ [0 , R 0] and q > 0 such that 
+
+(q + Jr − J)μ ≤ δJ , we have 
+
+∥M β [μ] − ˜θ∥ ≤ (q + Jr − J)μ
+
+η + exp( −βq )
+
+ρ(Bθ,r (˜θ)) 
+
+Z
+
+∥θ − ˜θ∥dρ(θ, ω ).
+
+Proof. Let ˜r = (q+Jr −J)μ 
+
+> η
+
+≥ (Jr −J)μ 
+
+> η
+
+≥ r, we have 
+
+∥M β [μ] − ˜θ∥ ≤ 
+
+Z 
+
+> Bθ, ˜r(˜θ)
+
+∥θ − ˜θ∥ wβ (θ)
+
+∥wβ (θ)∥L1(ρ)
+
+dρ +
+
+Z 
+
+> Bcθ, ˜r(˜θ)
+
+∥θ − ˜θ∥ wβ (θ)
+
+∥wβ (θ)∥L1(ρ)
+
+dρ
+
+≤ ˜r +
+
+Z 
+
+> Bcθ, ˜r(˜θ)
+
+∥θ − ˜θ∥ wβ (θ)
+
+∥wβ (θ)∥L1(ρ)
+
+dρ. 
+
+(16) By Markov’s inequality, we have ∥wβ ∥L1(ρ) ≥ aρ ({(θ, ω ) : exp( −βJ (θ) ≥ a)}). By choosing a = exp( −βJ r ), we have 
+
+∥wβ ∥L1(ρ) ≥ exp( −βJ r )ρ ({(θ, ω ) : exp( −βJ (θ) ≥ exp( −βJ r )) })= exp( −βJ r )ρ ({(θ, ω ) : J(θ) ≤ Jr )})
+
+≥ exp( −βJ r )ρ(Bθ,r (˜θ)) ,
+
+where the second inequality comes from the definition of Jr . Thus for the second term in (16), we obtain 
+
+Z 
+
+> Bcθ, ˜r(˜θ)
+
+∥θ − ˜θ∥ wβ (θ)
+
+∥wβ (θ)∥L1(ρ)
+
+dρ ≤ 1exp( −βJ r )ρ(Bθ,r (˜θ)) 
+
+Z 
+
+> Bcθ, ˜r(˜θ)
+
+∥θ − ˜θ∥wβ (θ)d ρ
+
+≤
+
+exp( −β(inf Bcθ, ˜r (˜θ) J(θ) − Jr )) 
+
+ρ(Bθ,r (˜θ)
+
+Z 
+
+> Bcθ, ˜r(˜θ)
+
+∥θ − ˜θ∥dρ
+
+≤
+
+exp( −β(inf Bcθ, ˜r (˜θ) J(θ) − Jr )) 
+
+ρ(Bθ,r (˜θ)) 
+
+Z
+
+∥θ − ˜θ∥dρ. 
+
+25 Consensus Based Stochastic Optimal Control 
+
+We also notice 
+
+inf  
+
+> Bcθ, ˜r(˜θ)
+
+J(θ) − Jr ≥ min {δJ + J, (η˜r)1/μ + J} − Jr ≥ (η˜r)1/μ − Jr + J = q, 
+
+where the first inequality comes from Assumption 4.1 and the second inequality comes from the definition of ˜r and q,
+
+˜r = (q+Jr −J)μ 
+
+> η
+
+≤ δJ 
+
+> η
+
+. Combining the above inequality and the definition of ˜r, we have 
+
+∥M β [μ] − ˜θ∥ ≤ (q + Jr − J)μ
+
+η +exp( −α(inf Bcθ, ˜r (˜θ) J(θ) − Jr )) 
+
+ρ(Bθ,r (˜θ)) 
+
+Z
+
+∥θ − ˜θ∥dρ
+
+≤ (q + Jr − J)μ
+
+η + exp( −βq )
+
+ρ(Bθ,r (˜θ)) 
+
+Z
+
+∥θ − ˜θ∥dρ. 
+
+Then we will establish a lower bound for ρt(Bθ,r (˜θ)) . Notice that ρt(Bθ,r (˜θ)) = ρt
+
+
+
+{(θ, ω ) : ∥θ − ˜θ∥2 ≤ r2}
+
+
+
+≥
+
+ρt
+
+
+
+{(θ, ω ) : ∥θ − ˜θ∥2 + m−1∥ω∥2 ≤ r2}
+
+
+
+:= ρt(Br (˜θ, 0)) . We first define the mollifier ϕr (θ, ω ) as follows 
+
+ϕr (θ, ω ) = 
+
+
+
+exp 
+
+
+
+1 − r2
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+
+
+, if ∥θ − ˜θ∥2 + m−1∥ω∥2 ≤ r2,
+
+0, else .
+
+We have Im (ϕr ) ∈ [0 , 1] , ϕr ∈ C ∞ 
+
+> c
+
+. First, we compute the first-order and second-order derivatives as 
+
+∇θ ϕr = −2r2 θ − ˜θ
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr ,
+
+∇ω ϕr = −2r2 m−1ω
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr ,
+
+and 
+
+∆θ ϕr = − 2r2 D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+− 2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+  
+
+−2( θ − ˜θ) · (θ − ˜θ)
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr
+
++ 4 r4 ∥θ − ˜θ∥2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr
+
+=2 r2 ∥θ − ˜θ∥2(−2r2 + 4 ∥θ − ˜θ∥2 + 4 m−1∥ω∥2) − D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr ,
+
+∆ω ϕr = − 2r2 D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+m−1 − 2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+
+
+(−m−1ω) · (m−1ω)
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr
+
++ 4 r4 m−2ω2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr
+
+=2 r2 m−2∥ω∥2(−2r2 + 4 ∥θ − ˜θ∥2 + 4 m−1∥ω∥2) − D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+m−1
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr .
+
+26 Consensus Based Stochastic Optimal Control 
+
+Lemma D.3. Let T > 0, r > 0. Choose parameters σ ≥ σ(t) ≥ σ > 0. Assume ρ ∈ C ([0 , T ], P(R2D )) weakly solves the Fokker-Planck equation (3) with initial condition ρ0. Then, ∀t ∈ [0 , T ], we have 
+
+ρt(Bθ,r (˜θ)) ≥
+
+Z 
+
+ϕr (θ, ω )d ρ0(θ, ω )
+
+
+
+exp( −pt ),
+
+where 
+
+p := max 
+
+(
+
+4λ(√kr + B)√k
+
+(1 − k)2 r + 2σ2(k + D)(1 − k)4r2 , 8( B + r)2λ2
+
+(2 k − 1) σ2
+
+)
+
+,
+
+for any B > 0 with sup t∈[0 ,T ] ∥M β [μt] − ˜θ∥ ≤ B and for any k ∈ ( 12 , 1) satisfying (−1 + 2 k)k ≥ 2D(1 − k)2 and 
+
+λ = max {γ1, m }.Proof. By the properties of the mollifier ϕr , we have μt(Bθ,r (˜θ)) ≥ ρt(Br (˜θ, 0)) ≥ R ϕr (θ, ω )d ρt(θ, ω ). Using properties of the weak solution ρt, we have 
+
+ddt
+
+Z
+
+ϕr (θ, ω )d ρt(θ, ω ) = 
+
+Z *
+
+ω − γ1(θ − M β [μt]) , −2r2 θ − ˜θ
+
+
+
+r2 − (∥θ − ˜θ∥2 + ∥ω∥2)
+
+2 ϕr
+
++
+
+dρt
+
++
+
+Z *
+
+−m(θ − M β [μt]) − γ2ω, −2r2 m−1ω
+
+
+
+r2 − (∥θ − ˜θ∥2 + ∥ω∥2)
+
+2 ϕr
+
++
+
+dρt
+
++ σ2
+
+2
+
+Z
+
+(m∆ω ϕr + ∆ θ ϕr ) d ρt
+
+=
+
+Z 
+
+γ⟨θ − M β [μt], θ − ˜θ⟩ + γ2ω, m −1ω +
+
+D
+
+ω, ˜θ − M β [μt]
+
+E 
+
+2 r2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr dρt + σ2
+
+2
+
+Z
+
+(m∆ω ϕr + ∆ θ ϕr ) d ρt
+
+:= 
+
+Z
+
+T1(θ, ω )d ρt +
+
+Z
+
+T2(θ, ω )d ρt.
+
+Since ϕr vanishes outside of Dr := {(θ, ω ) : ∥θ − ˜θ∥2 + m−1∥ω∥2 ≤ r2}, we restrict our attention to the open ball Dr . To obtain the lower bound, we introduce the following subsets 
+
+K1 := 
+
+n
+
+(θ, ω ) : ∥θ − ˜θ∥2 + m−1∥ω∥2 > kr 2o
+
+,K2 := 
+
+n
+
+(θ, ω ) : −
+
+
+
+γ1⟨θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [ρt]⟩
+
+
+
+(r2 − ∥ θ − ˜θ∥ − m−1∥ω∥2)2
+
+> ˜k σ2
+
+2 r2(∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+
+
+,
+
+(17) where ˜k = 2 k − 1 ∈ (0 , 1) . We divide the integral region into three domains. 27 Consensus Based Stochastic Optimal Control 
+
+Domain Ωr ∩ Kc 
+
+> 1
+
+: We have ∥θ − ˜θ∥2 + m−1∥ω∥2 ≤ kr 2 in this domain and we can get 
+
+T1(θ, ω ) = 
+
+
+
+⟨γ1(θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩
+
+ 2r2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr
+
+≥ − 
+
+
+
+γ1∥θ − M β [μt]∥∥ θ − ˜θ∥ + ∥ω∥∥ ˜θ − M β [μt]∥
+
+ 2r2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr
+
+≥ − 
+
+
+
+γ1∥θ − ˜θ∥ + ∥ω∥
+
+ 2( √kr + B)r2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr
+
+≥ − 
+
+
+
+γ1∥θ − ˜θ∥ + ∥ω∥
+
+ 2( √kr + B)r2
+
+(r2 − kr 2)2 ϕr
+
+≥ − λ
+
+
+
+∥θ − ˜θ∥ + m−1∥ω∥
+
+ 2( √kr + B)(1 − k)2 r2 ϕr
+
+≥ − 2λ√kr 2( √kr + B)(1 − k)2 r2 ϕr = − 4λ(√kr + B)√k
+
+(1 − k)2 r ϕr := −p1ϕr ,
+
+where the first inequality comes from Cauchy-Schwarz inequality and the positiveness of ∥ω∥2, the second inequality comes from the boundedness of ∥θ − M β [μt]∥ ≤ ∥ θ − ˜θ∥ + ∥˜θ − M β [μt]∥ ≤ √kr + B, the third inequality comes from the defintion of domain Kc 
+
+> 1
+
+, and the fourth inequality comes from the definition of λ.For T2, we have 
+
+T2(θ, ω ) = σ2r2 (∥θ − ˜θ∥2 + m−1∥ω∥2)( −2r2 + 4 ∥θ − ˜θ∥2 + 4 m−1∥ω∥2)
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr
+
+− σ2r2 2D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr
+
+≥ − σ2r2 2r2(∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4 ϕr
+
+− σ2r2 2D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 ϕr
+
+≥ − σ2r2 2kr 4
+
+(r2 − kr 2)4 ϕr − σ2r2 2D
+
+(r2 − kr 2)2 ϕr
+
+= − σ2 2k
+
+(1 − k)4r2 ϕr − σ2 2D
+
+(1 − k)2 r2 ϕr
+
+≥ − 2σ2(k + D)(1 − k)4r2 ϕr := −p2ϕr ,
+
+(18) where the first inequlaity uses the positiveness of ∥θ − ˜θ∥2 and ∥ω∥2, the second inequality uses the properties of Kc 
+
+> 1
+
+, and the third inequality use 1 − k ∈ (0 , 12 ).
+
+Domain Ωr ∩ K1 ∩ Kc
+
+> 2
+
+In this domian, we have ∥θ − ˜θ∥2 + m−1∥ω∥2 > kr 2 and 
+
+−
+
+
+
+γ1⟨θ − M β [ρt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [ρt]⟩
+
+
+
+(r2−∥ θ−˜θ∥− m−1∥ω∥2)2 ≤ ˜k σ2
+
+2 r2(∥θ−˜θ∥2+m−1∥ω∥2).
+
+(19) 28 Consensus Based Stochastic Optimal Control 
+
+Our goal is to show T1(θ, ω ) + T2(θ, ω ) ≥ 0 in this subset. We first compute 
+
+T1(θ, ω ) + T2(θ, ω )2r2ϕr
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+4
+
+=
+
+
+
+⟨γ(θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩
+
+  
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
++ σ2m−1∥ω∥2(−r2 + 2 ∥θ − ˜θ∥2 + 2 m−1∥ω∥2)
+
+− σ2D
+
+2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
++ σ2∥θ − ˜θ∥2(−r2 + 2 ∥θ − ˜θ∥2 + 2 m−1∥ω∥2)
+
+− σ2D
+
+2
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+.
+
+To prove the positiveness, we need to prove 
+
+−
+
+
+
+⟨γ(θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩
+
+  
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
++ σ2D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+≤ σ2(m−1∥ω∥2 + ∥θ − ˜θ∥2)( −r2 + 2 ∥θ − ˜θ∥2 + 2 m−1∥ω∥2).
+
+For the first term, we have 
+
+−
+
+
+
+⟨γ(θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩
+
+  
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+≤˜k σ2
+
+2 r2(∥θ − ˜θ∥2 + m−1∥ω∥2]) =(2 k − 1) σ2
+
+2 r2(∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+≤(2 ∥θ − ˜θ∥2 + 2 m−1∥ω∥2 − r2) σ2
+
+2 (∥θ − ˜θ∥2 + m−1∥ω∥2),
+
+where the first inequality comes from the positiveness of the norm and the second inequality comes from Equation (19) . By the definition ˜k = 2 k − 1, we have the equality in the fourth line and the last inequality comes from kr 2 ≤∥θ − ˜θ∥2 + m−1∥ω∥2. For the second term, we have 
+
+σ2D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+≤ σ2D (1 − k)2 r4
+
+≤ σ2
+
+2 (2 k − 1) r2kr 2
+
+≤ σ2
+
+2 (2 ∥θ − ˜θ∥2 + 2 m−1∥ω∥2 − r2)( ∥θ − ˜θ∥2 + m−1∥ω∥2),
+
+where in the second inequality we use (−1 + 2 k)k ≥ 2D(1 − k)2. Hence, we have the positiveness of T1(θ, ω ) + T2(θ, ω ).
+
+Domain Ωr ∩ K1 ∩ K2
+
+In this subset, we have ∥θ − ˜θ∥2 + m−1∥ω∥2 > kr 2 and 
+
+−
+
+
+
+γ1⟨θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [ρt]⟩
+
+
+
+(r2 − ∥ θ − ˜θ∥ − m−1∥ω∥2)2
+
+> ˜k σ2
+
+2 r2(∥θ − ˜θ∥2 + m−1∥ω∥2).
+
+(20) 29 Consensus Based Stochastic Optimal Control 
+
+In this subset, we have 
+
+γ1⟨θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩≥γ1⟨θ − M β [μt], θ − ˜θ⟩ + ⟨ω, ˜θ − M β [μt]⟩≥ − γ1∥θ − M β [μt]∥∥ θ − ˜θ∥ − ∥ ω∥∥ ˜θ − M β [μt]∥≥ − λ(∥˜θ − M β [μt]∥ + ∥θ − ˜θ∥)( ∥θ − ˜θ∥ + m−1∥ω∥),
+
+(21) where the last inequality comes from the definition of λ. From the inequality (20), we have 
+
+(∥θ − ˜θ∥ + m−1∥ω∥)2
+
+(r2 − ∥ θ − ˜θ∥2 − m−1∥ω∥2)2 ≤ 2 ∥θ − ˜θ∥2 + m−1∥ω∥2
+
+(r2 − ∥ θ − ˜θ∥2 − m−1∥ω∥2)2
+
+< − 4˜kσ 2r2
+
+
+
+γ1⟨θ − M β [ρt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [ρt]⟩
+
+
+
+.
+
+(22) Then we are ready to prove 
+
+⟨γ1(θ − M β [μ]) , θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+≥ − λ (∥˜θ − M β [μt]∥ + ∥˜θ − θ∥)( ∥θ − ˜θ∥ + m−1∥ω∥)
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+≥ λ 4˜kσ 2r2
+
+
+
+γ1⟨θ − M β [ρt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [ρt]⟩
+
+
+
+(∥˜θ − M β [μt]∥ + ∥˜θ − θ∥)
+
+∥θ − ˜θ∥ + m−1∥ω∥≥ − λ2 4˜kσ 2r2
+
+(∥˜θ − M β [μt]∥ + ∥˜θ − θ∥)2
+
+
+
+∥θ − ˜θ∥ + m−1∥ω∥
+
+
+
+∥θ − ˜θ∥ + m−1∥ω∥≥ − λ2 4˜kσ 2r2 (∥˜θ − M β [μt]∥ + ∥˜θ − θ∥)2
+
+≥ − λ2 4( B + r)2
+
+˜kσ 2r2 a, 
+
+where the first and third inequalities are derived from the inequality (21) , and the second one is a consequence of (22) .Utilizing Cauchy–Schwarz inequality and the definition specified in λ, we have the third and fourth inequalities. Given this we have 
+
+T1(θ, ω ) = ⟨γ1θ − M β [μt], θ − ˜θ⟩ + ⟨γ2ω, m −1ω⟩ + ⟨ω, ˜θ − M β [μt]⟩
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2 2r2ϕr
+
+≥ − 8( B + r)2λ2
+
+˜kσ 2 ϕr = − 8( B + r)2λ2
+
+(2 k − 1) σ2 ϕr := −p3ϕr .
+
+For T2, it is positive whenever 
+
+(∥θ − ˜θ∥2 + m−1∥ω∥2)( −2r2 + 4 ∥θ − ˜θ∥ + 4 m−1∥ω∥2) ≥ 2D
+
+
+
+r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)
+
+2
+
+,
+
+30 Consensus Based Stochastic Optimal Control 
+
+we have 
+
+(∥θ − ˜θ∥2 + m−1∥ω∥2)( −2r2 + 4 ∥θ − ˜θ∥ + 4 m−1∥ω∥2)
+
+≥(∥θ − ˜θ∥2 + m−1∥ω∥2)( −2r2 + 4 kr 2)
+
+≥(∥θ − ˜θ∥2 + m−1∥ω∥2)( −1 + 2 k)2 r2
+
+≥(∥θ − ˜θ∥2 + m−1∥ω∥2)2 D (1 − k)2
+
+k 2r2
+
+≥r22D(1 − k)22r2
+
+=2 D(r2 − kr 2)2
+
+≥2D(r2 − (∥θ − ˜θ∥2 + m−1∥ω∥2)) 2.
+
+This is safiesifed for all ∥θ − ˜θ∥2 + m−1∥ω∥2 ≥ kr 2.
+
+Concluding the proof: Using the evolution of ϕr , we now get 
+
+ddt
+
+Z
+
+ϕr (θ, ω )d ρt(θ, ω ) = 
+
+Z 
+
+> K1∩Kc
+> 2∩Ωr
+
+T1(θ, ω ) + T2(θ, ω )d ρt(θ, ω )+
+
+Z
+
+> K1∩K2∩Ωr
+
+T1(θ, ω ) + T2(θ, ω )d ρt(θ, ω ) + 
+
+Z 
+
+> Kc
+> 1∩Ωr
+
+T1(θ, ω ) + T2(θ, ω )d ρt(θ, ω )
+
+≥ − max {p1 + p2, p 3}
+
+Z
+
+ϕr (θ, ω )d ρt(θ, ω ) = −p
+
+Z
+
+ϕr (θ, ω )d ρt(θ, ω ).
+
+Proof of Theorem 4.5. We choose parameters β such that 
+
+β > β 0 := 1
+
+qϵ
+
+log 4p2E[ρ0]c( τ, λ )√ϵ + p
+
+(1 − τ )λ log 
+
+ E[ρ0]
+
+ϵ
+
+
+
+− log ρ0(B rϵ  
+
+> 2
+
+(˜θ, 0)) 
+
+!! 
+
+,
+
+where we introduce 
+
+c( τ, λ ) = τ γ λ , qϵ = 12 min 
+
+( c(τ, λ )√ϵη 
+
+2
+
+1/μ 
+
+, δ J
+
+)
+
+, and rϵ = max 
+
+> x∈[0 ,R 0]
+
+{ max 
+
+> (θ,ω )∈Bs(˜θ, 0)
+
+J(θ) ≤ qϵ + J},
+
+and define the time horizon Tβ ≥ 0, which may depend on β, by 
+
+Tβ = sup {t ≥ 0 : E[μt′ ] > ϵ and ∥M β [μt′ ] − ˜θ∥ < C (t′) for all t′ ∈ [0 , t ]}
+
+with C(t) = c( τ, λ )pE(ρt). First we want to prove Tβ > 0, which follows from the continunity of the mappings t → E[ρt]
+
+and t → ∥M β [μt] − ˜θ∥ since E[ρ0] > 0 and ∥M β [μ0] − ˜θ∥ < C (0) . While the former holds by assumption, the latter follows by 
+
+∥M β [μ0] − ˜θ∥ ≤ (qϵ + Jrϵ − J)μ
+
+η + exp( −βq ϵ)
+
+ρ(Bθ,r ϵ (˜θ)) 
+
+Z
+
+∥θ − ˜θ∥dρ0(θ, ω )
+
+≤ (qϵ + Jrϵ − J)μ
+
+η + exp( −βq ϵ)
+
+ρ(Brϵ (˜θ, 0)) 
+
+Z
+
+∥θ − ˜θ∥dρ0(θ, ω )
+
+≤ c( τ, λ )√ϵ
+
+2 + exp( −βq ϵ)
+
+ρ(Brϵ (˜θ, 0)) 
+
+p2E[ρ0]
+
+≤ c( τ, λ )√ϵ ≤ c( τ, λ )pE[ρ0] = C(0) ,
+
+where we use the definition of β in the first inequality of the last line. Recall the Lemma D.1, up to time Tβ
+
+ddt E[ρt] ≤ − γE [ρt] + λpE[ρt]∥M β [μt] − ˜θ∥ + σ2(t)D(m + 1) 2
+
+≤ − (1 − τ ) γE [ρt] + σ2(t)D(m + 1) 2 .
+
+31 Consensus Based Stochastic Optimal Control 
+
+Thus we have 
+
+ddt (exp ((1 − τ )γt ) E[ρt]) =(1 − τ )γ (exp ((1 − τ )γt ) E[ρt]) + exp ((1 − τ )γt ) ddt E[ρt]
+
+≤ exp ((1 − τ )γt ) σ2(t)D(m + 1) 2 .
+
+Therefore we have 
+
+(exp ((1 − τ )γt ) E[ρt]) − E[ρ0] ≤
+
+Z t
+
+> 0
+
+exp ((1 − τ )λs ) σ2(s)d s
+
+= σ21 (1 − exp (( −2σ2 + λ(1 − τ )) t)2σ2 − λ(1 − τ ) .
+
+We can get the boundedness for E[ρt], for 2σ2 − λ(1 − τ ) < 0 by the chosen of τ and λ, then we have 
+
+E[ρt] ≤ exp ( −(1 − τ )tλ ) E[ρ0].
+
+Accordingly, we note that E(ρt) is decreasing in t, which implies the decay of the function C(t) as well. Hence, recalling the definition of Tβ , we may bound max t∈[0 ,T β ] ∥M β [ρt′ ] − ˜θ∥ ≤ max t∈[0 ,T β ] C(t) ≤ C(0) . We now conclude by showing 
+
+min t∈[0 ,T β ] E(ρt) ≤ ϵ with Tβ ≤ T ∗. For this, we distinguish the following three cases. 
+
+Case Tβ ≥ T ∗: If Tβ ≥ T ∗, we can use the definition of T ∗ = 1(1 −τ )λ log( E[ρ0] 
+
+> ϵ
+
+) and the time evolution bound of E[ρt] to conclude that E[ρT ∗ ] ≤ ϵ. Hence, by definition of Tβ , we find E[ρTβ ] ≤ ϵ and Tβ = T ∗.
+
+Case Tβ < T ∗ and E[ρTβ ] ≤ ϵ: Nothing need to discussed in this case. 
+
+Case Tβ < T ∗ and E[ρTβ ] > ϵ : We shall prove that this case will never occur. 
+
+∥M β [μTβ ] − ˜θ∥ ≤ (qϵ + Jrϵ − J)μ
+
+η + exp( −βq ϵ)
+
+ρ(Bθ,r ϵ (˜θ)) 
+
+Z
+
+∥θ − ˜θ∥dρTβ (θ, ω )
+
+< c( τ, λ )pE[ρTβ ]2 + exp( −βq ϵ)
+
+ρ(Bθ,r ϵ (˜θ)) 
+
+q
+
+E[μTβ ].
+
+Since, we have max t∈[0 ,T β ] ∥M β [μt′ ] − ˜θ∥ = B = C(0) guarantees that there exist a p > 0 with 
+
+ρTβ (Bθ,r ϵ (˜θ)) ≥
+
+Z 
+
+ϕrϵ (θ, ω )d ρ0(θ, ω )
+
+
+
+exp( −pT β ) ≥ 12 ρ0
+
+
+
+B rϵ  
+
+> 2
+
+(˜θ, 0)) 
+
+
+
+exp( −pT ∗), (23) where we used (˜θ, 0) ∈ supp (ρ0) for bounding the initial mass ρ0 and the fact that ϕr is bounded from below on B rϵ  
+
+> 2
+
+(˜θ, 0)) 
+
+by 1/2. With this, we can conclude that 
+
+∥M β [μTβ ] − ˜θ∥ < c( τ, λ )pE[ρTβ ]2 + 2 exp( −βq ϵ)
+
+ρ(B rϵ  
+
+> 2
+
+(˜θ, 0)) exp( −pT ∗)
+
+q
+
+E[ρTβ ]
+
+≤ c(τ, λ )
+
+q
+
+E[ρTβ ] = C(Tβ ),
+
+where the first inequality in the last line holds by the choice of β. This establishes the desired contradiction, against the consequence of the continuity of the mappings t → E[ρt] and t → ∥M β [μt] − ˜θ∥.
+
+## E. Simulation Details 
+
+E.1. Linear-quadratic-Gaussian Control Problem 
+
+We begin by considering a classical LQG control problem, where the state dynamics is governed by: 
+
+dxt = 2 αtdt + √2d Wt,
+
+incorporating t ∈ [0 , T ] and x0 = x. The cost functional is given by J(αt) = E
+
+hR T 
+
+> 0
+
+∥αr ∥2dt + g(XT )
+
+i
+
+. Here, the state process xt is a d-dimensional vector, while the action process αt is a d-dimensional vector-valued function. The value 32 Consensus Based Stochastic Optimal Control 
+
+function u can be defined as 
+
+u(t, x) = inf  
+
+> α
+
+E
+
+"Z Tt
+
+f (t, xt, αt, t )d t + g(xT ) |xt = x
+
+#
+
+.
+
+By solving the Hamilton–Jacobi–Bellman equation for u, one can derive an explicit solution with the terminal condition 
+
+u(T, x ) = g(x), given by 
+
+u(t, x) = − ln 
+
+
+
+E
+
+h
+
+exp 
+
+
+
+−g
+
+
+
+x + √2WT −t
+
+i 
+
+.
+
+E.2. Ginzburg-Landau Model 
+
+In this model, superconducting electrons are described by a “macroscopic” wavefunction, φ(z), with Landau free energy 
+
+> μ
+> 4
+
+R 10 |1 − φ(z)2|2dz. In order to add fluctuations (local variations in the wavefunction) to this model, Ginzburg suggested adding a term proportional to |∇ z φ(z)|2, which can be interpolated as the kinetic energy term in quantum mechanics or the lowest order fluctuation term allowed by the symmetry of the order parameter. Adding this term to the free energy, we have the Ginzburg-Landau theory in zero field, 
+
+U [φ] = λ
+
+2
+
+Z 10
+
+|∇ z φ(z)|2dz + μ
+
+4
+
+Z 10
+
+|1 − φ(z)2|2dz. 
+
+Upon discretizing the space into d + 1 points, the potential is defined as 
+
+U (φ) = U (x1, · · · , x d) := 
+
+"
+
+λ
+
+2
+
+> d+1
+
+X
+
+> i=1
+
+ xi − xi−1
+
+h
+
+2
+
++ μ
+
+4
+
+> d
+
+X
+
+> i=1
+
+(1 − x2 
+
+> i
+
+)2
+
+#
+
+h, 
+
+where xi = φ( id+1 ) for i = 0 , · · · , d + 1 and x0 = xd+1 = 0 . The dynamics is given by 
+
+dxt = b(xt, α t)d t + √2d Wt,
+
+where the drift term is defined as 
+
+b(x, a ) = −∇ xU (x) + 2 αω.
+
+Here the potential is defined as 
+
+U (φ) = U (x1, · · · , x d) := 
+
+"
+
+λ
+
+2
+
+> d+1
+
+X
+
+> i=1
+
+ xi − xi−1
+
+h
+
+2
+
++ μ
+
+4
+
+> d
+
+X
+
+> i=1
+
+(1 − x2 
+
+> i
+
+)2
+
+#
+
+h, 
+
+and α is a scalar-valued function, represents the strength of the external field and the vector ω is a d-dimensional vector represents the domian of the external field applied, the i-th element takes the value of 1 if the condition id+1 ∈ [0 .25 , 0.6] is satisfied, and 0 under other circumstances. The cost functional is defined 
+
+J[α] = E
+
+"Z T
+
+> 0
+
+1
+
+d ∥xt∥2 + ∥α∥dt + 10 
+
+d ∥xT ∥2
+
+#
+
+.
+
+E.3. Systemic Risk Mean Field Control 
+
+We describe this problem as a network of N banks, where xi denotes the logarithm of the cash reserves of the i-th bank. The following model introduces borrowing and lending between banks, given by: 
+
+dxt = [ κ(¯ xt − xt) + αt]d t + σdWt,
+
+where ¯xt = 1
+
+> n
+
+Pni=1 xit represents the average logarithm of the cash reserves across all banks. The control of the representative bank, i.e., the amount lent or borrowed at time t is denoted by αt. Based on the Almgren-Chriss linear price impact model, the running cost and terminal cost are given by: 
+
+f (x, ¯x, α ) = 12 α2 − qα (¯ x − x) + η
+
+2 (¯ x − x)2, g (x, ¯x) = c
+
+2 (¯ x − x)2,
+
+where η and c balance the individual bank’s behavior with the average behavior of the other banks. q weights the contribution of the components and helps to determine the sign of the control (i.e., whether to borrow or lend). Specifically, if the logarithmic cash reserve of an individual bank is smaller than the empirical mean, the bank will seek to borrow, choosing 
+
+αt > 0, and vice versa. We test the performance of our method with parameters c = 2 , k = 0 .6, and η = 2 .33 Consensus Based Stochastic Optimal Control 
+
+Multi-Agent Robotic Systems 
+
+To formulate the original path planning problem as a stochastic optimal control problem, we consider n agents with states following the stochastic dynamics for t ∈ [0 , 1] :
+
+dxit = 10 αitdt + d Wit,
+
+where represents the feedback control policy implemented as a neural network with parameters θ, and are independent Wiener processes modeling noise. The environment contains K circular obstacles centered at yj with radius rj . These are incorporated through the running cost: 
+
+f (t, x, α) = 
+
+> n
+
+X
+
+> i=1
+
+|αi|2 +
+
+> n
+
+X
+
+> i=1
+> K
+
+X
+
+> j=1
+
+s(|xi − yj |, r j ),
+
+where s(d, r )-smooth penalty function defined piecewise as: 
+
+s(d, r ) = 
+
+
+
+1 if d ≤ r, 
+
+0.5 + 0 .5 cos  π d−r
+
+> 0.2r
+
+ if r < d ≤ 1.2r, 
+
+0 otherwise .
+
+The terminal cost at final timeis given by the squared Euclidean distance between each agent’s final position and its designated target. 
+
+## F. Neural Network Structure 
+
+In this subsection, we briefly illustrate the network structure used to model the action function. For the LQG and Ginzburg-Landau model problems, we employ traditional fully connected neural networks with a depth of 5 layers and a width of 5d,where d represents the dimension of the problem. In the mean-field control problem, we use the cylindrical type mean field neural network structure proposed in (Pham & Warin, 2024), where the control α(t, x) is parameterized as 
+
+αi(t, x; θ) = Ψ 
+
+"
+
+xi, 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+ψ(xi; θ2); θ1
+
+#
+
+,
+
+where θ = {θ1, θ 2}. The advantage of this type of network is its extendibility, i.e, as demonstrated in the numerical results, control policies trained on a small number of agents N can be effectively applied to problems with different values of n.34

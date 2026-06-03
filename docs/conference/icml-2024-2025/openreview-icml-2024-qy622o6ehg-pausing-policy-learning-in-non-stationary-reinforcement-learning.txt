@@ -1,0 +1,4979 @@
+Title: Pausing Policy Learning in Non-stationary Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=qY622O6Ehg
+
+Number of Pages: 25
+
+Markdown Content:
+## Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Hyunin Lee 1 Ming Jin 2 Javad Lavaei 1 Somayeh Sojoudi 1
+
+Abstract 
+
+Real-time inference is a challenge of real-world reinforcement learning due to temporal differ-ences in time-varying environments: the system collects data from the past, updates the decision model in the present, and deploys it in the future. We tackle a common belief that continually up-dating the decision is optimal to minimize the temporal gap. We propose forecasting an online reinforcement learning framework and show that strategically pausing decision updates yields bet-ter overall performance by effectively managing aleatoric uncertainty. Theoretically, we compute an optimal ratio between policy update and hold duration, and show that a non-zero policy hold duration provides a sharper upper bound on the dynamic regret. Our experimental evaluations on three different environments also reveal that a non-zero policy hold duration yields higher rewards compared to continuous decision updates. 
+
+1. Introduction 
+
+Real-world reinforcement learning (RL) bridges the gap between the current literature on RL and real-world prob-lems. Real-time inference , a key challenge in real-world RL, requires that inference occur in real-time at the control frequency of the system (Dulac-Arnold et al., 2019). For RL deployment in a production system, policy inference must occur in real-time, matching the control frequency of the system. This could range from milliseconds for tasks such as recommendation systems (Covington et al., 2016; Steck et al., 2021) or autonomous vehicle control (Hester & Stone, 2013), to minutes for building control systems (Evans & Gao). This constraint prevents us from speeding up the task beyond real-time to rapidly generate extensive data (Silver et al., 2016; Espeholt et al., 2018) or slowing it down for more computationally intensive approaches (Levine et al.,      
+
+> 1University of California, Berkeley 2Virginia Tech. Correspon-dence to: Hyunin Lee <hyunin@berkeley.edu >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+2019; Schrittwieser et al., 2020). One strategy for real-time action is to employ a multi-threaded architecture, where model learning and planning occur in background threads while actions are returned in real-time (Hester & Stone, 2013; Imanberdiyev et al., 2016; Glavic et al., 2017). In this paper, we show that intentionally pausing policy learning can lead to better overall performance than contin-uous policy updating. Our study is based on deriving an analytical solution for the optimal ratio between the paus-ing and updating phases. Perhaps most importantly, this paper offers the insight that the pausing phase is crucial to handling an aleatoric uncertainty that stems from the environment’s intrinsic uncertainty. This paper begins with a fundamental observation of the real-time inference mechanism based on prediction: the agent forecasts the future based on past data, and then continually updates decisions in the present based on future predictions. This highlights the significance of balancing conservatism or pessimism in decision-making, based on the three types of uncertainties: epistemic, aleatoric, and predictive uncer-tainties (Gal, 2016). We define conservatism as expecting past trends to continue in the future, and pessimism as antic-ipating future differences. Although accumulating extensive past data reduces aleatoric uncertainty, and a prediction model with high capacity lessens predictive uncertainty, the frequency of policy updates still remains a key factor due to unknown aleatoric uncertainty in the present. 𝑹 𝒕     
+
+> 1𝒂 𝟎
+> 𝒂 𝟏
+> 𝑻 𝟎
+> 0
+> (a) 𝑻 𝟎
+> 𝝅 𝒕
+> 1
+> 0
+> 𝛽 "(b) 𝝅 𝒕
+> 𝑻 𝟎 (c)
+> Figure 1. (a) Non-stationary bandit setting, (b) conservative policy, (c) pessimistic policy
+
+To elucidate the importance of the above problem, consider a recommendation system tasked with optimally suggesting item x0 or x1 to a user whose preference changes over time. This can be framed as a Bernoulli non-stationary bandit setting with a set of two actions A = {a0, a 1}, and a time-dependent policy πt : A → [0 , 1] , where πt(a0) = βt and 
+
+πt(a1) = 1 − βt, 0 ≤ βt ≤ 1. The rewards of each action, 1Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+denoted as Rt, switch (i.e., Rt(a0) ↔ Rt(a1)) once at an unpredictable time between 0 and T (see Figure 1 (a)). The goal of the system is to maximize the average rewards over a period T , i.e., max π1,...,π T E
+
+hPTt=0 Rt(a)
+
+i
+
+. Initially, rec-ommending x1 yields a higher reward ( R0(a1) = 1 ). How-ever, the system anticipates a shift in the user preference towards x0 by the end of period T . The system should optimize its policy πt during the interval from 0 to T , fac-ing aleatoric uncertainty about when the user preferences will change. A conservative policy increases the preference weight βt associated with x0 too quickly (Figure 1 (b)), while a pessimistic approach may adjust too slowly (Fig-ure 1 (c)). The key challenge is to determine the optimal tempo of policy adjustment in anticipation of this unknown preference shift. Based on the previous example, this paper challenges the be-lief that continually updating the decision always achieves an optimal bound of dynamic regret, a measurement of decision optimality in a time-varying environment. Our main contribution, Algorithm 1 and Theorem 5.8, demon-strates that strategically pausing decision updates provides a sharper upper bound on the dynamic regret by deriving an optimal ratio between the policy update duration and the pause duration. To achieve this, we formulate the online interactive learn-ing problem in Section 3 by determining three key aspects: 1) the frequency of policy updates, 2) the timing of policy updates, and 3) the extent of each update. First, we study the real-time inference mechanism by proposing a forecast-ing online reinforcement learning model-free framework in Section 4. In Section 5, we calculate an upper bound on the dynamic regret (Theorem 5.3) as a function of episodic and predictive uncertainties (Propositions 4.1 and 4.2), as well as aleatoric uncertainty (Proposition 5.6 and Lemma 5.7). This is achieved by separating it into the policy update phase (Lemma 5.1) and the policy hold phase (Lemma 5.2). In Subsection 5.3, we conduct numerical experiments to show how the optimal ratio minimizing the dynamic regret’s upper bound (Theorem 5.8) varies with hyperparameters related to aleatoric uncertainty, highlighting the significance of the policy hold phase in this minimization. Finally, in Section 6, we empirically show two findings from three non-stationary environments: 1) a higher average reward of the forecasting method compared to the reactive method (Subsection 6.2), and 2) a non-positive correlation relation-ship between update ratios and average returns (Subsection 6.3). 
+
+Notations 
+
+The sets of natural, real, and non-negative real numbers are denoted by N, R, and R+, respectively. For a finite set Z, the notation |Z| represents its cardinality, and ∆( Z)
+
+denotes the probability simplex over Z. Given X, Y ∈ N
+
+with X < Y , we define [X] := {1, 2, . . . , X }, the closed interval [X, Y ] := {X, X + 1 , . . . , Y }, and the half-open interval [X, Y ) := {X, X +1 , . . . , Y −1}. For x ∈ R+, the floor function ⌊x⌋ is defined as max {n ∈ N ∪ { 0} | n ≤ x}.For any functions f, g : Rm → R satisfying f (x) ≤ g(x)
+
+for all values of x, if x∗ 
+
+> g
+
+= arg min x∈Rm g(x), then x∗ 
+
+> g
+
+is referred to as a surrogate optimal solution of f (x). We use the term surrogate optimal solution and suboptimal solution interchangeably. 
+
+2. Related works 
+
+Real-time inference RL 
+
+One approach to real-time reinforcement learning is to adapt existing algorithms and validate their feasibility for real-time operation (Adam et al., 2012). Alternatively, some algorithms are specifically designed with the primary objec-tive of functioning in real-time contexts (Cai et al., 2017; Wang & Yuan, 2015). A recent and distinct perspective on real-time inference was presented in (Ramstedt & Pal, 2019), which proposed a real-time markov reward process. In this process, the state evolves concurrently with the action selection. The anytime inference approach (Vlasselaer et al., 2015; Spirtes, 2001) encompasses a set of algorithms capa-ble of returning a valid solution at any interruption point, with their performance improving over time. 
+
+Non-stationary RL 
+
+The problem formulation of this paper draws inspiration from “desynchronized-time environment”, initially pro-posed by (Lee et al., 2023). The desynchronized-time en-vironment assigns the real-time duration of the learning process, where the agent is responsible for deciding both the timing and the duration of its interactions. (Finn et al., 2019) introduced the Follow-The-Meta-Leader algorithm to improve parameter initialization in a non-stationary environ-ment, but it cannot efficiently handle delays in optimal pol-icy tracking. To address this, (Chandak et al., 2020b;a) de-veloped methods for forecasting policy evaluation, yet faced limitations in empirical analysis and theoretical bounds for policy performance. (Mao et al., 2021) proposed an adaptive 
+
+Q-learning approach with a restart strategy, establishing a near-optimal dynamic regret bound. We will further elaborate on related work on non-stationary RL in Appendix A. 
+
+3. Problem Statement 
+
+Time-elapsing Markov Decision Process (Lee et al., 2023). For a given time t ∈ [0 , T ], we define the Markov Decision Process (MDP) at time t as Mt := ⟨S , A, P t, R t, γ, H ⟩.2Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+S is a state space, A is an action space, Pt : S × A × S → ∆( S) is a transition probability at time t, and Rt :
+
+S × A → R is a reward function at time t. For every time t, the agent interacts with the environment via a policy 
+
+πt : S × A → ∆( S) where each episode takes H steps to complete. We assume that a trajectory is finished within a second, implying that the agent will finish its trajectory within a temporally fixed MDP Mt.
+
+Time elapsing variation budget. In the real world, the time of the environment flows independently from t = 0 
+
+to t = T regardless of the agent’s behavior. For any time instances t1, t 2 ∈ [0 , T ) such that t1 < t 2, we define local variation budgets Br (t1, t 2) and Bp(t1, t 2) as 
+
+Br (t1, t 2) := 
+
+> t2−1
+
+X
+
+> t=t1
+
+max  
+
+> s,a
+
+|Rt+1 (s, a ) − Rt(s, a )| ,Bp(t1, t 2) := 
+
+> t2−1
+
+X
+
+> t=t1
+
+max  
+
+> s,a
+
+|| Pt+1 (· | s, a ) − Pt(· | s, a )|| 1 .
+
+Also, we define cumulative variation budgets ¯Bp(t1, t 2)
+
+and ¯Br (t1, t 2) as the summation of local variation budgets between time t1 and t2, i.e., 
+
+¯Br (t1, t 2) := 
+
+> t2−1
+
+X
+
+> t=t1
+
+Br (t1, t ), ¯Bp(t1, t 2) := 
+
+> t2−1
+
+X
+
+> t=t1
+
+Bp(t1, t ).
+
+To align with real-world scenarios where environmental changes do not normally occur too abruptly, we propose that these changes follow an exponential growth. 
+
+Assumption 3.1 (Exponential order local variation bud-get) . For any time interval [t1, t 2] ⊂ [0 , T ), there ex-ist constants kr , k p > 1, B max  
+
+> p
+
+, B max  
+
+> r
+
+> 0 such that 
+
+Bp(t1, t ) ≤ Bmax  
+
+> p
+
+kt−t1 
+
+> p
+
+and Br (t1, t ) ≤ Bmax  
+
+> r
+
+kt−t1 
+
+> r
+
+hold for ∀t ∈ [t1, t 2] .Building on Assumption 3.1, we will derive cumulative variation budgets that also adhere to an exponential order. 
+
+Corollary 3.2 (Exponential order cumulative variation bud-get) . For arbitrary time instances t1, t 2 ∈ [0 , T ) satisfy-ing t1 < t 2, there exist constants αr , α p > 1 such that 
+
+¯Bp(t1, t 2) ≤ Bmax  
+
+> p
+
+αt2−t1 
+
+> p
+
+and ¯Br (t1, t 2) ≤ Bmax  
+
+> r
+
+αt2−t1
+
+> r
+
+hold. 
+
+Next, we define stationary and non-stationary environments in the context of variation budget. 
+
+Definition 3.3 (Stationary environment) . For arbitrary time instances t1, t 2 ∈ [0 , T ], if Br (t1, t 2) = 0 and Bp(t1, t 2) = 0 are satisfied, then we call the corresponding environment a stationary environment. 
+
+Definition 3.4 (Non-stationary environment) . If there exist 
+
+t1, t 2 ∈ [0 , T ] such that Br (t1, t 2) > 0 or Bp(t1, t 2) > 0,then we call the corresponding environment a non-stationary environment. 
+
+State value function, State action value function. For any policy π, we define the state value function V πt : S → R
+
+and the state action value function Qπt : S × A →
+
+R at time t as V πt (s) := EMt
+
+hPH−1 
+
+> h=0
+
+γhrt,h | s0 
+
+> t
+
+= s
+
+i
+
+and Qπt (s, a ) := EMt
+
+hPH−1 
+
+> h=0
+
+γhrt,h | s0 
+
+> t
+
+= s, a 0 
+
+> t
+
+= a
+
+i
+
+,where rt,h := Rt(sht , a ht ). We define the optimal policy at time t as π∗ 
+
+> t
+
+= arg max π V πt .
+
+Dynamic regret. During the interval [0 , T ], the agent op-erates according to a sequence of policies π1, π 2, . . . , π T .Drawing from the learning procedure outlined previously, we define the time-varying dynamic regret R(T ) := 
+
+PTt=1 (V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+), where V ∗ 
+
+> t
+
+represents the optimal pol-icy value at time t and V πt 
+
+> t
+
+is the value function obtained by executing policy πt in the MDP Mt.
+
+Parallel process of policy learning and data collection. 
+
+In our formalization of policy learning in a non-stationary environment, the policy learning phase and the data collec-tion phase (interaction) occur concurrently. In this context, the number of trajectories an agent can execute between the unit times (t, t + 1) , ∀t ∈ [T − 1] , typically depends on the system’s control frequency or its hardware capabilities. However, for the purpose of our analysis, we assume that the agent executes one trajectory per unit time. This means that at time t, the agent has rolled out a total of t trajectories. Before the first episode, the agent determines several key parameters: 1. Frequency of Policy Updates: The agent decides on the number of updates, denoted as M ∈ N times. 2. Timing of Policy Updates: The update times are set as a sequence {t1, t 2, t 3, . . . , t M } within [0 , T ].3. Extent of Each Update: The policy update iteration sequence is defined as {G1, G 2, . . . , G M }.Specifically, at each time tm ∈ [0 , T ] where m ∈ [M ], the agent updates its policy for Gm ∈ N ∪ { 0} iterations, using all previously collected trajectories. We assume that each policy iteration corresponds to one second in real-time. The policy then remains fixed for Nm ∈ N ∪ { 0} seconds after the updates, where it is determined as Nm = tm+1 − (tm +
+
+Gm). The next episode starts immediately at time tm+1 =
+
+tm + Gm + Nm. Without loss of generality, we assume that t1 = 0 , and therefore tm = Pm−1 
+
+> i=1
+
+(Ni + Gi) holds. Also, we define the mth policy update interval as Gm := [tm, t m + Gm) and the mth policy hold interval as Nm := [tm + Gm, t m+1 ). For notational simplicity, we denote 
+
+¯Br (tm, t m + Gm), ¯Br (tm + Gm, t m+1 ), ¯Bp(tm, t m + Gm)
+
+and ¯Bp(tm + Gm, t m+1 ) as ¯Br (Gm), ¯Br (Nm), ¯Bp(Gm)
+
+and ¯Bp(Nm), respectively. 3Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+How to determine {π1, π 2, ..., π T }. At time tm, the agent executes the policy πtm and starts optimizing the policy for Gm seconds. During this optimization, after g
+
+iterations (seconds), where g ∈ [Gm], the agent executes the most recently updated policy πgtm . This updated policy represents the gth iteration of optimization from the initial policy πtm . Therefore, during the policy update interval Gm,specifically at time tm + g, the policy πtm+g is equivalent to πgtm . Subsequently, throughout the policy hold interval 
+
+Nm, the agent continues to execute the latest updated policy, denoted as πt = πGm 
+
+> tm
+
+for every t within Nm.
+
+Figure 2. Parallel process of policy learning and data collection. 
+
+Example. Figure 2 illustrates our problem setting. For a given time duration between t = 0 and t = 30 , sup-pose that the agent has chosen the frequency of policy updates as M = 3 and the update time sequence as 
+
+t1 = 0 , t 2 = 13 , t 3 = 25 , along with the policy update durations G1 = 10 , G 2 = 4 , G 3 = 5 . The agent be-gins the first episode at t = 0 with a random policy π0.Subsequently, during times t = 1, 2, . . . , 10 , the agent continuously executes updating policies π10 , π 20 , . . . , π 10 0 ,respectively, and then employs the latest updated policy 
+
+π10 0 at times t = 11 , 12 , 13 . Following this, the agent operates with policies π113 , π 213 , . . . , π 413 during the period 
+
+t = 14 , 15 , 16 , 17 , where π13 = π10 0 . Lastly, it executes with the most recently updated policy π413 during the time 
+
+t = 18 , . . . , 25 .
+
+4. Method 
+
+To implement a real-time inference mechanism, particularly emphasizing the prediction-based control approach of “pre-dicting the future in the past,” we introduce a model-free proactive algorithm, detailed in Algorithm 1. This approach is based on the proactive evaluation of policies. At policy update time tm, our proposed algorithm forecasts the future 
+
+Q value of time tm+1 based on previous trajectories and then optimizes the future policy for duration Gm based on foreacasted future Q value. For all t ∈ [0 , T ], we denote the estimated value of Q based on the past trajectories as 
+
+bQt and the optimal value of Q as Q∗ 
+
+> t
+
+. We also denote the future Q value of time tm+1 which was forcasted at time tm
+
+as eQtm+1 |tm . During the time duration Gm, we determine the policies {πgtm }Gm 
+
+> g=1
+
+by utilizing the Natural Policy Gradi-ent (Kakade, 2001) with the entropy regularization method based on eQtm+1 |tm as follows: 
+
+πg+1  
+
+> tm
+
+(·| s) ∝  πgtm (·| s)1− ητ  
+
+> 1−γ
+
+exp η ˜Qtm+1 |tm 
+
+1 − γ
+
+!
+
+s.t. || ˜Qtm+1 |tm − Q∗ 
+
+> tm+1
+
+|| ∞ = δfm
+
+where η is a learning rate, τ is an entropy regularization parameter and δfm is the maximum forecasting error at time step tm.There are various methods to forecast Qtm+1 |tm based on past Q estimates { bQt}tm
+
+> t=0
+
+. In this work, we provide an-alytical explanations on how the forecasting error can be bounded by the past l uncertainties ( Q estimation errors) and the intrinsic uncertainty of the future environment (local variation budgets). For any t, we refer to ϵt as the maximum 
+
+Q estimation error if || bQt − Q∗ 
+
+> t
+
+|| ∞ ≤ ϵt holds. To simplify the presentation, we drop the term “maximum” when it is clear from the context. 
+
+Proposition 4.1 (Linear forecasting method with bounded 
+
+l2 norm) . Consider a past reference length lp ∈ N and define w := [ wtm−lp+1 , . . . , w tm−1, w tm ]⊤. We forecast 
+
+˜Qtm+1 |tm as a linear combination of the past lp-estimated 
+
+Q values, namely ˜Qtm+1 |tm = Ptm 
+
+> t=tm−lp+1
+
+wt ˆQt, where the condition ∥w∥2 ≤ L holds for some L. Then, δm can be bounded by 
+
+δfm ≤ L
+
+vuut
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+2 (max( ut, ϵ t)) 2 + lp(L + 1) 
+
+ 1 − γH
+
+1 − γ rmax 
+
+
+
+where ut := 1−γH
+
+> 1−γ
+
+
+
+Br (t, t m+1 ) + rmax  
+
+> 1−γ
+
+Bp(t, t m+1 )
+
+
+
+and rmax := max t,s,a |Rt(s, a )|.
+
+Proposition 4.1 shows that utilizing a low-complexity fore-casting model provides that the mth maximum forecasting error is bounded by intrinsic environment uncertainty of fu-ture {ut}tm 
+
+> t=tm−lp−1
+
+and past uncertainties {ϵt}tm
+
+> t=tm−lp−1
+
+due to finite samples. Compared to previous studies on finite-time Q value conver-gence with asynchronous updates (Qu & Wierman, 2020; Even-Dar & Mansour, 2004), our work primarily focuses on how strategic policy update intervals affect an upper bound on the dynamic regret, leaving room for future exploration of Q convergence rate improvement. This will be discussed in more detail in Section 5. In the remainder of this section, we investigate in Propo-sition 4.2 and Corollary 4.3 how an ϵt-accurate estimate of past Q value establishes a lower bound condition on 
+
+{Ni}m−1 
+
+> i=1
+
+and {Gi}m−1 
+
+> i=1
+
+.4Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Algorithm 1 Forecasting Online Reinforcement Learning 
+
+1: Input: Total time T , Policy update duration sets 
+
+{H1, .., H M }, {G}1: K , Dataset D
+
+2: Init: m = 0 , π1 = random policy 
+
+3: for t = {1, 2, ..., T } do 
+
+4: Rollout H steps trajectory with policy πt and save a trajectory to D
+
+5: if t ∈ { t1, t 2, ..., t M } then 
+
+6: m ← m + 1 
+
+7: eQtm+1 |tm = ForQ (D) /* Forecast future Q */ 8: end if 
+
+9: if t ∈ [tm + Gm) then 
+
+10: πt+1 = Update (πt, η, τ, γ, eQtm+1 |tm ) /* Update Policy */ 11: else if t ∈ [tm + Gm + Nm) then 
+
+12: πt+1 = πt /* Pause policy update*/ 13: end if 
+
+14: end for Proposition 4.2 (Past uncertainty with sample complexity (Qu & Wierman, 2020)) . For any κ > 0 and under some conditions on stepsizes, if t ≥ (|S|| A|)3.3
+
+> (1 −γ)5.2ϵ2.6
+> t
+
+, then || bQt −
+
+Q∗ 
+
+> t
+
+|| ∞ ≤ ϵt holds. 
+
+Proposition 4.2 highlights that the lower bound conditions of {Ni}m−1 
+
+> i=1
+
+and {Gi}m−1 
+
+> i=1
+
+are useful to reach ϵt-accurate estimate of Q value for asynchronous Q-learning method on a single trajectory. The upper bound of δfm could be better minimized by taking max( ut, ϵ t) = ut for all t ∈
+
+[tm − l + 1 , t m]. This requires t ≥ (|S|| A|)3.3
+
+> (1 −γ)5.2u2.6
+> t
+
+to hold for all t ∈ [tm − l + 1 , t m]. Note that tm = Pm−1 
+
+> i=1
+
+(Ni + Gi)
+
+holds. Therefore, for j = 1 , 2, ..., l p, we have Pm−1 
+
+> i=1
+
+(Ni +
+
+Gi) − j + 1 ≥ (|S|| A|)3.3
+
+> (1 −γ)5.2u2.6
+> tm −j+1
+
+. Then, the upper bound can be simplified without past uncertainty terms as follows. 
+
+Corollary 4.3 (Maximum forecasting error bound) . For j =1, 2, ..., l p, if {Ni}m−1 
+
+> i=1
+
+and {Gi}m−1 
+
+> i=1
+
+satisfy the condition 
+
+Pm−1 
+
+> i=1
+
+(Ni + Gi) − j + 1 ≥ (|S|| A|)3.3
+
+> (1 −γ)5.2u2.6
+> tm −j+1
+
+, then δf is bounded by 
+
+δf ≤ Lu max 
+
+p2lp + lp(L + 1) 
+
+ 1 − γH
+
+1 − γ rmax 
+
+
+
+where δf := max m∈[M ] δfm is a maximum forecasting error and umax := max m∈[M ] utm−lp+1 .
+
+Corollary 4.3 shows how the forecasting error δf is bounded with future environment’s uncertainty umax with lower bound conditions on {Ni}m−1 
+
+> i=1
+
+and {Gi}m−1 
+
+> i=1
+
+. By collect-ing more trajectories per the unit time (t, t + 1) , we can significantly relax the lower bound condition, going beyond our initial assumption (see Section 3). 
+
+5. Theoretical Analysis 
+
+In this section, we provide a dynamic regret analysis to investigate how policy hold durations {N1, N 2, . . . , N M }
+
+influence the minimization of dynamic regret. We initially decompose the regret into two main components and cal-culate upper bounds on these components in Subsection 5.1. Subsequently, in Subsection 5.2, we further divide the overall upper bound of regret into three distinct terms and investigate how Nm modulates each of these terms, except for the future forecasting regret term. Finally, in Subsec-tion 5.3, we present numerical experiments that demonstrate variations in the regret upper bound in response to different 
+
+Nm values under different aleatoric uncertainties. 
+
+5.1. Regret analysis 
+
+We define the dynamic regret between times tm and 
+
+tm+1 as Rm(T ), which is given by Rm(T ) := Ptm+1  
+
+> t=tm
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) . The mth dynamic regret, Rm(T ), can be decomposed into two components, named Policy update regret and Policy hold regret, as follows: 
+
+R(T ) = 
+
+> M
+
+X
+
+> m=1
+
+ X
+
+> t∈G m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+)
+
+| {z }
+
+> Policy update regret
+
++ X
+
+> t∈N m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+)
+
+| {z }
+
+> Policy hold regret
+
+
+
+.
+
+The policy update regret and the policy hold regret will be studied next. 
+
+Lemma 5.1 (Policy update regret) . Let ¯B(Gm) := 
+
+C4 ¯Br (Gm) + C5 ¯Bp(Gm). For all t ∈ G m where m ∈ [M ],it holds that 
+
+X
+
+> t∈G m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) ≤ C1
+
+ητ ·
+
+
+
+1 − (1 − ητ )Gm
+
+
+
++ Gm
+
+
+
+C2δfm + C3
+
+
+
++ ¯B(Gm)
+
+where C1 = ( γ + 2)  || Q∗ 
+
+> tm
+
+− Qtm || ∞ + 2 τ (1 − ητ 
+
+> 1−γ
+
+|| log π∗ 
+
+> tm
+
+− log πtm || ∞), C 2 = 2( γ+2) 1−γ
+
+
+
+1 + γητ 
+
+
+
+, C 3 =   
+
+> 2τlog |A|
+> 1−γ
+
+, C 4 = 2(1 −γH )1−γ , C 5 = γ 
+
+> 1−γ
+
+·
+
+ 1−γH 
+
+> 1−γ
+
+− γH−1H
+
+
+
++ 
+
+> 1−γH
+> 1−γ
+
+· rmax  
+
+> 1−γ
+
+.
+
+Lemma 5.2 (Policy hold regret) . Let ¯B(Nm) := 
+
+C4 ¯Br (Nm)+ C5 ¯Bp(Nm). For all t ∈ N m where m ∈ [M ],it holds that 
+
+X
+
+> t∈N m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) ≤ Nm ·
+
+
+
+C1(1 − ητ )Gm
+
++ C2δfm + C3
+
+
+
++ ¯B(Nm)
+
+where C1, C 2, C 3, C 4, C 5 are the constants defined in Lemma 5.1. 5Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+By leveraging Lemmas 5.1 and 5.2, the dynamic regret 
+
+R(T ) will be bounded below. 
+
+Theorem 5.3 (Dynamic regret) . Let ¯B(tm, t m+1 ) := ¯B(Nm) + ¯B(Gm). Then, it holds that 
+
+R(T ) ≤
+
+> M
+
+X
+
+> m=1
+
+ C1
+
+ητ +
+
+
+
+NmC1 − C1
+
+ητ 
+
+
+
+(1 − ητ )Gm
+
+| {z }
+
+> policy optimization regret (Rπm)
+
++ ( Nm + Gm)( C2δfm + C3)
+
+| {z }
+
+> Q function forecasting regret (Rf
+> m)
+
++ ¯B(tm, t m+1 )
+
+| {z } 
+
+> non-stationarity regret (Renv
+> m)
+
+
+
+.
+
+In Theorem 5.3, we articulate the decomposition of Rm(T )
+
+into three terms: the policy optimization regret, denoted as 
+
+Rπm, Q value forecasting regret, denoted as Rfm, and non-stationarity regret, denoted by Renv  
+
+> m
+
+. Now, by extending the upper bound of the forecasting error regret to PMm=1 Rfm ≤
+
+PMm=1 (Nm + Gm)( C2δf + C3) = T (C2δf + C3) ≤
+
+T
+
+
+
+C2
+
+
+
+Lu max 
+
+p2lp + lp(L + 1) 
+
+ 1−γH 
+
+> 1−γ
+
+rmax 
+
+ 
+
++ C3
+
+
+
+,we find that its upper bound is independent from 
+
+{Ni, G i}mi=1 and satisfies a sublinear convergence rate to the total time T for any lp = (1 /T )α, α > 0.Expanding on the independence of {Ni, G i}mi=1 from the upper bound of PMm=1 Rfm, we will show how Nm balances between Rπm and Renv m , followed by minimizing the upper bound of Rm(T ) in the next subsection. 
+
+5.2. Theoretical insight 
+
+One crucial theoretical insight to be deduced from The-orem 5.3 is what nonzero value of Nm strikes a balance between Rπm and Renv m . Our insights begin with the analy-sis of Rm(T ). We start by considering a fixed time interval 
+
+[tm, t m+1 ], which brings up the constraint Nm + Gm =
+
+tm+1 − tm. The initial aspect of our investigation addresses whether a nonzero value of Nm offers any advantage in a 
+
+stationary environment. 
+
+Lemma 5.4 (Optimal N ∗
+
+> m
+
+, G ∗ 
+
+> m
+
+for Rπm). Given a fixed time interval [tm, t m+1 ], the optimal values N ∗ 
+
+> m
+
+and G∗
+
+> m
+
+that minimize Rπm are determined as N ∗ 
+
+> m
+
+= 0 and G∗ 
+
+> m
+
+=
+
+tm+1 − tm, respectively. 
+
+Since Renv m = 0 is satisfied in stationary environments (see Definition 3.3), Corollary 5.5 ensues from Lemma 5.4. 
+
+Corollary 5.5 (Optimal N ∗
+
+> m
+
+, G ∗ 
+
+> m
+
+in Stationary Environ-ments) . Consider a stationary environment. The upper bound of Rm achieves its minimum when Nm = 0 and 
+
+Gm = tm+1 − tm.
+
+What Corollary 5.5 states is intuitively straightforward. This is because in scenarios where the time sequence of the pol-icy update (t1, t 2, . . . , t m) is fixed, maximizing the policy 
+
+(a) (b) 
+
+Figure 3. Optimal solutions for min Gm,N m ¯B(tm, t m+1 ) are 
+
+(G∗
+
+> m
+
+, N ∗
+
+> m
+
+) = (4 , 2) , (2 , 4) . (a) Gm = 4, N m = 2. (b) 
+
+Gm = 6 , N m = 0 
+
+update duration is advantageous without considering fore-casting errors. However, we claim that Nm plays an impor-tant role in a non-stationary environment, i.e., positive N ∗
+
+> m
+
+minimizes the upper bound of Rm(T ). We first develop the following proposition. 
+
+Proposition 5.6 (Existence of Positive N ∗ 
+
+> m
+
+for Renv  
+
+> m
+
+). In a non-stationary environment, consider any given time in-terval [tm, t m+1 ] satisfying tm+1 − tm ≥ 2. Under these conditions, there exists a number Nm within the open inter-val (0 , t m+1 − tm) that minimizes ¯B(tm, t m+1 ).
+
+One way to intuitively understand Proposition 5.6 is ex-emplified in Figure 3. Consider a non-stationary envi-ronment where the reward abruptly changes only at state 
+
+s0 and action a0. Suppose that C4 = C5 = 1 . Then 
+
+min ¯B(tm, t m+1 ) = 1 and its solution is attainable at 
+
+(G∗
+
+> m
+
+, N ∗
+
+> m
+
+) = (4 , 2) and (2 , 4) (Figure 3 (a)), while in the case where Gm = 6 , N m = 0 yields ¯B(tm, t m+1 ) = 3 
+
+(Figure 3 (b)). Both subfigures optimize the policy toward the forecasted future Q value of time tm+1 , but the time that the agent stops to update the policy ( t = tm + Gm)determines how much the agent would be conservative with respect to the future reward prediction. Based on Proposition 5.6, we introduce the sur-rogate optimal solution (G∗
+
+> m
+
+, N ∗
+
+> m
+
+) for the non-stationarity regret Renv m . According to Corol-lary 3.2, it holds that ¯Br (Nm) is bounded by 
+
+Pt=tm+Gm+Nm−1 
+
+> t=tm+Gm
+
+αt−(tm+Gm) 
+
+> r
+
+Bmax  
+
+> r
+
+(Nm), and similarly, 
+
+¯Br (Gm) is bounded by Pt=tm+Gm−1 
+
+> t=tm
+
+αt−tm 
+
+> r
+
+Bmax  
+
+> r
+
+(Gm).For brevity, we use the notation α⋄,1 = α⋄(Gm) and 
+
+α⋄,2 = α⋄(Nm), and similarly for Bmax  
+
+> ⋄,1
+
+= Bmax  
+
+> ⋄
+
+(Gm) and 
+
+Bmax  
+
+> ⋄,2
+
+= Bmax  
+
+> ⋄
+
+(Nm), where ⋄ is either r or p. Furthermore, we define α□ as the max  αr, □, α p, □
+
+, and Bmax  
+
+> □
+
+as the 
+
+max 
+
+
+
+Bmax  
+
+> r, □
+
+, B max 
+
+> p, □
+
+
+
+, where □ is either 1 or 2.
+
+Lemma 5.7 (Surrogate optimal (G∗
+
+> m
+
+, N ∗
+
+> m
+
+) for Renv m ). For given m, t m, t m+1 , the surrogate optimal policy update and policy hold variables that minimize the upper bound of Renv m
+
+are 
+
+N ∗ 
+
+> m
+
+= arg min     
+
+> Nm∈{⌊ ˜N∗
+> m⌋,⌊˜N∗
+> m⌋+1 }
+
+Renv m (Nm, G m)
+
+6Pausing Policy Learning in Non-stationary Reinforcement Learning 0 5 10 15 20      
+
+> Nm
+> 50
+> 60
+> env m upper bound
+> N*
+> mwith different 1/2ratios
+> 0.98
+> 0.99
+> 1.00
+> 1.01
+> 1.02
+
+(a) 0 5 10 15 20       
+
+> Nm
+> 44
+> 46
+> 48
+> 50
+> env m upper bound
+> N*
+> mwith different Bmax
+> 1/Bmax
+> 2ratios
+> 0.94
+> 0.97
+> 1.00
+> 1.03
+> 1.06
+
+(b) 
+
+Figure 4. Renv  
+
+> m
+
+upper bound with different environmental hyper-parameters. ♦ denotes the minimum of each function graph. (a) α1/α 2 ∈ { 0.98 , 0.99 , 1.0, 1.01 , 1.02 }. (b) Bmax  
+
+> 1
+
+/B max  
+
+> 2
+
+∈{0.94 , 0.97 , 1.0, 1.03 , 1.06 }.0 5 10 15 20     
+
+> Nm
+> 0
+> 200
+> 400
+> env m + m
+> N*
+> mwith different Cmratios
+> 0
+> 0.86
+> 0.92
+> 0.95
+
+(a) 0 5 10 15 20    
+
+> Nm
+> 130
+> 140
+> 150
+> env m + m
+> N*
+> mwith different learning rates
+> 0.01
+> 0.1
+> 0.4
+> 0.7
+> 0.99
+
+(b) 
+
+Figure 5. Renv  
+
+> m
+
++ Rπm upper bound with different CR ratios and learning rates. ♦ denotes the minimum of each function graph. (a) CR 
+
+> m
+
+∈ {0, 0.86 , 0.92 , 0.95 }. (b) Learning rates 
+
+∈ { 0.01 , 0.1, 0.3, 0.7, 0.99 }.
+
+and 
+
+G∗ 
+
+> m
+
+= tm+1 − tm − N ∗
+
+> m
+
+,
+
+where 
+
+˜N ∗ 
+
+> m
+
+= 1ln ( α2/α 1) ·ln 
+
+ ln α1/(α1 − 1) ln α2/(α2 − 1) · αtm+1 −tm 
+
+> 1
+
+· Bmax 
+
+> 1
+
+Bmax 
+
+> 2
+
+
+
+.
+
+Note that Lemma 5.7 provides a nonzero suboptimal N ∗
+
+> m
+
+that minimizes the non-stationary regret Renv m . Now, we combine Lemmas 5.4 and 5.7 to find the suboptimal N ∗
+
+> m
+
+and G∗ 
+
+> m
+
+that minimize the upper bound of Rm(T ).
+
+Theorem 5.8 (Surrogate optimal (G∗
+
+> m
+
+, N ∗
+
+> m
+
+) for Rm). For given m, t m, t m+1 , the surrogate optimal policy update vari-able Nm and surrogate policy hold variable Gm that mini-mize the upper bound of Rm satisfy the following equation: 
+
+C1 (( Nm − 1) ln(1 − ητ ) − 1) (1 − ητ )Gm +(C4 + C5)
+
+ ln α1
+
+α1 − 1 Bmax  
+
+> 1
+
+αGm 
+
+> 1
+
+− ln α2
+
+α2 − 1 Bmax  
+
+> 2
+
+αNm
+
+> 2
+
+
+
+= 0 ,
+
+where C1, C 4, C 5, η, τ, α 1, α 2, B max  
+
+> 1
+
+, and Bmax  
+
+> 2
+
+are con-stants or parameters specific to the system under considera-tion. 
+
+Apart from Lemma 5.7, Theorem 5.8 does not provide a closed-form solution. Consequently, we will conduct some numerical experiments to understand how N ∗ 
+
+> m
+
+and G∗
+
+> m
+
+change to the hyperparameters of Theorem 5.8 in the next subsection. 
+
+5.3. Numerical analysis of theoretical insights 
+
+Figures 4 and 5 show how the surrogate optimal N ∗
+
+> m
+
+changes with different parameter choices. Figure 4 shows how N ∗ 
+
+> m
+
+changes with different parameters of the envi-ronment intrinsic uncertainty. Note that (α1, B max  
+
+> 1
+
+) and 
+
+(α2, B max  
+
+> 2
+
+) represent the magnitude (severity) of the intrin-sic uncertainty of the environment during the policy update phase ( Gm) and the policy hold phase ( Nm), respectively. The two subfigures of Figure 4 not only support the impor-tance of holding N ∗
+
+> m
+
+, but also show the necessity of keeping the policy hold phase longer if the uncertainty of the environ-ment during the policy update phase ( α1, B max  
+
+> 1
+
+) is greater than that of the policy hold phase ( α2, B max  
+
+> 2
+
+). Moreover, Figure 5 (a) shows that increasing N ∗ 
+
+> m
+
+provides a better performance if the environment regret term dominates the regret Renv  
+
+> m
+
++ Rπm. We define the dominant ratio CR 
+
+> m
+
+as 
+
+CR 
+
+> m
+
+:= R tm+1  
+
+> tm
+
+Renv m /(Renv m + Rπm)dt. Finally, Figure 5
+
+(b) validates that the surrogate optimal solution is still an acceptable solution and illustrates that the suboptimal gap resulting from relaxing the non-convex upper bound into a convex one is tolerable, as a higher learning rate leads to a fast convergence of Rπm and, in turn, intuitively results in a longer Nm within fixed tm, t m+1 .
+
+6. Experiments 
+
+In this section, we demonstrate the effectiveness of two key components of the proposed algorithm, forecasting Q value (line 7 of Algorithm 1) and the strategic policy update (line 9 ∼ 12 of Algorithm 1). In Subsection 6.2, we illustrate how utilizing forecasted Q value yields higher rewards compared to a reactive method in a finite-dimensional environment. Subsequently, in Subsection 6.3, we will show how strategi-cally assigning different policy update frequencies provides a higher performance than the continually updating pol-icy method in an infinite-dimensional Mujoco environment, swimmer and halfcheetah. Details of environments and experiments are specified in Appendix C. 
+
+6.1. Future Q value estimator 
+
+For the following experiments in Subsections 6.2 and 6.3, we design the ForQ function as the least-squares estima-tor (Chandak et al., 2020b), namely ˜Qtm+1 |tm (s, a ) =
+
+ϕ(tm+1 )⊤w∗(s, a ) where ϕ : [0 , T ) → Rd is a basis func-tion for encoding the time index. For example, an identity basis is ϕ(x) := {x, 1}. Then w∗(s, a ) denotes an optimal solution of the least-squares problem for any s ∈ S , a ∈ A ,namely w∗(s, a ) = arg min w∈Rd×1 || Q(s, a )−Φ( X)⊤w|| 2
+
+7Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+(a) 0 5000 10000 15000 20000  
+
+> steps
+> 10
+> 5
+> 0
+> 5
+> Reward
+> Switching Goal Cliffworld
+> Q
+> FQ
+
+(b) 
+
+Figure 6. (a) Swithcing goal cliffworld. (b) Reward per step. A red triangle means the goal point switches at step = 10000 . A shaded area denotes one standard deviation among five different hyperparameter results. 
+
+(a) (b) 
+
+Figure 7. Halfcheetah environment: blue dots are FSAC and or-ange dots are SAC. An error bar is 0.5 standard deviation over 36 different hyperparmeter results. (a) Average reward lf = 5 . (b) Average reward lf = 20 .
+
+where Q(s, a ) := [Qtm−lp+1 (s, a ), ..., Q tm (s, a )] ⊤ ∈
+
+Rlp×1, X := [tm − lp + 1 , ..., t m]⊤ ∈ Rlp×1, and 
+
+Φ( X) := [ ϕ(tm − lp + 1) , ..., ϕ (tm)] ∈ Rd×lp . The so-lution to the above least-squares problem is w∗(s, a ) = (Φ( X)⊤Φ( X)) −1Φ( X)⊤Q(s, a ).
+
+6.2. Goal switching cliffworld 
+
+We first experiment with a low-dimensional tabular MDP to verify that evaluating the policy by the forecasting method yields a better performance than the reactive method. The environment is the switching goal cliffworld where the agent always starts in the blue circle and a goal switches between two green pentagons (Figure 6 (a)). We use the Q-learning algorithm (Watkins & Dayan, 1992), denoted as Q in Figure 6 (b), to evaluate the current policy and compute future policy with future Q estimator, denoted as FQ in Figure 6 (b), proposed in Subsection 6.1. Figure 6 (b) illustrates that after the goal point switches at step = 10000 , the reactive method fails to obtain an optimal policy for the remaining steps. In contrast, the forecasting Q method successfully identifies an optimal policy shortly after step = 15000 .
+
+(a) (b) 
+
+Figure 8. Swimmer environment: blue dots are FSAC and orange dots are SAC. An error bar is 0.5 standard deviation over 36 differ-ent hyperparmeter results. (a) Average reward lf = 5 . (b) Average reward lf = 15 .
+
+6.3. Mujoco environment 
+
+To verify our findings in a large-scale environment, we pro-pose a practical deep learning algorithm, Forecasting Soft-Actor Critic (FSAC), that specifies Algorithm 1. The FSAC algorithm is detailed in Algorithm 3 (see Appendix B). Then, we conduct experiments in high-dimensional non-stationary Mujoco environments (Todorov et al., 2012), swimmer, and halfcheetah where the reward changes as the episode goes by (Feng et al., 2022). We utilize the Soft-Actor Critic (SAC) algorithm (Haarnoja et al., 2018) as a baseline. In particular, the distinctions between the FSAC and the SAC are the lines 2, 9 ∼ 11 , and 16 ∼ 18 of Algorithm 3. In FSAC, the prediction length lf ∈ N and the update frequency γf ∈ (0 , 1] are set as hyperparameters, with 
+
+tm = lf m for all m ∈ [M ] (line 2). The algorithm forecasts future Q values at every lf iteration (lines 9 ∼ 11 ), updating the policy during the interval (tm, t m + ⌊lf γf ⌋] and keeping it between (tm + ⌊lf γf ⌋, t m+1 ] (lines 16 ∼ 18 ). Figures 7 and 8 depict the results. In most cases, the FSAC algorithm (indicated by blue dots) yields a higher average return compared to the SAC algorithm (indicated by orange dots). These practical experiments aim to emphasize that 
+
+γf = 1 .0 does not necessarily lead to the best average reward. This observation aligns with our theoretical analysis presented in Section 5.2, where we demonstrate that a non-negative N ∗ 
+
+> m
+
+minimizes the upper bound on dynamic regret. We will elaborate on training and result details in Appendix C.2. 
+
+7. Conclusion 
+
+This paper introduces a forecasting online reinforcement learning framework, demonstrating that non-zero policy hold durations improve dynamic regret’s upper bound. Em-pirical results show the forecasting method’s advantage over reactive approaches and indicate that continuous policy up-dates do not always maximize average rewards. For future 8Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+work, it is crucial to explore methods to minimize the fore-casting error to achieve a sharper upper bound. This paper presents work whose goal is implementing real-time control with prediction in environments with unknown uncertainties. A significant societal impact of our research is the narrowing of the gap between simulation-based RL and its real-world applications, along with demonstrating the advantages of pausing policy learning in continual learning settings. 
+
+Acknowledgements 
+
+This work was supported by grants from ARO, ONR, AFOSR, NSF, and Noyce Initiative. 
+
+Impact Statement 
+
+This paper presents work whose goal is to advance the field of reinforcement learning for real-world application. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+References 
+
+Adam, S., Busoniu, L., and Babuska, R. Experience re-play for real-time reinforcement learning control. IEEE Transactions on Systems, Man, and Cybernetics, Part C (Applications and Reviews) , 42(2):201–212, 2012. Al-Shedivat, M., Bansal, T., Burda, Y., Sutskever, I., Mor-datch, I., and Abbeel, P. Continuous adaptation via meta-learning in nonstationary and competitive environments. In International Conference on Learning Representations ,2018. Cai, H., Ren, K., Zhang, W., Malialis, K., Wang, J., Yu, Y., and Guo, D. Real-time bidding by reinforcement learning in display advertising. In Proceedings of the tenth ACM international conference on web search and data mining ,pp. 661–670, 2017. Cen, S., Cheng, C., Chen, Y., Wei, Y., and Chi, Y. Fast global convergence of natural policy gradient methods with entropy regularization. Operations Research , 70(4): 2563–2578, 2022. Chandak, Y., Jordan, S., Theocharous, G., White, M., and Thomas, P. S. Towards safe policy improvement for non-stationary mdps. Advances in Neural Information Processing Systems , 33:9156–9168, 2020a. Chandak, Y., Theocharous, G., Shankar, S., White, M., Mahadevan, S., and Thomas, P. Optimizing for the future in non-stationary mdps. In International Conference on Machine Learning , pp. 1414–1425. PMLR, 2020b. Chen, X., Zhu, X., Zheng, Y., Zhang, P., Zhao, L., Cheng, W., CHENG, P., Xiong, Y., Qin, T., Chen, J., and Liu, T.-Y. An adaptive deep rl method for non-stationary environments with piecewise stable context. In Advances in Neural Information Processing Systems , volume 35, pp. 35449–35461, 2022. Cheung, W. C., Simchi-Levi, D., and Zhu, R. Reinforcement learning for non-stationary markov decision processes: The blessing of (more) optimism. In International Con-ference on Machine Learning , pp. 1843–1854. PMLR, 2020. Covington, P., Adams, J., and Sargin, E. Deep neural net-works for youtube recommendations. In Proceedings of the 10th ACM Conference on Recommender Systems ,2016. Ding, Y. and Lavaei, J. Provably efficient primal-dual re-inforcement learning for cmdps with non-stationary ob-jectives and constraints. AAAI’23/IAAI’23/EAAI’23. AAAI Press, 2023. ISBN 978-1-57735-880-0. Ding, Y., Jin, M., and Lavaei, J. Non-stationary risk-sensitive reinforcement learning: Near-optimal dynamic regret, adaptive detection, and separation design. Proceed-ings of the AAAI Conference on Artificial Intelligence , 37 (6):7405–7413, 2022. Dulac-Arnold, G., Mankowitz, D., and Hester, T. Chal-lenges of real-world reinforcement learning. arXiv preprint arXiv:1904.12901 , 2019. Espeholt, L., Soyer, H., Munos, R., Simonyan, K., Mnih, V., Ward, T., Doron, Y., Firoiu, V., Harley, T., Dunning, I., et al. Impala: Scalable distributed deep-rl with im-portance weighted actor-learner architectures. In Interna-tional conference on machine learning , pp. 1407–1416. PMLR, 2018. Evans, R. and Gao, J. Deepmind ai reduces google data centre cooling bill by 40 URL https://deepmind. google/discover/blog/ .Even-Dar, E. and Mansour, Y. Learning rates for q-learning. 
+
+J. Mach. Learn. Res. , 5:1–25, dec 2004. ISSN 1532-4435. Fei, Y., Yang, Z., Wang, Z., and Xie, Q. Dynamic regret of policy optimization in non-stationary environments. 
+
+Advances in Neural Information Processing Systems , 33: 6743–6754, 2020. Feng, F., Huang, B., Zhang, K., and Magliacane, S. Factored adaptation for non-stationary reinforcement learning. Ad-vances in Neural Information Processing Systems , 35: 31957–31971, 2022. Finn, C., Rajeswaran, A., Kakade, S., and Levine, S. Online meta-learning. In International Conference on Machine Learning , pp. 1920–1930. PMLR, 2019. 9Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Gal, Y. Uncertainty in deep learning. phd thesis, University of Cambridge, 2016. Glavic, M., Fonteneau, R., and Ernst, D. Reinforcement learning for electric power system decision and control: Past considerations and perspectives. International Fed-eration of Automatic Control , 50:6918–6927, 2017. Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. Soft actor-critic: Off-policy maximum entropy deep reinforce-ment learning with a stochastic actor. In International conference on machine learning , pp. 1861–1870. PMLR, 2018. Hafner, D., Pasukonis, J., Ba, J., and Lillicrap, T. Mastering diverse domains through world models. arXiv preprint arXiv:2301.04104 , 2023. Hester, T. and Stone, P. Texplore: real-time sample-efficient reinforcement learning for robots. Machine learning , 90: 385–429, 2013. Huang, B., Feng, F., Lu, C., Magliacane, S., and Zhang, K. Adarl: What, where, and how to adapt in transfer reinforcement learning. In International Conference on Learning Representations , 2022. Imanberdiyev, N., Fu, C., Kayacan, E., and Chen, I.-M. Autonomous navigation of uav by using real-time model-based reinforcement learning. 2016 14th International Conference on Control, Automation, Robotics and Vision (ICARCV) , 2016. Janner, M., Fu, J., Zhang, M., and Levine, S. When to trust your model: Model-based policy optimization. Advances in neural information processing systems , 32, 2019. Kakade, S. M. A natural policy gradient. Advances in neural information processing systems , 14, 2001. Kwon, J., Efroni, Y., Caramanis, C., and Mannor, S. Rl for latent mdps: Regret guarantees and a lower bound. 
+
+Advances in Neural Information Processing Systems , 34: 24523–24534, 2021. Lee, H., Ding, Y., Lee, J., Jin, M., Lavaei, J., and Sojoudi, S. Tempo adaptation in non-stationary reinforcement learning. arXiv preprint arXiv:2309.14989 , 2023. Levine, N., Chow, Y., Shu, R., Li, A., Ghavamzadeh, M., and Bui, H. Prediction, consistency, curvature: Represen-tation learning for locally-linear control. arXiv preprint arXiv:1909.01506 , 2019. Mao, W., Zhang, K., Zhu, R., Simchi-Levi, D., and Ba s¸ ar, T. Model-free non-stationary rl: Near-optimal regret and applications in multi-agent rl and inventory control. arXiv preprint arXiv:2010.03161 , 2020. Mao, W., Zhang, K., Zhu, R., Simchi-Levi, D., and Basar, T. Near-optimal model-free reinforcement learning in non-stationary episodic mdps. In Proceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Machine Learning Research , pp. 7447–7458. PMLR, 2021. Qu, G. and Wierman, A. Finite-time analysis of asyn-chronous stochastic approximation and q-learning. In Abernethy, J. and Agarwal, S. (eds.), Proceedings of Thirty Third Conference on Learning Theory , volume 125 of Proceedings of Machine Learning Research , pp. 3185–3205. PMLR, 09–12 Jul 2020. Ramstedt, S. and Pal, C. Real-time reinforcement learning. 
+
+Advances in neural information processing systems , 32, 2019. Schrittwieser, J., Antonoglou, I., Hubert, T., Simonyan, K., Sifre, L., Schmitt, S., Guez, A., Lockhart, E., Hassabis, D., Graepel, T., et al. Mastering atari, go, chess and shogi by planning with a learned model. Nature , 588(7839): 604–609, 2020. Silver, D., Huang, A., Maddison, C. J., Guez, A., Sifre, L., van den Driessche, G., Schrittwieser, J., Antonoglou, I., Panneershelvam, V., Lanctot, M., Dieleman, S., Grewe, D., Nham, J., Kalchbrenner, N., Sutskever, I., Lillicrap, T., Leach, M., Kavukcuoglu, K., Graepel, T., and Hassabis, D. Mastering the game of go with deep neural networks and tree search. Nature , 529:484–503, 2016. Spirtes, P. An anytime algorithm for causal inference. In 
+
+Proceedings of the Eighth International Workshop on Artificial Intelligence and Statistics , volume R3 of Pro-ceedings of Machine Learning Research , pp. 278–285. PMLR, 04–07 Jan 2001. Steck, H., Baltrunas, L., Elahi, E., Liang, D., Raimond, Y., and Basilico, J. Deep learning for recommender systems: A netflix case study. AI Magazine , 42(3):7–18, 2021. Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics engine for model-based control. In 2012 IEEE/RSJ Inter-national Conference on Intelligent Robots and Systems ,pp. 5026–5033. IEEE, 2012. Vlasselaer, J., Van den Broeck, G., Kimmig, A., Meert, W., and De Raedt, L. Anytime inference in probabilistic logic programs with tp-compilation. In Proceedings of 24th International Joint Conference on Artificial Intelligence (IJCAI) , volume 2015, pp. 1852–1858. IJCAI-INT JOINT CONF ARTIF INTELL, 2015. Wang, J. and Yuan, S. Real-time bidding: A new frontier of computational advertising research. Proceedings of the Eighth ACM International Conference on Web Search and Data Mining , 2015. 10 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Watkins, C. J. and Dayan, P. Q-learning. Machine learning ,8:279–292, 1992. Zintgraf, L., Schulze, S., Lu, C., Feng, L., Igl, M., Shiarlis, K., Gal, Y., Hofmann, K., and Whiteson, S. Varibad: Vari-ational bayes-adaptive deep rl via meta-learning. Journal of Machine Learning Research , 22(289):1–39, 2021. 11 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+A. Related works 
+
+In this work, we have introduced a forecasting method for non-stationary environments. Before proceeding with our contributions, we first review the existing methods for addressing non-stationary environments in reinforcement learning (RL). Those can be categorized into three main approaches. One naive approach is to utilize previous RL algorithms that were designed for stationary environments to solve non-stationary environments. Namely, this involves directly applying established RL frameworks for stationary MDPs without additional mechanisms. Usually, this approach involves restarting strategies to handle longer horizon problems in a decision making. The second approach is model-based methods, which update models to adapt to changing environments. Techniques include using rollout data from the model (Janner et al., 2019; Hafner et al., 2023). A few well-known methods include online model updates and identifying latent factors (Zintgraf et al., 2021; Chen et al., 2022; Huang et al., 2022; Feng et al., 2022; Kwon et al., 2021). Model-based methods face challenges in non-stationary settings due to difficulties in estimating accurate non-stationary models (Cheung et al., 2020; Ding et al., 2022). To be more specific, (Huang et al., 2022) explored learning factors of non-stationarity and their representations in heterogeneous domains with varying reward functions and dynamics. (Zintgraf et al., 2021) proposed a Bayesian policy learning algorithm by conditioning actions on both states and latent tensors that capture the agent’s uncertainty in the environment. In a similar manner, (Feng et al., 2022) incorporated insights from the causality literature to model non-stationarity as latent change factors across different environments, learning policies conditioned on these latent factors of causal graphs. Despite these advancements, learning optimal policies conditioned on latent states (Zintgraf et al., 2021; Chen et al., 2022; Huang et al., 2022; Feng et al., 2022; Kwon et al., 2021) presents significant challenges for theoretical analysis. Recent works (Cheung et al., 2020; Ding et al., 2022; Ding & Lavaei, 2023) have proposed model-based algorithms with provable guarantees. However, these algorithms are not scalable for complex environments and lack empirical evaluation. The third approach is model-free methods. (Al-Shedivat et al., 2018) utilized meta-learning among training tasks to find initial hyperparameters of policy networks that can be quickly fine-tuned for new, unseen tasks. However, this method assumes access to a prior distribution of training tasks, which is often unavailable in real-world scenarios. To address this limitation, (Finn et al., 2019) proposed the Follow-The-Meta-Leader (FTML) algorithm, which continuously improves parameter initialization for non-stationary input data. Despite its innovation, FTML suffers from a lag in tracking the optimal policy, as it maximizes current performance uniformly over all past samples. To mitigate this lag, (Mao et al., 2020) introduced adaptive Q-learning with a restart strategy, establishing a near-optimal dynamic regret bound. (Chandak et al., 2020b;a) focused on forecasting the non-stationary performance gradient to adapt to time-varying optimal policies. Nevertheless, these approaches are limited by empirical analyses on bandit settings or low-dimensional environments and lack a theoretical performance bound for the adapted policies. Also, (Fei et al., 2020) proposed two model-free policy optimization algorithms based on the restart strategy, demonstrating that their dynamic regret exhibits polynomial space and time complexities. However, these methods (Mao et al., 2020; Fei et al., 2020) still lack empirical validation and adaptability in complex environments. 
+
+B. Algorithms 
+
+Algorithm 2 Update : Update policy π 
+
+> 1:
+
+Input: policy π, learning rate η, entropy regularization constant τ , discount factor γ, policy evaluation bQ 
+
+> 2:
+
+Z(s) = P 
+
+> a∈A
+
+(π(a|s)) 1− ητ  
+
+> 1−γ
+
+exp 
+
+
+
+η bQ(s, a )/(1 − γ)
+
+ 
+
+> 3:
+
+π′(·| s) = 1 
+
+> Z(s)
+
+· (π(·| s)) 1− ητ  
+
+> 1−γ
+
+exp 
+
+ η bQ(s, ·)1−γ
+
+ 
+
+> 4:
+
+Return π′
+
+C. Experiments 
+
+C.1. Environments and experiments details Goal switching cliffword 
+
+12 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Algorithm 3 Forecasting Soft Actor-Critic  
+
+> 1:
+
+Initialize parameter vectors ψ, ¯ψ, θ, ϕ . 
+
+> 2:
+
+Set prediction length lf , update frequency γf 
+
+> 3:
+
+for each iteration do  
+
+> 4:
+
+for each environment step do  
+
+> 5:
+
+Sample action at ∼ πθ (at|st). 
+
+> 6:
+
+Sample next state st+1 ∼ p(st+1 |st, a t). 
+
+> 7:
+
+D ← D ∪ { (st, a t, r (st, a t), s t+1 )}. 
+
+> 8:
+
+end for  
+
+> 9:
+
+if iteration % lf = 0 then  
+
+> 10:
+
+˜Q = ForQ (D). 
+
+> 11:
+
+end if  
+
+> 12:
+
+for each gradient step do  
+
+> 13:
+
+ψ ← ψ − λψ ∇ψ JV (ψ). 
+
+> 14:
+
+θi ← θi − λQ∇θi JQ(θi) for i ∈ { 1, 2}. 
+
+> 15:
+
+¯ψ ← τsψ + (1 − τs) ¯ψ. 
+
+> 16:
+
+if iteration % lf ≤ lf γf then  
+
+> 17:
+
+ϕ ← ϕ − λπ ∇ϕ ˜Jπ (ϕ). 
+
+> 18:
+
+end if  
+
+> 19:
+
+end for  
+
+> 20:
+
+end for 
+
+The environment is 12 × 3 tabular MDP where (0 , 2) is a fixed initial state (blue point), and the possible goal points are 
+
+(11 , 0) and (11 , 2) (for the x, y axis, see Figure 6 (a)). The agent executes 4 actions (up, left, right, down). If the agent reaches the restart states ( (1 , 2) , (2 , 2) , ..., (10 , 2) and (1 , 0) , (2 , 0) , ..., (10 , 0) ), denoted by yellow points, then the agent goes back to the initial state with a failure reward −100 . If the agent reaches the goal point, then it receives the success reward +100 . For taking every step (for every time the agent executes an action), the agent receives a step reward of −100 .For experiments, we use the Q-learning algorithm (Watkins & Dayan, 1992). In Figure 6 (b), we denote “reactive” label as Q-learning algorithm proposed by (Watkins & Dayan, 1992) and “future Q” label as a method that combines 
+
+Q-learning algorithm to evaluate the current policy and use future Q estimator to compute future policy that was proposed in section 6.1. We set the maximum number of steps as 100 . The experiments have been carried out by changing hyperparameters of Q-learning: step size α and ϵ from the ϵ-greedy method. We have done experiments with different 
+
+(α, ϵ ) = (0 .05 , 0.05) , (0 .1, 0.1) , (0 .1, 0.05) , (0 .2, 0.1) , (0 .2, 0.05) , (0 .3, 0.1) .
+
+Swimmer, Halfcheetah 
+
+The Swimmer and Halfcheetah environments share the same reward function at step h as rh = r(1)  
+
+> h
+
++ r(2)  
+
+> h
+
++ r(3)  
+
+> h
+
+. It comprises a healthy reward ( r(1)  
+
+> h
+
+), a forward reward ( r(2)  
+
+> h
+
+= kf xh+1 −xh 
+
+> ∆tf rame
+
+, k f > 0), and a control cost ( r(3)  
+
+> h
+
+). We modify the environment to be non-stationary by the agent’s desired velocity changes as time goes by. Specifically, we modify the forward reward r(2)  
+
+> h
+
+varies as r(2)  
+
+> h
+
+= − kf xh+1 −xh 
+
+> ∆tf rame
+
+− vd(t) , with vd(t) = a sin( wt ) and t representing the episode. Here, 
+
+a, w > 0 are constants. For our experiments, we varied hyperparameters such as learning rates λπ ∈ { 0.0001 , 0.0003 , 0.0005 , 0.0007 }, soft update parameters τs ∈ { 0.001 , 0.005 , 0.003 } and the entropy regularization parameters {0.01 , 0.03 , 0.1} and also experimented with different prediction lengths lf ∈ { 5, 15 , 20 }. We selected the average reward per episode as the performance metric, in line with the definition of dynamic regret. For given hyperparameters, we compare the average reward between FSAC and SAC for different update frequencies γf ∈ { 0.1, 0.2, . . . , 1.0}. The experiments were conducted in two different Mujoco environments: HalfCheetah and Swimmer (see Figures 7 and 8). In Figures 7 and 8, error bars denote 0.5 standard deviations. 13 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+C.2. Results 
+
+In this subsection, we have elaborated on the results of the experiment on Halfcheetah and Swimmer. Note that Fig-ures 9,11 and 12 are detailed results for Figure 7 of the main paper, and Figures 10,13 and 14 are detailed result for Figure 8 of the main paper. Figures 9 and 10 show the reward return per episode for different update frequencies 
+
+γf ∈ { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1.0}. Figures 11,12,13 and 14 compare the FSAC and SAC reward return per episode. Note that the plotted lines are mean rewards calculated over 36 different hyperparameters (learning rates 
+
+λπ ∈ { 0.0001 , 0.0003 , 0.0005 , 0.0007 }, soft update parameters τs ∈ { 0.001 , 0.005 , 0.003 } and the entropy regularization parameters {0.01 , 0.03 , 0.1}). 0 200 400 600 800 1000 
+
+> Episode
+> 1440
+> 1420
+> 1400
+> 1380
+> 1360
+> 1340
+> 1320
+> 1300
+> 1280
+> Reward
+> HalfCheetah-v2
+> UF=0.1
+> UF=0.2
+> UF=0.3
+> UF=0.4
+> UF=0.5
+> UF=0.6
+> UF=0.7
+> UF=0.8
+> UF=0.9
+> UF=1.0
+
+(a) 0 200 400 600 800 1000  
+
+> Episode
+> 1450
+> 1425
+> 1400
+> 1375
+> 1350
+> 1325
+> 1300
+> 1275
+> Reward
+> HalfCheetah-v2
+> UF=0.1
+> UF=0.2
+> UF=0.3
+> UF=0.4
+> UF=0.5
+> UF=0.6
+> UF=0.7
+> UF=0.8
+> UF=0.9
+> UF=1.0
+
+(b) 
+
+Figure 9. Reward per episode in the Halfcheetah environment for various update frequencies γf ∈ { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7
+
+, 0.8, 0.9, 1.0}. The plotted lines represent the mean reward across 36 different hyperparameters. (a) For lf = 5 . (b) For lf = 20 .0 200 400 600 800 1000 
+
+> Episode
+> 1090
+> 1080
+> 1070
+> 1060
+> 1050
+> 1040
+> 1030
+> 1020
+> 1010
+> Reward
+> Swimmer-v2
+> UF=0.1
+> UF=0.2
+> UF=0.3
+> UF=0.4
+> UF=0.5
+> UF=0.6
+> UF=0.7
+> UF=0.8
+> UF=0.9
+> UF=1.0
+
+(a) 0 200 400 600 800 1000  
+
+> Episode
+> 1090
+> 1080
+> 1070
+> 1060
+> 1050
+> 1040
+> 1030
+> 1020
+> 1010
+> Reward
+> Swimmer-v2
+> UF=0.1
+> UF=0.2
+> UF=0.3
+> UF=0.4
+> UF=0.5
+> UF=0.6
+> UF=0.7
+> UF=0.8
+> UF=0.9
+> UF=1.0
+
+(b) 
+
+Figure 10. Reward per episode in the Swimmer environment for various update frequencies γf ∈ { 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7
+
+, 0.8, 0.9, 1.0}. The plotted lines represent the mean reward across 36 different hyperparameters. (a) For lf = 5 . (b) For lf = 15 .
+
+14 Pausing Policy Learning in Non-stationary Reinforcement Learning 0 200 400 600 800 1000 
+
+Episode 
+
+1500 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.1 
+
+SAC / UF=0.1 
+
+(a) 0 200 400 600 800 1000 
+
+Episode 
+
+1500 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.2 
+
+SAC / UF=0.2 (b) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.3 
+
+SAC / UF=0.3 (c) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.4 
+
+SAC / UF=0.4 (d) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.5 
+
+SAC / UF=0.5 (e) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.6 
+
+SAC / UF=0.6 
+
+(f) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.7 
+
+SAC / UF=0.7 (g) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.8 
+
+SAC / UF=0.8 (h) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.9 
+
+SAC / UF=0.9 (i) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=1.0 
+
+SAC / UF=1.0 (j) 
+
+Figure 11. Reward per episode for Halfcheetah environment when lf = 5 . The blue lines are FSAC, and the orange lines are SAC. The shaded areas are 0.5 standard deviations over 36 different hyperparameter results. (a) γf = 0 .1. (b) γf = 0 .2. (c) γf = 0 .3. (d) γf = 0 .4.(e) γf = 0 .5. (f) γf = 0 .6. (g) γf = 0 .7. (h) γf = 0 .8. (i) γf = 0 .9. (j) γf = 1 .0.0 200 400 600 800 1000 
+
+Episode 
+
+1550 
+
+1500 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.1 
+
+SAC / UF=0.1 
+
+(a) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.2 
+
+SAC / UF=0.2 (b) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.3 
+
+SAC / UF=0.3 (c) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.4 
+
+SAC / UF=0.4 (d) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.5 
+
+SAC / UF=0.5 (e) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.6 
+
+SAC / UF=0.6 
+
+(f) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.7 
+
+SAC / UF=0.7 (g) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.8 
+
+SAC / UF=0.8 (h) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=0.9 
+
+SAC / UF=0.9 (i) 0 200 400 600 800 1000 
+
+Episode 
+
+1450 
+
+1400 
+
+1350 
+
+1300 
+
+1250 
+
+> Reward
+
+HalfCheetah-v2 
+
+FSAC / UF=1.0 
+
+SAC / UF=1.0 (j) 
+
+Figure 12. Reward per episode for Halfcheetah environment when lf = 20 . The blue lines are FSAC, and the orange lines are SAC. The shaded areas are 0.5 standard deviations over 36 different hyperparameter results. (a) γf = 0 .1. (b) γf = 0 .2. (c) γf = 0 .3. (d) 
+
+γf = 0 .4. (e) γf = 0 .5. (f) γf = 0 .6. (g) γf = 0 .7. (h) γf = 0 .8. (i) γf = 0 .9. (j) γf = 1 .0.
+
+15 Pausing Policy Learning in Non-stationary Reinforcement Learning 0 200 400 600 800 1000 
+
+Episode 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.1 
+
+SAC / UF=0.1 
+
+(a) 0 200 400 600 800 1000 
+
+Episode 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.2 
+
+SAC / UF=0.2 (b) 0 200 400 600 800 1000 
+
+Episode 
+
+1100 
+
+1080 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.3 
+
+SAC / UF=0.3 (c) 0 200 400 600 800 1000 
+
+Episode 
+
+1080 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.4 
+
+SAC / UF=0.4 (d) 0 200 400 600 800 1000 
+
+Episode 
+
+1125 
+
+1100 
+
+1075 
+
+1050 
+
+1025 
+
+1000 
+
+975 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.5 
+
+SAC / UF=0.5 (e) 0 200 400 600 800 1000 
+
+Episode 
+
+1125 
+
+1100 
+
+1075 
+
+1050 
+
+1025 
+
+1000 
+
+975 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.6 
+
+SAC / UF=0.6 
+
+(f) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.7 
+
+SAC / UF=0.7 (g) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.8 
+
+SAC / UF=0.8 (h) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.9 
+
+SAC / UF=0.9 (i) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=1.0 
+
+SAC / UF=1.0 (j) 
+
+Figure 13. Reward per episode for Swimmer environment when lf = 5 . The blue lines are FSAC, and the orange lines are SAC. The shaded areas are 0.5 standard deviations over 36 different hyperparameter results. (a) γf = 0 .1. (b) γf = 0 .2. (c) γf = 0 .3. (d) γf = 0 .4.(e) γf = 0 .5. (f) γf = 0 .6. (g) γf = 0 .7. (h) γf = 0 .8 (i) γf = 0 .9. (j) γf = 1 .0.0 200 400 600 800 1000 
+
+Episode 
+
+1080 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.1 
+
+SAC / UF=0.1 
+
+(a) 0 200 400 600 800 1000 
+
+Episode 
+
+1080 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.2 
+
+SAC / UF=0.2 (b) 0 200 400 600 800 1000 
+
+Episode 
+
+1080 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+980 
+
+960 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.3 
+
+SAC / UF=0.3 (c) 0 200 400 600 800 1000 
+
+Episode 
+
+1100 
+
+1080 
+
+1060 
+
+1040 
+
+1020 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.4 
+
+SAC / UF=0.4 (d) 0 200 400 600 800 1000 
+
+Episode 
+
+1100 
+
+1075 
+
+1050 
+
+1025 
+
+1000 
+
+975 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.5 
+
+SAC / UF=0.5 (e) 0 200 400 600 800 1000 
+
+Episode 
+
+1125 
+
+1100 
+
+1075 
+
+1050 
+
+1025 
+
+1000 
+
+975 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.6 
+
+SAC / UF=0.6 
+
+(f) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.7 
+
+SAC / UF=0.7 (g) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.8 
+
+SAC / UF=0.8 (h) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=0.9 
+
+SAC / UF=0.9 (i) 0 200 400 600 800 1000 
+
+Episode 
+
+1150 
+
+1100 
+
+1050 
+
+1000 
+
+> Reward
+
+Swimmer-v2 
+
+FSAC / UF=1.0 
+
+SAC / UF=1.0 (j) 
+
+Figure 14. Reward per episode for Swimmer environment when lf = 15 . The blue lines are FSAC, and the orange lines are SAC. The shaded areas are 0.5 standard deviations over 36 different hyperparameter results. (a) γf = 0 .1. (b) γf = 0 .2. (c) γf = 0 .3. (d) γf = 0 .4.(e) γf = 0 .5. (f) γf = 0 .6. (g) γf = 0 .7. (h) γf = 0 .8. (i) γf = 0 .9. (j) γf = 1 .0.
+
+16 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+D. Proofs 
+
+Proof of Proposition 4.1. 
+
+|| eQtm+1 − Q∗ 
+
+> tm+1
+
+|| ∞ =
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+wt
+
+ bQt − Q∗
+
+> tm+1
+
+
+
+> ∞
+
++
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+(wt − 1) Q∗
+
+> tm+1
+> ∞
+
+≤
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+|wt|
+
+
+
+|| Q∗ 
+
+> t
+
+− Q∗ 
+
+> tm+1
+
+|| ∞ + || Q∗ 
+
+> t
+
+− bQt|| ∞
+
+
+
++
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+|wt − 1| Q∗ 
+
+> tm+1 ∞
+
+≤
+
+vuut
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+|wt|2
+
+vuut
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+
+
+|| Q∗ 
+
+> t
+
+− Q∗ 
+
+> tm+1
+
+|| ∞ + || Q∗ 
+
+> t
+
+− bQt|| ∞
+
+2
+
++
+
+
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+|wt| + lp
+
+ Q∗ 
+
+> tm+1 ∞
+
+≤ L ·
+
+vuut
+
+> tm
+
+X
+
+> t=tm−lp+1
+
+
+
+|| Q∗ 
+
+> t
+
+− Q∗ 
+
+> tm+1
+
+|| 2 
+
+> ∞
+
++ 2 || Q∗ 
+
+> t
+
+− Q∗ 
+
+> tm+1
+
+|| ∞|| Q∗ 
+
+> t
+
+− bQt|| ∞|| Q∗ 
+
+> t
+
+− bQt|| 2
+
+> ∞
+
+
+
++
+
+lp
+
+vuut tmX
+
+> t=tm−l+1
+
+|wt|2 + lp
+
+ 1 − γH
+
+1 − γ rmax 
+
+
+
+. (1) We use Lemma E.2 to conclude that 
+
+|| Q∗ 
+
+> t
+
+− Q∗ 
+
+> tm+1
+
+|| ∞ ≤ 1 − γH
+
+1 − γ
+
+
+
+Br (t, t m+1 ) + rmax 
+
+1 − γ Bp(t, t m+1 )
+
+
+
+.
+
+Moreover, the assumption 
+
+|| Q∗ 
+
+> t
+
+− bQt|| ∞ ≤ ϵt
+
+holds. As a result, 
+
+eQtm+1 − Q∗ 
+
+> tm+1 ∞
+
+≤ L
+
+vuuuut
+
+> tm
+
+X
+
+> t=tm−l+1
+
+ 1−γH
+
+> 1−γ
+
+
+
+Br (t, t m+1 ) + rmax  
+
+> 1−γ
+
+Bp(t, t m+1 )
+
+ 2
+
++2 1−γH
+
+> 1−γ
+
+
+
+Br (t, t m+1 ) + rmax  
+
+> 1−γ
+
+Bp(t, t m+1 )
+
+
+
+ϵt + ϵ2
+
+> t
+
+i
+
++ lp(L + 1) 
+
+ 1 − γH
+
+1 − γ rmax 
+
+
+
+.
+
+To simplify the expression, define ut := 1−γH
+
+> 1−γ
+
+
+
+Br (t, t m+1 ) + rmax  
+
+> 1−γ
+
+Bp(t, t m+1 )
+
+
+
+. Then, the inequality (1) can be rewritten in a simpler form as follows: 
+
+eQtm+1 − Q∗ 
+
+> tm+1 ∞
+
+≤ L
+
+vuut tmX
+
+> t=tm−l+1
+
+2 (max( ut, ϵ t)) 2 + lp(L + 1) 
+
+ 1 − γH
+
+1 − γ rmax 
+
+
+
+≤ √2Ll p max  
+
+> t∈[tm−l+1 ,t m]
+
+(max( ut, ϵ t)) + lp(L + 1) 
+
+ 1 − γH
+
+1 − γ rmax 
+
+
+
+.
+
+Proof of Proposition 4.2. Refer to Theorem 7 of (Qu & Wierman, 2020). 17 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Proof of Lemma 5.1. The policy update term is divided into three terms: 
+
+X
+
+> t∈G m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) = 
+
+> Gm−1
+
+X
+
+> g=0
+
+ V ∗ 
+
+> tm+g
+
+− V πtm +g
+
+> tm+g
+
+
+
+=
+
+> Gm−1
+
+X
+
+> g=0
+
+ V ∗ 
+
+> tm+Gm−1
+
+− V πtm +g
+
+> tm+Gm−1
+
+| {z }
+
+> (1-I)
+
++  V πtm +g 
+
+> tm+Gm−1
+
+− V πtm +g
+
+> tm+g
+
+| {z }
+
+> (1-II)
+
++  V ∗ 
+
+> tm+g
+
+− V ∗
+
+> tm+Gm−1
+
+| {z }
+
+> (1-III)
+
+ .
+
+Note that the term (1-I), the term (1-II), and the term (1-III) are upper bounded by Lemma E.1, Corollary E.3, and Lemma E.4. For any g ∈ [0 , G m − 1] and for any s ∈ S , one can write: • V ∗ 
+
+> tm+Gm−1
+
+− V πtm +g 
+
+> tm+Gm−1
+
+≤ (γ + 2)((1 − ητ )g C′) + 2( γ+2) 1−γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+> 1−γ
+
+• V πtm +g
+
+> tm+Gm−1
+
+(s)−V πtm +g 
+
+> tm+g
+
+(s) ≤ 1−γH 
+
+> 1−γ
+
+·Br (tm +g, t m +Gm −1)+ γ 
+
+> 1−γ
+
+·
+
+ 1−γH 
+
+> 1−γ
+
+− γH−1H
+
+
+
+·Bp(tm +g, t m +Gm −1) 
+
+• V ∗ 
+
+> tm+g
+
+(s) − V ∗
+
+> tm+Gm−1
+
+(s) ≤ 1−γH
+
+> 1−γ
+
+
+
+Br (tm + g, t m + Gm − 1) + rmax  
+
+> 1−γ
+
+Bp(tm + g, t m + Gm − 1) 
+
+
+
+where C′ = || Q∗ 
+
+> τ
+
+− Qtm 
+
+> τ
+
+|| ∞ + 2 τ (1 − ητ  
+
+> 1−γ
+
+|| log π∗ 
+
+> τ
+
+− log πtm 
+
+> τ
+
+|| ∞). Now, taking the summation over g = 0 , ..., G m − 1
+
+gives rise to 
+
+X
+
+> t∈G m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+)=( γ + 2) C′ 1 − (1 − ητ )Gm
+
+ητ + Gm ·
+
+ 2( γ + 2) 1 − γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+1 − γ
+
+
+
++ 1 − γH
+
+1 − γ ·
+
+> Gm−1
+
+X
+
+> g=0
+
+Br (tm + g, t m + Gm − 1) 
+
+!
+
++ γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
+·
+
+> Gm−1
+
+X
+
+> g=0
+
+Bp(tm + g, t m + Gm − 1) 
+
+!
+
++ 1 − γH
+
+1 − γ
+
+> Gm−1
+
+X
+
+> g=0
+
+Br (tm + g, t m + Gm − 1) + rmax 
+
+1 − γ
+
+> Gm−1
+
+X
+
+> g=0
+
+Bp(tm + g, t m + Gm − 1) 
+
+!
+
+≤(γ + 2) C′ 1 − (1 − ητ )Gm
+
+ητ + Gm ·
+
+ 2( γ + 2) 1 − γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+1 − γ
+
+
+
++ 2(1 − γH )1 − γ ·   ¯Br (tm, t m + Gm − 1) 
+
++
+
+ γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
++ 1 − γH
+
+1 − γ · rmax 
+
+1 − γ
+
+
+
+·   ¯Br (tm, t m + Gm − 1) 
+
+= C1
+
+ητ ·  1 − (1 − ητ )Gm  + Gm · (C2ϵf + C3) + C4 ¯Br (Gm) + C5 ¯Bp(Gm)
+
+where C1 = (γ + 2) 
+
+
+
+|| Q∗ 
+
+> tm
+
+− Qtm || ∞ + 2 τ (1 − ητ  
+
+> 1−γ
+
+|| log π∗ 
+
+> tm
+
+− log πtm || ∞)
+
+
+
+, C 2 = 2( γ+2) 1−γ
+
+
+
+1 + γητ 
+
+
+
+, C 3 =   
+
+> 2τlog |A|
+> 1−γ
+
+, C 4 = 2(1 −γH )1−γ , C 5 = γ 
+
+> 1−γ
+
+·
+
+ 1−γH 
+
+> 1−γ
+
+− γH−1H
+
+
+
++ 1−γH 
+
+> 1−γ
+
+· rmax  
+
+> 1−γ
+
+.18 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Proof of Lemma 5.2. The policy hold error can be divided into three terms: 
+
+X
+
+> t∈N m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) = 
+
+> Nm−1
+
+X
+
+> n=0
+
+(V ∗ 
+
+> tm+Gm+n
+
+− V πtm +Gm 
+
+> tm+Gm+n
+
+)=
+
+> Nm−1
+
+X
+
+> n=0
+
+(V ∗ 
+
+> tm+Gm+n
+
+− V ∗ 
+
+> tm+Gm
+
+)
+
+| {z }
+
+> (2-I)
+
++ ( V ∗ 
+
+> tm+Gm
+
+− V πtm +Gm  
+
+> tm+Gm
+
+)
+
+| {z }
+
+> (2-II)
+
++ ( V πtm +Gm  
+
+> tm+Gm
+
+− V πtm +Gm 
+
+> tm+Gm+n
+
+)
+
+| {z }
+
+> (2-III)
+
+ .
+
+The terms (2-I), (2-II) and (2-III) can be bounded using Corollary E.3, Lemma E.1 and Lemma E.4. Recall that we have defined the time interval Nm = [ tm + Gm, t m+1 ), where tm+1 = tm + Gm + Nm. One can write: • V ∗ 
+
+> tm+Gm+n
+
+− V ∗ 
+
+> tm+Gm
+
+≤ 1−γH
+
+> 1−γ
+
+
+
+Br (tm + Gm, t m + Gm + n) + rmax  
+
+> 1−γ
+
+Bp(tm + Gm, t m + Gm + n)
+
+
+
+• V ∗ 
+
+> tm+Gm
+
+− V πtm +Gm  
+
+> tm+Gm
+
+≤ (γ + 2)((1 − ητ )Gm C′) + 2( γ+2) 1−γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+> 1−γ
+
+• V πtm +Gm  
+
+> tm+Gm
+
+−V πtm +Gm  
+
+> tm+Gm+n
+
+≤ 1−γH 
+
+> 1−γ
+
+·Br (tm +Gm, t m +Gm +n)+ γ 
+
+> 1−γ
+
+·
+
+ 1−γH 
+
+> 1−γ
+
+− γH−1H
+
+
+
+·Bp(tm +Gm, t m +Gm +n).Now, taking the summation over n = 0 , 1, ..., N m − 1 leads to 
+
+X
+
+> t∈N m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) = Nm ·
+
+
+
+(γ + 2)((1 − ητ )Gm C′) + 2( γ + 2) 1 − γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+1 − γ
+
+
+
++ 1 − γH
+
+1 − γ ·
+
+> Nm−1
+
+X
+
+> n=0
+
+Br (tm + Gm, t m + Gm + n)
+
+!
+
++ γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
+·
+
+> Nm−1
+
+X
+
+> n=0
+
+Bp(tm + Gm, t m + Gm + n)
+
+!
+
++ 1 − γH
+
+1 − γ
+
+> Nm−1
+
+X
+
+> n=0
+
+Br (tm + Gm, t m + Gm + n) + rmax 
+
+1 − γ
+
+> Nm−1
+
+X
+
+> n=0
+
+Bp(tm + Gm, t m + Gm + n)
+
+!
+
+≤Nm ·
+
+
+
+(γ + 2)((1 − ητ )Gm C′) + 2( γ + 2) 1 − γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+1 − γ
+
+
+
++ 2(1 − γH )1 − γ ·   ¯Br (tm + Gm, t m + Gm + Nm − 1) 
+
++
+
+ γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
++ 1 − γH
+
+1 − γ · rmax 
+
+1 − γ
+
+
+
+·   ¯Br (tm + Gm, t m + Gm + Nm − 1) 
+
+=Nm ·  C1(1 − ητ )Gm + C2ϵf + C3
+
+ + C4 ¯Br (Nm) + C5 ¯Bp(Nm)
+
+where C1, C 2, C 3, C 4, C 5 are the constants defined in the Lemma 5.1. 
+
+Proof of Theorem 5.3. Note that the following relationship holds for the dynamic regret R(T ):
+
+R(T ) = 
+
+> M
+
+X
+
+> m=1
+
+ X
+
+> t∈G m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+)
+
+| {z }
+
+> Policy update error
+
++ X
+
+> t∈N m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+)
+
+| {z }
+
+> Policy hold error
+
+
+
+.
+
+We use Lemma 5.1 to upper bound the use policy update error and use Lemma 5.2 to upper bound the policy hold error. 19 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+This leads to 
+
+R(T ) = 
+
+> M
+
+X
+
+> m=1
+
+ X
+
+> t∈G m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+) + X
+
+> t∈N m
+
+(V ∗ 
+
+> t
+
+− V πt 
+
+> t
+
+)
+
+
+
+≤
+
+> M
+
+X
+
+> m=1
+
+ C1
+
+ητ ·
+
+
+
+1 − (1 − ητ )Gm
+
+
+
++ Gm
+
+
+
+C2δfm + C3
+
+
+
++ C4 ¯Br (Gm) + C5 ¯Bp(Gm)+ Nm ·
+
+
+
+C1(1 − ητ )Gm + C2δfm + C3
+
+
+
++ C4 ¯Br (Nm) + C5 ¯Bp(Nm)
+
+
+
+=
+
+> M
+
+X
+
+> m=1
+
+ C1
+
+ητ +
+
+
+
+NmC1 − C1
+
+ητ 
+
+
+
+(1 − ητ )Gm + ( Nm + Gm)( C2δfm + C3) + ¯B(tm, t m+1 )
+
+
+
+.
+
+Proof of Lemma 5.4. The reader is referred to the proof of Theorem 5.8. 
+
+Proof of Proposition 5.6. For fixed tm, t m+1 , note that ¯B(tm, t m+1 ) is a function of Gm, N m with the constraint 
+
+Gm + Nm = tm+1 − tm. In this proof, we let ¯B(tm, t m+1 ) to be denoted as a function g(Gm, N m). Recall that we have defined ¯B(tm+1 , t m) := ¯B(Nm) + ¯B(Gm). Now, since g(0 , t m+1 − tm) = g(tm+1 − tm, 0) =
+
+Ptm+1 −1 
+
+> t=tm
+
+(C4Br (tm, t ) + C5Bp(tm, t )) , it is sufficient to show the existence of G† 
+
+> m
+
+∈ (0 , t m+1 , t m) and N † 
+
+> m
+
+∈
+
+(0 , t m+1 , t m) that satisfy g(G†
+
+> m
+
+, N †
+
+> m
+
+) < g (0 , t m+1 − tm) = g(tm+1 − tm, 0) . By the definition of non-stationary environ-ments (see Definition 3.4), let t†
+
+> 1
+
+, t † 
+
+> 2
+
+satisfy Br (t†
+
+> 1
+
+, t †
+
+> 2
+
+) > 0 or Bp(t†
+
+> 1
+
+, t †
+
+> 2
+
+) > 0. Now, letting G† 
+
+> m
+
+= t†
+
+> 2
+
+, we have Br (tm, G †
+
+> m
+
+) >
+
+0 or Bp(tm, G †
+
+> m
+
+) > 0. As a result, either Ptm+G† 
+
+> m−1
+> tm
+
+Br (tm, t ) + Ptm+1 −1
+
+> tm+G†
+> m
+
+Br (tm + G†
+
+> m
+
+, t ) < Ptm+1 −1 
+
+> tm
+
+Br (tm, t ) or 
+
+Ptm+G† 
+
+> m−1
+> tm
+
+Bp(tm, t ) + Ptm+1 −1
+
+> tm+G†
+> m
+
+Bp(tm + G†
+
+> m
+
+, t ) < Ptm+1 −1 
+
+> tm
+
+Bp(tm, t ) holds. Now, by combining the two inequalities with the constants C4, C 5 > 0 defined in Lemma 5.1, we obtain that 
+
+C4 ¯Br (tm, t m + G†
+
+> m
+
+) + C4 ¯Br (tm + G†
+
+> m
+
+, T m+1 ) + C5 ¯Bp(tm, t m + G†
+
+> m
+
+) + C5 ¯Bp(tm + G†
+
+> m
+
+, t m+1 )
+
+< C 4 ¯Br (tm, t m+1 ) + C5 ¯Bp(tm, t m+1 )
+
+if and only if 
+
+¯B(tm, t m + G†
+
+> m
+
+) + ¯B(tm + G†
+
+> m
+
+, t m+1 ) < ¯B(tm, t m+1 ).
+
+Therefore, G† 
+
+> m
+
+= t†
+
+> 2
+
+, N † 
+
+> m
+
+= tm+1 − tm − t† 
+
+> m
+
+satisfies the condition g(G†
+
+> m
+
+, N †
+
+> m
+
+) < g (0 , t m+1 − tm) = g(tm+1 − tm, 0) .This completes the proof. 
+
+Proof of Theorem 5.8. We first show that the policy optimization error is a convex function of Gm (or Nm. Let 
+
+f1(Nm, G m) = C1(1 − (1 − ητ )Gm ) + NmC1(1 − ητ )Gm , where Nm + Gm = tm+1 − tm is a constant. Note that ∂N m/∂G m = −1. It holds that 
+
+1
+
+C1
+
+· ∂f 1
+
+∂G m
+
+=  ln(1 − ητ ) ( Nm − 1) − 1 (1 − ητ )Gm
+
+and 
+
+1
+
+C1
+
+· ∂2f1
+
+∂G 2
+
+> m
+
+= (ln(1 − ητ )) 2(Nm − 1) − 2 ln(1 − ητ ) (1 − ητ )Gm .
+
+Therefore, ∂2f1/∂G 2 
+
+> m
+
+> 0 and ∂2f1/∂N 2 
+
+> m
+
+> 0 holds for ∀Nm, G m ≥ 0, where Nm + Gm = tm+1 − tm holds. The non-stationary terms are bounded as follows: 
+
+¯B(Nm) + ¯B(Gm) = ( C4 + C5)   ¯Br (Nm) + ¯Br (Gm) .
+
+20 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Note that by Assumption 3.1, ¯Br (Nm) ≤ Pt=tm+Gm+Nm−1 
+
+> t=tm+Gm
+
+αt−(tm+Gm) 
+
+> r
+
+Bmax (Nm) and ¯Br (Gm) ≤
+
+Pt=tm+Gm−1 
+
+> t=tm
+
+αt−tm 
+
+> r
+
+Bmax (Gm). For the short notation, we use α⋄(Gm) = α⋄,1, α ⋄(Nm) = α⋄,2 and Bmax  
+
+> ⋄
+
+(Gm) = 
+
+Bmax  
+
+> ⋄,1
+
+, B max  
+
+> ⋄
+
+(Nm) = Bmax  
+
+> ⋄,2
+
+where ⋄ = r or p. Also, we let α□ = max( αr, □, α p, □) and Bmax  
+
+> □
+
+= max( Bmax  
+
+> r, □
+
+, B max 
+
+> p, □
+
+), where 
+
+□ = 1 or 2. One can write: 
+
+¯B(Nm) + ¯B(Gm) = C4
+
+  ¯Br (Nm) + ¯Br (Gm) + C5
+
+  ¯Bp(Nm) + ¯Bp(Gm)
+
+≤ (C4 + C5) · αGm 
+
+> 1
+
+− 1
+
+α1 − 1 · Bmax  
+
+> 1
+
++ αNm 
+
+> 2
+
+− 1
+
+α2 − 1 · Bmax 
+
+> 2
+
+!
+
+.
+
+We denote the upper bound as a function f2(Nm, G m). Note that Bmax  
+
+> 1
+
+and Bmax  
+
+> 2
+
+> 0 hold for a non-stationary environment. If 0 < α 1, α 2 < 1, then f2(Nm, G m) is a concave function with respect to (Nm, G m). If α1, α 2 > 1, then f2(Nm, G m) is a convex function with respect to (Nm, G m).
+
+E. Supplementary lemmas 
+
+Lemma E.1 (NPG Convergence) . Assume that we have an inexact Q value estimation at time tm + Gm − 1, ˆQtm+Gm−1,where we denote Qtm+Gm−1 as the exact Q value. Now, define the error of estimation as ϵ, that is, || Qtm+Gm−1 −
+
+ˆQtm+Gm−1|| ∞ ≤ ϵf . For any g ∈ [Gm], it holds that 
+
+V ∗ 
+
+> tm+Gm−1
+
+− V πg 
+
+> tm+Gm−1
+
+≤ (γ + 2)((1 − ητ )g−1C1) + 2( γ + 2) 1 − γ
+
+
+
+1 + γητ 
+
+
+
+· ϵf + 2τ log |A| 
+
+1 − γ
+
+where 
+
+C1 = Q∗ 
+
+> τ
+
+− Q(0)  
+
+> τ∞
+
++ 2 τ
+
+
+
+1 − nτ 
+
+1 − γ
+
+
+
+log π∗ 
+
+> τ
+
+− log π(0) 
+
+> ∞
+
+.
+
+Proof of Lemma E.1. We omit the underscript t for simplicity of notation, i.e., Vt, V τ,t , V ∗ 
+
+> t
+
+denote V, V τ , V ∗, respectively. For any m ∈ [M ] and any t ∈ G m, the inequality 
+
+V ∗(s) − V (s) ≤ || V ∗(·) − V ∗ 
+
+> τ
+
+(·)|| ∞ + || V ∗ 
+
+> τ
+
+(·) − Vτ (·)|| ∞ + || Vτ (·) − V (·)|| ∞
+
+≤ || V ∗ 
+
+> τ
+
+(·) − Vτ (·)|| ∞ + 2τ log |A| 
+
+1 − γ
+
+holds since for any policy π, || V πτ − V π || ∞ = τ max s |H (s, π )| ≤ τ log |A|  
+
+> 1−γ
+
+holds. Now, note that Vτ is a value function of a policy πτ that we obtain after updating g iterations. As a result, 
+
+|| V ∗ 
+
+> τ
+
+(·) − Vτ (·)|| ∞ ≤ τ || log π∗ 
+
+> τ
+
+− log πgτ || ∞ + || Q∗ 
+
+> τ
+
+(·) − Qτ (·)|| ∞
+
+≤ τ · 2
+
+τ
+
+ (1 − ητ )g−1C1 + C2
+
+ + γ  (1 − ητ )g−1C1 + C2
+
+ (2) 
+
+= ( γ + 2)  (1 − ητ )g−1C1 + C2
+
+
+
+where 
+
+C1 = Q∗ 
+
+> τ
+
+− Q(0)  
+
+> τ∞
+
++ 2 τ
+
+
+
+1 − nτ 
+
+1 − γ
+
+
+
+log π∗ 
+
+> τ
+
+− log π(0) 
+
+> ∞
+
+, C 2 = 2ϵf
+
+1 − γ
+
+
+
+1 + γητ 
+
+
+
+.
+
+The equation (2) holds cue to Theorem 2 in (Cen et al., 2022). 
+
+Lemma E.2 (Difference between optimal state action value functions of two MDPs) . For any two time steps t1, t 2 ∈ T , we denote the optimal Q functions at step h ∈ [H] as Q∗
+
+> t1,h
+
+(s, a ), Q ∗
+
+> t2,h
+
+(s, a ). Then, for any state and action pair s, a ∈ S × A ,
+
+Q∗
+
+> t1,h
+
+(s, a ) − Q∗
+
+> t2,h
+
+(s, a ) ≤
+
+> H−1
+
+X
+
+> h′=h
+
+γh′−hBr (t1, t 2) + rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h
+
+γh′−hBp(t1, t 2)
+
+holds, where Br (t1, t 2) and Bp(t1, t 2) denote the local time-elapsing variation budgets between the time steps {t1, t 1 +1, t 1 + 2 , ..., t 2}.
+
+21 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Proof of Lemma E.2. Only for the purpose of the proof of Lemma E.2, we define the state value function V πt,h : S → R and the state action value function Qπt,h : S × A → R at step h of time t as 
+
+V πt,h (s) := EMt
+
+"H−1X
+
+> h′=h
+
+γh′−hrt,h ′ s0 
+
+> t
+
+= s
+
+#
+
+and 
+
+Qπt,h (s, a ) := EMt
+
+"H−1X
+
+> h′=h
+
+γh′−hrt,h ′ s0 
+
+> t
+
+= s, a 0 
+
+> t
+
+= a
+
+#
+
+.
+
+Note that the optimal state value function and the state action value function satisfy the following Bellman equation. 
+
+Q∗
+
+> t,h
+
+(s, a ) =  Rt,h + γP tV ∗
+
+> t,h
+
+ (s, a ), π ∗ 
+
+> t
+
+= arg max 
+
+> a∈A
+
+Q∗
+
+> t,h
+
+(s, a ).
+
+The proof depends on a backward induction. First, the statement holds when h = H − 1 since 
+
+Q∗
+
+> t1,H −1
+
+(s, a ) − Q∗
+
+> t2,H −1
+
+(s, a ) ∞ = || rt1,H −1 − rt2,H −1|| ∞ = || Rt1 − Rt2 || ∞ .
+
+Now, we assume that the statement of Lemma E.2 holds for h + 1 . Then, for h it holds that 
+
+Q∗
+
+> t1,h
+
+(s, a ) − Q∗
+
+> t2,h
+
+(s, a ) = ( Rt1,h − Rt2,h ) ( s, a ) + γ X
+
+> s′∈S
+
+
+
+Pt1 (s′|s, a )V ∗
+
+> t1,h +1
+
+(s′) − Pt2 (s′|s, a )V ∗
+
+> t2,h +1
+
+(s′)
+
+
+
+≤ Br (t1, t 2) + γ X
+
+> s′∈S
+
+
+
+Pt1 (s′|s, a )Q∗
+
+> t1,h +1
+
+(s′, π ∗ 
+
+> t1
+
+(s′)) − Pt2 (s′|s, a )Q∗
+
+> t2,h +1
+
+(s′, π ∗ 
+
+> t2
+
+(s′)( s′)
+
+
+
+.
+
+Then by the induction hypothesis on h + 1 , the following holds for any s′ ∈ S :
+
+Q∗
+
+> t1,h +1
+
+(s′, π ∗ 
+
+> t1
+
+(s′)) ≤ Q∗
+
+> t2,h +1
+
+(s′, π ∗ 
+
+> t1
+
+(s′)) + 
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−(h+1) Br (t1, t 2) + rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−(h+1) Bp(t1, t 2)
+
+≤ Q∗
+
+> t2,h +1
+
+(s′, π ∗ 
+
+> t2
+
+(s′)) + 
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−(h+1) Br (t1, t 2) + rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−(h+1) Bp(t1, t 2).
+
+Therefore, 
+
+Q∗
+
+> t1,h
+
+(s, a ) − Q∗ 
+
+> t2,h ′′
+
+(s, a ) ≤ Br (t1, t 2) + γ X
+
+> s′∈S
+
+
+
+Pt1 (s′|s, a ) − Pt2 (s′|s, a )
+
+
+
+Q∗
+
+> t2,h +1
+
+(s′, π ∗ 
+
+> t2
+
+(s′)) 
+
+
+
++
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−hBr (t1, t 2) + rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−hBp(t1, t 2)
+
+≤ γ
+
+
+
+Pt1 (s′|s, a ) − Pt2 (s′|s, a ) 1
+
+Q∗
+
+> t2,h +1
+
+(s′, π ∗ 
+
+> t2
+
+(s′)) ∞ +
+
+> H−1
+
+X
+
+> h′=h
+
+γh′−hBr (t1, t 2)+ rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−hBp(t1, t 2)
+
+≤ γB p(t1, t 2) · rmax 
+
+1 − γ +
+
+> H−1
+
+X
+
+> h′=h
+
+γh′−hBr (t1, t 2) + rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h+1
+
+γh′−hBp(t1, t 2)=
+
+> H−1
+
+X
+
+> h′=h
+
+γh′−hBr (t1, t 2) + rmax 
+
+1 − γ
+
+> H−1
+
+X
+
+> h′=h
+
+γh′−hBp(t1, t 2).
+
+This completes the proof. 22 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Corollary E.3 (Difference between optimal state value functions of two MDPs) . For any two times t1 < t 2 ∈ T , the gap between the two value functions at times t1 and t2 is bounded as 
+
+|| V ∗ 
+
+> t1
+
+(s) − V ∗ 
+
+> t2
+
+(s)|| ∞ ≤ 1 − γH
+
+1 − γ
+
+
+
+Br (t1, t 2) + rmax 
+
+1 − γ Bp(t1, t 2)
+
+
+
+.
+
+Proof of Corollary E.3. Corollary E.3 comes from Lemma E.2. 
+
+Lemma E.4 (Difference between value functions of two MDPs with same policy) . For any two times t1, t 2 ∈ T , any policy 
+
+π, and any state s ∈ S , the gap between the two value functions V πt1 and V πt2 is bounded as follows: 
+
+V πt1 (s) − V πt2 (s) ≤ 1 − γH
+
+1 − γ · Br (t1, t 2) + γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
+· Bp(t1, t 2).
+
+Proof of Lemma E.4. For a given initial state s0, we first define the occupancy measure of state and action (s, a ) as 
+
+ρπt (s, a ) := 
+
+> H−1
+
+X
+
+> h=0
+
+γhP (sh = s, a h = a|Pt, π ) .
+
+It is worth noting that P (sh = s, a h = a|Pt, π ) = P (sh = s|Pt, π ) · π(ah = a|ss = s). Now, note that the value function can be rewritten using the occupancy measure as 
+
+V πt (s) := EMt
+
+"H−1X
+
+> h=0
+
+γhrt,h | s0 
+
+> t
+
+= s
+
+#
+
+= E(s,a )∼ρπt [Rt(s, a )] .
+
+Then for any t1, t 2 ∈ T , the gap between the two value functions can be expressed as 
+
+V πt1 (s) − V πt2 (s) = E(s,a )∼dπt1
+
+[Rt1 (s, a )] − E(s,a )∼dπt2
+
+[Rt2 (s, a )] = E(s,a )∼dπt1
+
+[Rt1 (s, a ) − Rt2 (s, a )] − E(s,a )∼dπt1
+
+[Rt2 (s, a )] + E(s,a )∼dπt2
+
+[Rt2 (s, a )] 
+
+≤ 1 − γH
+
+1 − γ · max  
+
+> (s,a )
+
+(|Rt2 (s, a ) − Rt1 (s, a )|) + 
+
+
+
+E(s,a )∼dπt2
+
+[Rt2 (s, a )] − E(s,a )∼dπt1
+
+[Rt2 (s, a )] 
+
+
+
+= 1 − γH
+
+1 − γ · Br (t1, t 2) + 
+
+
+
+E(s,a )∼dπt2
+
+[Rt2 (s, a )] − E(s,a )∼dπt1
+
+[Rt2 (s, a )] 
+
+
+
+. (3) Now, the gap E(s,a )∼dπt2
+
+[Rt2 (s, a )] − E(s,a )∼dπt1
+
+[Rt2 (s, a )] is upper bounded as follows: 
+
+E(s,a )∼dπt2
+
+[Rt2 (s, a )] − E(s,a )∼dπt1
+
+[Rt2 (s, a )] ≤ || ρπt2 (·, ·) − ρπt1 (·, ·)|| 1 · || Rt2 (·, ·)|| ∞
+
+= || ρπt2 (·, ·) − ρπt1 (·, ·)|| 1 · rmax . (4) 23 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+Now, the term P 
+
+> (s,a )
+
+|ρπt2 (s, a ) − ρπt1 (s, a )| is bounded as follows: 
+
+X
+
+> (s,a )
+
+ρπt2 (s, a ) − ρπt1 (s, a ) = X
+
+> (s,a )
+> H−1
+
+X
+
+> h=0
+
+
+
+γh ·  P (sh = s|Pt2 , π ) − P (sh = s|Pt1 , π )  · π(ah = a|sh = s)
+
+
+
+= X
+
+> (s,a )
+> H−1
+
+X
+
+> h=0
+
+γh ·  P (sh = s|Pt2 , π ) − P (sh = s|Pt1 , π )  · π(ah = a|sh = s)
+
+!
+
+= X
+
+> s
+> H−1
+
+X
+
+> h=0
+
+γh ·  P (sh = s|Pt2 , π ) − P (sh = s|Pt1 , π )  · X
+
+> a∈A
+
+π(ah = a|sh = s)
+
+!
+
+= X
+
+> s∈S
+> H−1
+
+X
+
+> h=0
+
+γh ·  P (sh = s|Pt2 , π ) − P (sh = s|Pt1 , π )  · 1
+
+!
+
+=
+
+> H−1
+
+X
+
+> h=0
+
+γh · X
+
+> s∈S
+
+ P (sh = s|Pt2 , π ) − P (sh = s|Pt1 , π )  !
+
+. (5) Now, for simplicity of notation, we denote P(sh = s|Pt, π ) as Pht (s), Pt(sh = s|sh−1 = s′, a h−1 = a′) as Pht (s|s′, a ′),and π(ah = a|sh = s) as πh(a|s). Then, we have 
+
+X
+
+> s∈S
+
+Pht2 (s) − Pht1 (s)
+
+= X
+
+> s∈S
+
+X
+
+> s′,a ′
+
+
+
+P ht2 (s|s′, a ′) · πh−1(a′|s′) · Ph−1 
+
+> t2
+
+(s′) − P ht1 (s|s′, a ′) · πh−1(a′|s′) · Ph−1 
+
+> t1
+
+(s′)
+
+
+
+≤ X
+
+> s∈S
+
+X
+
+> s′,a ′
+
+
+
+P ht2 (s|s′, a ′) · Ph−1 
+
+> t2
+
+(s′) − P ht1 (s|s′, a ′) · Ph−1 
+
+> t1
+
+(s′)
+
+
+
+· πh−1(a′|s′)
+
+= X
+
+> s′,a ′
+
+X
+
+> s∈S
+
+
+
+P ht2 (s|s′, a ′) · Ph−1 
+
+> t2
+
+(s′) − P ht1 (s|s′, a ′) · Ph−1 
+
+> t1
+
+(s′)
+
+
+
+· πh−1(a′|s′)
+
+≤ X
+
+> s′,a ′
+
+X
+
+> s∈S
+
+  P ht2 (s|s′, a ′) − P ht1 (s|s′, a ′) · Ph−1 
+
+> t2
+
+(s′) · πh−1(a′|s′)
+
++  Ph−1 
+
+> t2
+
+(s′) − Ph−1 
+
+> t1
+
+(s′) · P ht1 (s|s′, a ′) · πh−1(a′|s′)
+
+
+
+≤ max 
+
+> s′,a ′
+
+ || P ht2 (·| s′, a ′) − P ht1 (·| s′, a ′)|| 1
+
+ ·
+
+X
+
+> s′,a ′
+
+ Ph−1 
+
+> t2
+
+(s′) · πh−1(a′|s′)
+
++
+
+X
+
+> s′,a ′
+
+  Ph−1 
+
+> t2
+
+(s′) − Ph−1 
+
+> t1
+
+(s′)  · πh−1(a′|s′)
+
+ · X
+
+> s∈S
+
+P ht1 (s|s′, a ′)
+
+!
+
+= Bp(t1, t 2) · X
+
+> s′∈S
+
+Ph−1 
+
+> t2
+
+(s′) · X
+
+> a′∈A
+
+πh−1(a′|s′)
+
+!
+
++ X
+
+> s′∈S
+
+Ph−1 
+
+> t2
+
+(s′) − Ph−1 
+
+> t1
+
+(s′) · X
+
+> a′∈A
+
+πh−1(a′|s′)
+
+!
+
+· 1= Bp(t1, t 2) + X
+
+> s′∈S
+
+Ph−1 
+
+> t2
+
+(s′) − Ph−1 
+
+> t1
+
+(s′) .
+
+Now, note that P 
+
+> s∈S
+
+P0 
+
+> t2
+
+(s) − P0 
+
+> t1
+
+(s) = 0 and P 
+
+> s∈S
+
+P1 
+
+> t2
+
+(s) − P1 
+
+> t1
+
+(s) = Bp(t1, t 2) hold. Therefore, 
+
+X
+
+> s∈S
+
+Pht2 (s) − Pht1 (s) ≤ hB p(t1, t 2)
+
+24 Pausing Policy Learning in Non-stationary Reinforcement Learning 
+
+holds. Then, substituting the above inequality into the inequality (5) gives that 
+
+X
+
+> (s,a )
+
+ρπt2 (s, a ) − ρπt1 (s, a ) ≤
+
+> H−1
+
+X
+
+> h=0
+
+γhhB p(t1, t 2)
+
+≤ γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
+· Bp(t1, t 2).
+
+Now, it follows from the inequalities (3) and (4) that 
+
+V πt1 (s) − V πt2 (s) ≤ 1 − γH
+
+1 − γ · Br (t1, t 2) + γ
+
+1 − γ ·
+
+ 1 − γH
+
+1 − γ − γH−1H
+
+
+
+· Bp(t1, t 2).
+
+F. Experiment Platforms and Licenses 
+
+F.1. Platforms 
+
+All experiments are conducted on 12 Intel Xeon CPU E5-2690 v4 and 2 Tesla V100 GPUs. 
+
+F.2. Licenses 
+
+We have used the following libraries/ repos for our Python codes: • Pytorch (BSD 3-Clause “New” or “Revised” License). • OpenAI Gym (MIT License). • Numpy (BSD 3-Clause “New” or “Revised” License). • Official codes distributed from https://github.com/pranz24/pytorch-soft-actor-critic : to compare the performance of SAC and FSAC in the Mujoco environment. • Official codes distributed from the https://github.com/linesd/tabular-methods : to compare SAC and FSAC in the goal-switching cliff world. 25

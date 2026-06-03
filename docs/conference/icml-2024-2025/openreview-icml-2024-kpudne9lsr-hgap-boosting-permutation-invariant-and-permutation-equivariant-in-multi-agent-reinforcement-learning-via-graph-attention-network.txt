@@ -1,0 +1,612 @@
+Title: HGAP: Boosting Permutation Invariant and Permutation Equivariant in Multi-Agent Reinforcement Learning via Graph Attention Network
+
+URL Source: https://openreview.net/pdf?id=KpUdNe9lsr
+
+Number of Pages: 22
+
+Markdown Content:
+# HGAP: Boosting Permutation Invariant and Permutation Equivariant in Multi-Agent Reinforcement Learning via Graph Attention Network 
+
+Bor Jiun Lin 1 Chun-Yi Lee 1
+
+# Abstract 
+
+Graph representation has gained widespread ap-plication across various machine learning do-mains, attributed to its ability to discern corre-lations among input nodes. In the realm of Multi-agent Reinforcement Learning (MARL), agents are tasked with observing other entities within their environment to determine their behavior. Conventional MARL methodologies often suffer from training difficulties if Permutation Invariant (PI) and Permutation Equivariant (PE) properties are not considered during training. The adoption of graph representation offers a solution to these challenges by conceptualizing observed entities as a graph. In this context, we introduce the Hy-per Graphical Attention Policy (HGAP) Network, which employs a graph attention mechanism to fulfill the PI and PE properties, while also un-derstanding inter-entity interactions for decision-making. HGAP is assessed across various MARL benchmarks to confirm its effectiveness and effi-ciency. In addition, a series of ablation studies are provided to demonstrate its adaptability, trans-ferability, and the capability to alleviate the com-plexities introduced by the POMDP constraint. 
+
+# 1. Introduction 
+
+Centralized Training with Decentralized Execution (CTDE) (Oliehoek et al., 2008; Kraemer & Banerjee, 2016) paradigm in Multi-agent Reinforcement Learning (MARL) enables agents to acquire collective decision-making skills through centralized training, while maintaining individual action selection during execution. Several methodologies (Lowe et al., 2017; Foerster et al., 2018a;b; Iqbal & Sha, 2019; Jiang & Lu, 2018; Kim et al., 2019; Yang et al., 2018) have 
+
+> 1
+
+ELSA Lab, Department of Computer Science, National Tsing Hua University, Hsinchu, Taiwan. Correspondence to: Chun-Yi Lee <cylee@cs.nthu.edu.tw >.
+
+Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s). 
+
+Figure 1. PI mandates that the agent treat the same types of entities uniformly, irrespective of their order, and make consistent action decisions. In contrast, PE demands that the agent understand the mapping relationship of the other entities to itself, rather than basing its actions on the entities’ positions within its observation. (a) The agent moves toward the left even if the other entities’ embedding orders change; (b) The agent acts on the red entity regardless of the positions of the entities in the agent’s observation. 
+
+Table 1. A comparison of different methods associated with the PI, PE, and graph properties. An introduction to each method can be found in the Appendix. The symbol ‘o’ indicates that the method possesses the specified property, ‘x’ denotes the absence of it, and ‘△’ suggests that the method only implicitly exhibits that property.                             
+
+> Methods DA-MADDPG Set GNN UPDeT ASN HPN HGAP (Ours) PI ooo△ooo
+> PE xxx△△oo
+> Graph xxoxxxo
+
+been proposed and demonstrated promising performance in various MARL benchmarks, particularly those employ-ing value factorization approaches (Sunehag et al., 2018; Rashid et al., 2018; Son et al., 2019; 2020; Rashid et al., 2020; Wang et al., 2021a; Yang et al., 2020a;b). The success of value factorization methods has prompted modifications to agent networks (Sun et al., 2021; Hu et al., 2021), which have significantly enhanced training performance. However, these modifications tend to neglect the significance of Per-mutation Invariant (PI) and Permutation Equivariant (PE) properties (Hao et al., 2023), which may result in reduced training efficiency. PI necessitates consistent behavior de-spite variations in the embedding orders of entities, while PE involves understanding the mapping relationship between specific entities and actions. Fig. 1 illustrates that PI re-quires various arrangements of the same types of entities 1HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network           
+
+> (a) 3m (E) (b) 1c3s5z (E) (c) 3s vs 5z (H) (d) 3s5 (H) (e) 6h vs 8z (S) (f) MMM2 (S)
+> Figure 2. This figure illustrates the attention maps for scenarios depicted in the last row from SMAC (Vinyals et al., 2017). The first row indicates UPDeT, and the second row represents HGAP. The red, blue, and green dots represent the agent, allies, and enemies, respectively. The grey-shaded circle represents the visible range of the agent. (E), (H), and (S) denote the Easy ,Hard , and Super-Hard scenarios, respectively. In each attention map, each horizontal row represents the attention of one agent/entity towards others, while each vertical column shows the attention received by a certain agent/entity from the others. Notice that UPDeT cannot correctly identify prioritized entities for decision-making, whereas HGAP not only focuses on crucial entities but also prioritizes the nearest ones based on their distance. In (a), (c), (d), and (e), the agents primarily undertake attacking actions, hence focusing more on enemies. In (b), the agent does not focus on other entities because it is retreating. This is due to the agent possessing a larger attacking range, leading it to prefer moving backward to avoid attacks and to strike from a distance. In (f), the agent is a Medivac (a healing unit), thus it focuses more on its allies.
+
+possessing identical information, enabling an agent to make the same action decision regardless of the entities’ order, while PE emphasizes that agents should learn the mapping relationship of entities to the agent rather than the entities’ positions in its observation. Failure to consider these proper-ties in the design of agent networks could lead to extended learning time and might adversely impact training efficiency and transferability (Hao et al., 2023). In addition, MARL setups typically involve a Partially Observable Markov De-cision Process (POMDP), which can further exacerbate the above PI and PE issues, as the number of observable entities is limited. Overlooking these would demand significantly more training effort in developing effective CTDE policies. To address the challenges, various CTDE-based MARL methods have been explored. Table 1 shows that some methods primarily focus on PI, while others consider both PI and PE properties. Earlier works such as DA-MADDPG (Ye et al., 2023), Set (Lee et al., 2019), and GNN (Liu et al., 2019) have begun to account for PI through data rearrangement-based augmentation. Nevertheless, they require considerable training time and computational re-sources and do not take PE into consideration (Hao et al., 2023). Recent approaches such as UPDeT (Hu et al., 2021), ASN (Wang et al., 2020b), and HPN (Hao et al., 2023) have integrated both PI and PE properties into the design of their agent networks through the use of either hypernet-works (Wang et al., 2020b; Hao et al., 2023) or attention lay-ers (Hu et al., 2021). HPN and ASN achieve these properties by encoding the features of different entities separately, thus avoiding issues related to the ordering of them. However, both generate the embeddings of entities without consider-ing the intercorrelations among different entities. UPDeT employs attention layers to learn correlations, and while attention layers inherently possess PI and PE properties im-plicitly, they may yield inconsistent attention results (Hao et al., 2023). Another concern is the increase in total train-ing parameters (Wang et al., 2020b; Hao et al., 2023) (due to additional hypernetworks) or computational costs (Hu et al., 2021) (due to longer attention sequences) as the num-ber of entities grows, which can lead to increased memory requirements for training agent networks (Hao et al., 2023). Furthermore, these methods do not account for entities that are out of sight due to POMDP, which can further limit the agent network’s representational capability and the agent’s comprehension of other entities. Addressing these chal-lenges is therefore the primary objective of this research. To meet the above demands, Graph Attention Network (GAT) (Veli ˇckovi ´c et al., 2018; Brody et al., 2022) has emerged as a promising candidate to be integrated into the agent network design to overcome the challenges. GATs 2HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+have been applied to multiple domains (Bao et al., 2019) and have demonstrated the capability to leverage dynamic attention for learning correlations among different graph nodes, which allows them to produce representative em-beddings that enhance performance in various downstream tasks (Park et al., 2022). This suggests its potential appli-cability to MARL problems, where capturing correlations among observed and/or even unobserved entities is crucial in POMDP. Utilizing GAT’s graph representation capabil-ity also enables an agent network to disregard the ordering relationship of entities, which helps it achieve PI and PE properties. Another key advantage of GAT is its feasibility for addressing POMDP, due to its ability to infer unseen enti-ties through graph-connected adjacent entities. This feature allows the agent to extract environmental information from graph-derived clues for more informed decision-making. Fig. 2 presents an analysis between UPDeT and our pro-posed GAT-based method. The attention heatmaps gener-ated by UPDeT lack the capability to learn entity correla-tions, especially in more challenging scenarios. In addition, UPDeT fails to provide sufficient information for entities out of sight. In contrast, our GAT-based method not only focuses attention on crucial entities, such as opponents, but also allocates attention based on their proximity. Moreover, our method exhibits the ability to implicitly account for en-tities out of sight by leveraging the strengths of GAT. These advantages position GAT as an excellent solution, filling a niche that prior approaches have not adequately addressed. In light of the preceding discussions, we introduce a graph attention-based agent network, termed ‘ Hyper Graphical 
+
+Attention Policy Network (HGAP)’, as a solution to the challenges discussed earlier. HGAP serves as a versatile framework applicable to a wide range of MARL paradigms, including actor-critic, value factorization, and policy-based methodologies. HGAP employs GATv2 (Brody et al., 2022) to extract correlations among entities, which also ensures its adherence to the PI and PE properties. In addition, by lever-aging GATv2’s property as a bi-directional complete graph, HGAP possesses the ability to infer environmental clues, even when entities are out of sight. This allows HGAP to mitigate the challenges posed by POMDP. Moreover, HGAP maintains a manageable number of parameters, even as the number of entities increases. To substantiate the effective-ness of HGAP, we conduct a series of experiments across diverse MARL benchmarks (Vinyals et al., 2017; Ellis et al., 2023; Mordatch & Abbeel, 2017). We also provide ablation studies to validate HGAP’s applicability to different MARL methodologies, its transfer learning capabilities, as well as its efficacy in retrieving information about unseen entities. The key contribution of this work is the evidence suggesting that HGAP satisfies PI and PE, overcomes the constraints of POMDP, and is applicable to various MARL paradigms. 
+
+# 2. Preliminaries 
+
+In this section, we begin by defining the MARL problem with Dec-POMDP, and introduce the notation to be used. Then, we present the formulation of GATv2. The back-grounds for the PI and PE properties, as well as several relevant MARL approaches, are detailed in the Appendix. 
+
+2.1. Definition of MARL (Dec-POMDP) 
+
+We model our MARL problem within the framework of De-centralized Partially Observable Markov Decision Process (Dec-POMDP) (Oliehoek & Amato, 2016). A Dec-POMDP is formally defined as a tuple <N, O, S, A, U, T, R, γ> ,where N represents the set of agents, oi ∈ O denotes the ob-servation of agent i, S denotes the global state space, and A
+
+represents the action space. The global state s ∈ S includes the joint agent observation (i.e., o1 × o2 × o3 × ... × oN ) and additional environmental information. T represents the state transition probability function that maps from the current global state and action space to the probability of reaching subsequent states: S × A × S → [0 , 1] . Each agent i can apply an action uit ∈ Ai at each timestep t from its own action space Ai ⊆ A to the environment and subsequently receive a reward rit from reward function R : S × A. The joint action space is defined as U = Π i∈N Ai, and the joint action is denoted as u = {ui|i ∈ N} ∈ U. The observation of agent i at t is defined as oit = {oi,own t , o i, 1 
+
+> t
+
+, o i, 2 
+
+> t
+
+, ..., o i,K t },where oi,own t is the observed environmental information and private information for agent i, and oi,j t refers to the infor-mation observed from entity j among K entities. A policy 
+
+πi : O × Ai → [0 , 1] specifies the probability distribution over the actions for agent i. The objective for each agent 
+
+i is to learn a πi that maximizes the expected cumulative reward G = Eπi [P∞ 
+
+> t=0
+
+γt · rit], where γ is a discount factor. 
+
+2.2. Graph Attention Transformer (GAT) 
+
+GAT is designed to process graph-structured data, typically defined as G = ( V, E ), where nodes V represent entities and edges E denote their interrelations. GAT employs atten-tion mechanisms to dynamically adjust the significance of nodes within a graph and assigns variable weights to them. This capability enhances tasks such as node classification and link prediction by prioritizing relevant nodes. GAT en-ables more efficient handling of irregular data structures and better representation of correlations among data elements. In this work, we utilize GATv2 (Brody et al., 2022) and describe it in the following context. Assuming a graph with 
+
+m nodes, we define W ∈ Rd×d′
+
+as a node transformation matrix, where d represents the dimension of the original en-tity features and d′ denotes the size of the output embedding. The embedding for node i, denoted as hi, is determined by hi = W · νi, where νi ∈ Rd symbolizes the original 3HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network  
+
+> Figure 3. An overview of the proposed Hyper Graphical Attention Policy (HGAP) framework.
+
+entity feature of node i, i ∈ { 1, · · · , m }. GATv2 employs a scoring function, fs : R2d′
+
+→ R, to assign a weight to every edge (i, j ), which reflects the significance of the features of neighbor j to node i. The scoring function is defined as: 
+
+fs(hi, h j ) = LeakyReLU (α⊤ · [hi|| hj ]) , (1) where α ∈ R2d′
+
+is a learned vector, and || denotes vector concatenation. The attention weight ωi.j can be derived as: 
+
+ωi,j = Sof tmax (fs(hi, h j )) = exp (fs(hi, h j )) 
+
+Pmk=1 fs(hi, h k) , (2) With the scoring process, GATv2 calculates a new represen-tation for each node i by taking a weighted average of the transformed features of its neighboring nodes followed by a nonlinearity transformation Ψ. This calculation uses the normalized attention coefficients obtained from the scoring function. Specifically, for a node i, GATv2 updates it as 
+
+h′
+
+> i
+
+[k] = Ψ( Pmj=1 ωk,j · hi[j]) , where [k] is the kth element. 
+
+# 3. Methodology 
+
+In this section, we begin with an overview of the HGAP framework and its components. Subsequently, we introduce the graph-based entity relation embedding module, a key element of HGAP. Following this, we delve into the action generation module, which generates ego and engagement actions. Lastly, we discuss the loss function used by HGAP. 
+
+3.1. Hyper Graphical Attention Policy Network (HGAP) 
+
+Fig 3 presents an overview of the HGAP framework for MARL. Assuming an environment that contains m enti-ties, including the agent itself, the objective of HGAP is to enable an agent to efficiently learn an optimal policy while still possessing the properties of PI, PE, and utilizing GATv2 to represent the relationships between an agent and different entities. HGAP comprises four major components: (1) an Input Module τi = I(oi) that transforms a raw ob-servation oi into a high-dimensional embedding τi, (2) a Graph-based Entity Relation Embedding Module that rep-resents the relationship of the entities within a graph as a latent embedding zi, fostering a more comprehensive repre-sentation of the relationships between agents and entities for improved decision-making, and (3) an Action Generation Module that recurrently embeds the past latent embedding as hi = GRU (zi) to generate the state-action values for ego actions, Qi(aego |oi), and engagement actions, Qi(aeng |oi).Ego actions primarily affect the agent itself, without directly influencing other entities. Engagement actions, on the other hand, are actions an agent takes that directly affect or target other entities. The design of the HGAP framework ensures consistent behavior (PI) as well as facilitating the learning of mapping relationships between entities and actions (PE). Given an input oi containing features of m entities, HGAP applies m independent weight matrices generated by a hypernetwork, denoted as Htran , for transforming en-tity features. These matrices are represented as Win =[W in  
+
+> 0
+
+, · · · , W in m−1]⊤. The output is described as τi[j] = 
+
+Pm−1 
+
+> j=0
+
+W in j oi[j], where [j] indicates the j-th element. The transformed features in our framework are designated as entity embeddings, collectively denoted by τi. These em-beddings are input into the Graph-based Entity Relation Embedding Module, detailed in Section 3.2, to generate the latent embedding zi. In line with prior methods such as QMIX (Vinyals et al., 2017), MADDPG (Lowe et al., 2017), and MAPPO (Yu et al., 2022), HGAP emploies a Gated Recurrent Unit (GRU) (Chung et al., 2014) to produce the hidden embedding hi. This embedding incorporates previ-4HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network   
+
+> (a) (b)
+> Figure 4. (a) Attention heatmap variation during training in SMAC 3s5z map at the initial state. (b) Initial position for all entities in 3s5z.
+
+ous history to provide temporal information and serves as a crucial component for the Action Generation Module to generate the state-action values, as discussed in Section 3.3. 
+
+3.2. Graph-based Entity Relation Embedding Module 
+
+To identify the correlations between the agent and its ob-served entities, the Graph-based Entity Relation Embedding Module takes τi ∈ Rm×e as input, where m is the number of entities and e represents the feature dimension of each entity within the embedding τi. It then constructs an m × m
+
+Correlation Matrix C ∈ Rm×m×2e, as depicted in Fig. 3, where each entry Ck,j ∈ C is the concatenation of τi[k]
+
+and τi[j], where k, j ∈ m. To facilitate GATv2 updates, 
+
+C must be transformed into an Attention Weight Matrix 
+
+Ω ∈ Rm×m for performing node updates, as described in Section 2.2, where nodes in GATv2 correspond to the entity embeddings τi[k], k ∈ m in HGAP. This transforma-tion is achieved with another Weight Transformation Matrix 
+
+Γ ∈ Rm×m×2e, where each entry of Ω is Ωi,j = Γ ⊤ 
+
+> i,j
+
+Ci,j .HGAP can then perform graph update operations as follows: 
+
+τ ′ 
+
+> i
+
+[k] = 
+
+> e
+
+X
+
+> j=1
+
+Ωk,j × τi[j]. (3) As the dimensions of Ω are determined by the number of entities, adjustments are necessary when transitioning to new environments, thus preventing it from being fixed-sized. As a result, HGAP employs a hypernetwork, Hatten , to generate Γ, where each element of Γ is computed as Γi,k =
+
+Hatten (oi,k ), ∀k ∈ [1 , m ]. The embedding zi is obtained by aggregating the updated entity embeddings τ ′ 
+
+> i
+
+as follows: 
+
+zi = Aggregate (τ ′
+
+> k
+
+|k ∈ [1 , m ]) . (4) Our experimental results, as depicted in Fig. 4, validate the effectiveness of the Graph-based Entity Relation Embedding Module in enabling the agent to quickly identify enemies within a brief training duration. As training progresses, Fig. 4 demonstrates the efficiency in the agent’s ability to enhance its proficiency in focusing on its enemies (given the agent’s role as an attacking unit) and to effectively identify correlations within a short training period. The findings substantiate the effectiveness of the proposed graph-based module in facilitating more uniform and efficient training. 
+
+3.3. Action Generation Module 
+
+The function of the Action Generation Module is to utilize the embedding zi to derive state-action values for ego and engagement actions. An embedding hi generated by a GRU retains the temporal information for the agent, which can be used to derive the current action based on prior temporal cues. Since zi is obtained through an aggregation function, it ensures that the entry order of the entity embeddings in 
+
+τ ′ 
+
+> i
+
+does not affect the outcome. This further ensures that HGAP satisfies the PI property and can utilize hi to derive ego actions subsequently. Therefore, we employ a fully connected layer to map hi to the corresponding state-action values for ego actions as Qi(aego |oi) for agent i. On the other hand, directly using hi to derive engagement actions without considering entity information and their embedding orders would not fulfill the requirement of PE. As a result, to derive the mapping relationship that links engagement actions with observed entities, HGAP adopts an approach in-spired by Wang et al. (2020b), in which a pairwise function is used to generate the corresponding action-state values. Specifically, the state-action value for the jth engagement action is computed as Qi(aeng |oi)[ j] = τ ′ 
+
+> i
+
+[j]⊤hi. The topo-logical interpretation of this equation can be understood as the cosine angle between hi and the entries of τ ′. When they are proximate, the cosine angle nears zero, indicating a high degree of correlation and suggesting that the corresponding action should be given more consideration. The state-action values are processed through a Softmax layer, and then the action with the highest probability is selected for execution. 
+
+3.4. Loss Function 
+
+To optimize HGAP, we employ the temporal difference (TD) error (Sutton & Barto, 2018) as the objective, same as the approach employed in QMIX (Rashid et al., 2018). The loss function used during training can be formulated as follows: 
+
+L(θ) = 
+
+> b
+
+X
+
+> i=1
+
+[( ytot i − Qtot (τ ; u, s ; θ)) 2], (5) where θ and θ− are the parameters of the agent and target networks, respectively. θ− is periodically copied from θ. b is the batch size, and ytot i = r + max u′ Q(τ ; u′, s ′; θ−).5HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+# 4. Experimental Results 
+
+In this section, we begin by detailing our experimental se-tups. This is followed by a comparison of HGAP against various state-of-the-art (SOTA) methods. Then, we provide a series of ablation studies to validate HGAP’s effective-ness. These studies include applying HGAP within different MARL frameworks, assessing its transferability, and evalu-ating its comprehension of invisible entities under POMDP. 
+
+4.1. Experimental Setups Environments. We evaluate the performance of HGAP on three representative MARL environments: Multiple Par-ticle Environments (MPE) (Mordatch & Abbeel, 2017), SMAC (Vinyals et al., 2017), and SMACv2 (Ellis et al., 2023). MPE is tailored explicitly for MARL, wherein agents are represented as elementary particles within physics-based simulations. The inherent simplicity of these basic environ-ments not only eliminates the complexities found in more re-alistic scenarios but also enables a concentrated examination of essential elements related to MARL agent interactions. SMAC serves as an evaluation platform for cooperative MARL algorithms, which utilizes the strategy game Star-Craft II as its foundation. The scenarios involve both agent and enemy units, with the objective of eliminating the en-emy within a predefined duration. Agents that are guided by MARL algorithms interact with adversaries governed by the game’s built-in AI heuristics. SMAC evaluates agent performance based on a global reward computed at each timestep, taking into account factors such as the number of defeated enemies, inflicted damage, and the agents’ overall success. The scenarios in SMAC contain Easy , Hard , and 
+
+Super-Hard difficulty levels defined by Vinyals et al. (2017). SMACv2 is an evolved extension of SMAC and features three significant changes: (1) randomized initial positions, (2) randomized entity types, and (3) adjusted unit sight and attack ranges. These introduce greater randomness and diversity into the scenarios, and the purpose is to address the previous limitations in SMAC concerning the assessment of algorithmic robustness. In our experiments, we employ five independent random seeds across all the environments to ensure the robustness and reliability of our evaluations. 
+
+Observation and Action Space. In MPE, the action space for each agent encompasses six potential operations: no operation (no-op), pressing a button, and movements in four directions (up, right, down, and left). The observation space for these agents includes individual features (e.g., velocity and position) and positional information about other entities. In the SMAC and SMACv2 environments, the action space for each agent is divided into two primary components: (i) stop, no-op, and the four directions of movement (north, south, east, and west), and (ii) attacks on the enemies. An agent can attack an enemy if two conditions are met: (1) the targeted enemy is alive, and (2) the enemy is both visible to the agent and falls within its attack range. The observation space in these environments includes the agent’s features, such as the ability to move in four directions and its current health status. Furthermore, it includes features of other entities, such as visibility, health, normalized relative x-y coordinates, and distance from the agent. In adherence to the principles of POMDP, entities outside an agent’s sight range are represented as zero in the corresponding observation. 
+
+Baselines. A wide range of CTDE-based MARL method-ologies have been selected to evaluate different agent net-work design strategies. These include the recurrent neu-ral network (RNN) (Hausknecht & Stone, 2015) agent, the attention-based UPDeT (Hu et al., 2021), and the DFAC (Sun et al., 2021) and ResQ (Shen et al., 2022) net-works, which represent distributional RL strategies. In ad-dition, RODE (Wang et al., 2020a) is included to represent role-based methodologies. Considering previous PI and PE approaches, ASN (Wang et al., 2020b) and HPN (Hao et al., 2023) have also been incorporated. All these agents employ QMIX as the factorization network for a fair comparison. To further demonstrate the adaptability of HGAP, a series of ablation studies are conducted. First, HGAP is inte-grated into action-critic frameworks, which include MAD-DPG (Lowe et al., 2017), DA-MADDPG (Ye et al., 2023), and PIC (Liu et al., 2019). Second, QMIX is replaced with QPLEX (Wang et al., 2021a) to verify the robustness of HGAP’s performance across different factorization net-works. Lastly, HGAP is implemented in a policy-based method, specifically MAPPO (Yu et al., 2022). We also evaluate HGAP alongside other PI/PE methodologies. For methods considering only the PI property, we include DA-MADDPG, Set (Lee et al., 2019), and GNN (Liu et al., 2019). Methods incorporating both PI and PE properties include UPDeT, ASN, and HPN. All experiments are eval-uated across five distinct random seeds, with shaded areas in the figures representing the training variance. The hy-perparameters for each method are configured based on the optimal settings reported in their respective original papers, with their detailed information available in Appendix F. 
+
+4.2. Agent Network Comparison 
+
+We explore a variety of agent network design strategies for CTDE-based MARL methods, all of which utilize the QMIX value factorization network for training. The results of this experiment are illustrated in Fig. 5. It is observed that agents (i.e., HGAP and HPN) considering both PI and PE properties achieve higher test win rates compared to the other baselines, particularly outperforming those based on distributional RL and role-based strategies. Moreover, as the complexity of the scenarios increases, HGAP exhibits a more rapid rate of convergence compared to the other 6HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network            
+
+> (a) 1c3s5z (E) (b) 3s vs 5z (H) (c) 5m vs 6m (H) (d) 3s5z vs 3s6z (S) (e) zerg 10 vs 11 (v2)
+> Figure 5. Test win rate comparison for different CTDE-based MARL approaches in SMAC and SMACv2 for comparing the agent network design strategies. (E), (H), (S) stand for Easy ,Hard , and Super-Hard scenarios in SMAC, and (v2) denotes the scenario from SMACv2.
+> (a) Navigation (N=10) (b) Predator-Prey (N=3)
+> Figure 6. Test win rate comparison for MADDPG variants in MPE for validating HGAP’s adaptability to actor-critic based methods.
+
+baselines. This indicates that HGAP is effective and robust across a range of scenarios, even the more challenging ones from SMACv2, which features increased stochasticity and difficulty. Additional results are offered in Appendix G.1. 
+
+4.3. Ablation: Adaptability of HGAP 
+
+In this section, the integration of HGAP with multiple MARL methods is presented to verify HGAP’s adaptability. 4.3.1. A CTOR -C RITIC NETWORK ADAPTABILITY 
+
+We first explore the application of HGAP within the MADDPG framework, which results in a new variant termed HGAP-MADDPG. This analysis compares HGAP-MADDPG with the existing MADDPG on MPE. The learn-ing curves presented in Fig. 6 demonstrate that HGAP-MADDPG achieves superior performance when bench-marked against HPN-MADDPG (Hao et al., 2023), PIC, DA-MADDPG, and MADDPG. We examine HGAP-MADDPG applied in large population environments in Appendix G.2. 4.3.2. F ACTORIZATION NETWORK ADAPTABILITY 
+
+We next examine the efficacy and adaptability of HGAP in conjunction with the QPLEX framework within the SMACv2 environments. This variant is termed HGAP-QPLEX. The results of this validation are illustrated in Fig. 7. Based on these results, it can be observed that in-tegrating HGAP with QPLEX enhances the test win rates and achieves better efficiency than the conventional QPLEX configuration. Further detailed results and discussions are presented in AppendixG.3. This substantiates HGAP’s po-tential to improve the robustness and effectiveness of other factorization networks in complex, dynamic environments.     
+
+> (a) protoss 10 vs 11 (b) terran 20 vs 23
+> Figure 7. Test win rates of QPLEX & HGAP-QPLEX in SMACv2.
+> (a) terran 10 vs 11 (b) zerg 20 vs 23
+> Figure 8. Test win rates: MAPPO & HGAP-MAPPO in SMACv2.
+
+4.3.3. P OLICY -BASED NETWORK ADAPTABILITY 
+
+Lastly, the integration of HGAP within the standard MAPPO learning framework is evaluated in the context of SMACv2, and this variant is termed HGAP-MAPPO. The test win rates are depicted in Fig. 8. The results suggest that HGAP enhances MAPPO and can yield improved performance and training efficiency in policy-based approaches. This finding demonstrates HGAP’s adaptability and effectiveness in improving policy-based multi-agent learning strategies. For additional analysis results, please refer to AppendixG.4. 
+
+4.4. Ablation: PI and PE Baselines Comparison 
+
+In this section, we compare HGAP with several baselines that consider PI and PE. The PI-only baselines include: (i) DA-MADDPG (DA), which enhances MADDPG by shuf-fling the input order for additional training data, as described by (Ye et al., 2023); (ii) Set, which applies the Set Trans-former to QMIX’s state-action value functions for entity embedding aggregation (Zaheer et al., 2017); and (iii) GNN, which implements GNN (Liu et al., 2019) on its state-action value functions within QMIX. The other baselines that con-sider both PI and PE (i.e., UPDeT, ASN, and HPN) are adopted without modification from their respective original 7HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network           
+
+> (a) 10m vs 11m (H) (b) 6h vs 8z (S) (c) corridor (S) (d) MMM2 (S)
+> Figure 9. Test win rates for the PI/PE baselines in SMAC. A detailed introduction to the PI/PE baselines can be found in Appendix D.
+> (a) (b)
+> Figure 10. Transfer learning comparison between HPN and HGAP in SMAC. The dashed lines represent the training of agents from scratch in the target environments without pretraining, while the solid lines indicate agents pre-trained in one scenario and then transferred to the target scenario. (a) 5m vs 6m (H) →
+> 10m vs 11m (H); and (b) 3s5z (H) →3s5z vs 3s6z (S).
+
+publications. The results evaluated in SMAC, shown in Fig. 9, indicate that the performance of HGAP surpasses HPN and the other baselines. It can be observed that con-sidering both PI and PE in the agent network design can indeed enhance training performance compared with the baselines that do not consider both, such as DA, Set, and GNN. HGAP’s superior performance over HPN and the others is attributed to its design, which effectively captures inter-entity relationships, thus providing more comprehen-sive information for HGAP to perform decision-making. 
+
+4.5. Transfer Learning Comparisons 
+
+The flexible architecture design of HGAP suggests that it can also be as a transferable framework, which allows HGAP to potentially expedite the adaptation of a pre-trained MARL policy to more complex scenarios with enhanced learning efficiency. To validate this, we conduct an ex-periment with HGAP and incorporat HPN as a baseline across various transfer learning scenarios. We evaluat the transferability of both HGAP and HPN using SMAC, with the results presented in Fig. 10. The findings indicate that HGAP achieves at least a 60% reduction in training time compared to training agents from scratch. This demonstrates HGAP’s capability to efficiently transfer pre-trained policies to new and more challenging scenarios. Additional results on HGAP’s transferability are available in Appendix G.5. 
+
+4.6. Competing Against Full-Information Opponents 
+
+We present an interesting experiment for a scenario in which the opponents have access to complete environmental in-formation, while the agent and its allies operate under the POMDP constraint with limited sight range. As a result,   
+
+> (a) 3s5z (H) (b) corridor (S)
+> Figure 11. A comparison of UPDeT, HPN, and HGAP in SMAC under special setting that the enemies have full environmental information, while the agent and allies are constrained by POMDP.
+
+certain entities remain unobservable, whereas the enemies enjoy an unlimited sight range. Many previous MARL stud-ies have treated invisible entities as non-existent, which constrains their representation capability of the environmen-tal information. In contrast, HGAP employs a graph-based representation strategy to enable the agent to implicitly infer potential information associated with these invisible enti-ties. We compare HGAP, HPN, and UPDeT under such constraints. The results presented in Fig. 11 indicate that HGAP exhibits superior evaluation performance in such a setting due to its graph-based representation mechanism. 
+
+# 5. Conclusions 
+
+This study introduced HGAP, an agent network designed for MARL that employs a graph attention mechanism to encode the relationships among entities in an environment, while maintaining the properties of PI and PE. The graph-based embedding mechanism of HGAP further enables it to address the constraints of POMDP by inferring informa-tion from the graph. The experimental results conducted on MPE, SMAC, and SMACv2 validated HGAP’s superiority over various CTDE-based MARL methodologies. Further-more, HGAP’s adaptability to different MARL framework designs is demonstrated, including its adaptability to actor-critic methods, a different value factorization frameworks, and a policy-based method. We also explored transfer learn-ing scenarios to show that HGAP’s architecture allows for the efficient transfer of a pre-trained policy to new or more challenging scenarios faster than the other baselines. Finally, we present a compelling experiment demonstrating that, even when enemies have full sight range and the agent and its allies operate under POMDP constraints, the graph-based embedding mechanism can still enable HGAP to outperform the baselines under this constrained and challenging setup. 8HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+# Acknowledgment 
+
+The authors gratefully acknowledge the support from the National Science and Technology Council (NSTC) in Tai-wan under grant number MOST 111-2223-E-007-004-MY3 and the financial support from MediaTek Inc., Taiwan. The authors would also like to express their appreciation for the donation of the GPUs from NVIDIA Corporation and NVIDIA AI Technology Center (NVAITC). Moreover, the authors extend their gratitude to the National Center for High-Performance Computing (NCHC) in Taiwan for pro-viding the necessary computational and storage resources. 
+
+# Impact Statement 
+
+This paper presents research aimed at utilizing graph rep-resentation and PI/PE properties to enhance agent policy learning in multi-agent reinforcement learning with better training efficiency. Our methodology can be easily inte-grated into various MARL approaches and offers better performance. While our research does not have any social consequences, the potential social impact is positive, as it can contribute to advancements in robotic applications. 
+
+# Limitation 
+
+One of the limitations of the current HGAP framework could be the absence of coach-based methodologies to en-hance agent learning and performance. The integration of a coach agent that provides critiques or strategic advice dur-ing training could potentially improve the learning process and the overall performance of the agents. Furthermore, incorporating human-in-the-loop coaching, where human experts offer real-time guidance, and curriculum learning techniques that gradually increase task complexity under a coach’s supervision, may facilitate more structured agent learning. However, realizing effective coach-based learning within the HGAP framework would require the development of new architectures and algorithms to seamlessly integrate coaching feedback and demonstrations. Techniques such as imitation learning, inverse reinforcement learning, or hy-brid coach-guided reinforcement learning approaches need to be explored to fully leverage the potential benefits of coach-based methods. By addressing these limitations and combining HGAP with coach-based methods, a crucial fu-ture direction of this work is to improve agent capabilities, boost performance in complex environments, enable more efficient multi-agent decision-making, and foster collabo-ration between artificial agents and human domain experts. This direction holds promise for tackling challenging real-world problems and will be a focus of our future work. 
+
+# References 
+
+Bao, L., Ma, B., Chang, H., and Chen, X. Masked graph attention network for person re-identification. In Proc. Computer Vision and Pattern Recognition (CVPR) , 2019. Battaglia, P. W., Hamrick, J. B., Bapst, V., Sanchez-Gonzalez, A., Zambaldi, V., et al. Relational in-ductive biases, deep learning, and graph networks. 
+
+arXiv:1806.01261 , 2018. Brody, S., Alon, U., and Yahav, E. How attentive are graph attention networks? In Int. Conf. on Learning Represen-tations (ICLR) , 2022. Chung, J., Gulcehre, C., Cho, K., and Bengio, Y. Em-pirical evaluation of gated recurrent neural networks on sequence modeling. In Proc. Conf. on Neural Information Processing Systems Workshop (NeurIPSW) , 2014. Dosovitskiy, A., Beyerm, L., Kolesnikov, A., Weissenborn, D., Zhai, X., et al. An image is worth 16x16 words: Transformers for image recognition at scale. In Int. Conf. on Learning Representations (ICLR) , 2021. Ellis, B., Cook, J., Moalla, S., Samvelyan, M., Sun, M., and et al. SMACv2: An improved benchmark for cooperative multi-agent reinforcement learning. arXiv:2212.07489, 2023. Foerster, J., Farquhar, G., Afouras, T., Nardelli, N., and Whiteson, S. Counterfactual multi-agent policy gradients. In Proc. Conf. on Artificial Intelligence (AAAI) , 2018a. Foerster, J., Nardelli, N., Farquhar, G., Afouras, T., Torr, P. H. S., and et al. Stabilising experience replay for deep multi-agent reinforcement learning. arXiv:1702.08887 ,2018b. Hao, J., Hao, X., Mao, H., Wang, W., Yang, Y., et al. Boost-ing multiagent reinforcement learning via permutation invariant and permutation equivariant networks. In Int. Conf. on Learning Representations (ICLR) , 2023. Hausknecht, M. J. and Stone, P. Deep recurrent Q-learning for partially observable mdps. In Proc. Conf. on Artificial Intelligence (AAAI) , 2015. Hu, S., Zhu, F., Chang, X., and Liang, X. UPDeT: Universal multi-agent reinforcement learning via policy decoupling with transformers. In Int. Conf. on Learning Representa-tions (ICLR) , 2021. Iqbal, S. and Sha, F. Actor-attention-critic for multi-agent reinforcement learning. In Proc. Int. Conf. on Machine Learning (ICML) , 2019. Jiang, J. and Lu, Z. Learning attentional communication for multi-agent cooperation. In Proc. Conf. on Neural Information Processing Systems (NeurIPS) , 2018. 9HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+Jiang, J., Dun, C., Huang, T., and Lu, Z. Graph convolu-tional reinforcement learning. In Int. Conf. on Learning Representations (ICLR) , 2020. Kim, D., Moon, S., Hostallero, D., Kang, W. J., Lee, T., et al. Learning to schedule communication in multi-agent reinforcement learning. In Int. Conf. on Learning Repre-sentations (ICLR) , 2019. Kraemer, L. and Banerjee, B. Multi-agent reinforcement learning as a rehearsal for decentralized planning. Neuro-computing , 190:82–94, 2016. Lee, J., Lee, Y., Kim, J., Kosiorek, A. R., Choi, S., et al. Set Transformer: A framework for attention-based permutation-invariant neural networks. In Prof. Int. Conf. on Machine Learning (ICML) , 2019. Liu, I. J., Yeh, R. A., and Schwing, A. G. PIC: Permutation invariant critic for multi-agent deep reinforcement learn-ing. In Proc. Int. Conf. on Machine Learning (ICML) ,2019. Lowe, R., WU, Y., Tamar, A., Harb, J., Abbeel, P., O., et al. Multi-agent actor-critic for mixed cooperative-competitive environments. In Proc. Conf. on Neural Information Processing Systems (NeurIPS) , volume 30, 2017. Maron, H., Ben-Hamu, H., Shamir, N., and Lipman, Y. Invariant and equivariant graph networks. In Int. Conf. on Learning Representations (ICLR) , 2019. Meng, L., Wen, M., Yang, Y., Le, C., Li, X. Y., et al. Offline pre-trained multi-agent decision transformer, 2022. Mordatch, I. and Abbeel, P. Emergence of grounded compositional language in multi-agent populations. 
+
+arXiv:1703.04908 , 2017. Oliehoek, F. A. and Amato, C. A Concise Introduction to Decentralized POMDPs . Springer Publishing Company, Incorporated, 2016. Oliehoek, F. A., Spaan, M. T. J., and Vlassis, N. Optimal and approximate Q-value functions for decentralized pomdps. 
+
+arXiv:1111.0062 , 2008. Park, C., Lee, C., Bahng, H., Tae, Y., Jin, S., et al. ST-GRAT: A novel spatio-temporal graph attention networks for accurately forecasting dynamically changing road speed, 2022. Rashid, T., Samvelyan, M., Schroeder, C., Farquhar, G., Fo-erster, J., and Whiteson, S. QMIX: Monotonic value function factorisation for deep multi-agent reinforce-ment learning. In Proc. Int. Conf. on Machine Learning (ICML) , 2018. Rashid, T., Farquhar, G., Peng, B., and Whiteson, S. Weighted QMIX: Expanding monotonic value function factorisation for deep multi-agent reinforcement learning. 33, 2020. Shen, S., Qiu, M., Liu, J., Liu, W., Fu, Y., et al. ResQ: A residual Q function-based approach for multi-agent reinforcement learning value factorization. In Proc. Conf. on Neural Information Processing Systems (NeurIPS) ,2022. Son, K., Kim, D., Kang, W. J., Hostallero, D. E., and Yi, Y. QTRAN: Learning to factorize with transformation for cooperative multi-agent reinforcement learning. In Proc. Int. Conf. on Machine Learning (ICML) , 2019. Son, K., Ahn, S., Reyes, R. D., Shin, J., and Yi, Y. Qtran++: Improved value transformation for cooperative multi-agent reinforcement learning. arXiv:2006.12010 , 2020. Sun, W. F., Lee, C. K., and Lee, C. Y. DFAC framework: Factorizing the value function via quantile mixture for multi-agent distributional q-learning. In Proc. Int. Conf. on Machine Learning (ICML) , 2021. Sunehag, P., Lever, G., Gruslys, A., Czarnecki, W. M., Zam-baldi, V., and et al. Value-decomposition networks for cooperative multi-agent learning based on team reward. In Proc. Int. Conf. on Autonomous Agents and MultiAgent Systems (AAMAS) , 2018. Sutton, R. S. and Barto, A. G. Reinforcement Learning: An Introduction, Second Edition . MIT Press, Cambridge, MA, 2018. Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., et al. Attention is all you need. In Proc. Conf. on Neural Information Processing Systems (NeurIPS) , 2017. Veli ˇckovi ´c, P., Cucurull, G., Casanova, A., Romero, A., Li `o, P., and et al. Graph attention networks. In Int. Conf. on Learning Representations (ICLR) , 2018. Vinyals, O., Ewalds, T., Bartunov, S., Georgiev, P., Vezh-nevets, A. S., et al. Starcraft II: A new challenge for reinforcement learning. arXiv:1708.04782, 2017. Wang, J., Ren, Z., Liu, T., Yu, Y., and Zhang, C. QPLEX: duplex dueling multi-agent q-learning. In Int. Conf. on Learning Representations (ICLR) , 2021a. Wang, T., Dong, H., Lesser, V., and Zhang, C. ROMA: Multi-agent reinforcement learning with emergent roles. In Proc. Int. Conf. on Machine Learning (ICML) , 2020a. Wang, T., Gupta, T., Mahajan, A., Peng, B., Whiteson, S., et al. RODE: Learning roles to decompose multi-agent tasks. In Int. Conf. on Learning Representations (ICLR) ,2021b. 10 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+Wang, W., Yang, T., Liu, Y., Hao, J., Hao, X., et al. From few to more: Large-scale dynamic multiagent curriculum learning. In Proc. Conf. on Artificial Intelligence (AAAI) ,2019. Wang, W., Yang, T., Liu, Y., Hao, J., Hao, X., et al. Action semantics network: Considering the effects of actions in multiagent systems. In Int. Conf. on Learning Represen-tations (ICLR) , 2020b. Yang, Y., Luo, R., Li, M., Zhou, M., Zhang, W., et al. Mean field multi-agent reinforcement learning. In Proc. Int. Conf. on Machine Learning (ICML) , 2018. Yang, Y., Hao, J., Liao, B., Shao, K., Chen, G., et al. Qat-ten: A general framework for cooperative multiagent reinforcement learning. arXiv:2002.03939 , 2020a. Yang, Y., Wen, Y., Chen, Y., Wang, H., Shao, K., et al. Multi-agent determinantal Q-learning. In Proc. Int. Conf. on Machine Learning (ICML) , 2020b. Ye, Z., Chen, Y., Song, G., Yang, B., and Fan, S. Experience augmentation: Boosting and accelerating off-policy multi-agent reinforcement learning. In Int. Conf. on Learning Representations (ICLR) , 2023. Yu, C., Velu, A., Vinitsky, E., Gao, J., Wang, T., et al. The surprising effectiveness of PPO in cooperative multi-agent games. In Proc. Conf. on Neural Information Pro-cessing Systems (NeurIPS) , 2022. Zaheer, M., Kottur, S., Ravanbakhsh, S., Poczos, B., Salakhutdinov, R., et al. Deep sets. In Proc. Conf. on Neural Information Processing Systems (NeurIPS) , 2017. 11 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+# Appendix 
+
+This appendix aims to provide additional information that includes a summary of notations for the main manuscript, background materials for various value factorization method baselines, and the foundational concept of the Transformer. It also supplements the main manuscript with additional experimental results. Section A summarizes the notations used throughout the paper. More specifically, Section B offers an in-depth discussion on contemporary value factorization methodologies. In Section C introduces various aspects of MARL approaches. Furthermore, we also demonstrate some PI and PE MARL methodologies in Section D. Section E briefly describes the concept of the Transformer model and the attention mechanism. Section F details the hyperparameters employed in our experiments. Moreover, Section G provides additional experimental results to complement those presented in the main manuscript. Lastly, we provide more graph attention heatmaps to validate the effectness of GATv2 in Section H. 
+
+# A. Notation Table 
+
+To enhance clarity and facilitate understanding of the notations used throughout our paper, Table A1 provides a comprehensive summary of these notations.  
+
+> Table A1. Notation table
+
+Notation Descriptions 
+
+Dec-POMDPs Notations 
+
+N Set of agents in the environments i ∈ N
+
+O Observation space oi ∈ OS Global state space s ∈ SA Action space uit ∈ Ai, ∀i ∈ N
+
+U Joint action space U = Π i∈N Ai
+
+T State transition function defining the probability from s to 
+
+s′ by taking u, where u ∈ UP (s′ | s, u )
+
+R Reward function R(s, u )
+
+# B. Background of the Value Factorization Methods 
+
+In this section, we elaborate on the core concepts of the mixing networks that we have selected for comparison with our proposed methodology in the manuscript. These networks include VDN (Sunehag et al., 2018), QMIX (Rashid et al., 2018), QTRAN (Son et al., 2019), Qatten (Yang et al., 2020a), and QPLEX (Wang et al., 2021a). The explanation aims to provide an in-depth comprehension of their function and enable a meaningful comparison with our proposed approach. The notations used in this section are defined as follows. N is the total number of agents and i ∈ N represents the index of the agent. The joint history h = h1, ..., h N concatenates the action-observation history of each agent, where hi denotes the individual action-observation history for agent i. The joint action u = u1, ..., u N is taken with joint history h to estimate the joint action-value function Qjt (h, u ) at every timestep t, where ui is the individual action taken by agent i.
+
+B.1. Value Decomposition Network (VDN) 
+
+In VDN (Sunehag et al., 2018), the value factorization network, often referred to as the mixing network, operates under the assumption of additivity in the value function. It represents the total return, denoted as Qjt , as a sum of individual utility functions. Each of these functions is derived from the corresponding agent’s individual trajectory and action. This concept can be represented as follows: 
+
+Qjt (h, u ) = 
+
+> N
+
+X
+
+> i=1
+
+Qi(hi, u i) . (6) 12 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+The contribution of VDN lies in decomposing complex joint learning problems into smaller, more manageable sub-problems. By value factorization, it simplifies the learning process of MARL agents. 
+
+B.2. QMIX 
+
+QMIX (Rashid et al., 2018) extends the concept of value factorization networks from VDN and employs a network to estimate the joint action-value function Qjt . This function is modeled as a non-linear combination of individual utility functions Qi(hi, u i).The formulation of Qjt can then be expressed as follows: 
+
+Qjt (h, u ) = Φ( Q1(h1, u 1), Q 2(h2, u 2), ..., Q N (hN , u N )) , (7) where Φ represents the monotonic function following the constraint ∂Φ 
+
+> ∂Q i
+
+≥ 0. The weights of the mixing network in QMIX originate from separate hypernetworks. Each hypernetwork accepts the state s as input and generates the weights for a specific layer within the mixing network. The generated weights are also enforced to remain non-negative, which ensures that QMIX adheres to the monotonicity constraint. The outputs of the hypernetworks are subsequently reshaped into matrices of appropriate dimensions. On the other hand, the biases are generated using a similar approach but are not subjected to non-negativity constraints, as described in the original manuscript of QMIX. 
+
+B.3. QTRAN 
+
+While VDN and QMIX have exhibited impressive performance in a number of MARL benchmarks, they face challenges when encountering functions that deviate from additivity or monotonicity. These constraints impose limitations on the representational capacity of the mixing network. In scenarios where the environment does not adhere to these constraints, VDN and QMIX often encounter difficulties in appropriately factorizing the joint Q-value. To address these difficulties, QTRAN (Son et al., 2019) proposed that a factorizable joint action-value function should conform to the following equation: 
+
+> N
+
+X
+
+> i=1
+
+Qi(hi, u i) − Qjt (h, u ) + Vjt (h) = 
+
+(
+
+0, u = ¯ u
+
+≥ 0, u̸ = ¯ u , (8) where Vjt (h) = max u Qjt (h, u ) − PNi=1 Qi(hi, ¯ui), and ¯ui represents the optimal local action for agent i. The joint state value function Vjt (h) incorporates joint observation-action history information. This enhancement, driven by the partial observability from each agent, offers QTRAN an edge in terms of value representation capabilities, and therefore, better performance, over VDN and QMIX. 
+
+B.4. Multi-Head Attention based Q-Value Mixing Network (Qatten) 
+
+QTRAN is introduced to ensure optimal decentralization. It preserves the additive assumption and mitigates the representa-tional constraints associated with VDN and QMIX. However, QTRAN presents a computationally intractable optimization problem. Recently, modules based on attention mechanisms have exhibited outstanding performance across various fields. In Qatten (Yang et al., 2020a), the authors offer a theoretical analysis of the capacity of attention modules for joint action-state value representation. This consideration takes into account a scenario with a continuous action space and the absence of independent agents. Given these assumptions, it’s possible to establish the existence of constants, denoted as c(s), dependent on the state s, which plays as the bias term. The joint action-value function, Qjt , can be expressed as: 
+
+Qjt (h,⃗ u ) ≈ c(s) + 
+
+> K
+
+X
+
+> k=1
+
+wkNX
+
+> i=1
+
+λi,k Qi(hi, u i), (9) where λi,k represents the output from the k-th head of the attention layer, k ∈ K denotes the index of the head in the attention layer utilized in Qatten, and K is the total number of heads. In order to assign weight importance, Qatten attributes 
+
+wk = |f N N (s)|k to different heads. Qatten uses hypernetworks to generate the weights associated with different attention heads in wk, where these weights adjust the Q-values associated with different heads based on global states s. Instead of conducting self-attention between each pair of agents, Qatten transforms the global state information and joint actions into a query matrix and a key matrix for attention. It then concatenates the individual action-value functions and transforms them, resulting in the formation of a value matrix for attention. Qatten utilizes a multi-head attention mechanism within a mixing network that distinctly models each agent’s influence on the overall system during the transformation of individual utilities into Qjt .13 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+B.5. DuPLEX Dueling Multi-Agent Q-Learning (QPLEX) 
+
+The insufficiency of the joint value function class can detrimentally impact performance and pose a potential risk of training instability in offline settings. Several approaches have emerged to address this structural limitation. Among these methods, QTRAN employs two soft regularizations aiming at harmonizing the choice of greedy actions between joint and individual value functions. Nevertheless, due to computational constraints, the implementation of these regularizations is inherently approximate, relying on heuristics and providing no concrete guarantee of Individual-Global-Minimum (IGM) consistency. To deal with this issue, QPLEX (Wang et al., 2021a) introduces an alternative strategy that incorporates a duplex dueling network architecture to facilitate the factorization of the joint action-value function into individual utility functions. It formulates the joint action-value function Qjt as follows: 
+
+Qjt (h, u ) = Vjt (h) + Ajt (h, u )=
+
+> n
+
+X
+
+> i=1
+
+Qi(hi, u i) + 
+
+> n
+
+X
+
+> i=1
+
+(λi(h, a ) − 1) Ai(hi, u i), (10) 
+
+λi(h, u ) = 
+
+> K
+
+X
+
+> k=1
+
+λi,k (h, u )ϕi,k (τ )vk(h), (11) where λi(h, u ) represents the positive importance weights, which are generated through a multi-head attention layer using global state information and joint actions as inputs. K denotes the number of heads, and vk(h) > 0 signifies a positive key for each head. The QPLEX architecture comprises two key components: (i) individual utility functions Qi(hi, u i),each characterized by a recurrent network dedicated to a particular agent, and (ii) a duplex dueling network that merges these individual utility functions to create a joint action-value function Qjt , while conforming to the advantage-based IGM constraint. The architecture employs a dot-product operation between the importance weight λi(h, u ) and the corresponding individual advantage function Ai(hi, u i). This is subsequently added to the joint state value function Vjt (h) = PNi=1 Vi(h),where Vi(h) = ωi(h)Vi(hi) + bi(h). Please note that both ωi(h) and bi(h) are the outputs of a multilayer perceptron (MLP) that uses the global state s as input. This MLP acts as a transformation mechanism for converting individual Vi(hi) to Vi(h).
+
+# C. Introduction to Various MARL approaches 
+
+In recent years, the landscape of Multi-Agent Reinforcement Learning (MARL) has been enriched by the introduction of numerous methodologies, each exhibiting proficiency in various dimensions. This subsection aims to systematically categorize these methodologies into three principal classes, namely: Actor-Critic approaches, Value Function Factorization approaches, and Role-Based approaches. 
+
+C.1. Actor-Critic approaches 
+
+In multi-agent reinforcement learning, it is difficult to estimate the value function since each agent sees the environment as constantly changing. A recent method, called multi-agent deep deterministic policy gradient (Lowe et al., 2017), addresses this by using a centralized critic. This critic combines the observations and actions of all agents. Similarly, other approaches like (Foerster et al., 2018a;b; Iqbal & Sha, 2019; Jiang & Lu, 2018; Kim et al., 2019; Yang et al., 2018; Ye et al., 2023) also use centralized critics to manage the changing environment. 
+
+C.2. Value function factorization approaches 
+
+Recent advancements in multi-agent reinforcement learning often use the Centralized Training with Decentralized Execution (CTDE) framework, which is effective for scalability and real-world application. The key element in CTDE is the factorization network, which allocates the overall reward to each agent based on their collective decisions. VDN (Sunehag et al., 2018) was the first to employ factorization networks, using a summation method, but it had limitations in representing the capacity of joint action values. QMIX (Rashid et al., 2018) improved on this by introducing a monotonic constraint and using hypernetworks for greater capacity. However, QMIX struggles with representing nonmonotonic joint action value functions. To address this, various approaches have been proposed: QTRAN (Son et al., 2019) and QTRAN++ (Son et al., 2020) use soft regularizations to align individual and joint value function decisions; WQMIX (Rashid et al., 2020) applies a weighted projection emphasizing better joint actions; Qatten (Yang et al., 2020a) utilizes self-attention layers to understand joint action correlations; and QPLEX (Wang et al., 2021a) introduces a dueling structure [cite] for duplex 14 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+action-value functions, redefining the IGM principle with an advantage-based approach. Another research area within value factorization networks is distributional RL. DMIX and DDN (Sun et al., 2021), extending QMIX and VDN, can distribute stochastic joint state-action values into individual agent utilities, adhering to the DIGM principle. ResQ (Shen et al., 2022) further innovates by using masking for non-monotonic mean joint value functions, fulfilling both IGM and DIGM principles without limitations in representation. 
+
+C.3. Role-based approaches 
+
+Role-based learning offers a scalable approach to multi-agent learning by breaking down complex tasks into distinct roles. ROMA (Wang et al., 2020a) integrates the concept of roles into MARL, allowing agents with similar duties to share their learning experiences. Additionally, it incorporates two regularizers to ensure that roles are identifiable through specific behaviors and are specialized for particular sub-tasks. Building on this idea, RODE (Wang et al., 2021b) proposes that discovering roles can be more straightforward by initially dividing the joint action spaces based on the functionality of actions, instead of learning roles from the beginning. 
+
+# D. Introduction to Permutation Invariant (PI) and Permutation Equivariant (PE) approaches in MARL 
+
+D.1. Data Augmentation 
+
+To minimize environmental interactions, DA-MADDPG (Ye et al., 2023) introduced a data augmented version of MADDPG. This method creates additional training data by rearranging the order of inputs and then updates the model using this new data. While effective, this approach demands more computational resources and takes longer. Moreover, the generated data, having identical information to the original, should yield the same Q-value. However, training a function sensitive to input order to produce the same output for differently ordered inputs is inefficient. 
+
+D.2. Set Representation 
+
+DeepSet (Zaheer et al., 2017) and Set Transformer (Lee et al., 2019) present a range of neural architectures that are Policy Invariant (PI) and are designed for learning set representations. In these architectures, each element ei is individually mapped to a latent space using a shared embedding layer ϕ(ei). The latent representations obtained are then combined through a PI pooling layer. This layer is key to maintaining the PI characteristic of the entire function. For example, the function f (E) = Γ( Pki=1 ϕ(ei)) , where Γ can be any function. This approach ensures that the output is invariant to the order of the input elements. 
+
+D.3. Graph Neural Network 
+
+Graph Neural Networks (GNNs) (Wang et al., 2019; Battaglia et al., 2018; Jiang et al., 2020) offer a different perspective compared to set-based approaches. Instead of treating an agent’s observation as a simple set, GNNs view these observations as having topological relationships among the features of different entities. Just like set-based methods, GNNs also employ shared embedding and pooling layers. These layers are adapted to learn functions specifically on graphs. These approaches allow for a more nuanced understanding of the relationships and interactions between different elements in the agent’s observations. 
+
+D.4. PE Functions 
+
+In the realm of deep learning, there has been research exploring the effectiveness of Policy Evaluation (PE) functions in problems involving graphs (Maron et al., 2019). However, within the field of multi-agent reinforcement learning (MARL), there are comparatively fewer studies that utilize the PE property. A notable exception is the Action Semantics Network (ASN) (Wang et al., 2020b), which investigates the varied impacts of different action types. Nevertheless, ASN doesn’t explicitly focus on the PE property in its approach. This indicates a potential area for further exploration in MARL, leveraging the PE property to enhance understanding and performance. 15 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+# E. Background of Transformer 
+
+Transformer (Vaswani et al., 2017) is an attention-based model used in a wide range of deep learning frameworks and has demonstrated excellent performance (Meng et al., 2022; Dosovitskiy et al., 2021). A typical Transformer model consists of two sub-modules: an encoder and a decoder. The encoder generally maps the input space to a latent space, and the decoder employs the resultant latent embedding to generate a sequence of target outputs. The most crucial component in a Transformer is the attention layer, which can be formulated as follows: 
+
+Attention( Q, K, V) = softmax 
+
+ QK T
+
+√dk
+
+
+
+V , (12) where Q is the query embedding, K denotes the key embedding, and V represents the value embedding. The three embeddings can be learned via training. The scaling factor dk represents the dimension of the key embedding for normalizing the dot-product of the query and key embeddings. 
+
+# F. Hyperparameter Settings 
+
+Table A2 presents the hyperparameter settings used in our experiments, with each component optimized according to its respective reference literature. For both our proposed Transfermer and the baseline methods, each training curve illustrated in the main manuscript is based on five independent runs using different random seeds.  
+
+> Table A2. Hyperparameter settings.
+
+Hyperparameters Value 
+
+Batch size 32 Buffer size 5,000 Learning rate 0.0005 Gamma 0.99 Epsilon start 1.0 Epsilon end 0.05 Update target network interval 10,000 RNN hidden dimension 64 UPDeT embedding size 32 UPDeT attention heads 3UPDeT attention layers 2HPN embedding size 64 HGAP embedding size 64 HGAP attention layers 1QMIX hypernet embedding 64 QMIX mixing embedding dimension 32 QTRAN opt loss 1QTRAN nopt loss 0.1 QPLEX hypernet embedding 64 QPLEX mixing embedding dimension 32 QPLEX advantage hypernet embedding 64 QPLEX advantage hypernet layers 3
+
+# G. Additional Experimental Results 
+
+In this section, we provide supplemental evidence to substantiate the effectiveness of our methodology. In Section G.1, we present results from additional SMAC scenarios to demonstrate the superior performance of HGAP over the other agent network baselines discussed in the main manuscript. In Section G.2, we show that HGAP is capable of delivering 16 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+better performance with a larger population compared with other approaches. Section G.3 and G.4 showcases additional experimental results that validate the adaptivity of HGAP with different MARL frameworks, including QPLEX and MAPPO respectively. Finally, Section G.5 provides experimental results to validate the transferability of HGAP in more cases. 
+
+G.1. Additional Agent Networks Comparison 
+
+In this section, we present additional comparisons of the training curves in addition to those presented in Fig 5 of the main manuscript. These comparisons contrast the performance of HGAP with the other agent network baselines. In Fig. A1, we can notice that the HGAP agents rise faster and achieve higher win rates than the baseline methods. These results thus provide strong evidence for the effectiveness of the HGAP architecture in comparison to the other agent network designs. We also provide a qualitative evaluation results for these baselines in difference benchmarks in Table A3.                 
+
+> (a) 3m (E) (b) 8m (E) (c) 2s3z (E) (d) 3s vs 3z (E)
+> (e) 3s5z (H) (f) 8m vs 9m (H) (g) 10m vs 11m (H) (h) 25m (H)
+> (i) 6h vs 8z (S) (j) 27m vs 30m (S) (k) bane vs bane (S) (l) MMM2 (S)
+> (m) corridor (S) (n) protoss 10 vs 11 (o) terran 10 vs 11
+> Figure A1. Test win rate comparison for different SOTA approaches in SMAC (Vinyals et al., 2017) and SMACv2 (Ellis et al., 2023). (E), (H), (S) stand for Easy ,Hard , and Super-Hard scenarios.
+
+17 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network  
+
+> Table A3. The averaged test win rates for all agent networks and mixing networks.
+
+Environments Vanilla Role-based Quantile Fac PI/PE Map Name Easy RNN UPDeT RODE DFAC ResQ ASN HPN HGAP Timesteps 
+
+3m Easy 96 98 100 100 100 99 100 100 1e6 
+
+8m Easy 98 99 99 100 100 100 100 100 1e6 
+
+3s vs 3z Easy 99 98 100 99 100 100 100 100 2e6 
+
+2s3z Easy 93 96 98 97 99 92 100 100 2e6 
+
+1c3s5z Easy 95 97 99 98 100 94 100 100 2e6 
+
+5m vs 6m Hard 62 73 96 94 93 86 98 100 5e6 
+
+8m vs 9m Hard 85 77 96 93 98 88 100 100 2e6 
+
+10m vs 11m Hard 88 92 97 99 100 94 100 100 5e6 
+
+25m Hard 79 83 92 91 98 88 99 100 5e6 
+
+SMAC 3s vs 5z Hard 73 88 94 96 99 93 100 100 5e6 
+
+3s5z Hard 75 81 91 93 96 88 100 100 5e6 
+
+MMM Hard 67 73 82 89 94 79 99 100 5e6 
+
+27m vs 30m Super Hard 53 69 72 83 89 77 96 100 1e7 
+
+3s5z vs 3s6z Super Hard 45 83 84 88 91 79 97 100 1e7 
+
+6h vs 8z Super Hard 27 43 73 84 94 59 98 100 1e7 
+
+bane vs bane Super Hard 77 82 89 92 95 86 99 100 1e7 
+
+corridor Super Hard 57 74 89 86 92 82 96 99 1e7 
+
+MMM2 Super Hard 81 84 96 93 95 88 97 100 1e7 
+
+protoss 5 vs 5 - 64 71 80 84 89 77 94 98 1e7 
+
+protoss 10 vs 11 - 53 62 71 80 86 73 91 96 1e7 
+
+protoss 20 vs 23 - 57 61 74 79 83 71 92 100 1e7 
+
+terran 5 vs 5 - 59 67 81 87 87 72 92 96 1e7 
+
+SMACv2 terran 10 vs 11 - 47 54 74 81 82 63 89 96 1e7 
+
+terran 20 vs 23 - 41 55 75 79 85 67 90 94 1e7 
+
+zerg 5 vs 5 - 53 63 79 83 88 71 94 92 1e7 
+
+zerg 10 vs 11 - 46 51 70 77 81 62 91 93 1e7 
+
+zerg 20 vs 23 - 49 57 69 79 83 63 89 95 1e7 
+
+18 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+G.2. Large Population Environment 
+
+Previous MARL methodologies have often neglected to assess their ability to maintain consistent performance as the population size increases. In light of this, we have conducted an ablation study incorporating varying numbers of entities to ascertain that the HGAP surpasses other MARL approaches. Fig. A2 presents the comparative results across different entity counts. Leveraging the PI and PE properties, HGAP exhibits convergence to superior training performance in comparison to alternative methods. Notably, as the number of entities increases, the training performance gap between HGAP and other methods widens, providing additional empirical support for the significance of the PI and PE properties.   
+
+> (a) Navigation (N=100) (b) Predator-Prey (N=200)
+> Figure A2. Test win rate comparison for MADDPG variants in Navigation with larger population.
+
+G.3. Additional Comparison of HGAP with QPLEX 
+
+To illustrate the applicability of the HGAP integrated with the value factorization method, additional experimental results are presented and elaborated upon in Section 4.3.2. The corresponding outcomes are graphically depicted in Fig. A3. The findings distinctly indicate that the HGAP agent, featuring PI and PE properties, effectively enhances training performance compared with a recurrent-based network.       
+
+> (a) protoss 5 vs 5 (b) protoss 20 vs 23 (c) terran 5 vs 5 (d) terran 10 vs 11
+> (e) zerg 5 vs 5 (f) zerg 10 vs 11 (g) zerg 20 vs 23
+> Figure A3. Test win rate comparison for QPLEX and HGAP-QPLEX in SMACv2 (Ellis et al., 2023).
+
+G.4. Additional Comparison of HGAP with MAPPO 
+
+In order to assess the adaptability of the HGAP within policy-based MARL approaches, as expounded in Section 4.3.3, additional experimental results comparing the original MAPPO and HGAP-MAPPO are presented in Fig. A4. The outcomes 19 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+consistently affirm that an actor network imbued with PI and PE properties effectively mitigates the occurrence of redundant learning scenarios wherein agents encounter identical information.       
+
+> (a) protoss 5 vs 5 (b) protoss 10 vs 11 (c) protoss 20 vs 23 (d) terran 5 vs 5
+> (e) terran 20 vs 23 (f) zerg 5 vs 5 (g) zerg 10 vs 11
+> Figure A4. Test win rate comparison for MAPPO and HGAP-MAPPO in SMACv2 (Ellis et al., 2023).
+
+G.5. Additional Transferability Comparison between HGAP and HPN 
+
+As discussed in Section 4.5, we have explored the comparative transferability between HPN and HGAP. In order to support the argument that HGAP exhibits consistent adaptability across various transfer scenarios, additional experimental results for these settings are showcased in Fig. A5. The findings substantiate the notion that HGAP possesses superior transferability compared to HPN, highlighting the capacity of graph-based representations to retain and apply learned strategies in novel scenarios.            
+
+> (a) (b) (c) (d)
+> Figure A5. Transfer learning comparison between HPN and HGAP in SMAC (Vinyals et al., 2017). (a) 3m (E) →8m (E). (b) 1c3s5z (E)
+> →3s vs 5z (H). (c) 8m (E) →27m (S). (d) 3s5z vs 3s6z (S) →MMM2 (S).
+
+# H. Graph Attention Heatmap Variation 
+
+In this subsection, additional training heatmaps depicting the performance of HGAP across various SMAC maps are presented. The outcomes demonstrate the rapid acquisition of policy knowledge by HGAP within a brief training duration, resulting in a consistent and effective graph representation. Notably, the visual analysis reveals that agents exhibit a heightened focus on adversaries, directing increased attention to enemies within close regions. 20 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+(a) (b) 
+
+Figure A6. (a) Attention heatmap variation during training in SMAC (Vinyals et al., 2017) 3m map at the initial state. (b) The initial position for all allies and enemies in 3m map. 
+
+(a) (b) 
+
+Figure A7. (a) Attention heatmap variation during training in SMAC (Vinyals et al., 2017) 1c3s5z map at the initial state. (b) The initial position for all allies and enemies in 1c3s5z map. 
+
+(a) (b) 
+
+Figure A8. (a) Attention heatmap variation during training in SMAC (Vinyals et al., 2017) 3s vs 5z map at the initial state. (b) The initial position for all allies and enemies in 3s vs 5z map. 
+
+21 HGAP: Boosting Permutation Invariant and Permutation Equivariant in MARL via Graph Attention Network 
+
+(a) (b) 
+
+Figure A9. (a) Attention heatmap variation during training in SMAC (Vinyals et al., 2017) 6h vs 8z map at the initial state. (b) The initial position for all allies and enemies in 6h vs 8z map. 
+
+(a) (b) 
+
+Figure A10. (a) Attention heatmap variation during training in SMAC (Vinyals et al., 2017) MMM2 map at the initial state. (b) The initial position for all allies and enemies in MMM2 map. 
+
+22

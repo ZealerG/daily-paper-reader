@@ -1,0 +1,1732 @@
+Title: An Information Theoretic Approach to Interaction-Grounded Learning
+
+URL Source: https://openreview.net/pdf?id=Sra298VMFM
+
+Number of Pages: 18
+
+Markdown Content:
+# An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Xiaoyan Hu 1 Farzan Farnia 1 Ho-fung Leung 2
+
+## Abstract 
+
+Reinforcement learning (RL) problems where the learner attempts to infer an unobserved re-ward from some feedback variables have been studied in several recent papers. The setting of 
+
+Interaction-Grounded Learning (IGL) is an exam-ple of such feedback-based RL tasks where the learner optimizes the return by inferring latent binary rewards from the interaction with the en-vironment. In the IGL setting, a relevant assump-tion used in the RL literature is that the feedback variable Y is conditionally independent of the context-action (X, A ) given the latent reward R.In this work, we propose Variational Information-based IGL (VI-IGL) as an information-theoretic method to enforce the conditional independence assumption in the IGL-based RL problem. The VI-IGL framework learns a reward decoder using an information-based objective based on the con-ditional mutual information (MI) between (X, A )
+
+and Y . To estimate and optimize the information-based terms for the continuous random variables in the RL problem, VI-IGL leverages the vari-ational representation of mutual information to obtain a min-max optimization problem. Also, we extend the VI-IGL framework to general f -Information measures leading to the generalized 
+
+f -VI-IGL framework for the IGL-based RL prob-lems. We present numerical results on several reinforcement learning settings indicating an im-proved performance compared to the existing IGL-based RL algorithm. 
+
+## 1. Introduction 
+
+In several applications of reinforcement learning (RL) al-gorithms, the involved agent lacks complete knowledge of      
+
+> 1Department of Computer Science and Engineering, The Chi-nese University of Hong Kong 2Independent Researcher. Corre-spondence to: Xiaoyan Hu <xyhu21@cse.cuhk.edu.hk >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+the reward variable, e.g. in applications concerning brain-computer interface (BCI) (Schalk et al., 2004; Serrhini & Dargham, 2017) and recommender systems (Maghakian et al., 2023). In such RL settings, the lack of an explicit reward could lead to a challenging learning task where the learner needs to infer the unseen reward from observed feedback variables. The additional inference task for the reward variable could significantly raise the computational and statistical complexity of the RL problem. Due to the great importance of addressing such RL problems with a misspecified reward variable, they have been exclusively studied in several recent papers (Xie et al., 2021b; 2022; Maghakian et al., 2023). To handle the challenges posed by a misspecified reward variable, Xie et al. (2021b; 2022) propose the Interaction-Grounded Learning (IGL) framework . According to the IGL framework, the agent observes a multidimensional con-text vector based on which she takes an action . Then, the environment generates a latent 0-1 reward and reveals a multidimensional feedback vector to the agent. The agent aims to maximize the (unobserved) return by inferring re-wards from the interaction, a sub-task which needs to be solved based on the assumptions on the relationship between reward and feedback variables. As a result, the key to addressing the IGL-based RL problem is a properly inferred reward decoder ψ ∈ Ψ, which maps a context-action-feedback tuple (X, A, Y ) ∈ X × A × Y to a prediction of the posterior probability on the latent reward 
+
+R. Given such a reward decoder, the optimal policy can be obtained using standard contextual bandit algorithms (Lang-ford & Zhang, 2007; Dud ´ık et al., 2014). However, such a reward decoder will be information-theoretically infea-sible to learn without additional assumptions (Xie et al., 2022). Consequently, the existing works on the IGL set-ting (Xie et al., 2021b; 2022) make relevant assumptions on the statistical relationship between the random variables of context X, action A, feedback Y , and latent reward R. In particular, a sensible assumption on the connection between 
+
+X, A, Y, R is the following conditional independence as-sumption proposed by Xie et al. (2021b) (The causal graph is given in Figure 1.): 
+
+Assumption 1 (Full conditional independence) . For ar-bitrary (X, A, R, Y ) tuple where R and Y are generated based on the context-action pair (X, A ), the feedback Y
+
+1An Information Theoretic Approach to Interaction-Grounded Learning 
+
+is conditionally independent of X and A given the latent reward R, i.e., Y ⊥⊥ X, A |R.
+
+X
+
+A
+
+Y
+
+R 
+
+> Figure 1. Causal graph of IGL under the full conditional indepen-dence assumption.
+
+In the work of Xie et al. (2021b), a reward decoder ψ :
+
+Y 7 → [0 , 1] takes the feedback Y ∈ Y as input and out-puts a prediction of the posterior distribution P(R = 1 |Y ).Their proposed approach performs a joint training of the policy and the decoder by maximizing the difference in the decoded return between the learned policy and a “bad” pol-icy that is known to have a low (true) return. They show that a properly inferred reward decoder can be learned sta-tistically efficiently when: (i) the full conditional indepen-dence assumption 1 strictly holds, and (ii) the distributions 
+
+P(Y |R = 0) and P(Y |R = 1) of the feedback variable Y
+
+conditioned to the latent reward can be well separated (Xie et al., 2021b, Assumption 2). However, these conditions are quite restricted in practice, where the observation of the feedback variable is often under significant noise levels, e.g. in the BCI application. In such noisy settings, Assumption 1 may still hold under an independent noise from the dis-cussed random variables or may not hold when the noise is correlated with the context or action variables. On the other hand, it can be much more difficult to distinguish between the feedback distributions conditioned to the latent reward. Consequently, the discussed IGL-based methods may no longer achieve optimal results under such noisy feedback conditions. In this paper, we attempt to address the mentioned chal-lenges in the IGL-based RL problem and propose Varia-tional Information-based IGL (VI-IGL) as an information-theoretic approach to IGL-based RL tasks. The proposed VI-IGL methodology is based on the properties of informa-tion measures that allow measuring the dependence among random variables. According to these properties, Assump-tion 1 will hold, i.e., the feedback variable Y is conditionally independent of the context-action (X, A ) given the latent reward R, if and only if the conditional mutual informa-tion (CMI) I(Y ; X, A |R) is zero. Therefore, we suggest an information bottleneck-based approach (Tishby et al., 2000) and propose to learn a reward decoder via the following information-based objective value where β > 0 is a tuning parameter and Rψ is the random decoded reward from ψ:
+
+arg min 
+
+> ψ∈Ψ
+
+{I(Y ; X, A |Rψ ) − β · I(X, A ; Rψ )} (1) Intuitively, minimizing the first term I(Y ; X, A |Rψ ) en-sures that the solved reward decoder satisfies the full con-ditional independence assumption. In addition, the second term I(Rψ ; X, A ) serves as a regularization term ruling out naive reward decoders. Nevertheless, the objective function in (1) is challenging to optimize, since a first-order optimization of this objec-tive requires estimating the value and derivatives of the MI for continuous random variables of the context X and the feedback Y . To handle this challenge, we leverage the vari-ational representation of MI (Donsker & Varadhan, 1983; Nguyen et al., 2010) and cast Objective (1) as a min-max optimization problem that gradient-based algorithms can efficiently solve. Using the variational formulation of the information-based objective, we propose the Variational Information-based IGL (VI-IGL) minimax learning algo-rithm for solving the IGL-based RL problem. The VI-IGL method applies the standard gradient descent ascent algo-rithm to optimize the min-max optimization problem fol-lowing the variational formulation of the problem. We numerically evaluate the proposed VI-IGL method on several RL tasks. Our empirical results suggest that VI-IGL can perform better than the baseline IGL RL algorithm in the presence of a noisy feedback variable. The main contributions of this paper can be summarized as: 1. We propose an information-theoretic approach to the IGL-based RL problem, which learns a reward decoder by minimizing an information-based objective function. 2. To handle the challenges in estimating and optimizing (f -)MI for continuous random variables, we leverage the variational representation and formulate our objective as a min-max optimization problem, which can be solved via gradient-based optimization methods. We show that the optimal value can be sample-efficiently learned. 3. We extend the proposed approach to f -Variational Information-based IGL ( f -VI-IGL), leading to a fam-ily of algorithms to solve the IGL-based RL task. 4. We provide empirical results indicating that f -VI-IGL performs successfully compared to existing IGL-based RL algorithms. 
+
+## 2. Related Works 
+
+Interaction-Grounded Learning (IGL). The framework of IGL is proposed by Xie et al. (2021b) to tackle learning sce-narios without explicit reward. At each round, the agent ob-serves a multidimensional context, takes an action, and then 2An Information Theoretic Approach to Interaction-Grounded Learning 
+
+the environment generates a latent 0-1 reward and outputs a multidimensional feedback. The agent aims to optimize the expected return by observing only the context-action-feedback tuple during the interaction. When the feedback is independent of both the context and the action given the la-tent reward (full conditional independence), Xie et al. show that the optimal policy can be sample-efficiently learned with additional assumptions. To relax the full conditional in-dependence requirement, Xie et al. (2022) introduce Action-Inclusive IGL, where the feedback can depend on both the latent reward and the action. They propose a contrastive learning objective and show that the latent reward can be decoded under a symmetry-breaking procedure. Recently, Maghakian et al. (2023) apply the IGL paradigm with a multi-state latent reward to online recommender systems. Their proposed algorithm is able to learn personalized re-wards and show empirical success. 
+
+Information-Theoretic Reinforcement Learning Algo-rithms. Reinforcement learning (RL) is a well-established framework for agents’ decision-making in an unknown envi-ronment (Sutton & Barto, 2018). Several recent works focus on designing RL algorithms by exploiting the information-related structures in the learning setting. To perform ex-ploration and sample-efficient learning, Russo and Van Roy (2014) propose information-directed sampling (IDS), where the agent takes actions that either with a small regret 
+
+or yield large information gain , which is measured by the mutual information between the optimal action and the next observation. They show that IDS preserves numerous the-oretical guarantees of Thompson sampling while offering strong performance in the face of more complex problems. In addition, information-theoretic approaches have been applied for skills discovery in machine learning contexts. Gregor, Rezende, and Wierstra (2016) introduce variational intrinsic control (VIC), which discovers useful and diverse behaviors (i.e., options ) by maximizing the mutual informa-tion between the options and termination states. A setting that is close to our paper is using information-based method-ology to learn reward functions in inverse reinforcement learning (IRL) (Ng & Russell, 2000). Levine, Popovi ´c, and Koltun (2011) propose to learn a cost function by maximiz-ing the entropy between the corresponding optimal policy and human demonstrations. However, IGL is different from this setting, since it does not make any assumptions on the optimality of the observed behavior. 
+
+Estimation of Mutual Information (MI). Mutual informa-tion (MI) is a fundamental information-theoretic quantity that measures “the amount of information” between random variables. However, estimating MI in continuous settings is statistically and computationally challenging (Gao et al., 2015). Building upon the well-known characterization of the MI as the Kullback-Leibler (KL-) divergence (Kullback, 1997), recent works propose to use the variational repre-sentation of MI for its estimation and more generally for 
+
+f - divergences (Nguyen et al., 2010; Belghazi et al., 2018; Molavipour et al., 2020). We note that estimating mutual in-formation in high-dimensional setting is subject to the curse of dimensionality as discussed in the related papers (Panin-ski, 2003b; Poole et al., 2019; Song & Ermon, 2020). On the other hand, the neural net based variational estimator of mutual information seems to generalize well in practical nu-merical experiments. Studying the generalization properties of such deep variational estimators of information measures is an interesting subject for future studies. In addition, we note an extra challenge in our analysis is to estimate the conditional mutual information given a latent variable that has not been addressed in the mentioned related works. 
+
+## 3. Preliminaries 
+
+3.1. Interaction-Grounded Learning (IGL) 
+
+In the Interaction-Grounded Learning (IGL) paradigm, at each round, a multidimensional context x ∈ X is drawn from a distribution d0 and is revealed to the agent. Upon observing x, the agent takes action a ∈ A from a finite ac-tion space. Let ∆S denote the probability simplex on space 
+
+S. Given the context-action pair (x, a ), the environment generates a latent and binary reward r ∼ R(x, a ) ∈ ∆{0,1}
+
+and returns a multidimensional feedback y ∈ Y to the agent. It can be seen that IGL recovers a contextual bandit (CB) problem (Langford & Zhang, 2007) if the reward is ob-served. Let π ∈ Π : X → ∆A denote any stochastic policy. The expected return of policy π is given by V (π) := 
+
+Ex∼d0 Ea∼π(·| x)[μ(x, a )] , where μ(x, a ) is the expected (la-tent) reward of any context-action pair (x, a ) ∈ X × A . We consider batch mode learning, where the agent has access to a dataset {(xk, a k, y k)}Kk=1 collected by the behavior policy 
+
+πb : X → ∆A, where xk ∼ d0, a k ∼ π(·| xk), and yk is the stochastic feedback. The agent aims to learn the optimal policy, that is, π∗ := arg max π∈Π V (π) while only observ-ing the context-action-feedback tuple (x, a, y ) at each round of interaction. 
+
+3.2. ( f -)Conditional Mutual Information 
+
+The ( f -)mutual information (MI) (Ali & Silvey, 1966) is a standard measure of dependence between random variables in information theory. Formally, let f : R+ → R be a convex function satisfying f (1) = 0 . The f -MI (Csisz ´ar, 1967) between a pair of random variables Z1 and Z2 is given by 
+
+If (Z1; Z2) := Df (PZ1Z2 ∥PZ2 ⊗ PZ1 ). (2) In this definition, Df (P∥Q) denotes the f -divergence be-tween distributions P and Q defined as 
+
+Df (P∥Q) := EQ
+
+
+
+f
+
+ dP
+
+dQ
+
+ 
+
+3An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Note that the standard KL-based conditional mutual in-formation, which is denoted by I(Z1; Z2), is given by 
+
+f (x) = x log x. Another popular f -divergence is Pearson-
+
+χ2 (Peason, 1900), where f (x) = ( x − 1) 2. An important property of f -MI is that two random variables Z1, Z 2 are statistically independent if and only If (Z1; Z2) = 0 , and hence dependence among between random variables can be measured via an f -mutual information. Furthermore, the f -conditional MI (Csisz ´ar, 1967) between a pair of random variables Z1 and Z2 when Z3 is observed can be defined as 
+
+If (Z1; Z2|Z3) := Df (PZ1Z2|Z3 ∥PZ2|Z3 ⊗ PZ1|Z3 ). (3) Similarly, the standard KL-based conditional mutual in-formation, denoted by I(Z1; Z2|Z3), is given by f (x) = 
+
+x log x. One useful property of the f -CMI is that, if Z1 is conditionally independent of Z2 given Z3 then it holds that 
+
+If (Z1; Z2|Z3) = 0 .
+
+## 4. Variational Information-Based IGL 
+
+In this section, we derive an information-theoretic formu-lation for the IGL-based RL problem. As discussed ear-lier, in information theory, a standard measure of the (con-ditional) dependence between random variables is (con-ditional) mutual information (MI). Particularly, Assump-tion 1 (i.e., Y ⊥⊥ X, A |R) is equivalent to that the condi-tional MI between the context-action (X, A ) and the feed-back variable Y is zero given the latent reward R, i.e., 
+
+I(Y ; X, A |R) = 0 . However, training a reward decoder by minimizing the conditional mutual information can ei-ther learn undesired causal structures or “overfit” to the feedback variable, which may underperform in the IGL set-ting. We defer the detailed discussion to Section 4.1. Hence, we propose an information-theoretic objective function to learn a reward decoder ψ ∈ Ψ : X × A × Y → [0 , 1] arg min 
+
+> ψ∈Ψ
+
+{I(Y ; X, A |Rψ ) − β · I(X, A ; Rψ )} (4) where β > 0 is a tunable hyperparameter. In the optimiza-tion of the above objective function, minimizing the first term I(Y ; X, A |Rψ ) guides the reward decoder to satisfy the conditional independence assumption. Furthermore, as the feedback variable is often under significant noise levels in practice, the second term I(X, A ; Rψ ) will play the role of a regularization term improving the robustness of the learned reward decoder against the noisy feedback. (The detailed discussion can be found in Appendix A.) To handle the continuous random variables of the context 
+
+X and the feedback Y , we leverage the variational repre-sentation of the mutual information (Nguyen et al., 2010; Belghazi et al., 2018) and reduce (4) to the following varia-tional information-based IGL (VI-IGL) optimization prob-lem. Here, we first present a min-max formulation for the above information-based optimization problem and a sam-ple complexity bound for the resulting RL algorithm. Later in Section 4.2, we explain the steps in the proof. 
+
+Theorem 1 (VI-IGL optimization problem) . Objective (4) 
+
+arg min 
+
+> ψ∈Ψ
+
+{I(Y ; X, A |Rψ ) − β · I(X, A ; Rψ )}
+
+is equivalent to the following optimization problem: 
+
+arg min 
+
+> ψ∈Ψ
+
+L(ψ) := max  
+
+> G∈G
+
+min  
+
+> T∈T
+
+n
+
+EPXAY R ψ [G]
+
+− EPY |Rψ ⊗PXAR ψ
+
+eG
+
+− β ·
+
+
+
+EPXAR ψ [T ] − EPXA ⊗PRψ
+
+eT  o 
+
+(5) 
+
+where G ∈ G : X × A × Y × { 0, 1} → R and T ∈ T :
+
+X × A × { 0, 1} → R are two function classes. 
+
+Algorithm 1 Variational Information-based IGL (VI-IGL) 
+
+Require: dataset Dtrain = {(xk, a k, y k)}Kk=1 , parameter 
+
+β > 0, reward decoder class Ψ = {ψθ }θ∈Θ, esti-mators G = {Gω1 }ω1∈Ω1 and T = {Tω2 }ω2∈Ω2 of 
+
+I(Y ; X, A |Rψ ) and I(X, A ; Rψ ), respectively.  
+
+> 1:
+
+for epoch k = 1 , 2, · · · , K do  
+
+> 2:
+
+Sample a mini-batch Dmini ∼ D train . 
+
+> 3:
+
+Estimate the objective value bL(ψ) given by Equa-tion (5).  
+
+> 4:
+
+Update the parameters 
+
+ω1 ← ω1 + η · ∇ ω1
+
+bL(ψ)
+
+ω2 ← ω2 − ηβ · ∇ ω2
+
+bL(ψ)
+
+θ ← θ − η · ∇ θ bL(ψ)
+
+where η is the learning rate.  
+
+> 5:
+
+end for  
+
+> 6:
+
+Train a policy π via an offline contextual bandit oracle.  
+
+> 7:
+
+Output: Policy π.The inner level of the VI-IGL optimization problem mini-mizes over function class T to estimate I(X, A ; Rψ ), the medium level maximizes over function class G to estimate 
+
+I(Y ; X, A |Rψ ), and the outer level minimizes over class Ψ
+
+to find the appropriate reward decoder. Finally, as learning in IGL requires interaction with the environment, which can be expensive in practice, we provide theoretical guarantees for the VI-IGL optimization problem and show that the optimal objective value can be sample-efficiently learned. (The detailed proof can be found in Appendix B.) 
+
+Theorem 2 (Sample complexity) . Consider a feedback-dependent reward decoder class Ψ such that ψ(y) ∈ [c, 1 −
+
+4An Information Theoretic Approach to Interaction-Grounded Learning 
+
+c] for any ψ ∈ Ψ and y ∈ Y , where c ∈ (0 , 12 ). Suppose the function classes T and G are bounded by B ≤ ∞ . Then, for any δ ∈ (0 , 1] , given a dataset D = {(xk, a k, y k)}Kk=1 
+
+collected by the behavior policy πb : X → ∆A, there exists an algorithm such that the solved reward decoder bψ from the optimization problem (5) satisfies that 
+
+L( bψ) − L ∗ ≤ max {1, β } · O (1 − c)2
+
+c2 ·
+
+s
+
+C(Yϵ 
+
+> P
+
+, B )
+
+K log 
+
+ |Y ϵ 
+
+> F
+
+|dΨ,T ,G
+
+δ
+
+! (6) 
+
+where L∗ := min ψ∈Ψ L(ψ) is the optimal value, Yϵ 
+
+> F
+
+⊂Y is a ϵ-covering of the feedback space Y equipped with (pseudo-)metric ρ(y, y ′) := max F ∈F |F (y)−F (y′)| where 
+
+F := Ψ ∪ { eG(x,a, ·,r ) : ( x, a, r ) ∈ X × A × { 0, 1}} G∈G ,
+
+C(Yϵ 
+
+> P
+
+) is the capacity number defined in Equation (25) in the Appendix, and dΨ,T ,G is the statistical complexity of the joint function classes Ψ, G, and T , with the parameter 
+
+ϵ = K−1/2.
+
+In practice, the functions T, G , and the reward decoder ψ
+
+are often overparameterized deep neural networks which enable expressing complex functions. As discussed in the related works, estimating MI with finite samples can be sta-tistically and computationally challenging, and we note that exponential factors indeed show up in our analysis. Specif-ically, the capacity number C in the sample complexity bound (6) depends on the covering number of the function class and also scales with O(e2B ), where B is the upper bound of the function classes. In application to deep neu-ral networks, the covering number in the above sample complexity bound can be prohibitively large. We note that this issue in theoretically bounding the generalization er-ror and sample complexity of deep learning algorithms is well-recognized in the supervised learning literature and is considered an open problem (Zhang et al., 2021). Similar to the supervised learning setting, we observed satisfactory numerical results achieved by the proposed VI-IGL-learned function, which highlights the role of gradient-based opti-mization in the success of the algorithm. Proving a sample complexity bound that takes the role of the gradient-based optimization algorithm into account will be an interesting future direction to our analysis. 
+
+4.1. Minimizing Conditional MI with Regularization 
+
+In this section, we present the detailed derivation of our information-theoretic objective (4). Recall that we aim to learn a reward decoder ψ ∈ Ψ : X × A × Y → [0 , 1] 
+
+which minimizes the dependence measure I(Y ; X, A |Rψ ).Here, Rψ ∼ Bernoulli (ψ(X, A, Y )) is the decoded 0-1 re-ward. However, minimizing only I(Y ; X, A |Rψ ) can be problematic. On one hand, a reward decoder satisfying 
+
+(Y ; X, A |Rψ ) = 0 may correspond to a causal structure such as X → Rψ → Y or A → Rψ → Y , which performs poorly in IGL as the latent reward often depends on the context-action pair (X, A ). On the other hand, note that the chain rule of MI results in the following identity 
+
+I(Y ; X, A |Rψ )=I(Y ; Rψ |X, A ) − I(Y ; Rψ ) + I(Y ; X, A ) (7) As a result of the above information-theoretic identity, training to minimize only I(Y ; X, A |Rψ ) may result in a context-action-dependent reward decoder ψ : X × A → 
+
+[0 , 1] , i.e., I(Y ; Rψ |X, A ) = 0 , that “over-fits” to the feed-back Y to maximize I(Y ; Rψ ), and hence may underper-form under a noisy feedback variable. One such example is given as follows. 
+
+Example 1 (Unregularized objective leads to overfitting) .
+
+By the expansion (7), for a reward decoder ψ such that 
+
+I(Y ; Rψ |X, A ) = 0 , it holds that I(Y ; X, A |Rψ ) = 0 if 
+
+I(Y ; Rψ ) = I(Y ; X, A ), i.e., 
+
+H(Y |Rψ ) = H(Y |X, A )
+
+There could exist multiple reward decoders satisfying the condition. One case is that if the action-context pairs can be partitioned into two disjoint sets, i.e., X × A = S0 ∪ S 1
+
+where S0 ∩ S 1 = ∅, such that the conditional entropy 
+
+H(Y |x, a ) is the same for any (x, a ) in the same sub-set, then the reward decoder Rψ assigning value 0 (and 1) to all the context-action pairs in S0 (and S1) satisfies 
+
+I(Y ; Rψ |X, A ) = 0 and I(Y ; X, A |Rψ ) = 0 .
+
+To address this issue, we propose the regularized information-based IGL objective (4) where β > 0 is a tunable parameter: 
+
+arg min 
+
+> ψ∈Ψ
+
+{I(Y ; X, A |Rψ ) − β · I(X, A ; Rψ )} (4) To gain intuition on why Objective (4) can be robust against noisy feedback, note that 
+
+I(X, A ; Rψ ) = H(Rψ ) − H(Rψ |X, A )
+
+where H is the Shannon entropy. Thus, Objective (4) en-courages the reward decoder to remain unchanged to the context-action (X, A ) to minimize H(Rψ |X, A ). Hence, the noises present in the feedback variable Y cannot signifi-cantly affect the accuracy of the optimized reward decoder. On the other hand, we can show that in the noiseless set-ting, including the regularization term does not (greatly) affect the quality of the optimized reward decoder with a proper selection of β. (The detailed proof can be found in Appendix C.) 
+
+Theorem 3 (Regularization (almost) ensures conditional independence) . Assume the reward decoder class Ψ ad-mits realizability assumption, i.e., there exists ˜ψ ∈ Ψ such 
+
+5An Information Theoretic Approach to Interaction-Grounded Learning 
+
+that I(Y ; X, A |R ˜ψ ) = 0 . Then, under Assumption 1, any reward decoder optimizing Objective (4) satisfies that 
+
+I(Y ; X, A |Rψ ) ≤ β · (log 2 − I(Y ; R)) (8) 
+
+where R is the true latent binary reward and I(Y ; R) ≤
+
+log 2 . Particularly, when Ψ is feedback-dependent, a reward decoder ψ : Y → [0 , 1] attains the minimum if and only if 
+
+I(Y ; X, A |Rψ ) = 0 .
+
+In other words, for a feedback-dependent reward decoder class, the optimized reward decoder is guaranteed to satisfy the conditional independence assumption regardless of the selection of β. For reward decoder class that also depends on the context-action, the learned reward decoder violates Assumption 1 by at most (a multiplicative of) β.As demonstrated by our numerical results in Section 6.2, introducing this regularizer not only helps to handle a noisy feedback variable, but also results in a more consistent algo-rithm performance under lower noise levels. 
+
+4.2. Leveraging Variational Representation to Solve Information-based Objective 
+
+While the previous sub-section introduces an information-theoretic objective to address the IGL-based RL problem, optimizing (4) in complex environments can be highly chal-lenging. The primary challenge to solve (4) is that it re-quires estimating MI among continuous random variables of the context X and the feedback Y , which is widely rec-ognized as a statistically and computationally difficult prob-lem (Paninski, 2003a). To derive a tractable optimization problem, we utilize the variational representation of the KL-divergence, which reduces the evaluation and estimation of MI to an optimization task. 
+
+Proposition 1 (Donsker-Varadhan representation (Donsker & Varadhan, 1983)) . Let P, Q ∈ ∆S be two probability distributions on space S. Then, 
+
+DKL (P∥Q) = sup  
+
+> T∈T
+
+n
+
+Es∼P[T (s)] − Es∼Q
+
+h
+
+eT (s)io 
+
+where the supremum is taken over all functions T such that the two expectations are finite. 
+
+Recall that the MI between random variables Z1 ∈ Z 1 and 
+
+Z2 ∈ Z 2 is the KL-divergence between their joint distribu-tion PZ1Z2 and the product of their marginal distributions 
+
+PZ1 ⊗ PZ2 , i.e., I(Z1; Z2) = DKL (PZ1Z2 ∥PZ1 ⊗ PZ2 ).Proposition 1 enables us to estimate I(Z1; Z2) through opti-mizing over a class of function T : Z1×Z 2 → R. Therefore, directly applying Proposition 1 to Objective (4) results in the VI-IGL optimization problem in Theorem 1. 
+
+arg min 
+
+> ψ∈Ψ
+
+max  
+
+> G∈G
+
+min  
+
+> T∈T
+
+n
+
+EPXAY R ψ [G] − EPY |Rψ ⊗PXAR ψ
+
+eG
+
+− β ·
+
+
+
+EPXAR ψ [T ] − EPXA ⊗PRψ
+
+eT  o 
+
+## 5. Extension of VI-IGL to General 
+
+## f -divergences 
+
+Algorithm 2 f -Variational Information-based IGL ( f -VI-IGL) 
+
+Require: dataset Dtrain = {(xk, a k, y k)}Kk=1 , parameter 
+
+β > 0, reward decoder class Ψ = {ψθ }θ∈Θ, esti-mators G = {Gω1 }ω1∈Ω1 and T = {Tω2 }ω2∈Ω2 of 
+
+If1 (Y ; X, A |Rψ ) and If2 (X, A ; Rψ ), respectively. 
+
+1: for epoch k = 1 , 2, · · · , K do 
+
+2: Sample a mini-batch Dmini ∼ D train .
+
+3: Construct datasets with distributions PY ⊗ PRψθ and 
+
+PY |Rψθ ⊗ PXAR ψθ using Dmini (See the algorithm description). 
+
+4: Estimate the f -MI terms 
+
+bIf1 (X, A ; Rψθ ) ←EPXAR ψθ
+
+[T ]
+
+− EPXA ⊗PRψθ
+
+[f ∗ 
+
+> 1
+
+(T )] 
+
+bIf2 (Y ; X, A |Rψθ ) ←EPXAY R ψθ
+
+[G]
+
+− EPY |Rψθ ⊗PXAR ψθ
+
+[f ∗ 
+
+> 2
+
+(G)] 
+
+5: Update the parameters 
+
+ω1 ← ω1 + η · ∇ ω1
+
+nbIf1 (X, A ; Rψ )
+
+o
+
+ω2 ← ω2 + η · ∇ ω2
+
+nbIf2 (X, A ; Rψ )
+
+o
+
+θ ← θ − η · ∇ θ
+
+nbIf1 (Y ; X, A |Rψθ )
+
+− β · bIf2 (X, A ; Rψθ )
+
+o
+
+where η is the learning rate. 
+
+6: end for 
+
+7: Select between ψθ and its opposite counterpart 1 − ψθ
+
+based on their decoded returns of πb.
+
+8: Train a policy π via an offline contextual bandit oracle. 
+
+9: Output: Policy π.
+
+5.1. The Extended f -Variational Information-based IGL 
+
+In this section, we first propose an extended version of the information-based objective in (4) and the VI-IGL optimiza-tion problem (5). Recall that f -mutual information defined in Equation (3) generalizes the standard KL-divergence-based MI to a general f -divergence-based MI. Therefore, we can extend the standard MI-based IGL objective (4) to the following f -MI-based IGL objective: 
+
+ψ∗ := arg min 
+
+> ψ∈Ψ
+
+{If1 (Y ; X, A |Rψ ) − β · If2 (X, A ; Rψ )}
+
+(9) 6An Information Theoretic Approach to Interaction-Grounded Learning 
+
+where f1 and f2 are two f -divergences. Note that Objec-tive (4) is a special case of the above formulation by select-ing f1(x) = f2(x) = x log x to obtain the standard KL-based mutual information. Similar to the VI-IGL problem formulation, to derive a tractable optimization problem cor-responding to the above task, we adopt the variational repre-sentation of f -divergences (Proposition 2 in Appendix D). We propose the following min-max optimization problem to solve Objective (9). 
+
+Theorem 4 (f -VI-IGL optimization problem) . Let f1 and 
+
+f2 be functions satisfying the requirements in Proposition 2 and we denote by f ∗ 
+
+> 1
+
+and f ∗ 
+
+> 2
+
+their Fenchel conjugate, respec-tively. Objective (9) is equivalent to the following min-max optimization problem 
+
+min  
+
+> ψ∈Ψ
+
+max  
+
+> G∈G
+
+min  
+
+> T∈T
+
+n
+
+EPXAY R ψ [G] − EPY |Rψ ⊗PXAR ψ [f ∗ 
+
+> 1
+
+(G)] 
+
+− β · (EPXAR ψ [T ]) − EPXA ⊗PRψ [f ∗ 
+
+> 2
+
+(T )]) 
+
+o
+
+(10) 
+
+where G ∈ G : X × A × Y × { 0, 1} → R and T ∈ T :
+
+X × A × { 0, 1} → R.
+
+Similarly, we derive the sample complexity for the above optimization problem in Theorem 5 in the Appendix. 
+
+5.2. Algorithm Description 
+
+Here, we present f -VI-IGL Algorithm 2 as an optimization method to solve the f -VI-IGL optimization problem (10) for continuous random variables of the context X and the feed-back Y . The algorithm optimizes over three function classes 
+
+G, T , and Ψ. Specifically, function class Ψ = {ψθ }θ∈Θ
+
+consists of the reward decoders parameterized by θ ∈ Θ.Function class G = {Gω1 } parameterized by ω1 ∈ Ω1 is the estimator of f1-MI If1 (Y ; X, A |Rψθ ). In addition, function class T = {Tω2 }ω2∈Ω2 parameterized by ω2 ∈ Ω2 is the estimator of f2-MI If2 (X, A ; Rψθ ). We focus on learning in the batch mode, where the algorithm has access to an offline dataset Dtrain = {(xt, a t, y t)}Tt=1 consisting of the context-action-feedback tuples, which is collected by the behavior policy πb interacting with the environment. At each epoch, f -VI-IGL first uses a mini-batch of data to estimate the value of Objective (10) (Lines 2-4). One difficulty is that estimating If1 (Y ; X, A |Rψθ ) requires sam-pling (x, a, y ) ∼ PRψθ ⊗ PY |Rψθ ⊗ PXA |Rψθ , where 
+
+PY |Rψθ and PXA |Rψθ can be intractable for continuous random variables of the context X and the feedback Y .To address the problem, we first augment each sample 
+
+(xt, a t, y t) N times to obtain {(xt, a t, y t, r it)}Ni=1 , where 
+
+rit ∼ Bernoulli (ψθ (xt, a t, y t)) and N is a small positive integer (e.g. 5 in our experiments). To sample, e.g., the feedback y ∼ PY |Rψθ =1 , we randomly sample a data point from {(xt, a t, y t, r jt ) : j ∈ [N ], r jt = 1 }Tt=1 , i.e., the “aug-mented” data points whose random decoded reward is 1. Given the estimated objective value, we alternatively update the parameters for the f -MI estimators and the reward de-coder (Line 5). At the end of the training, we use the learned reward decoder ψθ to train a policy via an offline contextual bandit oracle (Langford & Zhang, 2007; Dudik et al., 2011). However, note that in Objective (9), both the optimal reward decoder ϕ∗ and its opposite counterpart 1 − ϕ∗ may attain the minimum simultaneously (while only one of them aligns is consistent with the true latent reward). Hence, we use the data-driven collector (Xie et al., 2021b) and select the reward decoder (between the learned reward decoder ψθ
+
+and its opposite counterpart 1 − ψθ ) that gives a decoded return of πb lower than 0.5. 1
+
+## 6. Empirical Results 
+
+In this section, we numerically evaluate the f -VI-IGL algo-rithm on the number-guessing task (Xie et al., 2021b) with noisy feedback, the details of which are described in the following. 
+
+Number-guessing task with noisy feedback. In the stan-dard setting, a random image xt (context), whose corre-sponding number is denoted by lxt ∈ { 0, 1, · · · , 9}, is drawn from the MNIST dataset (Lecun et al., 1998) at the beginning of each round t. Upon observing xt, the learner selects at ∈ { 0, 1, · · · , 9} as the predicted number of xt (ac-tion). The latent binary reward rt = 1[at = lxt ] is the correctness of the prediction label. Then, a random image of digit rt ∈ { 0, 1} is revealed to the learner (feedback). In many real-world scenarios, the observation of the feedback variable is often under significant noise level, e.g., in the BCI application. To simulate these cases, we consider four types of noisy feedback. Specifically, with a small probability, the feedback is replaced with: 1) independent noises (I): a ran-dom image of letter “t” ( True ) when the guess is correct or a random image of letter “f” ( False ) when the guess is wrong, which is sampled from the EMNIST Letter dataset (Cohen et al., 2017), 2) action-inclusive noises (A): a random im-age of digit (at + 6 · rt − 3) mod 10 , 3) context-inclusive noises (C): a random image of digit (lxt +6 ·rt −3) mod 10 ,4) context-action-inclusive noises (C-A ): a random image of digit (lxt + at + 6 · rt − 3) mod 10 . An example is given in Table 1. Note that the full conditional independence assump-tion does not strictly hold as the feedback is also affected by the context-action pair (except for the independent noises). 
+
+Data collection. We focus on the batch learning mode, where a training dataset Dtrain = {(xk, a k, y k)}Kk=1 is col-lected by the uniform behavior policy using the training set .In all the experiments, the training dataset contains 60 , 000 
+
+samples, i.e., K = 60 , 000 . The output (linear) policy is 
+
+> 1Following the previous works (Xie et al., 2021b; 2022), we assume the behavior policy has a low (true) return.
+
+7An Information Theoretic Approach to Interaction-Grounded Learning 
+
+X = I A C C-A 
+
+Noisy Y (A = 5 )
+
+Noisy Y (A = 6 )
+
+Table 1. An example of the noisy feedback: The context is a ran-dom image of digit “5”, i.e., lx = 5 . The rows show the noisy feed-back when the guess is digit “5” (correct) and “6” (wrong), respec-tively. The columns show the cases for each type of noise ( I: inde-pendent, A: action-inclusive, C: context-inclusive, C-A : context-action-inclusive). 
+
+evaluated on a test dataset Dtest containing 10 , 000 samples of context, which is randomly collected from the test set .Additional experimental details are provided in Appendix G. 
+
+6.1. Robustness to Noises 
+
+In this section, we show that VI-IGL optimizing the stan-dard MI-based Objective (4) is more robust to the noisy feedback than the previous IGL-based E2G algorithm (Xie et al., 2021b). We compare the accuracy of the output policy under different noise levels ( 10% , 20% , 30% ), and the results are summarized in Figure 2. (The detailed data can be found in Appendix F.1) In the noiseless setting, VI-IGL achieves a comparable performance ( (81 .6 ± 7.9)% )to E2G ((82 .2 ± 4.3)% ). However, VI-IGL (blue lines) significantly outperforms E2G (orange lines) in all noisy settings and across all noise levels .
+
+Why previous IGL method fails. Recall that solving an appropriate reward decoder in the previous IGL method is given by (Xie et al., 2021b, Assumption 2), which states that there exists a reward decoder that well distinguishes between the feedback (distribution) generated from a latent reward of 0 and the one generated from a latent reward of 1. When additional noises present in the feedback, these two distributions can be quite similar. For example, for context-inclusive noises, a latent reward of 0 can also gener-ate an image of digit “1” ( lxt = 4 and rt = 0 ). Hence, the condition easily fails and the performance degrades. 
+
+6.2. Necessity of Regularization 
+
+In this section, we show that including the regularization term I(X, A ; Rψ ) in Objective (4) helps achieve a more consistent algorithm performance. We compare the algo-rithm performance when optimizing the unregularized ob-jective ( β = 0 ) and the regularized objective ( β = 10 ). Note that the case of β = 0 corresponds to minimizing only 
+
+I(Y ; X, A |Rψ ). The results are summarized in Table 2. (Re-sults for other selections of β can be found in Appendix F.2.) The results show that regularization significantly improves 0 10 20 30 Independent Noise Level (%) 20 30 40 50 60 70 80 Accuracy (%) 
+
+> VI-IGL E2G
+
+(a) Independent 0 10 20 30 Action-Inclusive Noise Level (%) 20 30 40 50 60 70 80 Accuracy (%)  
+
+> VI-IGL E2G
+
+(b) Action-Inclusive 0 10 20 30 Context-Inclusive Noise Level (%) 20 30 40 50 60 70 80 Accuracy (%) 
+
+> VI-IGL E2G
+
+(c) Context-Inclusive 0 10 20 30 Context-Action-Inclusive Noise Level (%) 20 30 40 50 60 70 80 Accuracy (%)  
+
+> VI-IGL E2G
+
+(d) Context-Action-Inclusive 
+
+Figure 2. Policy accuracy under different noise level: Our VI-IGL algorithm outperforms batch E2G (Xie et al., 2021b) in all noisy environments and across all noise levels. The results are averaged over 16 trials. 
+
+the performance. Methods VI-IGL ( β = 0 ) VI-IGL ( β = 10 )
+
+I 60 .6 ± 15 .5 71 .0 ± 16 .2
+
+A 64 .8 ± 17 .9 73 .6 ± 16 .0
+
+C 52 .4 ± 25 .3 72 .1 ± 10 .2
+
+C-A 63 .4 ± 16 .4 65 .2 ± 16 .3
+
+N 55 .7 ± 27 .3 81 .6 ± 7.9
+
+Table 2. Noise level=0.1. The results are averaged over 16 tri-als ( I: independent, A: action-inclusive, C: context-inclusive, C-A :context-action-inclusive, N: noiseless setting). 
+
+6.3. Ablation Experiments 6.3.1. Selection of f -divergences. Recall that in Ob-jective (9), we use f1 and f2 as general measures of 
+
+I(Y ; X, A |Rψ ) and I(X, A ; R), respectively. We analyze how the selection of f -divergences affects the performance. We test three pairs of f1-f2: (i) KL-KL: both f1 and f2 are KL divergence, i.e., f1(x) = f2(x) = x log x (this case corresponds to Objective (4)), (ii) χ2-χ2: both f1 and f2 are Pearson-χ2 divergence, i.e., f1(x) = f2(x) = ( x−1) 2, and (iii) χ2-KL: f1(x) = x log x is KL divergence and f2(x) = (x − 1) 2 is Pearson-χ2 divergence. Note that in the last case, the objective value, i.e., Iχ2 (Y ; X, A |Rψ )−β·I(X, A ; Rψ ),upper bounds the value of Objective (4). 2 We summarize the 
+
+> 2
+
+By the inequality log ≤ x − 1, we have that DKL (P∥Q) = 
+
+EP[log( dP 
+
+> dQ
+
+)] ≤ EP[( dP 
+
+> dQ
+
+− 1)] = EQ[( dP 
+
+> dQ
+
+)2] − 1 = D2
+
+> χ
+
+(P∥Q).
+
+8An Information Theoretic Approach to Interaction-Grounded Learning 
+
+results in Table 3 for a feedback-dependent reward decoder and β = 10 . The results show that different f -divergences benefit from different types of noises. 
+
+f1-f2 KL-KL χ2-χ2 χ2-KL 
+
+I 71 .0 ± 16 .2 72 .7 ± 17 .4 74 .1 ± 12 .7
+
+A 73 .6 ± 16 .0 65 .3 ± 11 .1 71 .5 ± 16 .7
+
+C 72 .1 ± 10 .2 76 .2 ± 11 .5 69 .4 ± 11 .5
+
+C-A 65 .2 ± 16 .3 70 .4 ± 15 .5 64 .6 ± 14 .7
+
+N 81 .6 ± 7.9 74 .8 ± 13 .3 77 .3 ± 11 .1      
+
+> Table 3. Selection of f-divergences: The results are averaged over 16 trials ( I: independent, A: action-inclusive, C: context-inclusive,
+> C-A : context-action-inclusive, N: noiseless setting).
+
+6.3.2. Input of reward decoder. We empirically analyze how the input of the reward decoder affects the actual per-formance. Particularly, we consider two types of input: (i) feedback Y and (ii) context-action-feedback (X, A, Y ). We present the results in Table 4 for β = 10 and KL-KL diver-gence measure. The results show that in all cases, using a feedback-dependent reward decoder class leads to better per-formance than a context-action-feedback-dependent reward decoder class. Input Y (X, A, Y )
+
+I 71 .0 ± 16 .2 42 .0 ± 24 .1
+
+A 73 .6 ± 16 .0 49 .6 ± 24 .4
+
+C 69 .3 ± 10 .9 46 .2 ± 16 .9
+
+C-A 72 .1 ± 10 .2 59 .4 ± 17 .4
+
+N 81 .6 ± 7.9 62 .5 ± 19 .1    
+
+> Table 4. Input of Reward Decoder: The results are averaged over 16 trials ( I: independent, A: action-inclusive, C: context-inclusive,
+> C-A : context-action-inclusive, N: noiseless setting).
+
+## 7. Discussion and Future Work 
+
+Regarding the limitations of our methodology and analy-sis, we observed that the variance of the numerical perfor-mance could be considerably large in some experiments. We hypothesize that this issue could be related to jointly training multiple networks and model initialization, also reported by Xie et al. (2021b), which could be an interest-ing topic for future studies. Furthermore, a relevant direc-tion for future exploration is to consider non-information-theoretic dependence measures, e.g., Maximum Mean Dis-crepancy (MMD) (Gretton et al., 2012) and Wasserstein dis-tances (Villani et al., 2009), to enforce the IGL assumption. Another potential extension of our studied IGL problem is to relax the conditional independence assumption (As-sumption 1). Such an extension could follow (Xie et al., 2022)’s idea on the Action-Inclusive IGL (AI-IGL), where the feedback may also be affected by the action. 
+
+## Acknowledgments 
+
+The work of Farzan Farnia is partially supported by a grant from the Research Grants Council of the Hong Kong Special Administrative Region, China, Project 14209920, and is partially supported by a CUHK Direct Research Grant with CUHK Project No. 4055164. Also, the authors would like to thank the anonymous reviewers for their constructive feedback and suggestions. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Reinforcement Learning. There are many potential soci-etal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Ali, S. M. and Silvey, S. D. A general class of coefficients of divergence of one distribution from another. Journal of the Royal Statistical Society. Series B (Methodological) ,28(1):131–142, 1966. ISSN 00359246. URL http: //www.jstor.org/stable/2984279 .Belghazi, M. I., Baratin, A., Rajeshwar, S., Ozair, S., Ben-gio, Y., Courville, A., and Hjelm, D. Mutual informa-tion neural estimation. In Dy, J. and Krause, A. (eds.), 
+
+Proceedings of the 35th International Conference on Ma-chine Learning , volume 80 of Proceedings of Machine Learning Research , pp. 531–540. PMLR, 10–15 Jul 2018. URL https://proceedings.mlr.press/v80/ belghazi18a.html .Cohen, G., Afshar, S., Tapson, J., and van Schaik, A. Emnist: an extension of mnist to handwritten letters, 2017. Csisz ´ar, I. Information-type measures of difference of prob-ability distributions and indirect observation. studia sci-entiarum Mathematicarum Hungarica , 2:229–318, 1967. Donsker, M. and Varadhan, S. Asymptotic evaluation of certain markov process expectations for large time. iv. 
+
+Communications on Pure and Applied Mathematics , 36 (2):183–212, March 1983. ISSN 0010-3640. doi: 10. 1002/cpa.3160360204. Dudik, M., Hsu, D., Kale, S., Karampatziakis, N., Langford, J., Reyzin, L., and Zhang, T. Efficient optimal learning for contextual bandits, 2011. Dud ´ık, M., Erhan, D., Langford, J., and Li, L. Doubly robust policy evaluation and optimization. Statistical 
+
+9An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Science , 29(4), nov 2014. doi: 10.1214/14-sts500. URL 
+
+https://doi.org/10.1214%2F14-sts500 .Gao, S., Ver Steeg, G., and Galstyan, A. Efficient Estimation of Mutual Information for Strongly Dependent Variables. In Lebanon, G. and Vishwanathan, S. V. N. (eds.), Pro-ceedings of the Eighteenth International Conference on Artificial Intelligence and Statistics , volume 38 of Pro-ceedings of Machine Learning Research , pp. 277–286, San Diego, California, USA, 09–12 May 2015. PMLR. URL https://proceedings.mlr.press/v38/ gao15.html .Gregor, K., Rezende, D. J., and Wierstra, D. Variational intrinsic control, 2016. Gretton, A., Borgwardt, K. M., Rasch, M. J., Sch ¨olkopf, B., and Smola, A. A kernel two-sample test. Jour-nal of Machine Learning Research , 13(25):723–773, 2012. URL http://jmlr.org/papers/v13/ gretton12a.html .Kullback, S. Information theory and statistics . Courier Corporation, 1997. Langford, J. and Zhang, T. The epoch-greedy algo-rithm for multi-armed bandits with side information. In Platt, J., Koller, D., Singer, Y., and Roweis, S. (eds.), Advances in Neural Information Pro-cessing Systems , volume 20. Curran Associates, Inc., 2007. URL https://proceedings. neurips.cc/paper/2007/file/ 4b04a686b0ad13dce35fa99fa4161c65-Paper. pdf .Lecun, Y., Bottou, L., Bengio, Y., and Haffner, P. Gradient-based learning applied to document recognition. Pro-ceedings of the IEEE , 86(11):2278–2324, 1998. doi: 10.1109/5.726791. Levine, S., Popovic, Z., and Koltun, V. Nonlinear inverse reinforcement learning with gaussian processes. In Shawe-Taylor, J., Zemel, R., Bartlett, P., Pereira, F., and Weinberger, K. (eds.), Advances in Neural Information Processing Systems , volume 24. Curran Associates, Inc., 2011. URL https://proceedings.neurips. cc/paper_files/paper/2011/file/ c51ce410c124a10e0db5e4b97fc2af39-Paper. pdf .Maghakian, J., Mineiro, P., Panaganti, K., Rucker, M., Saran, A., and Tan, C. Personalized reward learning with interaction-grounded learning (IGL). In The Eleventh International Conference on Learning Representations ,2023. URL https://openreview.net/forum? id=wGvzQWFyUB .Molavipour, S., Bassi, G., and Skoglund, M. Condi-tional mutual information neural estimator. In ICASSP 2020 - 2020 IEEE International Conference on Acoustics, Speech and Signal Processing (ICASSP) , pp. 5025–5029, 2020. doi: 10.1109/ICASSP40776.2020.9053422. Ng, A. Y. and Russell, S. J. Algorithms for inverse rein-forcement learning. In Proceedings of the Seventeenth International Conference on Machine Learning , ICML ’00, pp. 663–670, San Francisco, CA, USA, 2000. Mor-gan Kaufmann Publishers Inc. ISBN 1558607072. Nguyen, X., Wainwright, M. J., and Jordan, M. I. Es-timating divergence functionals and the likelihood ra-tio by convex risk minimization. IEEE Trans. Inf. Theor. , 56(11):5847–5861, nov 2010. ISSN 0018-9448. doi: 10.1109/TIT.2010.2068870. URL https://doi. org/10.1109/TIT.2010.2068870 .Paninski, L. Estimation of entropy and mutual information. Neural Comput. , 15(6):1191–1253, jun 2003a. ISSN 0899-7667. doi: 10.1162/ 089976603321780272. URL https://doi.org/10. 1162/089976603321780272 .Paninski, L. Estimation of entropy and mutual information. 
+
+Neural computation , 15(6):1191–1253, 2003b. Peason, K. On the criterion that a given system of de-viations from the probable in the case of a correlated system of variables is such that it can be reasonably supposed to have arisen from random sampling. The London, Edinburgh, and Dublin Philosophical Magazine and Journal of Science , 50(302):157–175, 1900. doi: 10.1080/14786440009463897. URL https://doi. org/10.1080/14786440009463897 .Poole, B., Ozair, S., Van Den Oord, A., Alemi, A., and Tucker, G. On variational bounds of mutual information. In Chaudhuri, K. and Salakhutdinov, R. (eds.), Proceed-ings of the 36th International Conference on Machine Learning , volume 97 of Proceedings of Machine Learn-ing Research , pp. 5171–5180. PMLR, 09–15 Jun 2019. URL https://proceedings.mlr.press/v97/ poole19a.html .Russo, D. and Van Roy, B. Learning to optimize via information-directed sampling. In Ghahramani, Z., Welling, M., Cortes, C., Lawrence, N., and Wein-berger, K. (eds.), Advances in Neural Information Processing Systems , volume 27. Curran Associates, Inc., 2014. URL https://proceedings.neurips. cc/paper_files/paper/2014/file/ 301ad0e3bd5cb1627a2044908a42fdc2-Paper. pdf .10 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Schalk, G., McFarland, D., Hinterberger, T., Birbaumer, N., and Wolpaw, J. Bci2000: a general-purpose brain-computer interface (bci) system. IEEE Transactions on Biomedical Engineering , 51(6):1034–1043, 2004. doi: 10.1109/TBME.2004.827072. Serrhini, M. and Dargham, A. Toward incorporating bio-signals in online education case of assessing student attention with bci. In Rocha, ´A., Serrhini, M., and Felgueiras, C. (eds.), Europe and MENA Cooperation Advances in Information and Communication Technolo-gies , pp. 135–146, Cham, 2017. Springer International Publishing. ISBN 978-3-319-46568-5. Song, J. and Ermon, S. Understanding the limitations of variational mutual information estimators. In In-ternational Conference on Learning Representations ,2020. URL https://openreview.net/forum? id=B1x62TNtDS .Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, 2018. Tishby, N., Pereira, F. C., and Bialek, W. The information bottleneck method, 2000. Villani, C. et al. Optimal transport: old and new , volume 338. Springer, 2009. Xie, T., Jiang, N., Wang, H., Xiong, C., and Bai, Y. Policy finetuning: Bridging sample-efficient offline and online reinforcement learning. In Beygelzimer, A., Dauphin, Y., Liang, P., and Vaughan, J. W. (eds.), Advances in Neural Information Processing Systems , 2021a. URL https: //openreview.net/forum?id=MjNFN44NbZm .Xie, T., Langford, J., Mineiro, P., and Momennejad, I. Interaction-grounded learning. In Meila, M. and Zhang, T. (eds.), Proceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Ma-chine Learning Research , pp. 11414–11423. PMLR, 18– 24 Jul 2021b. URL https://proceedings.mlr. press/v139/xie21e.html .Xie, T., Saran, A., Foster, D. J., Molu, L. P., Momennejad, I., Jiang, N., Mineiro, P., and Langford, J. Interaction-grounded learning with action-inclusive feedback. In Oh, A. H., Agarwal, A., Belgrave, D., and Cho, K. (eds.), 
+
+Advances in Neural Information Processing Systems ,2022. URL https://openreview.net/forum? id=pBz3h8VibKY .Zhang, C., Bengio, S., Hardt, M., Recht, B., and Vinyals, O. Understanding deep learning (still) requires rethinking generalization. Communications of the ACM , 64(3):107– 115, 2021. 11 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+## A. Proof of Theorem 1: The VI-IGL Optimization Problem 
+
+Proof. The theorem is a direct application of Proposition 1. The optimization problem possesses three levels: (i) the inner level minimizes over function class T ∈ T to estimate I(X, A ; Rψ ) = DKL (PXAR ψ || PXA ⊗ PRψ ) =sup T ∈T {EPXAR ψ [T ] − EPXA ⊗PRψ [eT ]}, (ii) the medium level maximizes over function class G ∈ G to estimate 
+
+I(Y ; X, A |Rψ ) = DKL (PXAY R ψ || PY |Rψ ⊗ PXAR ψ ) = sup G∈G {EPXAY R ψ [G] − EPY |Rψ ⊗PXAR ψ [eG]}, and (iii) the outer level finds the desired reward decoder. 
+
+## B. Proof of Theorem 2: Sample Complexity of VI-IGL Optimization Problem 
+
+Recall that the optimization problem (5) is minimizing 
+
+L(ψ) = max  
+
+> G∈G
+
+min  
+
+> T∈T
+
+n
+
+EPXAY R ψ [G] − EPY |Rψ ⊗PXA |Rψ
+
+eG − β ·
+
+
+
+EPXAR ψ [T ] − EPXA ⊗PRψ
+
+eT  o 
+
+(11) over the reward decoder ψ ∈ Ψ. In the offline setting, the learner has access to a K-size dataset D = {(xk, a k, y k)}Kk=1 
+
+collected by the behavior policy πb : X → ∆A. Particularly, at round k, a context xk ∼ d0 is drawn from the context distribution. The behavior policy returns ak ∼ πb(·| xk) and receives feedback yk from the environment. The algorithm constructs the empirical objective bL(ψ) from the dataset for any reward decoder ψ ∈ Ψ and outputs the minimizer bψ = arg min ψ∈Ψ bL(ψ). To show Theorem 2, it suffices to show that 
+
+L(ψ) − bL(ψ) ≤ ϵ + max {1, β } · O
+
+ (1 − c)2
+
+c2 · X  
+
+> y∈Y ϵ
+> F:σϵπb(y)>0
+
+s
+
+e2B + B2
+
+K · σϵπb (y) log 
+
+ |Y ϵ 
+
+> F
+
+|dΨ,T ,G
+
+δ
+
+
+
+for any reward decoder ψ ∈ Ψ with high probability, where the parameters Yϵ 
+
+> F
+
+, σ ϵπb , and dΨ,T ,G are specified in the proof. Once obtained, we set the parameter ϵ = K−1/2 and invoke the following inequality 
+
+L( bψ) − L (ψ∗) ≤ L( bψ) − bL( bψ) + bL( bψ) − bL(ψ∗)
+
+| {z } 
+
+> ≤0
+
++ bL(ψ∗) − L (ψ∗) (12) to conclude the proof. Since the optimization problem over function classes G and T are decoupled, we define 
+
+L1(ψ) = max 
+
+> G∈G
+
+n
+
+EPXAY R ψ [G] − EPY |Rψ ⊗PXA |Rψ
+
+eGo
+
+(13) 
+
+L2(ψ) = max  
+
+> T∈T
+
+n
+
+EPXAR ψ [T ] − EPXA ⊗PRψ
+
+eT o
+
+(14) Hence, we have that L(ψ) = L1(ψ) − β · L 2(ψ).The details of the algorithm is given as follows. We consider a feedback-dependent reward decoder class, where ψ(y) ∈
+
+[c, 1 − c] is the decoded probability given by ψ ∈ Ψ that the feedback y ∈ Y is associated with a latent reward of 1. For convenience, we define ψ1(y) := ψ(y) and ψ0(y) := 1 − ψ(y), where the subscript is decoded binary reward. The algorithm computes the empirical counterpart of L1(ψ) and L2(ψ) as follows. 
+
+bL1(ψ) = max 
+
+> G∈G
+
+(
+
+1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) ·
+
+
+
+G(xk, a k, y k, r ) − EbPY ϵ|Rψ =r
+
+h
+
+eG(xk ,a k ,˜y,r )i  )
+
+(15) 
+
+bL2(ψ) = max  
+
+> T∈T
+
+(
+
+1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+
+
+ψr (yk) · T (xk, a k, r ) − bpψ (r) · eT (xk ,a k ,r ) )
+
+(16) where ˜y ∼ bPY ϵ|Rψ =r in bL1(ψ) is the empirical estimation of PY |Rψ =r constructed from the dataset (see details in the proof) and bpψ (r) := 1
+
+> K
+
+PKk=1 ψ1(yk). In the proof, we aim to bound the estimation errors |L 1(ψ) − bL1(ψ)| and |L 2(ψ) − bL2(ψ)|.
+
+Proof. Fix a reward decoder ψ ∈ Ψ.12 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Step 1. Bounding |L 2(ψ) − bL2(ψ)|. Recall that T is bounded by B. Hence, with probability at least 1 − δ and applying a union bound over the function classes T , the estimation errors are bounded by 
+
+EPXAR ψ [T ] − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) · T (xk, a k, r ) ≤ O
+
+s
+
+B2
+
+K log 
+
+ dT
+
+δ
+
+!
+
+(17) 
+
+EPXA ⊗PRψ
+
+eT  − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+bpψ (r) · eT (xk ,a k ,r ) ≤ O
+
+s
+
+e2B
+
+K log 
+
+ dT
+
+δ
+
+!
+
+(18) for any function T ∈ T , where dT is the statistical complexity of the function class T . Particularly, if T is finite, we have that dT = |T | .
+
+Step 2. Bounding |L 1(ψ) − bL1(ψ)|. Fix a function G ∈ G . Recall that G is bounded by B. Hence, with probability at least 1 − δ, we have that 
+
+EPXAY R ψ [G] − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) · G(xk, a k, y k, r ) ≤ O
+
+s
+
+B2
+
+K log 
+
+ 1
+
+δ
+
+!
+
+(19) The challenge is to analyze the estimation error 
+
+EPY |Rψ ⊗PXAR ψ
+
+eG − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) · EbPY ϵ|r
+
+h
+
+eG(xk ,a k ,˜y,r )i
+
+(20) To handle the continuous feedback space, we first introduce the notion of ϵ-covering, which results in a finite “clusterings” of the feedback and yields nice statistical properties. 
+
+Definition 1 (ϵ-covering) . Let G ⊂ {Y → R} denote a function class. A (finite) set Yϵ 
+
+> G
+
+⊂ Y is said to be ϵ-covering the space Y with respect to function class G if for any y ∈ Y , there exists yϵ ∈ Y ϵ 
+
+> G
+
+such that max G∈G |G(y) − G(yϵ)| ≤ ϵ.Further, we denote by |Y ϵ 
+
+> G
+
+| the ϵ-covering number. 
+
+Remark 1. Definition 1 is a classic ϵ-covering of space Y equipped with (pseudo-)metric ρ(y, y ′) = max G∈G |G(y) −
+
+G(y′)|.3 For example, if the class G includes α-Lipschitz functions, i.e., |G(y) − G(y′)| ≤ α · ∥ y − y′∥2, then Yϵ 
+
+> G
+
+is an 
+
+( ϵα )-covering of Y equipped with metric ρ(y, y ′) = ∥y − y′∥2.
+
+In the following, we denote by Yϵ 
+
+> F
+
+an ϵ-covering with respect to the joint function class F := Ψ ∪ { eG(x,a, ·,r ) : ( x, a, r ) ∈X × A × { 0, 1}} G∈G and let s : Y 7 → Y ϵ 
+
+> F
+
+be a mapping from any y ∈ Y to Yϵ 
+
+> F
+
+such that max F ∈F |F (y) − F (yϵ)| ≤ ϵ. Let 
+
+σπb ∈ ∆Y be the feedback distribution induced by the behavior policy πb. We denote by σϵπb the corresponding distribution on the ϵ-covering Yϵ 
+
+> F
+
+. Specifically, the mass at any yϵ ∈ Y ϵ 
+
+> F
+
+is given by σϵπb (yϵ) := R 
+
+> y:s(y)= yϵ
+
+dσπb (y). Further, the reward decoder ψ ∈ Ψ induces posterior distributions PY |Rψ and PY ϵ|Rψ conditioned to the decoded reward on Y and Yϵ 
+
+> F
+
+,respective. By Definition 1, the expectation with respect to the distribution PY |Rψ can be well estimated by the expectation computed from PY ϵ|Rψ .
+
+Sub-Step 2.1. Construction of bPY ϵ|r . The construction of bPY ϵ|r , which involves: 1) computing the empirical feedback distribution σϵπb := 1
+
+> K
+
+PKk=1 1[s(y) = yϵ] for any yϵ ∈ Y ϵ 
+
+> F
+
+, and 2) utilizing Bayes rules to estimate the posterior distribution by 
+
+bPY ϵ|Rψ =r (yϵ) := bσϵπb (yϵ) · ψr (yϵ)
+
+P
+
+> y∈Y ϵ
+> F
+
+bσϵπb (y) · ψr (y) (21) 
+
+> 3
+
+To show ρ is indeed a metric, note that 1) ρ(y, y ′) = ρ(y′, y ) ≥ 0 ρ(y, y ) = 0 for any y, y ′ ∈ Y and 2) ρ(y, y ′) ≤ ρ(y, y ′′ ) + 
+
+ρ(y′′ , y ′) for any y, y ′, y ′′ ∈ Y .
+
+13 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+for any yϵ ∈ Y ϵ 
+
+> F
+
+. Hence, the error (20) can be further written as 
+
+EPY |Rψ ⊗PXAR ψ
+
+eG − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) · EbPY ϵ|Rψ
+
+h
+
+eG(xk ,a k ,˜yr ,r )−1i
+
+≤ EPY |Rψ ⊗PXAR ψ
+
+eG − EPY ϵ|Rψ ⊗PXAR ψ
+
+eG| {z } 
+
+> ≤ϵ
+
++ EPY ϵ|Rψ ⊗PXAR ψ
+
+eG − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) · EPY ϵ|Rψ =r
+
+eG| {z }
+
+> concentration error
+
++ 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) ·
+
+
+
+EPY ϵ|Rψ =r
+
+h
+
+eG(xk ,a k ,˜y,r )i
+
+− EbPY ϵ|Rψ =r
+
+h
+
+eG(xk ,a k ,˜y,r )i 
+
+(22) Observe that the last term is bounded by 
+
+max  
+
+> r
+
+PY ϵ|Rψ =r − bPY ϵ|Rψ =r 1
+
+· eB−1
+
+for any (ψ, G ) ∈ Ψ × G and (x, a ) ∈ X × A . It remains to bound the error ∥PY ϵ|Rψ =r − bPY ϵ|Rψ =r ∥1.
+
+Sub-Step 2.2. Bounding ∥PY ϵ|Rψ =r − bPY ϵ|Rψ =r ∥1. To start with, by (Xie et al., 2021a, Lemma A.1), with probability at least 1 − δ and applying union bound over Yϵ 
+
+> F
+
+, it holds that 
+
+bσϵπb (yϵ) − σϵπb (yϵ) ≤ O
+
+s
+
+1
+
+K · σϵπb (yϵ) log 
+
+ |Y ϵ 
+
+> F
+
+|
+
+δ
+
+!
+
+for any yϵ ∈ Y ϵ 
+
+> F
+
+. Recall that ψr is bounded between [c, 1 − c] where 0 < c < 12 . We have that 
+
+PY ϵ|r (yϵ) − bPY ϵ|r (yϵ)
+
+= bσϵπb (yϵ) · ψr (yϵ)
+
+P
+
+> y∈Y ϵ
+> F
+
+bσϵπb (y) · ψr (y) − σϵπb (yϵ) · ψr (yϵ)
+
+P
+
+> y∈Y ϵ
+> F
+
+σϵπb (y) · ψr (y)
+
+=
+
+ bσϵπb (yϵ) − σϵπb (yϵ) · ψr (yϵ)
+
+P
+
+> y∈Y ϵ
+> F
+
+bσϵπb (y) · ψr (y) + σϵπb (yϵ) · ψr (yϵ)
+
+P
+
+> y∈Y ϵ
+> F
+
+bσϵπb (y) · ψr (y) − σϵπb (yϵ) · ψr (yϵ)
+
+P
+
+> y∈Y ϵ
+> F
+
+σϵπb (y) · ψr (y)
+
+≤O
+
+ 1 − cc
+
+s
+
+1
+
+K · σϵπb (yϵ) log 
+
+ |Y ϵ 
+
+> F
+
+|
+
+δ
+
+
+
++ (1 − c)2
+
+c2 · X
+
+> y∈Y ϵ
+> F
+
+s
+
+1
+
+K · σϵπb (y) log 
+
+ |Y ϵ 
+
+> F
+
+|
+
+δ
+
+
+
+≤O
+
+ (1 − c)2
+
+c2 · X  
+
+> y∈Y ϵ
+> F:σϵπb(y)>0
+
+s
+
+1
+
+K · σϵπb (y) log 
+
+ |Y ϵ 
+
+> F
+
+|
+
+δ
+
+
+
+where the second inequality holds by the fact that P
+
+> y∈Y ϵ
+> F
+
+bσϵπb (y) · ψr (y) and P
+
+> y∈Y ϵ
+> F
+
+σϵπb (y) · ψr (y) are bounded between 
+
+[c, 1 − c]. Hence, for any r ∈ { 0, 1}, it holds that 
+
+PY ϵ|Rψ =r − bPY ϵ|Rψ =r 1
+
+≤ O
+
+ (1 − c)2
+
+c2 · X  
+
+> y∈Y ϵ
+> F:σϵπb(y)>0
+
+s
+
+|Y ϵ 
+
+> F
+
+|2
+
+K · σϵπb (y) log 
+
+ |Y ϵ 
+
+> F
+
+|
+
+δ
+
+ (23) 14 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Therefore, combining Inequalities (22) ∼(23) and applying a union bound over G ∈ G yields, 
+
+EPY |Rψ ⊗PXAR ψ
+
+eG − 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+X
+
+> r=0 ,1
+
+ψr (yk) · EbPY ϵ|r
+
+h
+
+eG(xk ,a k ,˜y,r )i
+
+≤O
+
+ (1 − c)2
+
+c2 · X  
+
+> y∈Y ϵ
+> F:σϵπb(y)>0
+
+s
+
+e2B |Y ϵ 
+
+> F
+
+|2
+
+K · σϵπb (y) log 
+
+ |Y ϵ 
+
+> F
+
+|dG
+
+δ
+
+
+
+(24) where dG is the statistical complexity of the function class G, with dG = |G| for finite class G.
+
+Step 3. Putting everything together. Combining Inequalities (17) ∼(19) and (24) and applying a union bound over the reward decoder class Ψ, we have that 
+
+L(ψ) − bL(ψ) ≤ ϵ + max {1, β } · O
+
+ (1 − c)2
+
+c2 · X  
+
+> y∈Y ϵ
+> F:σϵπb(y)>0
+
+s
+
+(e2B + B2)|Y ϵ 
+
+> F
+
+|2
+
+K · σϵπb (y) log 
+
+ |Y ϵ 
+
+> F
+
+|dΨ,T ,G
+
+δ
+
+
+
+for any ψ ∈ Ψ, where we denote by dΨ,T ,G the statistical complexity of the joint function classes Ψ, T , and G, with 
+
+dΨ,T ,G = |Ψ||T ||G| for finite classes. Define the capacity number 
+
+C(Yϵ 
+
+> P
+
+, B ) := X  
+
+> y∈Y ϵ
+> F:σϵπb(y)>0
+
+(e2B + B2)|Y ϵ 
+
+> F
+
+|3
+
+σϵπb (y) (25) By Cauchy-Schwartz inequality, we further have 
+
+L(ψ) − bL(ψ) ≤ ϵ + max {1, β } · O (1 − c)2
+
+c2 ·
+
+s
+
+C(Yϵ 
+
+> P
+
+, B )
+
+K log 
+
+ |Y ϵ 
+
+> F
+
+|dΨ,T ,G
+
+δ
+
+!
+
+Set ϵ = K−1/2 and we conclude the proof. 
+
+## C. Proof of Theorem 3: Regularization (Almost) Ensures Conditional Independence 
+
+Proof. Under the realizability assumption, there exists either (i) a context-action-dependent reward decoder ˜ψ : X × A → 
+
+[0 , 1] or (ii) a feedback-dependent reward decoder ˜ψ : Y → [0 , 1] such that I(Y ; X, A |R ˜ψ ) = 0 .4 We first show that 
+
+I(X, A ; R ˜ψ ) = I(Y ; X, A ) = I(Y ; R) (26) holds for both cases, where R is the true latent reward. 
+
+Case (i). Note that by the chain rules of CMI, we derive 
+
+0 = I(Y ; X, A |R ˜ψ ) = I(Y ; X, A ) + I(Y ; R ˜ψ |X, A )
+
+| {z }
+
+> = 0
+
+−I(Y ; R ˜ψ )
+
+where the second term I(Y ; R ˜ψ |X, A ) on the RHS is zero as Rψ is context-action-dependent. Hence, we have that 
+
+I(Y ; R ˜ψ ) = I(Y ; X, A ). Further, note that the following Markov chain holds: 
+
+(X, A ) → R ˜ψ → Y
+
+By the data processing inequality, we derive that I(X, A ; R ˜ψ ) ≤ I(Y ; X, A ) and the equality holds if and only if 
+
+I(Y ; R ˜ψ ) = I(Y ; X, A ). Therefore, we have that I(X, A ; R ˜ψ ) = I(Y ; X, A ). Since the true latent reward R is context-action-dependent, following the same analysis, we have 
+
+I(Y ; X, A ) = I(Y ; R) = I(X, A ; R) (27) 
+
+> 4
+
+Note that if a reward decoder depends on the (X, A, Y ) tuple, it can be regarded as case (i). 
+
+15 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+Combining the analysis above, Equation (26) is proved. 
+
+Case (ii). Note that the following Markov chain holds for any feedback-dependent reward decoder: 
+
+(X, A ) → Y → R ˜ψ
+
+Then, the data processing inequality implies that I(X, A ; R ˜ψ ) ≤ I(Y ; X, A ) and the equality holds if and only if 
+
+I(Y ; X, A |R ˜ψ ) = 0 . Therefore, we derive I(X, A ; R ˜ψ ) = I(Y ; X, A ) = I(Y ; R), where the last equality holds by Equation (27). This also implies that for feedback-dependent reward decoder class, it holds that 
+
+min 
+
+> ψ∈Ψ
+
+{I(Y ; X, A |Rψ ) − β · I(X, A ; Rψ )} ≥ − β · I(Y ; R)
+
+Therefore, when Ψ is feedback-dependent, a reward decoder ψ : Y → [0 , 1] attains the minimum if and only if 
+
+I(Y ; X, A |Rψ ) = 0 .Once Equation (26) is obtained, we have that 
+
+min 
+
+> ψ∈Ψ
+
+{I(Y ; X, A |Rψ ) − β · I(X, A ; Rψ )} ≤ I(Y ; X, A |R ˜ψ ) − β · I(X, A ; R ˜ψ ) = −β · I(Y ; R)
+
+Let ψ∗ denote any reward decoder optimizing Objective (4). Rearranging the terms proves 
+
+I(Y ; X, A |Rψ∗ ) ≤ β · (I(X, A ; Rψ∗ ) − I(Y ; R)) ≤ β · (log 2 − I(Y ; R)) 
+
+where the second inequality holds by the fact that R∗ 
+
+> ψ
+
+is a 0-1 random variable. Therefore, we conclude the proof. 
+
+## D. The Variational Representation of f -divergences 
+
+Proposition 2 (Variational representation of f -divergences (Nguyen et al., 2010)) . Let f : R+ 7 → R be a convex, lower-semicontinuous function satisfying f (1) = 0 . Consider P, Q ∈ ∆S as two probability distributions on space S. Then, 
+
+Df (P∥Q) = EQ
+
+
+
+f
+
+ dP
+
+dQ
+
+ 
+
+≥ sup  
+
+> T∈T
+
+{Es∼P[T (s)] − Es∼Q[f ∗(T (s))] }
+
+where T ⊆ { T : S 7 → R} is any class of functions and f ∗(z) := sup u∈R{u · z − f (u)} for any z ∈ R+ is the Fenchel conjugate. 
+
+## E. Sample Complexity of Optimization Problem (9) 
+
+Theorem 5 (Sample complexity of f -VI-IGL) . Consider a feedback-dependent reward decoder class Ψ such that ψ(y) ∈
+
+[c, 1 − c] for any ψ ∈ Ψ and y ∈ Y , where c ∈ (0 , 12 ). Suppose the functions |G|, |T |, |f ∗ 
+
+> 1
+
+(G)|, |f ∗ 
+
+> 2
+
+(T )| ≤ B∗ ≤ ∞ are bounded. Then, for any δ ∈ (0 , 1] , given a dataset D = {(xk, a k, y k)}Kk=1 collected by the behavior policy πb : X → ∆A,there exists an algorithm such that the solved reward decoder bψ from the optimization problem (10) satisfies that |L f ( bψ)−L ∗ 
+
+> f
+
+|
+
+is bounded by 
+
+max {1, β } · O
+
+ (1 − c)2
+
+c2 · X 
+
+> y∈Y ϵ
+> Ξ:σϵπb(y)>0
+
+s
+
+(B∗)2|Y ϵ
+
+> Ξ
+
+|2
+
+K · σϵπb (y) log 
+
+ |Y ϵ
+
+> Ξ
+
+|dΨ,T ,G
+
+δ
+
+
+
+where L∗ 
+
+> f
+
+is the optimal value to the optimization problem (10), parameters σϵπb and dΨ,T ,G are defined in the Appendix B, and Yϵ 
+
+> Ξ
+
+is ϵ-covering of feedback space Y with respect to the joint function class Ξ := Ψ ∪ { f ∗(G(x, a, ·, r )) : ( x, a, r ) ∈X × A × { 0, 1}} G∈G .Proof. The proof follows the exact same analysis in Appendix B, with f ∗(x) = exp( x − 1) as a special case. 
+
+## F. Additional Experimental Results 
+
+F.1. Robustness to Noises 
+
+This section provides the detailed data in Section 6.1. We compare the performance of E2G (Xie et al., 2021b) and the VI-IGL algorithm 1 in the number-guessing task. We report both the policy accuracy and the standard deviation. The results 16 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+are averaged over 16 trials. Specifically, Table 5 corresponds to the noiseless setting and Tables 6 ∼8 show the results under three noise levels ( 0.1, 0.2, 0.3). We use the results for β = 10 to plot Figure 2. In addition, the results show that as the noise level increases, our regularized objective (4) with β = 10 attains more consistent performance than the unregularized one (i.e., only minimizing I(X, A ; Y |Rψ ), which is shown by β = 0 ), in terms of both accuracy and the standard deviation. This reinforces the necessity to include the regularization term. Methods VI-IGL ( β = 0 ) VI-IGL ( β = 10 ) E2G 
+
+N 55 .7 ± 27 .3 81 .6 ± 7.9 82 .2 ± 4.3 
+
+> Table 5. Noiseless setting. The results are averaged over 16 trials.
+
+Methods VI-IGL ( β = 0 ) VI-IGL ( β = 10 ) E2G 
+
+I 60 .6 ± 15 .5 71 .0 ± 16 .2 25 .0 ± 18 .4
+
+A 64 .8 ± 17 .9 73 .6 ± 16 .0 21 .6 ± 12 .4
+
+C 52 .4 ± 25 .3 72 .1 ± 10 .2 15 .4 ± 14 .3
+
+C-A 63 .4 ± 16 .4 65 .2 ± 16 .3 20 .6 ± 14 .8    
+
+> Table 6. Noise level=0.1. The results are averaged over 16 trials ( I: independent, A: action-inclusive, C: context-inclusive, C-A : context-action-inclusive).
+
+Methods VI-IGL ( β = 0 ) VI-IGL ( β = 10 ) E2G 
+
+I 54 .6 ± 23 .5 68 .8 ± 16 .2 18 .5 ± 13 .1
+
+A 43 .9 ± 23 .5 64 .1 ± 18 .7 15 .1 ± 11 .7
+
+C 49 .0 ± 25 .9 62 .7 ± 21 .6 21 .0 ± 13 .3
+
+C-A 57 .6 ± 24 .3 62 .8 ± 23 .9 17 .2 ± 13 .7    
+
+> Table 7. Noise level=0.2. The results are averaged over 16 trials ( I: independent, A: action-inclusive, C: context-inclusive, C-A : context-action-inclusive).
+
+Methods VI-IGL ( β = 0 ) VI-IGL ( β = 10 ) E2G 
+
+I 56 .9 ± 21 .4 57 .8 ± 19 .0 16 .8 ± 12 .7
+
+A 33 .6 ± 22 .3 42 .8 ± 17 .2 16 .4 ± 12 .6
+
+C 50 .5 ± 21 .2 51 .4 ± 18 .3 24 .6 ± 16 .4
+
+C-A 50 .6 ± 22 .6 50 .3 ± 18 .1 18 .5 ± 14 .7    
+
+> Table 8. Noise level=0.3. The results are averaged over 16 trials ( I: independent, A: action-inclusive, C: context-inclusive, C-A : context-action-inclusive).
+
+F.2. Value of Parameter β
+
+This section provides the detailed data in Section 6.2. Tables 9 and 10 show the results for the noiseless setting and the noisy settings (with noise level 0.1), respectively. In contrast, the performance of the unregularized objective significantly degrades. 
+
+β 0 5 10 15 20 
+
+N 55 .7 ± 27 .3 69 .7 ± 15 .6 81 .6 ± 7.9 79 .1 ± 9.1 72 .7 ± 16 .4  
+
+> Table 9. Value of Parameter β: Noiseless environment. The results are averaged over 16 trials.
+
+17 An Information Theoretic Approach to Interaction-Grounded Learning 
+
+β 0 5 10 15 20 
+
+I 60 .6 ± 15 .5 59 .5 ± 24 .2 71 .0 ± 16 .2 71 .7 ± 19 .3 63 .0 ± 18 .7
+
+A 64 .8 ± 17 .9 68 .5 ± 18 .8 73 .6 ± 16 .0 67 .7 ± 20 .6 58 .2 ± 19 .5
+
+C 52 .4 ± 25 .3 61 .4 ± 13 .9 72 .1 ± 10 .2 63 .1 ± 21 .1 58 .0 ± 26 .3
+
+C-A 63 .4 ± 16 .4 68 .7 ± 20 .8 65 .2 ± 16 .3 60 .2 ± 15 .0 62 .6 ± 11 .7
+
+Table 10. Value of Parameter β: Noise level = 0 .1. The results are averaged over 16 trials ( I: independent, A: action-inclusive, C:context-inclusive, C-A : context-action-inclusive). 0 5 10 15 20     
+
+> 50 55 60 65 70 75 80 85 Accuracy (%)
+> IACC-A N
+
+Figure 3. Policy accuracy for different β: All noisy settings have level = 0 .1. The optimal selections are marked beside the value. The results show the necessity of regularization. The results are averaged over 16 trials. 
+
+## G. Additional experimental details 
+
+For the f -variational estimators (functions T and G), the reward decoder ψ, and the linear policy π, we use a 2-layer fully-connected network to process each input image (i.e., the context or the feedback). Then, the concatenated inputs go through an additional linear layer and the final value is output. The same network structures are used to implement the reward decoder and the policy of the previous IGL algorithm (Xie et al., 2021b). In each experiment, we train the f -VI-IGL algorithm for 1, 000 epochs with a batch size of 600 . Particularly, we alternatively update the parameters of the f -MI estimators and the reward decoders (i.e., 500 epochs of training for each). To stabilize the training, we clip the gradient norm to be no greater than 1 and use an exponential moving average (EMA) with a rate of 0.99 . For the previous IGL method, we follow the experimental details provided in the work of Xie et al. (Xie et al., 2021b, Appendix C) and train the algorithm for 10 epochs over the entire training datasets. 18

@@ -1,0 +1,1092 @@
+Title: HYGMA: Hypergraph Coordination Networks with Dynamic Grouping  for Multi-Agent Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=mgJkeqc685
+
+Number of Pages: 22
+
+Markdown Content:
+# HYGMA: Hypergraph Coordination Networks with Dynamic Grouping for Multi-Agent Reinforcement Learning 
+
+Chiqiang Liu 1 Dazi Li 1
+
+## Abstract 
+
+Cooperative multi-agent reinforcement learning faces significant challenges in effectively orga-nizing agent relationships and facilitating infor-mation exchange, particularly when agents need to adapt their coordination patterns dynamically. This paper presents a novel framework that in-tegrates dynamic spectral clustering with hyper-graph neural networks to enable adaptive group formation and efficient information processing in multi-agent systems. The proposed frame-work dynamically constructs and updates hyper-graph structures through spectral clustering on agents’ state histories, enabling higher-order rela-tionships to emerge naturally from agent interac-tions. The hypergraph structure is enhanced with attention mechanisms for selective information processing, providing an expressive and efficient way to model complex agent relationships. This architecture can be implemented in both value-based and policy-based paradigms through a uni-fied objective combining task performance with structural regularization. Extensive experiments on challenging cooperative tasks demonstrate that our method significantly outperforms state-of-the-art approaches in both sample efficiency and final performance. The code is available at: https://github.com/mysteryelder/HYGMA. 
+
+## 1. Introduction 
+
+Cooperative multi-agent reinforcement learning (MARL) has emerged as a promising paradigm for addressing com-plex real-world challenges that require coordinated decision-making among multiple agents (Charbonnier et al., 2025; Si et al., 2025). A fundamental challenge in MARL is the    
+
+> 1College of Information Science and Technology, Beijing Uni-versity of Chemical Technology, Beijing, China. Correspondence to: Dazi Li <lidz@mail.buct.edu.cn>.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+efficient organization and coordination of agents to achieve system-wide objectives. This becomes particularly criti-cal when agent relationships need to dynamically evolve in response to changing task demands and environmental conditions. Despite significant advances in value decomposition meth-ods and policy optimization techniques (Huang et al., 2025; Li et al., 2021), existing MARL approaches face inherent limitations in modeling the dynamic nature of inter-agent relationships. Traditional methods either adopt a uniform treatment of all agents (Tan, 1993; Heess et al., 2017) or rely on static grouping structures (Zhang et al., 2020; Sukhbaatar et al., 2016). Such rigid frameworks often fail to capture the evolving coordination requirements in complex multi-agent systems, leading to suboptimal performance and inef-ficient information exchange.Recent work has highlighted the importance of adaptive coordination structures in MARL (Zang et al., 2024), yet the development of frameworks that can automatically identify and adapt agent relationships remains an open challenge (Niu et al., 2021). To address these limitations, this paper proposes HYGMA (HYpergraph Grouping for Multi-Agent coordination), a novel framework that leverages hypergraph networks to capture and adapt the complex relationships in multi-agent systems. Unlike traditional graph-based approaches that can only model pairwise interactions, hypergraph networks naturally represent higher-order relationships among multi-ple agents (Kim et al., 2024), enabling more expressive and efficient group coordination. The proposed framework dy-namically constructs hypergraph structures through spectral clustering on agents’ state histories, allowing agent groups to form and evolve based on their actual coordination needs during task execution. The core of our approach is a two-level architecture that separates group formation from infor-mation processing. The first level employs dynamic spectral clustering to identify agent groups based on their state his-tories and interaction patterns. These grouping results are then used to construct hyperedges in the hypergraph net-work. The second level utilizes hypergraph convolution networks (HGCN) to process and propagate information among agents, enabling efficient feature extraction that re-spects the identified group structures. This architecture can 1Hypergraph Coordination with Dynamic Grouping for MARL 
+
+be effectively integrated into both value-based and policy-based multi-agent learning frameworks. The main contributions of this work are summarized as follows: • A dynamic spectral clustering-based grouping mecha-nism that adaptively constructs coordination structures through temporal agent state representations, enabling automated group formation and evolution in response to dynamic coordination requirements in multi-agent systems. • A novel hypergraph neural architecture that extends tra-ditional graph-based information processing to capture higher-order agent relationships, substantially improv-ing the expressiveness and efficiency of multi-agent information exchange through learnable hypergraph convolution operations. • A unified learning framework that seamlessly incor-porates the proposed hypergraph-based coordination mechanism into both value-based and policy-based multi-agent learning paradigms, achieving signifi-cant empirical improvements over state-of-the-art ap-proaches in complex cooperative tasks. 
+
+## 2. Related Work 
+
+Multi-Agent Coordination Structures Centralized Train-ing with Decentralized Execution (CTDE) (Oliehoek et al., 2008) has driven significant advances in value decomposi-tion methods. While single-agent settings have explored re-cursive least-squares approaches (Song et al., 2021), MARL methods like VDN (Sunehag et al., 2017) employed linear summation of local utilities, while QMIX (Rashid et al., 2020) introduced non-linear mixing networks constrained by monotonicity. Subsequent innovations like QTRAN (Son et al., 2019) relaxed these constraints through the Individual-Global-Max principle, with extensions enhancing explo-ration (Gupta et al., 2021; Mahajan et al., 2019) and mixing capacity (Wang et al., 2020a; Zang et al., 2023). However, these methods fundamentally assume fixed agent relation-ships through static decomposition structures (e.g., sum/max operations), limiting their ability to model dynamic coordi-nation patterns requiring adaptive group formation. In par-allel, actor-critic frameworks have extended CTDE through centralized critics, as seen in MADDPG (Lowe et al., 2017) and COMA (Foerster et al., 2018) which address credit assignment via counterfactual baselines. While such ap-proaches enable decentralized execution, their information processing remains restricted to pairwise interactions. Re-cent communication-augmented variants (Su et al., 2021; Wan et al., 2021) demonstrate performance gains from ex-plicit information exchange, yet still operate on fixed inter-action graphs that cannot capture the higher-order relation-ships inherent in complex team coordination. 
+
+Dynamic Grouping Mechanisms Prior work in agent or-ganization has explored three principal paradigms: prede-fined grouping (Lhaksmana et al., 2018; Macarthur et al., 2011; Russell & Zimdars, 2003), task-specific allocation (Iqbal et al., 2022; Lee et al., 2019; Shu & Tian, 2018), and role-based decomposition. While role-learning methods like ROMA (Wang et al., 2020b) and RODE (Wang et al., 2020c) enable context-dependent specialization, they typically re-quire manual specification of role numbers or action space partitions. VAST (Phan et al., 2021) demonstrates subgroup-aware value factorization but inherits the limitation of fixed group cardinality. These approaches remain constrained by either domain knowledge requirements or static structural assumptions, struggling to adapt when coordination patterns evolve dynamically during task execution. Recent advances attempt to automate group formation through learned simi-larity metrics (Zang et al., 2024). However, such methods often rely on heuristic similarity measures or black-box relational modules that lack interpretable temporal analy-sis. Recent work has also explored coordination graphs for adaptive agent relationships (Yang et al., 2022; Wang et al., 2021). Our spectral clustering approach fundamen-tally differs by establishing mathematically grounded group discovery through spectral analysis of agents’ state trajec-tory manifolds, enabling principled adaptation to emerging coordination needs without prior group specifications. 
+
+Hypergraph Representation Learning Graph neural net-works (GNNs) (Wang & Gombolay, 2020; Wu et al., 2020) have demonstrated extensive applications in various do-mains (Jia et al., 2025), and have become prevalent in MARL for modeling agent interactions through graph struc-tures (Pesce & Montana, 2023). Approaches like DGN (Jiang et al., 2018) and MAGNet (Malysheva et al., 2018) employ attention mechanisms to capture pairwise relation-ships, while dynamic variants (Liu et al., 2020; Sheng et al., 2022) learn adaptive edges through differentiable attention. However, these graph-based methods fundamentally op-erate on dyadic connections, forcing higher-order group interactions to be approximated through chains of pairwise edges—an inefficient representation that loses natural multi-agent coordination semantics. Addressing coordination complexity, research has advanced along several dimen-sions: factorization approaches through coordination graphs (Böhmer et al., 2020), regularization techniques via nested optimization (Song et al., 2020), adaptive topological struc-tures (Li et al., 2020), and representational capacity analysis across varied multi-agent domains (Castellini et al., 2021). Policy-based frameworks have incorporated attention mech-anisms to enhance selective information processing (Iqbal & Sha, 2019), yet these innovations remain constrained by their underlying pairwise representational paradigm. Even 2Hypergraph Coordination with Dynamic Grouping for MARL 
+
+hierarchical communication architectures (Liu et al., 2023), while enhancing structured information flow, cannot inher-ently capture the n-ary relationships fundamental to complex team coordination. Hypergraph neural networks (Feng et al., 2019), demonstrating their expressiveness in social network modeling (Yu et al., 2021) and recommendation systems (Gao et al., 2023), offer a theoretical framework capable of natively representing higher-order interactions. To our knowledge, no prior work has combined spectral cluster-ing with hypergraph convolution to dynamically construct multi-agent hyperedges based on temporal state patterns, bypassing the heuristic hyperedge definitions common in other domains. 
+
+## 3. Method 
+
+A cooperative multi-agent task can be modeled as a Dec-POMDP (Oliehoek et al., 2016) forming the tuple 
+
+⟨N, S, A, P, R, Ω, O, n, γ ⟩, where N = {1, ..., n } denotes the finite set of n agents. s ∈ S represents the true state of the environment from which each agent i draws an in-dividual observation oi ∈ Ω according to the observation function O(s, i ). At each timestep, each agent i selects an action ai ∈ Ai based on its action-observation history 
+
+τi ∈ T = (Ω × A)∗, forming a joint action a ∈ An. This results in a transition to the next state s′ according to the transition function P (s′|s, a ) : S ×A → ∆( S) and a shared reward r = R(s, a ) for the team, where R : S × A → R is the reward function and γ ∈ [0 , 1) is the discount factor. The dynamic relationships between agents are modeled through a hypergraph structure (Zhang et al., 2018) G =(V, E, W ). The vertex set V = {v1, ..., v n} represents agents, while the hyperedge set E = {e1, ..., e m} captures higher-order interactions among multiple agents, where each hyperedge ek connects a subset of agents. W ∈ Rm×m is a diagonal matrix containing hyperedge weights wkk that indicate the strength of these relationships. Unlike tradi-tional graphs limited to pairwise relationships, hypergraphs capture complex group interactions that naturally arise in multi-agent systems. The hypergraph structure updates dy-namically through spectral clustering based on agents’ state histories, enabling adaptive grouping as the environment evolves. 
+
+3.1. Overview 
+
+The proposed HYGMA framework enhances multi-agent reinforcement learning through dynamic grouping and hypergraph-based information processing. The core com-ponents include a dynamic spectral clustering module for adaptive group formation, a hypergraph convolution net-work with multi-head attention for intra-group information processing. The method has been implemented in both value-based and policy-based learning paradigms.The over-all architecture of our proposed method is illustrated in Figure 1. The dynamic spectral clustering module periodically pro-cesses agents’ state histories rather than every timestep, identifying natural groupings based on behavioral similari-ties. These grouping results construct a hypergraph topol-ogy where vertices represent agents and hyperedges capture intra-group relationships. Within each group, a multi-layer hypergraph convolution network with multi-head attention mechanism processes information, allowing agents to selec-tively focus on relevant information rather than simple aver-aging. For each agent i, its local observation oi and action-observation history τi are encoded through a recurrent neu-ral network to generate individual embeddings, which are then enhanced through the attentive hypergraph convolution layers to produce group-aware representations hi.In the value-based implementation, each agent’s individual Q-value is augmented with its group-aware representation to form Qi(τi, a i, h i). These enhanced Q-values are then combined through a monotonic mixing network to compute the joint action-value Qtot . Similarly, in the policy-based implementation, each agent’s policy network πi takes the concatenation of local observation history τi and group-aware representation hi as input to generate action probabil-ities, while the critic network uses the enhanced joint state representation for value estimation. Both implementations fully adhere to the CTDE paradigm while enhancing its coordination capabilities. During cen-tralized training, we leverage global information to discover dynamic group structures through spectral clustering. As proven in Theorem 3.2, these group structures converge and stabilize during training. At execution time, the core CTDE principle is preserved—agents operate without ac-cess to global state information. The key enhancement is that agents within established groups share local obser-vations with groupmates, enabling the HGCN to generate group-aware representations that capture coordinated be-haviors discovered during training. This approach respects CTDE’s fundamental requirement of avoiding global state dependency during execution, while allowing more effective coordination through structured local information exchange within stable groups. 
+
+3.2. Dynamic Spectral Clustering for Group Formation 
+
+The group formation process takes agents’ state histories as input to identify natural groupings that reflect coordination patterns. Given state history matrix Ht ∈ Rb×l×d for n
+
+agents, where b is batch size, l is trajectory length, and d is state dimension, we formalize the grouping as a normalized cut minimization problem: 
+
+N cut (G) = 
+
+> k
+
+X
+
+> i=1
+
+cut (Vi, ¯Vi)
+
+vol (Vi) (1) 3Hypergraph Coordination with Dynamic Grouping for MARL Hyperedge Generation 1 Hyperedge Generation n               
+
+> Mixing Network Agent 1 Agent n
+> MLP
+> ……
+> Node features Hypergraph convolution Linear ReLu …Multi-heads attention Agents’ features …Cooperative Task Group 1 Group 𝑘
+> Similarity Matrix 𝑊
+> Agents
+> group number 𝑘
+> Group update ?
+> ⨁
+> concat
+> ⨁
+> concat Hypergraph mapping stability threshold δ
+> Periodic grouping Hypergraph structure
+> Figure 1. Overview of the proposed hypergraph-based dynamic grouping multi-agent rein-forcement learning framework with spectral clustering and attentive infor-mation processing.
+
+where cut (Vi, ¯Vi) measures the sum of edge weights be-tween group Vi and its complement, and vol (Vi) is the sum of degrees of vertices in Vi. To solve this NP-hard discrete optimization problem, we adopt a spectral relaxation: 
+
+min 
+
+> A∈Rn×k
+
+T r (AT LA ) s.t. AT A = I (2) where L = D − W is the normalized graph Laplacian, with 
+
+D being the diagonal degree matrix and W representing the similarity matrix constructed using k-nearest neighbors based on Euclidean distances between agents’ state history trajectories. Formally, Wij > 0 if agent j is among the 
+
+k-nearest neighbors of agent i (or vice versa), and Wij = 0 
+
+otherwise. State histories are normalized across feature dimensions to ensure consistent scaling in different envi-ronments, enabling identification of coordination patterns regardless of specific state representations. The solution A
+
+contains the k eigenvectors corresponding to the k smallest eigenvalues of L, providing a provably good approximation: 
+
+Theorem 3.1 (Clustering Approximation) . The spectral clustering solution G satisfies: 
+
+N cut (G) ≤ O(log k) · N cut (G∗) (3) 
+
+where G∗ is the optimal grouping structure. Further-more, this approximation ratio is tight in the sense that no polynomial-time algorithm can achieve asymptotically better approximation under standard complexity assump-tions. (See Appendix A.1 for proof) 
+
+The determination of optimal group number k∗ requires balancing the expressiveness of grouping structure with its computational efficiency. We address this through optimiz-ing the silhouette score, which measures both the cohesion within groups and the separation between groups: 
+
+k∗ = argmax k∈[kmin ,k max ]
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+b(i) − a(i)max a(i), b (i) (4) where a(i) represents the mean distance between agent i
+
+and all other agents within the same group, and b(i) denotes the minimum mean distance from agent i to any other group. This optimization inherently captures the trade-off between intra-group similarity and inter-group distinctiveness. The dynamic nature of multi-agent interactions necessitates a group update mechanism: 
+
+Gt =
+
+(
+
+C(Ht) if η(Gt−1, C(Ht)) > δ Gt−1 otherwise (5) where η(·, ·) measures the normalized proportion of agents changing groups, and δ is a stability threshold. This mecha-nism guarantees both adaptivity and stability: 
+
+Theorem 3.2 (Convergence) . Under the dynamic update rule with threshold δ, the sequence of groupings Gt con-verges in finite time with probability 1. The expected number of updates before convergence is bounded by O(1 /δ ).(See Appendix A.2 for proof) 
+
+To ensure computational efficiency, we employ optimization strategies including history windowing, periodic updates, and termination. The quality of grouping structure directly impacts the effec-tiveness of subsequent learning. For a rigorous characteri-zation of this relationship, let V ∗(s, G ) denote the optimal value function under grouping structure G, we have: 
+
+Theorem 3.3 (Quality Preservation) . For the obtained grouping structure Gt and the optimal grouping G∗:
+
+|V ∗(s, G ∗) − V ∗(s, G t)| ≤ γα log k (6) 
+
+where γ is the discount factor and α is a problem-dependent constant. Moreover, this bound is tight when the normalized cut difference between Gt and G∗ approaches O(log k).(See Appendix A.3 for proof) 
+
+4Hypergraph Coordination with Dynamic Grouping for MARL 
+
+These theoretical guarantees establish the effectiveness of the dynamic spectral clustering mechanism in both com-putational efficiency and learning quality. The resulting group structure forms the foundation for hypergraph-based information processing described in the subsequent section. 
+
+3.3. Hypergraph Attention Convolution Network 
+
+Based on the grouping structure obtained from dynamic spectral clustering, we construct a hypergraph G =(V, E, W ) where vertices V represent agents and hyper-edges E capture the intra-group relationships. Specifically, for each group identified in Section 3.2, we create a hyper-edge connecting all agents within that group, with the edge weight in W reflecting the group cohesion measured by the silhouette score. This dynamic hypergraph construc-tion allows us to model complex, higher-order relation-ships that naturally emerge from agent interactions. Within this dynamic hypergraph structure, we employ an attention-enhanced hypergraph convolution network to generate per-sonalized information embeddings for each agent. For a node i at layer l, the feature update follows: 
+
+h(l+1)  
+
+> i
+
+= σ X
+
+> e∈E i
+
+αie · D− 12 HW B −1
+
+· HT D− 12 h(l) 
+
+> i
+
+P (l)
+
+!
+
+(7) where Ei represents the set of hyperedges containing node i,and matrices H, D, and B define the hypergraph structure. The attention coefficient αie is computed through: 
+
+αie = exp( LeakyReLU (aT [Wsh(l) 
+
+> i
+
+|Wsh(l) 
+
+> e
+
+])) 
+
+P 
+
+> e′∈E i
+
+exp( LeakyReLU (aT [Wsh(l) 
+
+> i
+
+|Wshe ′(l)])) 
+
+(8) This attention mechanism enables each agent to adaptively weight information from different groups it belongs to, gen-erating personalized feature representations that capture both individual characteristics and group dynamics. The processed features enhance both value and policy networks: 
+
+Qi(τi, a i, h (L) 
+
+> i
+
+) = fQ([ τi|ai|h(L) 
+
+> i
+
+]) (9) 
+
+πi(ai|τi, h (L) 
+
+> i
+
+) = fπ ([ τi|h(L) 
+
+> i
+
+]) (10) This integration creates an end-to-end trainable architecture where dynamic group structures adaptively influence agents’ decision making through attention-weighted information aggregation. By combining dynamic spectral clustering with attention-based hypergraph convolution, HYGMA enables flexible and efficient information exchange within groups while maintaining each agent’s ability to selectively process relevant information. This hypergraph structure not only enhances representa-tion learning but also reduces communication complexity compared to fully-connected architectures, from O(n2) to 
+
+O(n2/k ) where k is the number of groups (see Appendix A.4 for theoretical analysis). 
+
+3.4. Learning Objectives 
+
+To optimize HYGMA architecture, we design a joint learn-ing objective that combines the main task performance with group consistency and attention regularization: 
+
+Ltotal = Ltask + λ1Lgroup + λ2Latt (11) The group consistency loss Lgroup ensures effective spec-tral clustering by minimizing intra-group distances while maximizing inter-group separation: 
+
+Lgroup =
+
+> K
+
+X
+
+> k=1
+
+ 1
+
+|Ck|
+
+X
+
+> i,j ∈Ck
+
+d(hi, h j )
+
+−β min  
+
+> l̸=k
+
+1
+
+|Cl|
+
+X 
+
+> i∈Ck,j ∈Cl
+
+d(hi, h j )
+
+
+
+(12) To encourage selective information processing through the attention mechanism while avoiding trivial solutions, we employ an entropy regularization term: 
+
+Latt = − X i = 1 N X
+
+> e∈E i
+
+αie log( αie ) (13) The hyperparameters λ1 and λ2 balance the importance of these auxiliary objectives against the main task learning. 
+
+3.5. Implementation in Value-based and Policy-based Frameworks 
+
+HYGMA framework can be effectively implemented in both value-based and policy-based learning paradigms while maintaining the CTDE principle. In both implementations, we maintain the core components: dynamic spectral cluster-ing for group formation, hypergraph construction based on group structure, and attention-enhanced HGCN for informa-tion processing within groups. 3.5.1. V ALUE -BASED IMPLEMENTATION 
+
+In the QMIX framework, we enhance individual Q-values with group-aware representations: 
+
+Qi(τi, a i, h i) = fQ([ τi|ai|hi]) (14) These enhanced Q-values are then combined through a monotonic mixing network: 
+
+Qtot = fmix (Q1, ..., Q n; s) (15) The TD loss serves as the main task objective: 
+
+Ltask = ( r + γ max a′Qtot (s′, a ′) − Qtot )2 (16) 5Hypergraph Coordination with Dynamic Grouping for MARL 
+
+The hypergraph structure particularly enhances the value-based implementation by providing contextual information that helps individual agents understand their role within different coordination patterns. This addresses a funda-mental limitation of traditional value factorization methods: while they can learn joint action-values, they struggle to identify dynamic coordination relationships. By integrating HGCN-extracted features into the Q-function, agents learn to consider both individual utility and group-level coordina-tion simultaneously, leading to more effective collaborative strategies. 3.5.2. P OLICY -BASED IMPLEMENTATION 
+
+In the actor-critic framework, both the actor and critic net-works utilize the group-aware features. The policy network generates actions based on augmented observations: 
+
+πi(ai|τi, h i) = fπ ([ τi|hi]) (17) The critic estimates state values incorporating group infor-mation: 
+
+V (s, h ) = fV ([ s|h]) (18) The task loss combines actor and critic objectives: 
+
+Ltask = − E [log πi(ai|τi, h i)Ai]+ α(r + γV (s′, h ′) − V (s, h )) 2 (19) In policy-based methods, the hypergraph structure enhances credit assignment by creating dynamic groupings where rewards can be more efficiently distributed within relevant agent subsets. The multi-head attention mechanism further refines this by allowing agents to focus on different aspects of group information simultaneously. The complete training procedure for both implementations is summarized in Algorithm 1, integrating dynamic group formation (lines 6-8), attentive information processing (lines 11-12), and joint optimization (lines 26-28). This unified approach ensures coordination patterns emerge naturally while maintaining stable learning dynamics. 
+
+## 4. Experiments 
+
+The empirical evaluation consists of experiments on both value-based and policy-based implementations. The value-based implementation is tested on StarCraft II Multi-Agent Challenge (SMAC) benchmark (Vinyals et al., 2019) with three representative maps: 3s_vs_5z, 5m_vs_6m and 3s5z_vs_3s6z. The policy-based implementation is evalu-ated on Predator-Prey (Singh et al., 2018), Traffic junction (Sukhbaatar et al., 2016) and Google Research Football (GRF) (Kurach et al., 2020), which introduces additional complexity through sparse rewards, stochasticity and adver-sarial agents. A comprehensive description of each environ-ment can be found in the Appendix B. 
+
+Algorithm 1 HYGMA: Hypergraph grouping for MARL 
+
+Require: Initial parameters θ for networks, learning rates 
+
+απ , αQ, group update threshold δ
+
+Ensure: Trained policy/value networks  
+
+> 1:
+
+Initialize replay buffer D, hypergraph G = ( V, E, W ) 
+
+> 2:
+
+for each episode do  
+
+> 3:
+
+for each timestep t do  
+
+> 4:
+
+Observe current states st and histories τt 
+
+> 5:
+
+// Update group structure if necessary  
+
+> 6:
+
+if η(Gt−1, C(Ht)) > δ then  
+
+> 7:
+
+Update groups via spectral clustering  
+
+> 8:
+
+Construct new hypergraph Gt 
+
+> 9:
+
+end if  
+
+> 10:
+
+// Generate group-aware representations  
+
+> 11:
+
+Compute attention coefficients αie  
+
+> 12:
+
+Update node features hi 
+
+> 13:
+
+// Action selection and execution  
+
+> 14:
+
+for each agent i do  
+
+> 15:
+
+if Value-based then  
+
+> 16:
+
+Select action via ϵ-greedy from Qi(τi, ·, h i) 
+
+> 17:
+
+else  
+
+> 18:
+
+Sample action from πi(·| τi, h i) 
+
+> 19:
+
+end if  
+
+> 20:
+
+end for  
+
+> 21:
+
+Execute joint action, observe reward rt and next state st+1  
+
+> 22:
+
+Store transition in D 
+
+> 23:
+
+end for  
+
+> 24:
+
+// Training phase  
+
+> 25:
+
+Sample mini-batch from D 
+
+> 26:
+
+Compute Ltask according to implementation type  
+
+> 27:
+
+Compute Lgroup and Latt  
+
+> 28:
+
+Update networks using Ltotal = Ltask + λ1Lgroup +
+
+λ2Latt  
+
+> 29:
+
+end for Baselines. The SMAC experiments compare against state-of-the-art value factorization methods including Ft-QMIX (Hu et al., 2023), QPLEX (Wang et al., 2020a), VAST (Phan et al., 2021), MAPPO (Yu et al., 2022)and GoMARL (Zang et al., 2024). Ft-QMIX represents a finetuned version of QMIX with enhanced win rates over the vanilla implementa-tion. VAST incorporates sub-team value factorization based on predefined group numbers, while GoMARL presents an automatic grouping mechanism for efficient coopera-tion. The comparison also includes RIIT (Hu et al., 2023), which integrates effective modules from multiple methods for credit assignment. For policy-based scenarios, the base-line methods comprise communication-oriented approaches: MAGIC (Niu et al., 2021), CommNet (Sukhbaatar et al., 2016), GA-Comm (Liu et al., 2020), I3CNet (Singh et al., 2018) and TarMAC-IC3Net (Das et al., 2019). 6Hypergraph Coordination with Dynamic Grouping for MARL 0 1 2 3 4                
+
+> Steps (×10 )
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Test Win Rate (%)
+> 3s_vs_5z
+> 012345
+> Steps (×10 )
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Test Win Rate (%)
+> 5m_vs_6m
+> 012345
+> Steps (×10 )
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Test Win Rate (%)
+> 3s5z_vs_3s6z
+> HYGMA GoMARL Ft-Qmix Qplex RIIT VAST MAPPO
+
+Figure 2. The test won rate for the 3s_vs_5z (Left), the 5m_vs_6m (Middle) and the 3s5z_vs_3s6z (Right). 0 100 200 300 400 500 
+
+> Epochs
+> 0
+> 5
+> 10
+> 15
+> 20
+> 25
+> 30
+> 35
+> 40
+> 45
+> Steps-Taken
+> HYGMA
+> MAGIC
+> CommNet
+> GA-Comm
+> I3CNet
+> TarMAC-IC3Net
+
+(a) moderate-scale (10×10 grid, 5 agents) 0 200 400 600 800 1000  
+
+> Epochs
+> 0
+> 10
+> 20
+> 30
+> 40
+> 50
+> 60
+> 70
+> 80
+> Steps-Taken
+
+(b) large-scale (20×20 grid, 10 agents) 
+
+Figure 3. Average steps per episode in Predator-Prey. 
+
+4.1. Performance on SMAC 
+
+Figure 2 illustrates the performance of HYGMA across diverse SMAC benchmark scenarios, demonstrating consis-tent effectiveness where baseline approaches exhibit context-dependent limitations. In the balanced engagement scenario (5m_vs_6m), which demands precise positioning and coor-dinated focus fire, HYGMA maintains stable high win rates while baseline methods demonstrate suboptimal coordina-tion efficiency. Analysis of the asymmetric combat scenario (3s_vs_5z) reveals that despite GoMARL ultimately achiev-ing comparable asymptotic performance, HYGMA exhibits significantly accelerated convergence dynamics. This advan-tage becomes particularly pronounced in the heterogeneous scenario (3s5z_vs_3s6z), where baseline approaches mani-fest substantial performance variance and limited win rates, contrasting with the stable and superior performance of HYGMA. The consistent effectiveness across these varying coordination challenges validates the dynamic hypergraph structure’s capacity to facilitate diverse forms of agent co-operation. Notably, while HYGMA introduces additional parameters through the HGCN module, it maintains the same mixing network architecture as Ft-QMIX, demonstrat-ing that performance improvements stem primarily from our novel hypergraph-based information processing rather than simply scaling up conventional network capacity. This architectural choice does introduce approximately 36% com-putational overhead in training time compared to baseline methods, but this cost is justified by the significant improve-ment in sample efficiency and final performance. The accel-erated convergence dynamics observed across all scenarios effectively offset the per-iteration computational increase, creating a favorable efficiency-performance trade-off (see Appendix C for detailed analysis of parameter efficiency, computational overhead, and performance trade-offs) 
+
+4.2. Performance on Predator-Prey 
+
+The Predator-Prey environment presents coordination chal-lenges at different scales through a pursuit task with negative step penalties. The evaluation considers both moderate-scale coordination (5 predators, 10×10 grid) and large-scale co-ordination (10 predators, 20×20 grid), where agents must balance exploration and coordinated capture strategies. Figure 3 reveal the scalability advantages of the dynamic hypergraph structure. In the moderate-scale scenario, the method demonstrates rapid policy convergence and stable performance, outperforming the state-of-the-art baseline MAGIC in both convergence speed and final performance. The performance distinction becomes more pronounced in the large-scale scenario, where communication-based meth-ods like CommNet and I3CNet exhibit substantial coordi-nation degradation. This contrast particularly highlights the limitations of fixed communication architectures in scaling to larger agent populations. The proposed method main-tains consistent coordination efficiency across both scenar-ios through adaptive group formation, enabling effective information flow while avoiding communication overhead. 7Hypergraph Coordination with Dynamic Grouping for MARL 
+
+4.3. Performance on Traffic Junction 
+
+The Traffic Junction environment evaluates coordination mechanisms through traffic control scenarios of increasing complexity. The evaluation encompasses both a basic coor-dination setting with sparse traffic flow and a more challeng-ing scenario featuring higher traffic density and increased spatial complexity. The success criterion requires complete collision avoidance throughout episodes, demanding consis-tent coordination among all active agents. 
+
+Table 1. Success rate and convergence steps in Traffic Junction. 
+
+METHOD 
+
+7 × 7,N max = 5 ,parrive = 0 .314 × 14 ,N max = 10 ,parrive = 0 .2
+
+HYGMA 99.7 ± 0.1% (272 ± 41) 99.2 ± 0.1% (569 ± 34) 
+
+MAGIC 99.9 ± 0.1% (440 ± 64) 99.9 ± 0.1% (819 ± 85) COMMNET 99.3 ± 0.6% (585 ± 73) 97.2 ± 0.3% (3657 ± 480) IC3NET 97.8 ± 1.0% (611 ± 101) 96.0 ± 0.7% (1604 ± 109) TARMAC-IC3NET 84.8 ± 4.5% (599 ± 187) 95.5 ± 1.3% (1706 ± 104) GA-COMM 95.9 ± 0.1% (891 ± 141) 97.1 ± 0.7% (1573 ± 253) 
+
+Table 1 reveals a compelling trade-off between asymptotic performance and learning efficiency. Although MAGIC achieves marginally higher final success rates, HYGMA demonstrates substantially enhanced sample efficiency across both scenarios, with convergence (defined as first reaching 90% of final performance sustained for 5 consecu-tive epochs) occurring significantly earlier. Rapid conver-gence characteristics can be attributed to the adaptive nature of the hypergraph structure, which enables efficient discov-ery of critical coordination patterns. Notably, the method maintains high success rates comparable to state-of-the-art approaches while requiring only a fraction of the training samples, demonstrating the effectiveness of dynamic group coordination in accelerating policy learning. 
+
+4.4. Performance on Google Research Football 
+
+The Google Research Football (GRF) environment intro-duces additional complexity through the combination of sparse rewards, high-dimensional action spaces, and ad-versarial elements. The evaluation scenario requires three attacking agents to coordinate against adaptive defensive opponents, presenting challenges in both strategic planning and tactical execution. The environment’s inherent stochas-ticity and delayed reward signals pose particular challenges for consistent policy learning. Table 2 reveal key characteristics of different coordination approaches in complex domains. The proposed HYGMA and MAGIC establish comparable success rates at the up-per performance boundary, yet exhibit distinct operational characteristics. While communication-centric approaches like GA-Comm demonstrate moderate effectiveness, meth-ods relying on fixed communication structures (CommNet, 
+
+Table 2. Success rate and average steps taken in GRF. METHOD SUCCESS RATE STEPS TAKEN 
+
+HYGMA 97.7 ± 0.7% 30.26 ± 0.24 
+
+MAGIC 98.2 ± 1.0% 34.30 ± 1.34 COMM NET 59.2 ± 13.7% 39.32 ± 2.35 IC3N ET 70.0 ± 9.8% 40.37 ± 1.22 TAR MAC-IC3N ET 73.5 ± 8.3% 41.53 ± 2.80 GA-C OMM 88.8 ± 3.9% 39.05 ± 3.05 
+
+IC3Net, TarMAC-IC3Net) show limited ability to develop sophisticated offensive strategies. The performance dispar-ity particularly manifests in the stability of learned policies, where the proposed approach maintains consistent behavior across evaluation episodes. This stability in the presence of environmental stochasticity suggests effective informa-tion aggregation through the dynamic hypergraph structure, enabling robust coordination in the face of uncertain state transitions and opponent behaviors. 0 2 4 6 8 10                         
+
+> Normalized Time Steps (1e5 steps per interval)
+> Node 0
+> Node 1
+> Node 2
+> Node 3
+> Node 4
+> Group Evolution Timeline 01234Node ID 01234Node ID
+> 0.00 0.80 0.70 0.40 0.20 0.80 0.00 0.50 0.40 0.20 0.70 0.50 0.00 0.30 0.50 0.40 0.40 0.30 0.00 0.30 0.20 0.20 0.50 0.30 0.00
+> Node Co-occurrence Matrix
+> 0.0 0.1 0.2 0.3 0.4 0.5 0.6 0.7 0.8
+> Co-occurrence Probability
+
+Figure 4. Group analysis in 5m_vs_6m. 0 1 2 3 4 5   
+
+> Steps (×10 )
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Test Win Rate (%)
+> HYGMA Grouping with GCN all-in-one group Ft-Qmix
+
+Figure 5. Ablation studies in 5m_vs_6m. 
+
+8Hypergraph Coordination with Dynamic Grouping for MARL 
+
+4.5. Analysis 
+
+Analysis of the learned coordination patterns provides in-sights into the underlying mechanisms driving performance improvements. Taking the 5m_vs_6m scenario as a repre-sentative case, Figure 4 reveals the emergence of structured coordination through temporal group evolution. The co-occurrence analysis indicates three distinct coordination pat-terns: a core tactical unit (Agents 0,1,2) maintaining high coordination frequency, a flexible support unit (Agent 3) adapting its grouping based on tactical situations, and a spe-cialized independent unit (Agent 4) operating with strategic autonomy. The convergence of this organizational struc-ture aligns with the stabilization of performance metrics, indicating the discovery of effective tactical roles. Ablation studies presented in Figure 5 isolate three critical architectural components: our full method with dynamic hypergraph structure (HYGMA), a variant replacing HGCN with standard GCN while maintaining dynamic grouping (Grouping with GCN), and a fixed single-group variant (all-in-one group). The performance differentials demonstrate that improvements stem primarily from the hypergraph structure rather than merely increased information avail-ability. While the GCN variant outperforms the fixed-group baseline, it exhibits significant performance degradation compared to proposed method, particularly in asymptotic performance. This confirms the superior representational capacity of hypergraphs for modeling higher-order agent relationships. Furthermore, the single-group variant’s per-formance plateau illustrates how static information sharing structures, despite access to equivalent information, fun-damentally limit coordination complexity. These results validate that the dynamic hypergraph topology provides es-sential structural inductive bias for discovering sophisticated coordination strategies, serving as a key mechanism in bal-ancing the exploration-exploitation trade-off in coordination learning. 
+
+## 5. Conclusion 
+
+This paper presents HYGMA, a novel framework that inte-grates dynamic spectral clustering with hypergraph neural networks for addressing coordination challenges in multi-agent reinforcement learning. The framework makes three key technical contributions: First, an adaptive grouping mechanism leveraging spectral analysis to discover coordi-nation patterns. Second, an attention-enhanced hypergraph architecture capturing higher-order relationships while main-taining computational efficiency. Third, a unified objective combining task performance with structural regularization for both value-based and policy-based learning paradigms. Experimental results across diverse domains demonstrate significant improvements in sample efficiency and asymp-totic performance compared to state-of-the-art approaches. The emergence of interpretable group structures through spectral clustering provides insights into learned coordina-tion strategies. Theoretical analysis establishes guarantees on the grouping mechanism’s quality and computational efficiency.Future work explore extensions to overlapping group structures through soft clustering techniques, further optimizations for very large agent populations, and deeper theoretical connections between spectral clustering and in-formation bottleneck principles in representation learning. 
+
+## Acknowledgement 
+
+This work was substantially supported by the National Nat-ural Science Foundation of China under Grants 62273026. 
+
+## Impact Statement 
+
+This work advances multi-agent reinforcement learning through more efficient coordination mechanisms. Beyond the general implications of advancing machine learning, our method’s improved sample efficiency and interpretable group structures could benefit real-world applications like traffic management and robotic coordination, potentially reducing computational resources and energy consumption. However, as with any advancement in multi-agent systems, considerations should be given to ensuring responsible de-ployment in sensitive applications. We release our imple-mentation to promote transparent and equitable access to this technology. 
+
+## References 
+
+Böhmer, W., Kurin, V., and Whiteson, S. Deep coordina-tion graphs. In International Conference on Machine Learning , pp. 980–991. PMLR, 2020. Castellini, J., Oliehoek, F. A., Savani, R., and Whiteson, S. Analysing factorizations of action-value networks for cooperative multi-agent reinforcement learning. Au-tonomous Agents and Multi-Agent Systems , 35(2):25, 2021. Charbonnier, F., Peng, B., Vienne, J., Stai, E., Morstyn, T., and McCulloch, M. Centralised rehearsal of decentralised cooperation: Multi-agent reinforcement learning for the scalable coordination of residential energy flexibility. Ap-plied Energy , 377:124406, 2025. Das, A., Gervet, T., Romoff, J., Batra, D., Parikh, D., Rab-bat, M., and Pineau, J. Tarmac: Targeted multi-agent communication. In International Conference on machine learning , pp. 1538–1546. PMLR, 2019. Feng, Y., You, H., Zhang, Z., Ji, R., and Gao, Y. Hypergraph neural networks. In Proceedings of the AAAI confer-
+
+9Hypergraph Coordination with Dynamic Grouping for MARL 
+
+ence on artificial intelligence , volume 33, pp. 3558–3565, 2019. Foerster, J., Farquhar, G., Afouras, T., Nardelli, N., and Whiteson, S. Counterfactual multi-agent policy gradi-ents. In Proceedings of the AAAI conference on artificial intelligence , volume 32, 2018. Gao, C., Zheng, Y., Li, N., Li, Y., Qin, Y., Piao, J., Quan, Y., Chang, J., Jin, D., He, X., et al. A survey of graph neural networks for recommender systems: Challenges, meth-ods, and directions. ACM Transactions on Recommender Systems , 1(1):1–51, 2023. Gupta, T., Mahajan, A., Peng, B., Böhmer, W., and White-son, S. Uneven: Universal value exploration for multi-agent reinforcement learning. In International Confer-ence on Machine Learning , pp. 3930–3941. PMLR, 2021. Heess, N., Tb, D., Sriram, S., Lemmon, J., Merel, J., Wayne, G., Tassa, Y., Erez, T., Wang, Z., Eslami, S., et al. Emer-gence of locomotion behaviours in rich environments. 
+
+arXiv preprint arXiv:1707.02286 , 2017. Hu, J., Jiang, S., Harding, S. A., Wu, H., and wei Liao, S. Rethinking the implementation tricks and monotonic-ity constraint in cooperative multi-agent reinforcement learning, 2023. Huang, A., Wang, Y., Liu, R., Zou, H., and Zhou, X. Qvf: Incorporating quantile value function factorization into cooperative multi-agent reinforcement learning. Pattern Recognition , pp. 111323, 2025. Iqbal, S. and Sha, F. Actor-attention-critic for multi-agent reinforcement learning. In International conference on machine learning , pp. 2961–2970. PMLR, 2019. Iqbal, S., Costales, R., and Sha, F. Alma: Hierarchical learning for composite multi-agent tasks. Advances in Neural Information Processing Systems , 35:7155–7166, 2022. Jia, M., Yao, Y., and Liu, Y. Review on graph neural net-works for process soft sensor development, fault diagno-sis, and process monitoring. Industrial & Engineering Chemistry Research , 64(17):8543–8564, 2025. Jiang, J., Dun, C., Huang, T., and Lu, Z. Graph convolutional reinforcement learning. arXiv preprint arXiv:1810.09202 , 2018. Kim, S., Lee, S. Y., Gao, Y., Antelmi, A., Polato, M., and Shin, K. A survey on hypergraph neural networks: An in-depth and step-by-step guide. In Proceedings of the 30th ACM SIGKDD Conference on Knowledge Discovery and Data Mining , pp. 6534–6544, 2024. Kurach, K., Raichuk, A., Sta´ nczyk, P., Zaj ˛ ac, M., Bachem, O., Espeholt, L., Riquelme, C., Vincent, D., Michalski, M., Bousquet, O., et al. Google research football: A novel reinforcement learning environment. In Proceedings of the AAAI conference on artificial intelligence , volume 34, pp. 4501–4510, 2020. Lee, Y., Yang, J., and Lim, J. J. Learning to coordinate ma-nipulation skills via skill behavior diversification. In In-ternational conference on learning representations , 2019. Lhaksmana, K. M., Murakami, Y., and Ishida, T. Role-based modeling for designing agent behavior in self-organizing multi-agent systems. International Journal of Software Engineering and Knowledge Engineering , 28(01):79–96, 2018. Li, L., Li, D., Song, T., and Xu, X. Actor–critic learning control with regularization and feature selection in pol-icy gradient estimation. IEEE Transactions on Neural Networks and Learning Systems , 32(3):1217–1227, 2021. Li, S., Gupta, J. K., Morales, P., Allen, R., and Kochenderfer, M. J. Deep implicit coordination graphs for multi-agent reinforcement learning. arXiv preprint arXiv:2006.11438 ,2020. Liu, Y., Wang, W., Hu, Y., Hao, J., Chen, X., and Gao, Y. Multi-agent game abstraction via graph attention neu-ral network. In Proceedings of the AAAI conference on artificial intelligence , volume 34, pp. 7211–7218, 2020. Liu, Z., Wan, L., Sui, X., Chen, Z., Sun, K., and Lan, X. Deep hierarchical communication graph in multi-agent reinforcement learning. In IJCAI , pp. 208–216, 2023. Lowe, R., Wu, Y. I., Tamar, A., Harb, J., Pieter Abbeel, O., and Mordatch, I. Multi-agent actor-critic for mixed cooperative-competitive environments. Advances in neu-ral information processing systems , 30, 2017. Macarthur, K., Stranders, R., Ramchurn, S., and Jennings, N. A distributed anytime algorithm for dynamic task allocation in multi-agent systems. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 25, pp. 701–706, 2011. Mahajan, A., Rashid, T., Samvelyan, M., and Whiteson, S. Maven: Multi-agent variational exploration. Advances in neural information processing systems , 32, 2019. Malysheva, A., Sung, T. T., Sohn, C.-B., Kudenko, D., and Shpilman, A. Deep multi-agent reinforcement learning with relevance graphs. arXiv preprint arXiv:1811.12557 ,2018. Niu, Y., Paleja, R. R., and Gombolay, M. C. Multi-agent graph-attention communication and teaming. In AAMAS ,volume 21, pp. 20th, 2021. 10 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+Oliehoek, F. A., Spaan, M. T., and Vlassis, N. Optimal and approximate q-value functions for decentralized pomdps. 
+
+Journal of Artificial Intelligence Research , 32:289–353, 2008. Oliehoek, F. A., Amato, C., et al. A concise introduction to decentralized POMDPs , volume 1. Springer, 2016. Pesce, E. and Montana, G. Learning multi-agent coordi-nation through connectivity-driven communication. Ma-chine Learning , 112(2):483–514, 2023. Phan, T., Ritz, F., Belzner, L., Altmann, P., Gabor, T., and Linnhoff-Popien, C. Vast: Value function factorization with variable agent sub-teams. Advances in Neural Infor-mation Processing Systems , 34:24018–24032, 2021. Rashid, T., Samvelyan, M., De Witt, C. S., Farquhar, G., Foerster, J., and Whiteson, S. Monotonic value function factorisation for deep multi-agent reinforcement learning. 
+
+Journal of Machine Learning Research , 21(178):1–51, 2020. Russell, S. J. and Zimdars, A. Q-decomposition for rein-forcement learning agents. In Proceedings of the 20th international conference on machine learning (ICML-03) ,pp. 656–663, 2003. Sheng, J., Wang, X., Jin, B., Yan, J., Li, W., Chang, T.-H., Wang, J., and Zha, H. Learning structured communica-tion for multi-agent reinforcement learning. Autonomous Agents and Multi-Agent Systems , 36(2):50, 2022. Shu, T. and Tian, Y. M3rl: Mind-aware multi-agent management reinforcement learning. arXiv preprint arXiv:1810.00147 , 2018. Si, X., Song, Y., Sun, X., Wang, W., and Qin, Z. Marlfuzz: industrial control protocols fuzzing based on multi-agent reinforcement learning. Computing , 107(2):1–26, 2025. Singh, A., Jain, T., and Sukhbaatar, S. Learning when to communicate at scale in multiagent cooperative and com-petitive tasks. arXiv preprint arXiv:1812.09755 , 2018. Son, K., Kim, D., Kang, W. J., Hostallero, D. E., and Yi, Y. Qtran: Learning to factorize with transformation for cooperative multi-agent reinforcement learning. In Inter-national conference on machine learning , pp. 5887–5896. PMLR, 2019. Song, T., Li, D., Jin, Q., and Hirasawa, K. Sparse proximal reinforcement learning via nested optimization. IEEE Transactions on Systems, Man, and Cybernetics: Systems ,50(11):4020–4032, 2020. Song, T., Li, D., Yang, W., and Hirasawa, K. Recursive least-squares temporal difference with gradient correc-tion. IEEE Transactions on Cybernetics , 51(8):4251– 4264, 2021. Su, J., Adams, S., and Beling, P. Value-decomposition multi-agent actor-critics. In Proceedings of the AAAI conference on artificial intelligence , volume 35, pp. 11352–11360, 2021. Sukhbaatar, S., Fergus, R., et al. Learning multiagent com-munication with backpropagation. Advances in neural information processing systems , 29, 2016. Sunehag, P., Lever, G., Gruslys, A., Czarnecki, W. M., Zam-baldi, V., Jaderberg, M., Lanctot, M., Sonnerat, N., Leibo, J. Z., Tuyls, K., et al. Value-decomposition networks for cooperative multi-agent learning. arXiv preprint arXiv:1706.05296 , 2017. Tan, M. Multi-agent reinforcement learning: Independent vs. cooperative agents. In Proceedings of the tenth inter-national conference on machine learning , pp. 330–337, 1993. Vinyals, O., Babuschkin, I., Czarnecki, W. M., Mathieu, M., Dudzik, A., Chung, J., Choi, D. H., Powell, R., Ewalds, T., Georgiev, P., et al. Grandmaster level in starcraft ii using multi-agent reinforcement learning. nature , 575 (7782):350–354, 2019. Wan, L., Liu, Z., Chen, X., Wang, H., and Lan, X. Greedy-based value representation for optimal coordina-tion in multi-agent reinforcement learning. arXiv preprint arXiv:2112.04454 , 2021. Wang, J., Ren, Z., Liu, T., Yu, Y., and Zhang, C. Qplex: Duplex dueling multi-agent q-learning. arXiv preprint arXiv:2008.01062 , 2020a. Wang, T., Dong, H., Lesser, V., and Zhang, C. Roma: Multi-agent reinforcement learning with emergent roles. arXiv preprint arXiv:2003.08039 , 2020b. Wang, T., Gupta, T., Mahajan, A., Peng, B., Whiteson, S., and Zhang, C. Rode: Learning roles to decompose multi-agent tasks. arXiv preprint arXiv:2010.01523 , 2020c. Wang, T., Zeng, L., Dong, W., Yang, Q., Yu, Y., and Zhang, C. Context-aware sparse deep coordination graphs. arXiv preprint arXiv:2106.02886 , 2021. Wang, Z. and Gombolay, M. Learning scheduling poli-cies for multi-robot coordination with graph attention networks. IEEE Robotics and Automation Letters , 5(3): 4509–4516, 2020. Wu, Z., Pan, S., Chen, F., Long, G., Zhang, C., and Philip, S. Y. A comprehensive survey on graph neural networks. 
+
+IEEE transactions on neural networks and learning sys-tems , 32(1):4–24, 2020. 11 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+Yang, Q., Dong, W., Ren, Z., Wang, J., Wang, T., and Zhang, C. Self-organized polynomial-time coordination graphs. In International Conference on Machine Learning , pp. 24963–24979. PMLR, 2022. Yu, C., Velu, A., Vinitsky, E., Gao, J., Wang, Y., Bayen, A., and Wu, Y. The surprising effectiveness of ppo in cooper-ative multi-agent games. Advances in neural information processing systems , 35:24611–24624, 2022. Yu, J., Yin, H., Li, J., Wang, Q., Hung, N. Q. V., and Zhang, X. Self-supervised multi-channel hypergraph convolutional network for social recommendation. In 
+
+Proceedings of the Web Conference 2021 , WWW ’21, pp. 413–424, New York, NY, USA, 2021. Association for Computing Machinery. Zang, Y., He, J., Li, K., Fu, H., Fu, Q., and Xing, J. Sequen-tial cooperative multi-agent reinforcement learning. In 
+
+Proceedings of the 2023 International Conference on Au-tonomous Agents and Multiagent Systems , pp. 485–493, 2023. Zang, Y., He, J., Li, K., Fu, H., Fu, Q., Xing, J., and Cheng, J. Automatic grouping for efficient cooperative multi-agent reinforcement learning. Advances in Neural Information Processing Systems , 36, 2024. Zhang, T., Xu, H., Wang, X., Wu, Y., Keutzer, K., Gon-zalez, J. E., and Tian, Y. Multi-agent collaboration via reward attribution decomposition. arXiv preprint arXiv:2010.08531 , 2020. Zhang, Z., Lin, H., Gao, Y., and BNRist, K. Dynamic hypergraph structure learning. In IJCAI , pp. 3162–3169, 2018. 12 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+## A. Theoretical Proofs 
+
+A.1. Proof of Clustering Approximation Theorem Theorem A.1 (Clustering Approximation) . The spectral clustering solution G obtained from the dynamic optimization satisfies: 
+
+N cut (G) ≤ O(log k) · N cut (G∗) (20) 
+
+where G∗ is the optimal grouping structure. 
+
+The proof consists of three key steps: 
+
+Lemma A.2 (Discrete-Continuous Relation) . The normalized cut minimization can be formulated as: 
+
+min 
+
+> X∈{ 0,1}n×k
+
+T r (XT LX) s.t. XT D1/2X = I (21) 
+
+where L = D−1/2LD −1/2 is the normalized Laplacian. Proof. For any k-way partition {V1, ..., V k}:
+
+N cut (G) = 
+
+> k
+
+X
+
+> i=1
+
+cut (Vi, ¯Vi)
+
+vol (Vi) (22) 
+
+=
+
+> k
+
+X
+
+> i=1
+
+xTi Lx i
+
+xTi Dx i
+
+(23) 
+
+= T r (XT LX) (24) where xi is the indicator vector for partition Vi.
+
+Lemma A.3 (Spectral Relaxation Bound) . The spectral relaxation provides a bounded approximation: 
+
+λ2(L)2 ≤ ϕ(G) ≤ p2λ2(L) (25) 
+
+where λ2(L) is the second smallest eigenvalue of the normalized Laplacian. Proof. By the Courant-Fischer theorem, the second eigenvalue of L satisfies: 
+
+λ2(L) = min 
+
+> y⊥D1/21
+
+yT LyyT y .
+
+Applying the co-area formula and Cheeger’s rounding argument (Cheeger’s Inequality), we obtain the conductance bound: 
+
+ϕ(G) ≤ p2λ2(L).
+
+The lower bound λ2(L)/2 ≤ ϕ(G) follows from the variational characterization of λ2.
+
+Lemma A.4 (Dynamic Grouping Bound) . For our dynamic k-way clustering: 
+
+N cut k(G) ≤ O(log k)ϕ∗(G)
+
+> k
+
+X
+
+> j=1
+
+vol (Vj ) (26) 
+
+where ϕ∗(G) is the optimal conductance. 
+
+13 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+Proof. Through recursive analysis: 
+
+N cut k(G) = 
+
+> k
+
+X
+
+> i=1
+
+cut (Vi, ¯Vi)
+
+vol (Vi) (27) 
+
+≤ 
+
+> ⌈log k⌉
+
+X
+
+> i=1
+
+2ϕ(Gi)
+
+> 2i−1
+
+X
+
+> j=1
+
+vol (V ij ) (28) 
+
+≤ 2⌈log k⌉ϕ∗(G)
+
+> k
+
+X
+
+> j=1
+
+vol (Vj ) (29) where Gi represents subgraphs at recursion level i.Combining lemmas, we obtain: 
+
+N cut (G) ≤ O(log k)ϕ∗(G)
+
+> k
+
+X
+
+> j=1
+
+vol (Vj ) (30) 
+
+≤ O(log k) · N cut (G∗) (31) This establishes our main approximation bound. The optimality of this ratio follows from reduction to the Balanced Separator problem, details of which we omit as they are standard in the literature. 
+
+A.2. Proof of Convergence Theorem Theorem A.5 (Convergence) . Under the dynamic update rule with threshold δ, the sequence of groupings {Gt} converges in finite time with probability 1. The expected number of updates before convergence is bounded by O(1 /δ ).
+
+Lemma A.6 (Potential Function Properties) . Define the potential function as: 
+
+V (Gt) = E
+
+ X
+
+> g∈Gt
+
+X
+
+> i,j ∈g
+
+∥si − sj ∥2
+
+ (32) 
+
+This function satisfies: 1. Non-negativity: V (Gt) ≥ 0
+
+2. Boundedness: V (Gt) ≤ M = n2 · max i,j ∥si − sj ∥2
+
+Lemma A.7 (Potential Descent) . For any timestep t where η(Gt, C(Ht)) > δ :
+
+V (Gt+1 ) − V (Gt) = X
+
+> i∈S t
+
+ X
+
+> j∈gt+1 (i)
+
+∥si − sj ∥2 − X
+
+> j∈gt(i)
+
+∥si − sj ∥2
+
+ (33) 
+
+≤ − αδV (Gt) (34) 
+
+where St is the set of agents that change groups, and α > 0 is a constant determined by the clustering algorithm. Proof. Consider the change in potential for each agent i ∈ S t:
+
+∆Vi = X
+
+> j∈gt+1 (i)
+
+∥si − sj ∥2 − X
+
+> j∈gt(i)
+
+∥si − sj ∥2 (35) 
+
+≤ − α∥si − μgt(i)∥2 (36) where μgt(i) is the centroid of group gt(i). Summing over all changed agents and using |S t| ≥ δn gives the result. 14 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+The convergence then follows from the supermartingale convergence theorem: 
+
+Proof of Main Theorem. 1) The sequence {V (Gt)} forms a supermartingale: 
+
+E[V (Gt+1 )|Gt] ≤ V (Gt) (37) 2) Let T be the number of updates. For any t < T :
+
+V (G0) − E[V (Gt)] ≥ αδ E[Nt] (38) where Nt is the number of updates up to time t.3) Therefore: 
+
+E[T ] ≤ V (G0)
+
+αδ = O(1 /δ ) (39) 
+
+A.3. Proof of Quality Preservation Theorem 
+
+We establish that the quality of obtained grouping structures provides theoretical guarantees for the subsequent learning process, regardless of the specific learning framework used. 
+
+Lemma A.8 (Value Function Decomposition) . For any grouping structure G, the value function can be decomposed as: 
+
+V ∗(s, G ) = X
+
+> g∈G
+
+V ∗ 
+
+> g
+
+(sg ) + ∆( G) (40) 
+
+where V ∗ 
+
+> g
+
+is the group-wise value function, and ∆( G) represents the inter-group value term. Proof. Consider the Bellman equation: 
+
+V ∗(s, G ) = max  
+
+> a
+
+{R(s, a ) + γEs′ [V ∗(s′, G )] } (41) 
+
+= max  
+
+> a
+
+{X
+
+> g∈G
+
+Rg (sg , a g ) + Rinter (s, a ) + γEs′ [V ∗(s′, G )] } (42) The inter-group reward term Rinter (s, a ) is bounded by the normalized cut: 
+
+|Rinter (s, a )| ≤ βN cut (G) (43) for some constant β, as the normalized cut directly measures the strength of inter-group connections. 
+
+Lemma A.9 (Value Function Bound) . For any grouping structures G1 and G2:
+
+|V ∗(s, G 1) − V ∗(s, G 2)| ≤ γ
+
+1 − γ λ|N cut (G1) − N cut (G2)| (44) 
+
+where λ = β(1 + γ).
+
+15 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+Proof. Let π∗ 
+
+> 1
+
+and π∗ 
+
+> 2
+
+be the optimal policies under G1 and G2 respectively. Then: 
+
+|V ∗(s, G 1) − V ∗(s, G 2)| = | max 
+
+> π1
+
+Eπ1 [
+
+> ∞
+
+X
+
+> t=0
+
+γt(Rt + Rinter,t (G1))] (45) 
+
+− max 
+
+> π2
+
+Eπ2 [
+
+> ∞
+
+X
+
+> t=0
+
+γt(Rt + Rinter,t (G2))] | (46) 
+
+≤ max  
+
+> π
+
+Eπ [
+
+> ∞
+
+X
+
+> t=0
+
+γt|Rinter,t (G1) − Rinter,t (G2)|] (47) 
+
+≤ β
+
+> ∞
+
+X
+
+> t=0
+
+γt|N cut (G1) − N cut (G2)| (48) 
+
+= β
+
+1 − γ |N cut (G1) − N cut (G2)| (49) The inequality follows from the triangle inequality and the bound on inter-group rewards. 
+
+Theorem A.10 (Quality Preservation) . For the obtained grouping structure Gt and optimal grouping G∗:
+
+|V ∗(s, G ∗) − V ∗(s, G t)| ≤ γα log k (50) 
+
+where α = β 
+
+> (1 −γ)2
+
+.Proof. From the Clustering Approximation Theorem: 
+
+|N cut (Gt) − N cut (G∗)| ≤ c log k (51) for some constant c. Combining with the Value Function Bound: 
+
+|V ∗(s, G ∗) − V ∗(s, G t)| ≤ γ
+
+1 − γ λ|N cut (Gt) − N cut (G∗)| (52) 
+
+≤ γβ 
+
+(1 − γ)2 c log k (53) 
+
+= γα log k (54) where α = βc  
+
+> (1 −γ)2
+
+.
+
+Theorem A.11 (Tightness) . The bound O(γ log k) is tight. Proof. Consider an MDP with the following structure: 1. States directly correspond to group assignments 2. Rewards reflect the normalized cut values: r(s) = −γN cut (Gs)
+
+3. Transitions maintain group structure with probability 1 In this construction: 
+
+V ∗(s, G ∗) = −γN cut (G∗)
+
+> ∞
+
+X
+
+> t=0
+
+γt = − γ
+
+1 − γ N cut (G∗) (55) 
+
+V ∗(s, G t) = − γ
+
+1 − γ N cut (Gt) (56) Given that |N cut (Gt) − N cut (G∗)| = Θ(log k) from the Clustering Approximation Theorem’s tightness result, we have: 
+
+|V ∗(s, G ∗) − V ∗(s, G t)| = Θ( γ log k) (57) 16 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+A.4. Communication Complexity Analysis 
+
+We analyze the communication efficiency of hypergraph structures in multi-agent systems, demonstrating that dynamic spectral clustering significantly reduces communication overhead compared to traditional fully-connected communication architectures. 
+
+Theorem A.12 (Communication Efficiency of Hypergraph Structures) . For a system with n agents partitioned into k groups through dynamic spectral clustering, the communication complexity satisfies: 
+
+Chyper (Gt) = O
+
+ n2
+
+k
+
+
+
+≤ O(n2) (58) 
+
+where Chyper (Gt) represents the number of messages required for one complete information exchange in the hypergraph structure Gt.Furthermore, this communication complexity is bounded by the normalized cut: 
+
+Chyper (Gt) ≤ ρ · (1 + N cut (Gt)) · n ≤ ρ · (1 + O(log k) · N cut (G∗)) · n (59) 
+
+where ρ is a problem-dependent constant, and G∗ is the optimal grouping structure. Proof. In a fully-connected communication architecture, each agent communicates with all other (n − 1) agents, resulting in n(n − 1) = O(n2) total messages. With hypergraph-based communication, assuming k groups with approximately n/k agents per group on average, each agent only communicates with other agents in the same group. This requires approximately P 
+
+> g∈Gt
+
+|g| · (|g| − 1) = O(n2/k )
+
+total messages, where |g| represents the size of group g.The relationship with normalized cut follows from analyzing the communication cost relative to group structures. Let vol (g)
+
+represent the volume of group g and cut (g, ¯g) represent the cut between group g and its complement. By definition of normalized cut: 
+
+N cut (Gt) = X
+
+> g∈Gt
+
+cut (g, ¯g)
+
+vol (g) (60) For groups formed through spectral clustering, we can establish that: 
+
+X
+
+> g∈Gt
+
+|g| · (|g| − 1) ≤ X
+
+> g∈Gt
+
+|g|2 ≤ ρ · n · (1 + X
+
+> g∈Gt
+
+cut (g, ¯g)
+
+vol (g) ) (61) The first inequality follows from |g| − 1 < |g|, and the second inequality reflects the relationship between intra-group communication and the normalized cut, where better groupings (lower normalized cut) lead to more efficient communication structures. Here, ρ is a problem-dependent constant that captures this relationship. Therefore: 
+
+Chyper (Gt) ≤ ρ · n · (1 + N cut (Gt)) (62) Substituting the bound from Theorem 1, which establishes N cut (Gt) ≤ O(log k)·N cut (G∗), we obtain the final complexity bound: 
+
+Chyper (Gt) ≤ ρ · n · (1 + O(log k) · N cut (G∗)) (63) This demonstrates that our hypergraph communication structure achieves significantly improved efficiency while maintaining the theoretical guarantees on grouping quality. 17 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+## B. Experimental Details and Environment Configurations 
+
+B.1. Detailed Information about SMAC Tasks 
+
+In each SMAC micromanagement problem, a group of units controlled by decentralized agents cooperates to defeat the enemy team controlled by built-in heuristics. Each agent’s partial observation comprises the attributes (such as health ,
+
+location , unit_type ) of all units shown up in its view range. The global state information includes all agents’ positions and health , and allied units’ last actions and cooldown , which is only available to agents during centralized training. The agents’ discrete action space consists of attack[enemy_id] , move[direction] , stop , and no-op for the dead agents only. A particular unit, Medivac, has no action attack[enemy_id] but has action heal[enemy_id] .Agents can only attack enemies within their shooting range. Proper micromanagement requires agents to maximize the damage to the enemies and take as little damage as possible in combat, so they need to cooperate with each other or even sacrifice themselves. Based on the performance of baseline algorithms, the tasks in SMAC are broadly grouped into three categories: Easy , Hard ,and Super Hard . The key to winning some Hard or Super Hard battles is mastering specific micro techniques, such as 
+
+focusing fire , kiting , avoiding overkill , et cetera. The battles can be symmetric or asymmetric, and the group of agents can be homogeneous or heterogeneous. Here we provide detailed characteristics of the scenarios used in our experiments: • 3s_vs_5z is a Hard asymmetric battle between three Stalkers and five Zealots. The allied Stalkers must master the kiting technique and disperse in the area to kill the Zealots that chase them one after another. This map faces the delayed reward problem; however, it is not very strict about micro-cooperation between agents because of agents’ scattering. • 5m_vs_6m presents a Hard asymmetric engagement requiring precise tactical coordination. The allied agents must learn to focus fire without overkill and position themselves with considerable precision to overcome the enemy team’s numerical advantage. The relatively confined map space compared to 3s_vs_5z increases the importance of proper positioning and target selection. • 3s5z_vs_3s6z represents a Super Hard heterogeneous battle that requires breaking the bottleneck of exploration. Three Stalkers and five Zealots must battle against three enemy Stalkers and six enemy Zealots. The complexity arises from managing two unit types with distinct capabilities - Stalkers excel at ranged combat while Zealots are melee specialists. This map requires sophisticated tactical coordination, where Zealots engage in close combat while Stalkers provide ranged support, making it one of the most challenging tasks in SMAC. 
+
+B.2. Detailed Information about Predator-Prey Environment 
+
+The Predator-Prey environment evaluates coordination capability through multi-agent pursuit tasks with different scales and complexity levels. At each time step, each predator receives a local observation within its limited vision range and incurs a penalty of -0.05 until the prey is captured. This negative reward structure creates pressure for efficient coordination while the partial observability necessitates information sharing among agents. Two configuration settings are examined to evaluate scalability and coordination effectiveness: • Moderate Scale (10×10 grid, 5 predators): A baseline setting testing fundamental coordination capabilities. Predators must balance between exploration and coordinated capture, as premature engagement without proper positioning often leads to prey escape. • Large Scale (20×20 grid, 10 predators): A significantly more challenging setting that stresses both coordination and exploration efficiency. The enlarged state space and increased agent number create substantial challenges for conventional communication protocols, making it an effective test for scalable coordination mechanisms. 
+
+B.3. Detailed Information about Traffic Junction Environment 
+
+The Traffic Junction environment examines multi-agent coordination in dynamic traffic scenarios where cars must navigate through intersections without collisions. The environment features stochastic agent arrivals and requires consistent coordination among varying numbers of active agents. Two scenarios with increasing complexity are investigated: 18 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+• Basic Setting : A 7×7 grid environment accommodating up to 5 cars ( N_max = 5 ) with an arrival rate of 0.3 (p_arrive = 0.3 ). Cars enter from designated points with random route assignments and must coordinate their movements to reach their destinations without collision. This setting tests fundamental coordination capabilities in a controlled scale. • Complex Setting : A 14×14 grid environment supporting up to 10 simultaneous cars ( N_max = 10 ) with a reduced arrival rate of 0.2 ( p_arrive = 0.2 ). The expanded space and increased agent number create more complex traffic patterns requiring sophisticated coordination strategies. The lower arrival rate maintains a manageable density while extending average interaction durations. Each car observes a 5×5 local region centered on its current position and must choose between gas and brake actions at each timestep. Episodes terminate upon collision or successful traversal of all spawned cars, with success measured by completing episodes without any collisions. 
+
+B.4. Detailed Information about Google Research Football 
+
+The Google Research Football (GRF) environment presents a challenging mixed cooperative-competitive scenario featuring three attacking agents coordinating against built-in AI defenders. The environment is characterized by: • Action Space : Each agent selects from 19 discrete actions including directional movements (8 directions), ball control actions ( e.g. , dribbling, short pass, long pass, shot), and special actions ( e.g. , sliding, sprint). This rich action space enables diverse tactical possibilities while increasing coordination complexity. • Observation Space : Agents receive local observations including relative positions and states of nearby players, ball position and velocity, and game mode indicators. The partial observability and dynamic state transitions create substantial uncertainty in decision-making. • Reward Structure : A sparse reward signal (+1 for scoring) combined with potential early termination (ball out of bounds, possession change) creates a challenging credit assignment problem. This structure necessitates effective exploration and coordination to discover successful offensive strategies. The game engine’s built-in AI provides adaptive defensive behaviors, requiring attacking agents to develop robust and coordinated strategies. The inherent stochasticity in both state transitions and opponent behavior creates a particularly challenging test environment for multi-agent coordination mechanisms. 
+
+B.5. Hyperparameters and Implementation Details 
+
+To ensure reproducibility of our experimental results, we provide the hyperparameter settings used in our experiments across different environments. Tables 3, 4, and 5 detail the key hyperparameters for SMAC, Predator-Prey, and Traffic Junction/GRF environments respectively.  
+
+> Table 3. Hyperparameters for SMAC environments
+
+Parameter 3s_vs_5z 5m_vs_6m 3s5z_vs_3s6z 
+
+Batch size 128 128 128 Buffer size 5000 5000 5000 Double Q True True True Epsilon anneal time 100000 100000 100000 HGCN hidden dim 48 64 196 HGCN out dim 36 48 128 HGCN num layers 2 2 2Min/Max clusters 2/4 2/3 2/3 Clustering interval 100000 100000 100000 Stability threshold 0.6 0.6 0.6 
+
+λ1 0.001 0.001 0.001 
+
+λ2 0.01 0.01 0.01 19 Hypergraph Coordination with Dynamic Grouping for MARL  
+
+> Table 4. Hyperparameters for Predator-Prey environments
+
+Parameter Moderate-scale Large-scale 
+
+Learning rate 0.001 0.0003 Batch size 500 500 Grid size 10 ×10 20 ×20 Number of agents 5 10 Max steps 40 80 HGCN hidden dim 96 96 HGCN out dim 64 64 HGCN num layers 1 1Min/Max clusters 2/4 2/5 Clustering interval 100 100 Stability threshold 0.8 0.8 Group consistency coeff 0.1 0.1 Attention reg coeff 0.01 0.01  
+
+> Table 5. Hyperparameters for Traffic Junction and GRF environments
+
+Parameter TJ-7 ×7 TJ-14 ×14 GRF 
+
+Learning rate 0.001 0.001 0.001 Batch size 500 500 500 Number of agents 5 10 3Max steps 20 40 80 HGCN hidden dim 96 128 128 HGCN out dim 64 96 96 HGCN num layers 1 2 1Min/Max clusters 2/4 2/5 2/3 Clustering interval 100 100 100 Stability threshold 0.8 0.8 0.8 Group consistency coeff 0.1 0.1 0.1 Attention reg coeff 0.01 0.01 0.01 
+
+## C. Parameter Size and Performance Analysis 
+
+C.1. Parameter Efficiency Analysis 
+
+Table 6 provides a detailed comparison of parameter sizes across different mixing network architectures.We focus specifically on mixing network parameters as they represent the core architectural difference between QMIX-based methods and directly impact centralized training efficiency in MARL algorithms. While our method incorporates additional HGCN components (analyzed separately in Section C.2), the mixing network comparison highlights our architectural efficiency in the critical value decomposition component. Our method demonstrates remarkable parameter efficiency while achieving superior performance: • In 3s_vs_5z , with only 21.601K parameters (same as QMIX), our method achieves nearly 100% win rate and faster convergence compared to QPLEX (72.482K parameters) and RIIT (37.986K parameters). This showcases our method’s ability to learn efficient representations without requiring additional parameters. • In 5m_vs_6m , maintaining the parameter efficiency (31.521K), our method consistently outperforms all baselines with a win rate around 95%. Notably, QPLEX uses more than three times the parameters (107.574K) but achieves lower performance. 20 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+• In the challenging 3s5z_vs_3s6z scenario, despite keeping the parameter count at 63.105K, our method demonstrates significant performance advantages over baselines, reaching approximately 90% win rate while QPLEX (243.156K parameters) struggles to achieve 40%.  
+
+> Table 6. Size comparison of all methods’ mixing network(s)
+
+Maps (Ft-)QMIX QPLEX RIIT GoMARL Ours 
+
+3s_vs_5z 21.601K 72.482K 37.986K 26.530K 21.601K 
+
+5m_vs_6m 31.521K 107.574K 51.362K 31.554K 31.521K 
+
+3s5z_vs_3s6z 63.105K 243.156K 118.466K 61.028K 63.105K C.2. HGCN Overhead Analysis 
+
+While our method maintains the parameter-efficient QMIX mixing network, it introduces additional computational elements through the hypergraph convolutional network (HGCN) component. Table 7 quantifies this overhead. The HGCN module introduces additional parameters beyond the mixing network parameters reported in Table 6. The com-putational overhead, measured as the increase in wall-clock training time compared to the base (Ft-)QMIX implementation, remains relatively consistent across scenarios at approximately 36%. This additional computational cost is justified by the significant performance improvements our method achieves: 1. Enhanced Sample Efficiency : Despite increased computation per iteration, our method requires fewer training iterations to achieve superior performance. 2. Adaptive Information Flow : The HGCN enables dynamic grouping and information sharing between agents, capturing coordination patterns that static architectures cannot represent.  
+
+> Table 7. HGCN additional parameters and computational overhead
+
+Scenario HGCN Parameters Computation Overhead 3s_vs_5z 65,356 +36.47% 5m_vs_6m 104,632 +35.33% 3s5z_vs_3s6z 391,336 +36.95% 
+
+C.3. Analysis of Efficiency-Performance Trade-off 
+
+The superior efficiency-performance trade-off of our method can be attributed to three key design choices: 1. Architectural Innovation : Our method introduces hypergraph structure for better representation learning while maintaining QMIX’s efficient architecture. This enables more expressive information processing without increasing parameter count. 2. Efficient Information Flow : The hypergraph structure facilitates more effective information exchange between agents, leading to faster convergence and better performance despite using fewer parameters than complex architectures like QPLEX and RIIT. 3. Smart Parameter Sharing : Our architecture achieves better performance through intelligent parameter sharing across components, demonstrating that architectural design can be more crucial than model capacity. 
+
+C.4. Scalability and Performance Analysis 
+
+The performance scaling with respect to scenario complexity shows interesting patterns: • Simple Scenarios (e.g., 3s_vs_5z): Our method achieves faster convergence and better final performance while maintaining minimal parameter count. 21 Hypergraph Coordination with Dynamic Grouping for MARL 
+
+• Medium Complexity (e.g., 5m_vs_6m): The performance advantage becomes more pronounced, with sustained high win rates despite keeping parameter count low. • Complex Scenarios (e.g., 3s5z_vs_3s6z): Our method demonstrates remarkable scalability, maintaining high perfor-mance in challenging environments where other methods, even with substantially more parameters, struggle. These results highlight a critical finding: superior performance in multi-agent reinforcement learning can be achieved through better architectural design rather than increased model capacity. Our method successfully improves upon QMIX’s foundation by introducing more expressive information processing capabilities without sacrificing parameter efficiency, leading to better performance across various scenarios while maintaining minimal parameter requirements. 22

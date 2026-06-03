@@ -1,0 +1,5962 @@
+Title: Provably Efficient Partially Observable Risk-sensitive  Reinforcement Learning with Hindsight Observation
+
+URL Source: https://openreview.net/pdf?id=5S8ukkEQr2
+
+Number of Pages: 37
+
+Markdown Content:
+# Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Tonghe Zhang * 1 Yu Chen * 2 Longbo Huang 2
+
+## Abstract 
+
+This work pioneers regret analysis of risk-sensitive reinforcement learning in partially ob-servable environments with hindsight observa-tion, addressing a gap in theoretical exploration. We introduce a novel formulation that integrates hindsight observations into a Partially Observ-able Markov Decision Process (POMDP) frame-work, where the goal is to optimize accumulated reward under the entropic risk measure. We de-velop the first provably efficient RL algorithm tai-lored for this setting. We also prove by rigorous analysis that our algorithm achieves polynomial regret ˜O
+
+ e|γ|H −1 
+
+> |γ|H
+
+H2√KHS 2OA 
+
+
+
+, which out-performs or matches existing upper bounds when the model degenerates to risk-neutral or fully ob-servable settings. We adopt the method of change-of-measure and develop a novel analytical tool of beta vectors to streamline mathematical deriva-tions. These techniques are of particular interest to the theoretical study of reinforcement learning. 
+
+## 1. Introduction 
+
+Reinforcement learning (RL) is a sequential decision-making problem in which an agent learns to maximize ac-cumulated rewards through interactions with an unknown environment (Sutton & Barto, 2018). In many practical scenarios such as derivative hedging (Cao et al., 2020) and actuarial science (Richman, 2021), decision-makers have to consider the associated risks, leading to the study of risk-sensitive RL (Fei et al., 2020). It is also a common practice to make costly decisions based on unreliable or incomplete information, such as in au-      
+
+> *Equal contribution 1Department of Electronic Engineering, Tsinghua University, Beijing, China 2Institute for Interdisciplinary Information Sciences, Tsinghua University, Beijing, China. Corre-spondence to: Longbo Huang <longbohuang@tsinghua.edu.cn >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+tonomous driving (Huang et al., 2019), stock market predic-tion (Kabbani & Duman, 2022), and cybersecurity (Vassilev et al., 2022). The Partially Observable Markov Decision Process (POMDP) (Monahan, 1982) is widely employed as the mathematical framework for these problems. Empirical studies have been conducted on risk-sensitive POMDPs to address the planning or learning problem in various application scenarios (Skoglund, 2021; Choi et al., 2021; Qiu et al., 2021; Shen et al., 2023). However, these studies often lack a performance guarantee. On the other hand, theoretical studies primarily focus on demonstrat-ing the existence of an optimal policy (Di Masi & Stht-tner, 1999) or addressing the planning problem with full knowledge of the transition probabilities (James et al., 1994; B ¨aauerle & Rieder, 2017), but have yet to develop the sam-ple complexity analysis. Consequently, an open theoretical question remains from prior research: 
+
+Can we devise a sample-efficient and theoretically grounded risk-sensitive RL algorithm in partially ob-servable environments? 
+
+Obtaining a conclusive answer to this question is challeng-ing due to several technical obstacles. Firstly, the com-plex structure of the POMDP becomes even more intricate when incorporating a non-linear risk measure, raising doubts about whether mathematical analysis alone can effectively simplify the problem. Secondly, partial observations pose challenges in learning the model with limited sample com-plexity and designing the exploration bonus with incomplete information. In this work, we devise a novel algorithm that addresses these problems in a POMDP model equipped with hindsight observations. Due to the fact that reinforcement learning in general POMDPs is intractable (Papadimitriou & Tsit-siklis, 1987; Jin et al., 2020), we involve hindsight obser-vations(Lee et al., 2023) in the learning protocol, which will be introduced in Section 3. We also excavate the dy-namic programming structure implicit in the risk-sensitive POMDP model and subsequently derive a fresh set of Bell-man equations that matched our problem setting. Moreover, we uncover a simple representation of the value functions with explicit analytical forms, leading to the creation of a 1Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+new exploration bonus that exploits the partial information gleaned from the environment while considering the agent’s risk sensitivity. Our algorithm efficiently estimates the ac-cumulated risks in all the possible hidden states and selects the optimal actions. In addition, we provide theoretical guarantee for the algo-rithm design: the upper bound of the regret presented in Eq. (23) is not only polynomial in all the parameters but also explains how the risk measure, partial observations and empirical estimator affects the learning efficiency of each component of the POMDP model. Moreover, when the model degenerates to risk-neutral or fully observable set-tings, our result improves or matches existing upper bounds and nearly reaches the lower bounds in these scenarios. The contributions of this work are summarized as follows: • Formulation. We propose a novel theoretical formu-lation for risk-sensitive reinforcement learning in a partially observable environment with hindsight ob-servations. We adopt the entropic risk measure in the framework, which accommodates general underlying POMDP models with non-stationary decision process. We also generalize certain results to arbitrary utility risk measures. • Algorithm. We develop a new algorithm that incor-porates a belief propagation process before the value iteration begins. Our design allows the agent to pre-emptively estimate the accumulated risks within the hidden states, before she optimizes the value functions through a greatly simplified Bellman equation. We also introduce a new bonus function that exploits partial in-formation to encourage risk-sensitive exploration. • Regret. We provide the first regret analysis of the problem. By disregarding lower-order terms, our algorithm successfully attains the regret 
+
+O
+
+ e|γ|H −1 
+
+> |γ|H
+
+· H2√KS 2OA · pH ln KHSOA/δ 
+
+
+
+,
+
+which demonstrates the risk awareness of the agent and the history-dependency. When the model degenerates to risk-neutral or fully observable settings, our regret improves or matches existing upper bounds and nearly reaches the lower bound of risk-sensitive RL. • Techniques. We introduce a novel analytical tool called the beta vector, which plays a pivotal role in design-ing our bonus function, resulting in simplified value iteration and regret analysis. We also adopt the change-of-measure technique, which decouples the state and observations to streamline analytical derivations. 
+
+## 2. Related Work 
+
+Due to space limits, we only discuss the most relevant works below. A thorough overview is provided in Appendix F. 
+
+Risk-sensitive RL. Our analysis draws inspiration from studies about risk-sensitive RL. For instance, (Fei et al., 2021a) introduces a new bonus to improve the regret bound of learning an MDP using entropic risk. Additionally, (Liang & Luo, 2023) uses the concept of Lipschitz con-tinuity to linearize various risk measures. These works contribute to our technical toolkit. 
+
+POMDP. It is well-known that planning or learning a gen-eral POMDP is intractable (Papadimitriou & Tsitsiklis, 1987; Jin et al., 2020). Consequently, a body of research in partially observable RL restricts attention to subclasses of POMDP with structural assumptions (Golowich et al., 2022b; Zhan et al., 2022), such as the emission matrices having a minimum positive singular value, denoted by α
+
+(Liu et al., 2022a;b). In these subclasses of POMDPs, the emission process reveals enough information for the agent to decode the hidden states (Liu et al., 2022a; Cai et al., 2022; Golowich et al., 2022b). Our work significantly di-verges by not imposing such structural constraints on the probability kernels. This foundational difference in formu-lation allows our regret bound to remain independent of α,which enlarges the scope of applicability to instances where emission kernels lack full column rank. 
+
+Risk-sensitive POMDP. Our theoretical framework builds on prior research such as (James et al., 1994; B ¨aauerle & Rieder, 2017). However, our study significantly diverges from the predecessors because we do not presuppose the transition and emission matrices are time-invariant and fully known. Our agent learns a non-stationary model through online interactions, focusing on the exploration-exploitation trade-off typical of reinforcement learning. 
+
+## 3. Problem Formulation 
+
+Notations In this study we use ≳ and ˜O to hide problem-independent constants or logarithmic terms in the sam-ple complexity. γ− represents min {γ, 0} and γ+ is for 
+
+max {γ, 0}, while ι is the shorthand for ln( KHSOA/δ )
+
+and N ∨ 1 is for max {N, 1}. Random variables are in bold, while their realizations are in roman. For random vectors 
+
+vA and vB , we use vA \ vB to denote the subvector of vA
+
+with the components from vB removed. 
+
+The POMDP Model We consider a tabular, episodic and finite horizon POMDP with non-stationary transition matrices (Monahan, 1982; Liu et al., 2022a). The under-lying model of the POMDP can be specified by a tuple 
+
+P = ( S , O, A ; μ1, T, O; K, H, r ), where S , O and A
+
+are the spaces of the hidden states, observations, and actions with cardinality S, O , and A respectively. The agent plays with the model in K episodes and each episode contains 
+
+H steps. μ1 ∈ ∆( S ) is the prior distribution of the hid-2Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+den states which can be represented as an S-dimensional vector ⃗μ 1. T = {Th,a ∈ RS×S | (h, a ) ∈ [H] × A } and 
+
+O = {Oh ∈ RO×S | h ∈ [H]} are the transition and emis-sion matrices respectively. If the environment is in state s at step h, then Th,a (·| s) represents the distribution of the next hidden state when the agent takes action a, while Oh(·| s) is the distribution of the observations generated by the current hidden state. r = { rh(·, ·) : S × A → [0 , 1] | h ∈ [H] }
+
+is the collection of reward functions that measure the per-formance of actions in each hidden state. In each episode, the initial state S1 is sampled from μ1(·).For all steps h ∈ [H], the agent decides an action Ah
+
+based on previous observations and receives a reward 
+
+rh(sh, a h). The environment then transits to a new hid-den state Sh+1 ∼ Th,a h (·| sh) and emits an observation 
+
+Oh+1 ∼ Oh+1 (·| sh+1 ), after which the a new action will be taken. In a POMDP, the agent never detects the hidden states, so she makes decisions according to the observable history F h := ( A1, O 2, · · · , O h−1, A h−1, O h) ∈ Fh,from which her policy πh(·) maps to the action space. 1The POMDP evolves until the last state SH+1 , before a new episode begins. 
+
+Reinforcement Learning with Hindsight Observation 
+
+In RL, the agent plans under empirical models { bPk}Kk=1 
+
+learned from data samples of the history. The corresponding empirical distributions will be denoted as bμk 
+
+> 1
+
+, bTk, and bOk. In this work, we incorporate hindsight observation (Lee et al., 2023) in the interaction protocol of the POMDP: in test time, the agent is allowed to review the hidden states that occurred in the last H steps at the end of each episode. The concept of hindsight observability in RL is proposed by (Lee et al., 2023) and echoed by (Sinclair et al., 2023; Shi et al., 2023; Guo et al., 2023). This setting also makes efficient learning possible. According to (Lee et al., 2023), hindsight observa-tions are common in real-world applications of the POMDP, such as data center scheduling (Sinclair et al., 2023) and online imitation learning (Ross et al., 2011). 2 Hindsight ob-servability is also satisfied in asymmetric RL settings (Pinto et al., 2017; Baisero et al., 2022) and sim-to-real robotic learning tasks (Chen et al., 2020). 
+
+Reinforcement Learning using Entropic Risk Measure 
+
+In risk-sensitive RL, the agent seeks an optimal policy π⋆
+
+that maximizes the following optimization objective , which is the entropic risk measure of accumulated reward: 
+
+J(π; P, γ ) := 1
+
+γ ln Eπ
+
+> P
+
+h
+
+eγ PHt=1 rt(St,A t)i
+
+(1)   
+
+> 1We use the notation Fbecause the histories constitute a filter process.
+> 2Please refer to Section 3.2 and 5 in (Lee et al., 2023) for more examples.
+
+where P is the POMDP model and γ̸ = 0 is the given parameter of risk-sensitivity. 
+
+Remark 3.1 . Following the convention of risk-sensitive RL (B ¨auerle & Rieder, 2014; Liang & Luo, 2023), we adopt the entropic risk measure (Fei et al., 2020) to define the risk-sensitive objective function in (1) . The connection between the exponential function and risk-awareness can be illustrated by the following expansion: 
+
+1
+
+γ ln EeγR = ER + γ
+
+2 · Var R + o(Var R)
+
+where R = PHh=1 rh(Sh, A h) is the accumulated reward. This relation intuitively reveals a close connection between the value of the risk measure and the uncertainty (variance) in the agents’ returns, implying that the agent is risk-seeking when γ > 0 while risk-averse when γ < 0 (B ¨auerle & Rieder, 2014). There exists various other risk measures in the studies of risk-sensitive RL, such as Conditional Value-at-Risk (CVaR) (Du et al., 2022), Lipschitz risks (Liang & Luo, 2023) and utility risks (B ¨auerle & Rieder, 2014). Many of the results in this study can be generalized to utility risks, and we defer the discussion to Appendix B. 
+
+Learning Objective In this study, we aim to devise an algorithm whose output policies {bπk}Kk=1 minimizes the difference with π⋆, which will be measured by the “regret” 
+
+defined below: 
+
+Regret( K; P, γ ) := 
+
+> K
+
+X
+
+> k=1
+
+J(π⋆; P, γ ) − J(bπk; P, γ )
+
+We are also concerned with the sample complexity of the algorithm, which is the smallest episode number K that ensures 1
+
+> K
+
+PKk=1 J(bπk, P, γ ) ≥ J(π⋆, P, γ ) − ϵ with prob-ability at least 1 − δ.
+
+## 4. Value Function and the Bellman Equations 
+
+In the much more complex setting of POMDP, we need to design special value functions to simplify the intensive computation caused by the history dependency in the poli-cies. However, as is shown in Remark B.27 in the appendix, a naive adaptation of the value functions in the POMDP literature (Monahan, 1982) fails to capture the nonlinear structure of a risk-POMDP. In this work, we introduce a new definition for value functions based on the studies of (B ¨aauerle & Rieder, 2017; James et al., 1994), which not only simplifies the analysis but also helps us derive a new set of Bellman equations tailored to our problem. We will use these concepts in our algorithm presented in Section 5. 
+
+Change of Measure To simplify the mathematical analy-sis, we adopt the technique called “change of measure” and investigate the risk-POMDP problem in a simpler model P′
+
+3Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+(obtained via transformation), in which the observations Ot
+
+and hidden states St are independent. The technique of change-of-measure originates from stochastic calculus (Oksendal, 2013) and is vastly adopted in derivative pricing (Baxter & Rennie, 1996) and filter-ing theory (Jazwinski, 2007). In the study of POMDP, this method is used to decouple the transition and emission pro-cesses (Baras & James, 1997; Fernandez-Gaucherand & Marcus, 1997), which will also facilitate the statistical com-plexity analysis using hindsight observations. In this work, we refer to P′ as the “reference model”, whose rigorous definition is presented in Appendix B.1. The fol-lowing analysis comes from the studies of (James et al., 1994; Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005). The relationship between P′ and the original POMDP can be described by their Radon-Nikodym derivative: 3
+
+Dh := dPπ
+
+> P
+
+dPπ
+
+> P′
+
+=
+
+> h
+
+Y
+
+> t=2
+
+Ot(Ot|St)
+
+O′(Ot)
+
+In the reference model, the observations are irrelevant to the hidden states. As a result, they are separate from the underlying process and independent of the history. To fur-ther simplify the model, we can specify O′(·) as the uni-form distribution, so that Ohi.i.d. 
+
+∼ Unif O in the model P′.4
+
+Consequently, we can significantly simplify the posterior distribution of Ot in model P′, which not only reduces space consumption dramatically but also reduces a series of analytical computations. After planning in P′, we will use 
+
+Dh as a bridge to convert the results back to the environ-ment P, according to the following rule derived from the Lebesgue-Radon-Nikodyn theorem (Rankin, 1968): 
+
+Eπ 
+
+> P
+
+= Eπ 
+
+> P′
+
+Dh
+
+We define our value functions in the model P′.
+
+Definition 4.1. (Value functions) 
+
+Vπh (F h) := 1
+
+γ ln Eπ
+
+> P′
+
+
+
+eγ PHt=1 rt(St,At) F h
+
+
+
+Qπh (F h, Ah) := 1
+
+γ ln Eπ
+
+> P′
+
+
+
+eγ PHt=1 rt(St,At) F h, Ah
+
+
+
+(2) In a POMDP, the policy passes the history-dependency down to the value functions, whose variables contain Fh but not 
+
+Sh, since the latter is not even observable. We can also derive the Bellman equation for our problem: 
+
+> 3
+
+Please refer to Appendix G.1 for a formal definition. 
+
+> 4
+
+Other distributions are also suitable for O′. Please refer to Appendix G.1. 
+
+Definition 4.2. (Bellman equations) 
+
+
+
+VπH+1 (fH+1 ) = 1
+
+γ ln Eπ
+
+> P′
+
+
+
+eγ PHt=1 rt(St,At) fH+1 
+
+
+
+Qπh (fh, a h) = 1
+
+γ ln EOh+1 ∼Unif O
+
+h
+
+eγVπh+1 (fh,a h,Oh+1 )i
+
+Vπh (fh) = EAh∼πh(·| fh)Qπh (fh, Ah)
+
+(3) The Bellman equations in Eq. (3) are novel in the literature. Specifically, the value function VπH+1 is not zero, which necessitates a belief propagation in the algorithm to initiate the value iteration. Moreover, the computation of Q function is greatly simplified since it is defined in the reference model. For the derivation of Eq. (3) and a generalization to arbitrary utility functions, please refer to AppendixB.4. 
+
+## 5. Algorithm Design 
+
+In the subsequent section, we introduce a sample-efficient algorithm tailored for solving the partially observable risk-sensitive RL problem. Algorithm 1 presents a concise overview, while a comprehensive description can be found in Appendix C. We name the algorithm Beta Vector Value Iteration (BVVI). 
+
+Algorithm 1 Beta Vector Value Iteration (BVVI) 
+
+1: Input K, H, risk level γ̸ = 0 , confidence δ ∈ (0 , 1) 
+
+2: Initialize bμ11(·), bT1
+
+> h,a
+
+(·| s) ← Unif (S )
+
+3: Initialize bO1
+
+> h
+
+(·| s) ← Unif (O)
+
+4: for k = 1 : K do 
+
+5: bσk 
+
+> 1
+
+← bμk 
+
+> 1
+
+▷ Belief propagation 
+
+6: for h = 1 : H do 
+
+7: Update risk belief bσkh+1 ,f h+1 by Eq.(9) 
+
+8: Update bonus function bkh(sh, a h) by Eq.(4) 
+
+9: end for 
+
+10: bβkH+1 ,f H+1 ←⃗ 1S ▷ Value iteration 
+
+11: for h = H : 1 do 
+
+12: bQkh(fh, a h) ← 1 
+
+> γ
+
+ln Eoh+1 ∼Unif O ⟨bσkh+1 , bβk, bπk 
+
+> h+1
+
+⟩
+
+13: bVkh(fh) ← max 
+
+> a∈A
+
+bQkh(fh, a )
+
+14: bπkh(fh) ← argmax 
+
+> a∈A
+
+bQkh(fh, a )
+
+15: Update beta vector bβk, bπk 
+
+> h,f h
+
+by Eq.(13) 
+
+16: Restrict bβk, bπk 
+
+> h,f h
+
+in 
+
+h
+
+eγ−(H−h+1) , e γ+(H−h+1) 
+
+i
+
+17: end for ▷ Statistical Learning 
+
+18: Play with P under bπk while gleaning {bokt , bakt }
+
+19: Review hidden states {bskt }H+1  
+
+> t=1
+
+in hindsight .
+
+20: bN k+1  
+
+> h
+
+(s, a ) ← Pkκ=1 1 {ˆsκh = s, ˆaκh = a}
+
+21: bN k+1  
+
+> h
+
+(s) ← Pkκ=1 1 {ˆsκh = s}
+
+22: Update bμk 
+
+> 1
+
+(·), bTk+1  
+
+> h,a
+
+(·| s), bOk+1  
+
+> h
+
+(·| s) by Eq.(6) 
+
+23: end for 
+
+4Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+BVVI is a UCB algorithm (Lattimore & Szepesv ´ari, 2020) that encourages explorations by a bonus function: 
+
+bkh(sh, a h) = eγ(H−h+1) − 1 ·
+
+min { 1, tkh(sh, a h) + X
+
+> s′
+
+bTkh,a h (s′|sh)okh+1 (s′)} (4) where tkh(sh, a h) and okh+1 (s′) are defined as 
+
+tkh(sh, a h) := min 
+
+(
+
+1, 3
+
+s SH · ι
+
+bN kh (sh, a h) ∨ 1
+
+)
+
+okh+1 (sh+1 ) := min 
+
+(
+
+1, 3
+
+s OH · ι
+
+bN k+1  
+
+> h+1
+
+(sh+1 ) ∨ 1
+
+) (5) In BVVI, the agent updates the empirical model using hind-sight observations: 
+
+bμk+1 1 (s) ←
+
+> k
+
+X
+
+> κ=1
+
+1{bsκ 
+
+> 1
+
+= s}
+
+k
+
+bTk+1  
+
+> h,a
+
+(s′|s) ←
+
+> k
+
+X
+
+> κ=1
+
+1{ˆsκh+1 = s′ , ˆsκh = s , ˆaκh = a}
+
+bN k+1  
+
+> h
+
+(s, a ) ∨ 1
+
+bOk+1  
+
+> h
+
+(o|s) ←
+
+> k
+
+X
+
+> κ=1
+
+1{ˆoκh = o , ˆsκh = s}
+
+bN k+1  
+
+> h
+
+(s) ∨ 1
+
+(6) In the planning phase, the agent preemptively estimates the accumulated risks across the hidden states in a belief prop-agation process (Line 1), before she plans for the optimal policy in the empirical model, according to the Bellman equations provided in Eq. (3) . To simplify computations, we express the value function with the help of a set of new variables bσkh,f h and bβk, bπk 
+
+> h,f h
+
+, which will be introduced later in Section 7. BVVI provides exact solution to the plan-ning problem so assignments to the functions traverse their domains. 
+
+## 6. Main Results 
+
+In this section, we present the theoretical guarantee for algorithm 1. The proofs will be overviewed in Section 7. 
+
+Theorem 6.1. (Regret) With probability at least 1 − 4δ,algorithm 1 achieves the following regret upper bound: 
+
+O
+
+ e|γ|H − 1
+
+|γ| H
+
+| {z }
+
+> risk awareness
+
+H2√KS 2AO | {z }
+
+> Statistical error
+
+r
+
+H ln KHSOA δ
+
+| {z }
+
+> History-dependency
+
+
+
+(7) The detailed expression of the regret bound is presented in Eq. (23) . Using the online-to-PAC conversion argument(Jin et al., 2018) we also obtain the sample complexity of BVVI: 
+
+Corollary 6.2. (Sample complexity) For algorithm 1, the uniform mixture of its output policies ensures 
+
+P
+
+
+
+V ⋆ −
+
+> K
+
+X
+
+> k=1
+
+V bπk
+
+< ϵ 
+
+
+
+≥ 1 − δ
+
+when episode number K satisfies 
+
+K ≳ 1
+
+ϵ2δ2
+
+ e|γ|H − 1
+
+|γ| H
+
+2
+
+· H5S2OA · ln 
+
+ KHSOA δ
+
+
+
+Remark 6.3 . The first factor in Eq. (7) reveals the risk aware-ness of the agent, which disappears in the risk-neutral sce-nario ( γ → 0). The second term demonstrates the statistical error brought by our UCB-style algorithm. The last fac-tor represents how the inherent history-dependency of the POMDP discourages confidence in exploration, where the additional √H comes from the uncertainty in the face of the large history space: 
+
+q
+
+ln |Fh| 
+
+> δ
+
+≤
+
+q
+
+ln |OA |H 
+
+> δ
+
+≤ √Hι .The mathematical analysis behind the main results will be presented in the following two sections. 
+
+## 7. Risk Belief and Beta Vector 
+
+In what follows we lay the foundation for comprehending Theorem 6.1 by the introduction of several essential con-cepts and lemmas. A crucial element of the analysis is the risk belief vector, which plays a pivotal role in deriving novel value func-tions and Bellman equations presented in Eq. (4.1) and (4.2) .Moreover, we will put forward the concept of beta vector, which is the cornerstone for the bonus design in Eq. (4) and the regret analysis presented in Section 8. 
+
+7.1. Risk Belief and the Bellman Equations 
+
+To capture the structural properties characteristic of our problem, we construct a risk belief that estimates the accu-mulated risk based on historical observations, which also excavates the dynamic programming structure implicit in the risk-sentive POMDP model. 
+
+Definition 7.1. (Risk Belief) (James et al., 1994) For all h ∈ [H + 1] , f h ∈ Fh, s h ∈ S , the risk beliefs are random vectors in RS , in which ⃗σ 1 is defined as ⃗μ 1 and 
+
+[⃗σ h, Fh ]sh := Eπ
+
+> P′
+
+
+
+Dh1{Sh = sh}eγ Ph−1  
+
+> t=1 rt(St,At)
+
+Fh
+
+
+
+We can view the vector ⃗σ h, Fh as a list of cumulative risks estimated from the observable history, when the agent is in each of the hidden states. Using the risk beliefs, the optimization objective in Eq.(1) takes a simple form: 
+
+J(π; P, γ ) = 1
+
+γ ln Eπ
+
+> P′
+
+h
+
+⟨⃗σ H+1 ,FH+1 ,⃗ 1S ⟩
+
+i
+
+(8) 5Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+With some derivation (cf. Theorem B.8), we can obtain the evolution law of the stochastic process ⃗σ h, F h :5
+
+[⃗σ h+1 ,F h+1 ]sh+1 = X
+
+> sh
+
+Th, Ah (sh+1 |sh)·
+
+eγr h(sh,Ah) Oh+1 (Oh+1 |sh+1 )
+
+O′
+
+> h+1
+
+(Oh+1 ) [⃗σ h, Fh ]sh (9) which has a matrix representation in the tabular case: ⃗σ h+1 ,f h+1 = Uah,o h+1 ⃗σ h,f h . The inner product in Eq. (8) illuminates the existence of linear structure in J(π; P, γ ).Next, we will introduce another stochastic process, called the conjugate beliefs, which works in a concerted effort with the risk beliefs to expose the linearity within the optimiza-tion objective. 
+
+Definition 7.2. (Conjugate beliefs) (James et al., 1994) Let ⃗ν H+1 := ⃗ 1S . For all h ∈ [H] and ¯F h = FH+1 \ Fh,the conjugate beliefs is a series of random vectors in RS
+
+which is defined iteratively: ⃗ν h, ¯F h = U⊤
+
+> Ah,O h+1
+
+⃗ν h+1 , ¯F h+1 
+
+The the update operator of the conjugate beliefs is the trans-pose of that of the risk belief, which immediately implies their inner product is invariant with time 
+
+⟨⃗σ H+1 ,f H+1 ,⃗ 1⟩ ≡ ⟨ ⃗σ h,f h ,⃗ ν h, ¯fh ⟩, ∀h ∈ [H + 1] (10) Consequently, we have 
+
+J(π; P, γ ) ≡ 1
+
+γ ln Eπ
+
+> P′
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ , ∀h ∈ [H + 1] 
+
+Motivated by the equation above we introduce the value functions and Q-functions in our problem setting, which take equivalent forms presented in Definition 4.1. 
+
+Vπh (Fh) := 1
+
+γ ln Eπ
+
+> P′
+
+
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯F h ⟩ Fh
+
+
+
+Qπh (Fh, Ah) := 1
+
+γ ln EP′
+
+
+
+⟨⃗σ h, F h ,⃗ ν h, ¯F h ⟩ Fh, Ah
+
+ (11) We can immediately obtain the Bellman equations intro-duced in Section 3 by the iterative expectation formula. 
+
+7.2. Beta Vector and the Bonus Design 
+
+To recover the Markov property of the value functions, in this work, we put forward the concept of beta vectors ⃗ βπh,f h ,and take it as the surrogate for Vπh (fh). Beta vectors utilize the hindsight observations to obtain a polynomial regret for our algorithm. We will study the statistical error of approximating a beta vector and then design a bonus that ensures optimism in the value functions and encourages greedy exploration. 
+
+> 5
+
+For the evolution law of the empirical beliefs bσkh+1 , we re-place the transition and emission matrices with their empirical approximations. 
+
+Definition 7.3. (Beta vector) The beta vectors of a risk-sensitive POMDP P with policy π is a series of random vectors in RS , which are specified by ⃗βπH+1 ,FH+1 := ⃗ 1S⃗βπh, Fh := Eπ
+
+> P′
+
+⃗ν h, ¯Fh |Fh
+
+ , ∀2 ≤ h ≤ H.⃗ βπ 
+
+> 1
+
+:= Eπ
+
+> P′
+
+⃗ν 1, ¯F 1
+
+
+
+(12) where ⃗ν f, ¯Fh are the conjugate beliefs specified in Defini-tion 7.2. The beta vectors can be viewed as the risk-sensitive counter-part of the alpha-vector well-known in the POMDP literature (Pineau et al., 2006). 6 Similarly, they help to represent the value function in a simple form: 
+
+Theorem 7.4. (Beta Vector Representation) 
+
+∀h ∈ [H + 1] , f h ∈ Fh : Vπh (fh) = 1 
+
+> γ
+
+ln ⟨⃗σ h,f h⃗ βπh,f h ⟩
+
+As will be shown in Theorem B.26, the beta vector h⃗βπh, Fh
+
+i
+
+> sh
+
+is equal to the following quantity: 
+
+EAh∼πh(·| Fh)
+
+h
+
+eγr h(sh,Ah)
+
+X
+
+> sh+1 ∈S
+
+Th, Ah (sh+1 |sh) X
+
+> oh+1 ∈O
+
+Oh+1 (oh+1 |sh+1 )
+
+h⃗βπh+1 ,f h+1 =( Fh,Ah,o h+1 )
+
+i
+
+> sh+1
+
+
+
+where the expectation is computed with respect to proba-bility measures that solely rely on the previous states sh,rather than the entire history. We will see in Section 8 that the Markov property of the stochastic process {βπh, Fh }h≥1
+
+will cooperate with the hindsight observations to secure a polynomial sample complexity for our algorithm. Conse-quently, we will focus on studying the beta vectors in the proceeding bonus design and regret analysis. 
+
+Bonus Function In reinforcement learning, we are con-cerned with the statistical error of the value functions brought by the inaccurate estimate of the environment P.Using Theorem 7.4, it suffices to calculate the error that occurred in the evolution of the beta vectors. Based on con-centration inequalities, detailed analysis in Appendix D.2.1 shows that the empirical error of beta vectors is controlled by the following bound with probability at least 1 − 2δ:
+
+
+
+Eπ bPk (·,·| sh) − Eπ
+
+> P(·,·| sh)
+
+
+
+eγr h(sh,π h(fh)) βπh+1 (·, ·; fh)
+
+≤ eγ(H−h+1) − 1 ·
+
+"
+
+min 
+
+(
+
+1, 3
+
+s SHι 
+
+bN kh (sh, π h(fh)) ∨ 1
+
+)
+
++ X
+
+> s′
+
+bTkh,π h(fh)(s′|sh) min 
+
+(
+
+1, 3
+
+s OHι 
+
+bN k+1  
+
+> h+1
+
+(s′) ∨ 1
+
+)# 
+
+> 6
+
+For a detailed comparison, please refer to Appendix B.27. 
+
+6Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+where we have temporarily viewed the beta vector as a binary function over O × S . We refer to bN k+1  
+
+> h+1
+
+(s) and 
+
+bN k+1  
+
+> h+1
+
+(s, a ) as the occurrence frequencies of states and ac-tions in the data samples obtained in the learning process. We will abbreviate the two minimums in Eq. (5) as the the transition error residue tkh(sh, a h) and the emission error residue okh+1 (sh+1 ) respectively. With some minor adjust-ments, the upper bound in Eq. (5) will be used to define our bonus function for all the state-action pairs under the risk level γ, which is presented in Eq.(4). 
+
+Optimism In the algorithm, we have the freedom to de-sign the empirical value function, as well as the empirical beliefs bσkh,f h and the beta vectors bβk,π h,f h . In this study, the empirical beliefs are determined by Eq. (9) and we define the empirical beta vectors by the iterative formulas below: 
+
+h bβk,π H+1 
+
+i
+
+> s1
+
+:=1 
+
+h bβk,π h,f h
+
+i
+
+> sh
+
+:= Eah∼πh(·| fh)
+
+h
+
+eγr h(sh,a h) X
+
+> s′
+
+bTkh,a h (s′|sh)
+
+X
+
+> o′
+
+bOkh+1 (o′|s′)
+
+h bβk, bπk
+
+> h+1 ,f h+1 =( fh,a h,o ′)
+
+i
+
+> s′
+
++
+
+sgn γ · bkh(sh, a h; γ)
+
+(13) Finally, we mimic the representation Theorem 7.4 and con-struct the empirical value function by 
+
+bV πh (fh) := 1
+
+γ ln ⟨bσkh,f h , bβk,π h,f h ⟩
+
+As will be shown in Appendix D.2.2, the introduction of an additional bonus term in Eq. (13) will ensure that the value functions will be over-estimated in the empirical model: 
+
+Corollary 7.5. (Optimism in value functions) For any risk-sensitivity level γ̸ = 0 and episode number 
+
+k ∈ [K], we have V π⋆ 
+
+> 1
+
+≤ bV bπk 
+
+> 1
+
+, where bπk is the optimal policy in bPk.
+
+## 8. Regret Analysis 
+
+We now give an overview of the proof of Theorem 6.1. Technical details are provided in Appendix D. 
+
+8.1. From Regret to Beta Vectors 
+
+With the help of Corollary 7.5 and Theorem 7.4, we can control the regret by the risk beliefs and the beta vectors: Regret (K; P, γ )
+
+≤KγKX
+
+> k=1
+
+⟨bσk 
+
+> 1
+
+−⃗σ 1, bβk, bπk 
+
+> 1
+
+⟩ + EP
+
+ bβk, bπk 
+
+> 1
+
+−⃗ βbπk
+
+> 1
+
+
+
+(14) where Kγ is the Lipschitz constant of the entropic risk mea-sure, which is e(−γ)+ 
+
+> γ
+
+for all γ̸ = 0 .7
+
+Using concentration inequalities G.5 and G.6, the first term in Eq.(14) is controlled by the following upper bound 
+
+KγKX
+
+> k=1
+
+⟨bσk 
+
+> 1
+
+−⃗σ 1, bβk, bπk 
+
+> 1
+
+⟩ ≤ e|γ|H − 1
+
+|γ|
+
+r
+
+2KS ln Kδ
+
+(15) with probability at least 1 − δ. We name the right-hand side of Eq. (15) as “the prior error,” which arises from the inaccurate estimate of the prior distribution μ1.Next, our attention turns to bounding the second term in Eq. (14) , which we refer to as the initial beta vector error and denote as ∆k 
+
+> 1
+
+.
+
+8.2. Control the Error Between Beta Vectors 
+
+We extend the definition of beta vector errors to h ∈ [H +1] :
+
+∆kh := EP
+
+h bβk, bπk 
+
+> h, Fh
+
+(Sh) −⃗ βbπk 
+
+> h, Fh
+
+(Sh)
+
+i
+
+which demonstrate the average error of the beta vectors at step h incurred by the inaccurate empirical estimate of the POMDP model. We observe that 8
+
+∆kh =| sgn (γ)EP [bkh]
+
+| {z }
+
+> I
+
++ EP [( bTkh bOkh+1 − ThOh+1 )eγr h⃗ βbπk
+
+> h+1
+
+]
+
+| {z }
+
+> II
+
++ EP [( bTkh bOkh+1 − ThOh+1 )( eγr h bβbπk 
+
+> h+1
+
+− eγr h⃗ βbπk
+
+> h+1
+
+)] 
+
+| {z }
+
+> III
+
++ EP [ThOh+1 (eγr h bβbπk 
+
+> h+1
+
+− eγr h⃗ βbπk
+
+> h+1
+
+)] 
+
+| {z }
+
+> IV
+
+|
+
+(16) The terms in Eq. (16) are controlled by the concentration inequalities. In Appendix D.3.3, we show that 
+
+∆kh ≤ eγ+
+
+∆kh+1 + 4 EP
+
+bkh
+
+ ∀h ∈ [H] (17) Then we invoke Lemma G.15 to obtain an upper bound on 
+
+∆k 
+
+> 1
+
+based on Eq. (17) . In the end, we prove that the sum of the initial beta vector error is dominated by the value of the bonus functions on the sampled trajectories and the bias in 
+
+> 7
+
+Please refer to Lemma G.14 for a detailed derivation. 
+
+> 8
+
+We have abbreviated the transition and emission matrices as operators in Eq.(16). We also omitted the variables of bkh(·, ·).
+
+7Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+the bonus function incurred by the empirical estimator: 
+
+KγKX
+
+> k=1
+
+∆k 
+
+> 1
+
+< 4KγHX
+
+> h=1
+
+eγ+(h−1) ·
+
+
+
+> K
+
+X
+
+> k=1
+
+bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Bonus samples
+
++
+
+> K
+
+X
+
+> k=1
+
+EP bkh(Sh, Ah; γ) − bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Empirical bias
+
+
+
+(18) We will first study the second summation. Concentration inequality G.9 implies that with probability at least 1 − δ,
+
+> K
+
+X
+
+> k=1
+
+EP bkh(Sh, Ah; γ) − bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Empirical bias
+
+≤ eγ(H−h+1) − 1 pK/ 2 · ι (19) A bound on the first term can also be derived from Eq.(4): 
+
+> K
+
+X
+
+> k=1
+
+bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Bonus samples
+
+≤ eγ(H−h+1) − 1
+
+·
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) + X
+
+> s′
+
+bTkh, ˆakh
+
+(s′|ˆskh)okh+1 (s′) (20) To establish an upper bound for the summation in Eq. (20) ,we will telescope the equation twice and utilize the results from Lemmas G.6 and G.9 to bound the statistical error in the transition and emission processes. Subsequently, we demonstrate that with a probability of at least 1 − 2δ,
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) + X
+
+> s′
+
+bTkh, ˆakh
+
+(s′|ˆskh)okh+1 (s′)=
+
+> K
+
+X
+
+> k=1
+
+h
+
+Tkh, ˆakh
+
+(·| ˆskh)okh+1 (·) − okh+1 (ˆ skh+1 )
+
+| {z }
+
+> Concentration of MDS
+
++ tkh(ˆ skh, ˆakh) + okh+1 (ˆ skh+1 )
+
+| {z }
+
+> Residues
+
++ bTkh, ˆakh
+
+(·| ˆskh)okh+1 (·) − Tkh, ˆakh
+
+(·| ˆskh)okh+1 (·)
+
+i| {z }
+
+> Azuma Hoeffding
+
+≤
+
+r
+
+2K ln HSA δ + 2 
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) + okh+1 (ˆ skh+1 )
+
+(21) The relations above imply that the right-hand side of Eq. (18) is dominated by the transition and emission residues, which are defined in Eq.(5). 
+
+8.3. Sum Up the Residue 
+
+Finally, the pigeon-hole Lemma G.12 will help us compute the summation of the residue terms. Indeed, 
+
+> k
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) = 
+
+> k
+
+X
+
+> k=1
+
+min 
+
+(
+
+1, 3
+
+s
+
+SH ln KHSOA δ
+
+bN kh (ˆ skh, ˆakh) ∨ 1) 
+
+)
+
+≤
+
+
+
+3√SHι 
+
+
+
+2√KSA 
+
+Similarly, we have 
+
+> K
+
+X
+
+> k=1
+
+okh+1 (ˆ skh+1 ) ≤ 3√OH · ι · 2√KS 
+
+Bringing these relations back to Eqs. (21) and (20) , we ob-tain 
+
+> K
+
+X
+
+> k=1
+
+bkh(ˆ skh, ˆakh; γ) + EP [bkh(Sh, Ah; γ)] − bkh(ˆ skh, ˆakh; γ)
+
+≤12 · eγ(H−h+1) − 1
+
+| {z }
+
+> Bonus magnitude
+
+· √H ·
+
+s
+
+ln 
+
+ KHSOA δ
+
+| {z }
+
+> History-dependency of POMDP
+
+·
+
+ √KS 2 A| {z }
+
+> Hidden state error
+
++ √KSO | {z }
+
+> Observation error
+
++ √K|{z} 
+
+> Empirical bias
+
+
+
+(22) The last step remaining is to take Eq. (22) back to Eq. (18) and then bring Eq. (18) with Eq. (15) to Eq. (14) . Rearranging terms, we conclude that with probability at least 1 − 4δ,Regret (K; P, γ ) ≤ 48 e|γ|H − 1
+
+|γ|
+
+| {z }
+
+> Risk measure
+
+r
+
+H · ln KHSOA δ
+
+| {z }
+
+> History-dependency
+
+·  √KS 
+
+| {z } 
+
+> Prior error
+
++ H√KS 2 A| {z }
+
+> Transition error
+
++ H√KSO | {z }
+
+> Emission error
+
++ H√K| {z }
+
+> Empirical bias
+
+(23) Neglecting lower order terms, we obtain the upper bound presented in Theorem 6.1: 
+
+Regret( K; P, γ ) ≤ ˜O
+
+ e|γ|H − 1
+
+|γ| H H 52
+
+√KS 2AO 
+
+
+
+Discussion In the risk-neutral setting, our regret improves the result given by (Lee et al., 2023) 9
+
+Regret( K; P) ≤ ˜O
+
+√SAH 4K + H3S√O
+
++ H4S2A(1 + ln K) + HSA √H3
+
+
+
+in the order of S, A , and H. The improvement is attributed to the refined analysis in this work. Our sample complexity 
+
+> 9
+
+For details, please refer to Theorem C.1 of (Lee et al., 2023). 
+
+8Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+also nearly reaches the lower bound of learning a hindsight POMDP, which is Ω   SO ϵ2
+
+ according to (Lee et al., 2023). In the completely observable setting, with some adjustments, our algorithm can degenerate to the algorithm 1 in (Fei et al., 2021a) and thus matches their upper bound 10 
+
+Regret( K; M, γ ) ≤ ˜O
+
+ e|γ|H − 1
+
+|γ|H
+
+√KH 4S2A
+
+
+
+Moreover, our regret achieves the lower bound of risk-sensitive RL (Fei et al., 2020) concerning K and γH , with the order of H only slightly higher. 
+
+Regret( K; M, γ ) ≥ ˜O e|γ| H 
+
+> 2
+
+− 1
+
+|γ| H · H 32
+
+√K
+
+!
+
+## 9. Experiments 
+
+In this section, we present experimental results to evaluate the empirical performance of our algorithm, BVVI, which serves as a reference to validate our theoretical findings in Section 8. For details of our experimental setup and more results, please refer to Section E. Although tailored for solving POMDPs, the BVVI algo-rithm also adapts to MDP setups with lower regret due to the reduction of the uncertainty in the environment. In both scenarios, BVVI yields sublinear regret, growing approxi-mately at a rate of O
+
+√K
+
+
+
+, consolidating our theoretical guarantee proposed in Theorem 6.1.   
+
+> Figure 1: Regret of BVVI (Algorithm 1) in MDP and POMDP with γ= 1 . Solid lines indicate cumulative regrets. Dashed curves are the regrets fitted with Theorem 6.1.
+
+We also test BVVI in a POMDP under different risk sensi-tivity parameters. Our experiment shows that BVVI yields sublinear regret across multiple risk levels,demonstrating its versatility in handling various risk-sensitive RL scenarios. 
+
+> 10 Please refer to Appendix D.4.4 for details.
+
+Furthermore, our experiments demonstrate that the regret increases with the absolute value of γ, aligning with the theoretical reasoning presented in Section 6.          
+
+> Figure 2: Cumulative regret of BVVI (Algorithm 1) in a POMDP with various risk-sensitivity. Risk-level γranges in
+> {− 5.0,−3.0,−1.0,1.0,3.0,5.0}.
+
+## 10. Conclusion and Future Work 
+
+In this study, we introduce a novel formulation of risk-sensitive RL in a partially observable environment with hind-sight observations. We provide the first provably sample-efficient algorithm tailored for the new setting, whose regret improves existing upper bounds and nearly reaches the lower bounds in the degenerated cases. Our analysis also explains how the sample complexity is affected by the risk-awareness and history-dependency inherent in our problem. We vali-date the theoretical findings through numerical experiments, which demonstrates the algorithm’s capability in solving POMDP problems across various levels of risk sensitivity. There are several potential future directions. One is to derive theoretical results for POMDPs with function-approximation, for the case when the state space is ex-tremely large or even infinite. Another avenue is to extend our findings to various risk measures such as conditional value-at-risk, coherent risk and optimized certainty equiva-lents. 
+
+## Acknowledgement 
+
+This work was supported by the Technology and In-novation Major Project of the Ministry of Science and Technology of China under Grant 2020AAA0108400 and 2020AAA0108403. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 9Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+## References 
+
+Azar, M. G., Osband, I., and Munos, R. Minimax regret bounds for reinforcement learning. In International Con-ference on Machine Learning , pp. 263–272. PMLR, 2017. B ¨aauerle, N. and Rieder, U. Partially observable risk-sensitive markov decision processes. Mathematics of Operations Research , 42(4):1180–1196, 2017. Bai, Y. and Jin, C. Provable self-play algorithms for compet-itive reinforcement learning. In International conference on machine learning , pp. 551–560. PMLR, 2020. Baisero, A., Daley, B., and Amato, C. Asymmetric dqn for partially observable reinforcement learning. In Un-certainty in Artificial Intelligence , pp. 107–117. PMLR, 2022. Baras, J. S. and James, M. R. Robust and risk-sensitive out-put feedback control for finite state machines and hidden markov models. J. Math. Systems, Estimation & Control ,7:371–374, 1997. URL http://spigot.anu.edu. au/people/mat/home.html .B ¨auerle, N. and Rieder, U. Markov decision processes with applications to finance . Springer Science & Business Media, 2011. B ¨auerle, N. and Rieder, U. More risk-sensitive markov decision processes. Mathematics of Operations Research ,39(1):105–120, 2014. Baxter, M. and Rennie, A. Financial calculus: an introduc-tion to derivative pricing . Cambridge university press, 1996. Bercu, B., Delyon, B., Rio, E., et al. Concentration inequal-ities for sums and martingales . Springer, 2015. Boda, K. and Filar, J. A. Time consistent dynamic risk mea-sures. Mathematical Methods of Operations Research ,63:169–186, 2006. Boucheron, S., Lugosi, G., and Bousquet, O. Concentration inequalities . Springer, 2003. Cai, Q., Yang, Z., and Wang, Z. Reinforcement learning from partial observation: Linear function approximation with provable sample efficiency, 2022. Cao, J., Chen, J., Hull, J., and Poulos, Z. Deep hedging of derivatives using reinforcement learning. The Journal of Financial Data Science , 2020. Cassandra, A. R. Exact and approximate algorithms for partially observable Markov decision processes . Brown University, 1998. Cavazos-Cadena, R. and Hern ´andez-Hern ´andez, D. Succes-sive approximations in partially observable controlled markov chains with risk-sensitive average criterion. 
+
+Stochastics: An International Journal of Probability and Stochastics Processes , 77(6):537–568, 2005. Cesa-Bianchi, N., Conconi, A., and Gentile, C. On the generalization ability of on-line learning algorithms. In-formation Theory, IEEE Transactions on , 50:2050 – 2057, 10 2004. doi: 10.1109/TIT.2004.833339. Chen, D., Zhou, B., Koltun, V., and Kr ¨ahenb ¨uhl, P. Learning by cheating. In Conference on Robot Learning , pp. 66–75. PMLR, 2020. Choi, J., Dance, C., Kim, J.-E., Hwang, S., and Park, K.-s. Risk-conditioned distributional soft actor-critic for risk-sensitive navigation. In 2021 IEEE International Confer-ence on Robotics and Automation (ICRA) , pp. 8337–8344. IEEE, 2021. Di Masi, G. and Sthttner, L. Risk sensitive control of dis-crete time partially observed markov processes with in-finite horizon. Stochastics: An International Journal of Probability and Stochastic Processes , 67(3-4):309–322, 1999. Du, Y., Wang, S., and Huang, L. Provably efficient risk-sensitive reinforcement learning: Iterated cvar and worst path. In The Eleventh International Conference on Learn-ing Representations , 2022. Elliott, R. J., Moore, J. B., and Dey, S. Risk-sensitive maxi-mum likelihood sequence estimation. IFAC Proceedings Volumes , 29(1):4616–4621, 1996. ISSN 1474-6670. doi: https://doi.org/10.1016/S1474-6670(17)58410-4. URL https://www.sciencedirect.com/ science/article/pii/S1474667017584104 .13th World Congress of IFAC, 1996, San Francisco USA, 30 June - 5 July. Fei, Y., Yang, Z., Chen, Y., Wang, Z., and Xie, Q. Risk-sensitive reinforcement learning: Near-optimal risk-sample tradeoff in regret. Advances in Neural Information Processing Systems , 33:22384–22395, 2020. Fei, Y., Yang, Z., Chen, Y., and Wang, Z. Exponential bellman equation and improved regret bounds for risk-sensitive reinforcement learning. Advances in Neural In-formation Processing Systems , 34:20436–20446, 2021a. Fei, Y., Yang, Z., and Wang, Z. Risk-sensitive reinforce-ment learning with function approximation: A debi-asing approach. In Meila, M. and Zhang, T. (eds.), 
+
+Proceedings of the 38th International Conference on 
+
+10 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Machine Learning , volume 139 of Proceedings of Ma-chine Learning Research , pp. 3198–3207. PMLR, 18– 24 Jul 2021b. URL https://proceedings.mlr. press/v139/Fei21improve.html .Fernandez-Gaucherand, E. and Marcus, S. Risk-sensitive optimal control of hidden markov models: structural re-sults. IEEE Transactions on Automatic Control , 42(10): 1418–1422, 1997. doi: 10.1109/9.633830. Golowich, N., Moitra, A., and Rohatgi, D. Planning in ob-servable pomdps in quasipolynomial time. arXiv preprint arXiv:2201.04735 , 1 2022a. URL http://arxiv. org/abs/2201.04735 .Golowich, N., Moitra, A., and Rohatgi, D. Learning in ob-servable pomdps, without computationally intractable oracles. Advances in Neural Information Processing Systems , 6 2022b. URL http://arxiv.org/abs/ 2206.03446 .Guo, J., Chen, M., Wang, H., Xiong, C., Wang, M., and Bai, Y. Sample-efficient learning of pomdps with multiple ob-servations in hindsight. arXiv preprint arXiv:2307.02884 ,2023. Hau, J. L., Delage, E., Ghavamzadeh, M., and Petrik, M. On dynamic programming decompositions of static risk measures in markov decision processes, 2023. Huang, X., Hong, S., Hofmann, A., and Williams, B. C. Online risk-bounded motion planning for autonomous vehicles in dynamic environments. In Proceedings of the International Conference on Automated Planning and Scheduling , volume 29, pp. 214–222, 2019. James, M. R., Baras, J. S., and Elliott, R. J. Risk-sensitive control and dynamic games for partially ob-served discrete-time nonlinear systems. IEEE Transac-tions on Automatic Control , 39:780–792, 1994. ISSN 15582523. doi: 10.1109/9.286253. Jazwinski, A. H. Stochastic processes and filtering theory .Courier Corporation, 2007. Jin, C., Allen-Zhu, Z., Bubeck, S., and Jordan, M. I. Is q-learning provably efficient?, 2018. Jin, C., Kakade, S., Krishnamurthy, A., and Liu, Q. Sample-efficient reinforcement learning of undercom-plete pomdps. Advances in Neural Information Process-ing Systems , 33:18530–18539, 2020. Kabbani, T. and Duman, E. Deep reinforcement learning ap-proach for trading automation in the stock market. IEEE Access , 10:93564–93574, 2022. Kreyszig, E. Introductory functional analysis with applica-tions , volume 17. John Wiley & Sons, 1991. Lattimore, T. and Szepesv ´ari, C. Bandit algorithms . Cam-bridge University Press, 2020. Lee, J. N., Agarwal, A., Dann, C., and Zhang, T. Learning in pomdps is sample-efficient with hindsight observability, 2023. Liang, H. and Luo, Z.-q. Regret bounds for risk-sensitive reinforcement learning with lipschitz dynamic risk mea-sures. arXiv preprint arXiv:2306.02399 , 2023. Liu, Q., Chung, A., Szepesv ´ari, C., Ca, S., Jin, C., Loh, P.-L., and Raginsky, M. When is partially observable re-inforcement learning not scary? Proceedings of Machine Learning Research , 178:1–46, 2022a. Liu, Q., Netrapalli, P., Szepesv ´ari, C., and Jin, C. Optimistic mle – a generic model-based algorithm for partially ob-servable sequential decision making, 2022b. Monahan, G. E. State of the art—a survey of partially observable markov decision processes: theory, models, and algorithms. Management science , 28(1):1–16, 1982. Oksendal, B. Stochastic differential equations: an intro-duction with applications . Springer Science & Business Media, 2013. Papadimitriou, C. H. and Tsitsiklis, J. N. The com-plexity of markov decision processes. Mathematics of Operations Research , 12(3):441–450, 1987. ISSN 0364765X, 15265471. URL http://www.jstor. org/stable/3689975 .Pineau, J., Gordon, G., and Thrun, S. Anytime point-based approximations for large pomdps. Journal of Ar-tificial Intelligence Research , 27:335–380, November 2006. ISSN 1076-9757. doi: 10.1613/jair.2078. URL 
+
+http://dx.doi.org/10.1613/jair.2078 .Pinto, L., Andrychowicz, M., Welinder, P., Zaremba, W., and Abbeel, P. Asymmetric actor critic for image-based robot learning. arXiv preprint arXiv:1710.06542 , 2017. Qiu, W., Wang, X., Yu, R., Wang, R., He, X., An, B., Obraztsova, S., and Rabinovich, Z. Rmix: Learning risk-sensitive policies for cooperative reinforcement learning agents. Advances in Neural Information Processing Sys-tems , 34:23049–23062, 2021. Rankin, R. Real and complex analysis. by w. rudin. pp. 412. 84s. 1966.(mcgraw-hill, new york.). The Mathematical Gazette , 52(382):412–412, 1968. Richman, R. Ai in actuarial science–a review of recent advances–part 1. Annals of Actuarial Science , 15(2): 207–229, 2021. 11 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Righi, M. B. A theory for combinations of risk measures. 
+
+arXiv preprint arXiv:1807.01977 , 2018. Ross, S., Gordon, G., and Bagnell, D. A reduction of imita-tion learning and structured prediction to no-regret online learning. In Proceedings of the fourteenth international conference on artificial intelligence and statistics , pp. 627–635. JMLR Workshop and Conference Proceedings, 2011. Sereda, E., Bronshtein, E., Rachev, T., Fabozzi, F., Sun, E., and Stoyanov, S. Distortion risk measures in portfo-lio optimization. Handbook of Portfolio Construction: Contemporary Applications of Markowitz Techniques , pp. 649–673, 01 2010. doi: 10.1007/978-0-387-77439-8 25. Shen, S., Ma, C., Li, C., Liu, W., Fu, Y., Mei, S., Liu, X., and Wang, C. Riskq: risk-sensitive multi-agent re-inforcement learning value factorization. arXiv preprint arXiv:2311.01753 , 2023. Shi, M., Liang, Y., and Shroff, N. Theoretical hardness and tractability of pomdps in rl with partial hindsight state information. arXiv preprint arXiv:2306.08762 , 2023. Sinclair, S. R., Frujeri, F. V., Cheng, C.-A., Marshall, L., Barbalho, H. D. O., Li, J., Neville, J., Menache, I., and Swaminathan, A. Hindsight learning for mdps with ex-ogenous inputs. In International Conference on Machine Learning , pp. 31877–31914. PMLR, 2023. Skoglund, C. Risk-aware autonomous driving using pomdps and responsibility-sensitive safety, 2021. Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, 2018. Tirinzoni, A., Al-Marjani, A., and Kaufmann, E. Optimistic pac reinforcement learning: the instance-dependent view, 2022. Vassilev, V., Donchev, D., and Tonchev, D. Risk assessment in transactions under threat as partially observable markov decision process. In Optimization in Artificial Intelligence and Data Sciences: ODS, First Hybrid Conference, Rome, Italy, September 14-17, 2021 , pp. 199–212. Springer, 2022. Von Neumann, J. and Morgenstern, O. Theory of games and economic behavior princeton. Princeton University Press , 1947:1953, 1944. WATER, H. V. D. and Willems, J. C. The certainty equiva-lence property in stochastic control theory. IEEE TRANS-ACTIONS ON AUTOMATIC CONTROL , 1981. Weissman, T., Ordentlich, E., Seroussi, G., Verdu, S., and Weinberger, M. J. Inequalities for the l1 deviation of the empirical distribution. Hewlett-Packard Labs, Tech. Rep ,2003. Whittle, P. A risk-sensitive maximum principle: the case of imperfect state observation. IEEE Transactions on Automatic Control , 36(7):793–801, 1991. doi: 10.1109/9. 85059. Zhan, W., Uehara, M., Sun, W., and Lee, J. D. Pac rein-forcement learning for predictive state representations, 2022. 12 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+## A. Notations and Concepts 
+
+In this section we provide several additional concepts and notations not mentioned in Section 1. 
+
+Additional Notations Given a vector x ∈ Rd, we denote its ith entry as x(i) or [x]i. For a matrix A ∈ Rm×n, we use 
+
+Aij or [A]i,j to indicate the (i, j )th entry. The comparison and expectation of random vectors are defined component-wise. We employ 1{·} to represent the indicator operator, and the signature function is denoted as sgn (·). Additionally, we use Unif (X ) to express the uniform distribution over the finite space X .
+
+Remark on the POMDP 
+
+Remark A.1 . Following the convention of POMDP literature (Monahan, 1982; James et al., 1994; Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005; Golowich et al., 2022a), no observation is made at the first step. The definition of Oh begins from h = 2 . The first action A1 is chosen based on the agent’s prior knowledge. For the sake of consistent notations, we still adopt the notation of F1 and we use P(·| F 1) and P(·) interchangeably. We permit the environment to generate the observation OH + 1 when in state SH + 1 , but the agent abstains from taking any actions at H + 1 .We will use the following fact extensively which expresses the recursive relation of the “history” defined in Section 3. 
+
+Fact A.2 . ∀h ∈ [H − 1] : Fh+1 = ( Fh, Ah, Oh+1 ), where Ah = πh(F h)
+
+In this study, we use fh+1 and (fh, a h, o h+1 ) interchangeably. Another concept related to “history” is the trajectory τ h of the Markov process. 
+
+Definition A.3. (Trajectory) Full trajectory ¯τh := ( S1, A1, . . . Sh, Oh, Ah), ∀h ∈ [H] , ¯τH+1 := ( S1, A1, . . . , SH , OH , AH , SH+1 )
+
+Observable trajectory τh := ( A1, . . . , Oh, Ah), ∀h ∈ [H] (24) 
+
+Optimization Objective using General Utility Risk Measure In this work we refer the utility risk as any strictly increasing function that is continuously differentiable. We can extend many results in this work to general utility risk measures. We will present our proofs using the utility function U and instantiate it to the entropic risk ( U (·) = γe γ(·)) when necessary. The optimization objective using arbitrary utility risk measure U is defined as maximize  
+
+> π
+
+U −1Eπ 
+
+> P
+
+U
+
+" HX
+
+> t=1
+
+rt(St, A t)
+
+#
+
+(25) 
+
+## B. The Structure of Risk-sensitive POMDP 
+
+In what follows, we present the theoretical framework of partially observable reinforcement learning using arbitrary utility risk measures. Our framework builds upon the studies of (James et al., 1994; Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005; B ¨aauerle & Rieder, 2017). Furthermore, we introduce novel concepts and provide several new proofs in a more comprehensive setting, enhancing the existing literature. Given that the studies of risk-sensitive POMDP are relatively historical, we will provide detailed discussions about the intuition and implications behind various concepts and results. We aim to elucidate these findings, as they will serve as a foundation for the algorithm design and regret analysis in the subsequent sections. 
+
+B.1. Change of Measure 
+
+In reinforcement learning, the lack of knowledge about the emission process Oh presents a significant challenge for statistical inference, which motivates us to devise a surrogate POMDP P′ named “reference model”, which possesses a simplified emission process. 
+
+Definition B.1. (Reference model of a POMDP) Given a POMDP model P = ( S , O, A ; μ1, T, O; K, H, r ) and a reference measure O′(·) ∈ ∆( O), the reference model of 
+
+P specified by O′ is another partially observable Markov decision process P′ = ( S , O, A ; μ1, T, O′; K, H, r ), in which for all h ∈ [H] and sh ∈ S , we have O′
+
+> h
+
+(·| sh) = O′(·).13 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+In the reference model, the initial distribution and transition matrices mirror those of the real-world POMDP P. However, the observations and hidden states are statistically independent and the emission process is stationary with a predefined observation probability. Consequently, the observations are separate from the underlying transition process and are independent of the history. The probability of generating a full trajectory in the two models can be expressed as 
+
+Pπ 
+
+> P
+
+(¯τh) = μ1(S1)O1(O1|S1)π1(A1|O1) · Th, A1 (S2|S1)O2(O2|S2)π2(A2|F 2)
+
+. . . Th−1,Ah−1 (Sh+1 |Sh)Oh(Oh|Sh)πh(Ah|F h)=
+
+"
+
+μ1(S1)
+
+> h−1
+
+Y
+
+> t=1
+
+Tt, At (St+1 |St)
+
+#
+
+·
+
+" hY
+
+> t=2
+
+Ot(Ot|St)
+
+#
+
+·
+
+" hY
+
+> t=1
+
+πt(At|F t)
+
+#
+
+Pπ 
+
+> P′
+
+(¯τh) = 
+
+"
+
+μ1(S1)
+
+> h−1
+
+Y
+
+> t=1
+
+Tt, At (St+1 |St)
+
+#
+
+·
+
+" hY
+
+> t=2
+
+O′
+
+> t
+
+(Ot|St)
+
+#
+
+·
+
+" hY
+
+> t=1
+
+πt(At|F t)
+
+#
+
+(26) Eq. (26) suggests that conditioned on the generated sigma-algebra Gh = σ  {St, Ot, At}ht=1 
+
+, the Radon-Nykodym derivative between the two trajectory probabilities takes the form of 
+
+dPπ
+
+> P
+
+dPπ 
+
+> P′Gh
+
+=
+
+> h
+
+Y
+
+> t=2
+
+Ot(Ot|St)
+
+O′
+
+> t
+
+(Ot|St) := Dh(O2: h, S2: h) := Dh
+
+By Theorem G.1, for any measurable function f of the full trajectory ¯τh, 11 
+
+Eπ 
+
+> P
+
+[f (¯τh)] = Eπ 
+
+> P′
+
+[Dh · f (¯τh)] = 
+
+Z
+
+> Th
+
+(Dhf )(¯ τh) · dPπ 
+
+> P′
+
+(¯ τh) (27) The two expectations are taken with respect to the randomness in the transitions, emissions and the same policy. Then we can rewrite our optimization objective in Eq.(25) by the change of measure 
+
+J(π; P) := 1
+
+γ ln Eπ
+
+> P
+
+h
+
+eγ PHh=1 rh(Sh,Ah)i
+
+= 1
+
+γ ln Eπ
+
+> P′
+
+h
+
+DH · eγ PHh=1 rh(Sh,Ah)i
+
+(28) 
+
+Remark B.2 . In general, the conditional expectation Eπ 
+
+> P′
+
+[Dh · | fh] in Definition B.3 cannot be replaced by Eπ 
+
+> P
+
+[· | fh], as our RN derivative Dh is calculated from the joint but not conditional probability. 
+
+B.2. Risk-sensitive Belief 
+
+One of the key concepts in the study of risk-neutral POMDP (Monahan, 1982)is the “belief state’, which is the posterior distribution of the hidden states given the observable history. ⃗bh(·; fh) = Pπ 
+
+> P
+
+{Sh = ·| Fh = fh}
+
+Since we can always view a probability from the perspective of expectation, we observe that 12 ⃗bh(·; fh) = Pπ 
+
+> P
+
+{Sh = ·| Fh = fh}≡Eπ 
+
+> P
+
+[1{Sh = · } | Fh = fh]=Eπ
+
+> P
+
+h
+
+1{Sh = · } eγ Ph−1  
+
+> t=1 rt(St,At)
+
+| Fh = fh
+
+i
+
+> γ=0
+
+(29) The risk-sensitive counterpart of the belief is inspired by Eq.(29). 
+
+> 11
+
+We should also guarantee that the reference measure O′ is strictly positive a.s. and Pπ 
+
+> P′
+
+<< Pπ 
+
+> P
+
+. See Section G.1 for details. 
+
+> 12
+
+In the continuous case we replace the indicator 1{·} with the Dirac-delta function and the following definitions should be modified accordingly. 
+
+14 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Definition B.3. (Risk-sensitive belief, Definition 2.9 in (Cavazos-Cadena & Hern´ andez-Hern´ andez, 2005)) For all h ∈ [H + 1] , f h ∈ Fh, s h ∈ S :[⃗σ 1]s1 := μ1(s1)[⃗σ h,f h ]sh := Eπ
+
+> P′
+
+"
+
+Dh · 1{Sh = sh} exp γ
+
+> h−1
+
+X
+
+> t=1
+
+rt(St, At) Fh = fh
+
+# (30) 
+
+Remark B.4 . The risk belief in this study is not normalized, since we make it a carrier of the one-step risk-sensitive reward. However, some literature (Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005; B ¨aauerle & Rieder, 2017) still defines a normalized belief. 
+
+Remark B.5 . In reinforcement learning, the risk beliefs corresponding to the empirical models bPk = ( bμk 
+
+> 1
+
+, bTk, bOk) will be defined in a similar manner and referred to as the empirical belief bσkh.
+
+Relationship with the Optimization Objective We can use the risk belief to express the optimization objective defined in Eq.(29). 
+
+J(π; P) := U −1Eπ
+
+> P
+
+"
+
+U
+
+> H
+
+X
+
+> h=1
+
+rh(Sh, Ah)
+
+#
+
+≡U −1Eπ
+
+> P′
+
+"
+
+DH+1 · U
+
+> H
+
+X
+
+> h=1
+
+rh(Sh, Ah)
+
+#
+
+// Change of measure 
+
+=U −1Eπ
+
+> P′
+
+"
+
+Eπ
+
+> P′
+
+"
+
+DH+1 · U
+
+> H
+
+X
+
+> h=1
+
+rh(Sh, Ah) FH+1 
+
+## 
+
+≡U −1Eπ
+
+> P′
+
+ X
+
+> sH+1 ∈S
+
+Eπ
+
+> P′
+
+"
+
+1{SH+1 = sH+1 }DH+1 · U
+
+> H
+
+X
+
+> h=1
+
+rh(Sh, Ah) FH+1 
+
+#
+
+· 1
+
+ // Lemma G.3 
+
+≡U −1Eπ
+
+> P′
+
+h
+
+⟨⃗σ H+1 ,FH+1 ,⃗ 1S ⟩
+
+i
+
+(31) If we can discover the evolution law of the new belief then we will be able to break the structure of J(π; P) down by dynamic programming equations, as is presented in Section B.3. 
+
+Closed-form expression To gain more concrete understanding of the the specific structure of σ we may first utilize the Markov property of the hidden states to expand the condition measure of Sh given fh:
+
+Observation B.6 . (Expansion of conditional probability) ∀π ∈ Π, P′ = ( μ1, {Th}, {O′
+
+> h
+
+}), h ∈ [H + 1] , s 1: h ∈ S h,fh = ( o1, a 1, . . . , o h−1, a h−1, o h) ∈ Fh+1 ,
+
+Pπ 
+
+> P′
+
+(s1: h, a 1: h|fh) = μ1(s1) ·
+
+> h−1
+
+Y
+
+> t=1
+
+Tt,a t (st+1 |st)
+
+> h
+
+Y
+
+> t=1
+
+πt(at|ft) (32) The belief can then be computed by 
+
+[⃗σ h+1 ,f h+1 ]sh+1 
+
+= X
+
+> ˜s1: h+1
+
+Pπ 
+
+> P′
+
+(˜ s1: h+1 , a 1: h+1 |fh+1 ) ·
+
+"
+
+1{˜sh+1 = sh+1 } · Dh+1 (˜ s2: h+1 , o 2: h+1 ) · exp γ
+
+> h
+
+X
+
+> t=1
+
+rt(˜ st, a t)
+
+# (33) 
+
+A Special Case In tabular case, when we select the emission matrix as the uniform distribution, Dh(o2: h; s2: h) will become  
+
+> 1
+> O′
+> 1(o1)
+> h
+
+Qht=2 Ot(ot|st). Moreover, if the policies are deterministic, Pπ 
+
+> P′
+
+(s1: h, a 1: h|fh) = μ1(s1) Qh−1 
+
+> t=1
+
+Tt,a t (st+1 |st).Plugging the two terms together in Eq.(33) we conclude that 15 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Corollary B.7. (Belief vector using uniform emission matrix, Eq. (2.9) in (Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005)) Suppose that O′
+
+> t
+
+(·| St) = Unif O and the policies are deterministic, then 
+
+[⃗σ 1]s1 =μ1(s1)[⃗σ h,f h ]sh = |O|h Eπ
+
+> P
+
+" hY
+
+> t=2
+
+Ot(ot|St)1{Sh = sh}eγ Ph−1 
+
+> t=1 rt(St,At)
+
+#
+
+, ∀2 ≤ h ≤ H + 1 (34) 
+
+Evolution law The risk belief evolves in a Markovian manner, incorporating recent action ah and observation oh+1 to the new belief. We will use Ψ( ·, a h, o h+1 ) : RS → RS to denote the update operator of ⃗σ h,f h , whose matrix representation will be denoted as Uah,o h+1 ∈ RS×S . The details of the update process is specified by the following theorem. 
+
+Theorem B.8. (Evolution of risk-sensitive belief, adapted from theorem 2.2 of (James et al., 1994)) 
+
+∀h = H, H − 1, · · · , 1,f h+1 = ( fh, a h, o h+1 ) ∈ Fh+1 , s h+1 ∈ S :[⃗σ h+1 ,f h+1 ]sh+1 =Ψ( ⃗σ h,f h , a h, o h+1 ) = Uah,o h+1 ⃗σ h,f h
+
+
+
+= X
+
+> sh
+
+Th,a h (sh+1 |sh)Oh+1 (oh+1 |sh+1 ) ·
+
+ eγr h(sh,a h)
+
+O′
+
+> h+1
+
+(oh+1 |sh+1 )
+
+
+
+[⃗σ h,f h ]sh
+
+(35) 
+
+Remark B.9 . The proof for this theorem in the continuous case is provided by (James et al., 1994). However, their proof was written in the language of functional analysis and they have restricted the transition and observation probabilities to be i.i.d. Gaussian distributions. In the tabular setting, though (Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005) have presented a similar result in Eq.(2.10), they have omitted the proof and restricted the reference measure O′ as the uniform distribution. For the reader’s convenience, in what follows we will prove Theorem B.8 in the tabular case using simple algebraic calculations, which also accommodates arbitrary structures of O′, T and O.
+
+Proof. 
+
+RHS = X
+
+> sh
+
+Th,a h (sh+1 |sh) Oh+1 
+
+O′
+
+> h+1
+
+(oh+1 |sh+1 ) exp γr h(sh, a h)
+
+"X
+
+> ˜s1: h
+
+1{˜sh = sh}
+
+> h
+
+Y
+
+> t=2
+
+Ot
+
+O′
+
+> t
+
+(ot|˜st) exp γ
+
+> h−1
+
+X
+
+> t=1
+
+rt(˜ st, a t)Pπ 
+
+> P′
+
+(˜ s1: h|fh)
+
+#
+
+// (Definition B.3 ) (36) 
+
+= X
+
+> sh
+
+Th,a h (sh+1 |sh) Oh+1 
+
+O′
+
+> h+1
+
+(oh+1 |sh+1 )exp γr h(sh, a h)
+
+X
+
+> ˜s1: h
+> h
+
+Y
+
+> t=2
+
+Ot
+
+O′
+
+> t
+
+(ot|˜st)1 {˜sh = sh} exp γ
+
+> h−1
+
+X
+
+> t=1
+
+rt(˜ st, a t)μ1(˜ s1)
+
+> h−1
+
+Y
+
+> t=1
+
+Pπ 
+
+> P′
+
+(˜ st+1 |˜st, a t) // (Observation B.6) (37) Since P′ and P share the same transition matrix, rearranging terms by Fubini’s theorem we have 
+
+RHS = X
+
+> ˜s1: h−1
+
+X
+
+> sh
+
+Pπ 
+
+> P′
+
+(sh+1 |sh, a h) exp γr h(sh, a h) X
+
+> ˜sh
+
+1{˜sh = sh}Pπ 
+
+> P′
+
+(˜ sh|˜sh−1, a h)
+
+!
+
+· μ1(˜ s1)
+
+> h−2
+
+Y
+
+> t=1
+
+Pπ 
+
+> P′
+
+(˜ st+1 |˜st, a t)
+
+!
+
+· Oh+1 
+
+O′
+
+> h+1
+
+(oh+1 |sh+1 )
+
+> h
+
+Y
+
+> t=2
+
+Ot
+
+O′
+
+> t
+
+(ot|˜st)
+
+!
+
+· exp γr h(sh, a h) exp γ
+
+> h−1
+
+X
+
+> t=1
+
+rt(˜ st, a t)
+
+!
+
+(38) 
+
+= X
+
+> ˜s1: h−1
+
+X
+
+> sh
+
+Pπ 
+
+> P′
+
+(sh+1 |sh, a h) · Pπ 
+
+> P′
+
+(sh|˜sh−1, a h)
+
+!
+
+· μ1(˜ s1)
+
+> h−2
+
+Y
+
+> t=1
+
+Pπ 
+
+> P′
+
+(˜ st+1 |˜st, a t)
+
+!
+
+· Oh+1 
+
+O′
+
+> h+1
+
+(oh+1 |sh+1 )
+
+> h
+
+Y
+
+> t=2
+
+Ot
+
+O′
+
+> t
+
+(ot|˜st)
+
+!
+
+· exp γr h(sh, a h) exp γ
+
+> h−1
+
+X
+
+> t=1
+
+rt(˜ st, a t)
+
+!
+
+(39) 16 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Relabel sh as ˜sh and invoke the equality f (sh+1 ) ≡ P 
+
+> ˜sh+1
+
+f (˜ sh+1 )1{˜sh+1 = sh+1 }, we conclude 
+
+RHS = X
+
+> ˜sh+1
+
+1{˜sh+1 = sh+1 }
+
+ X
+
+> ˜s1: h−1
+
+X
+
+> ˜sh
+
+(Pπ 
+
+> P′
+
+(˜ sh+1 |˜sh, a h) · Pπ 
+
+> P′
+
+(˜ sh|˜sh−1, a h)) · μ1(˜ s1)
+
+> h−2
+
+Y
+
+> t=1
+
+Pπ 
+
+> P′
+
+(˜ st+1 |˜st, a t)
+
+!
+
+· Oh+1 
+
+O′
+
+> h+1
+
+(oh+1 |˜sh+1 )
+
+> h
+
+Y
+
+> t=2
+
+Ot
+
+O′
+
+> t
+
+(ot|˜st)
+
+!
+
+· exp γr h(˜ sh, a h) exp γ
+
+> h−1
+
+X
+
+> t=1
+
+rt(˜ st, a t)
+
+!
+
+= X
+
+> ˜s1: h+1
+
+1{˜sh+1 = sh+1 } · 
+
+"
+
+μ1(˜ s1)
+
+> h
+
+Y
+
+> t=1
+
+Pπ 
+
+> P′
+
+(˜ st+1 |˜st, a t)
+
+#
+
+·
+
+> h+1
+
+Y
+
+> t=2
+
+Ot
+
+O′
+
+> t
+
+(ot|˜st)
+
+!
+
+· exp γ
+
+> h
+
+X
+
+> t=1
+
+rt(˜ st, a t)
+
+!
+
+= X
+
+> ˜s1: h+1
+
+Pπ 
+
+> P′
+
+(˜ s1: h+1 |fh+1 ) ·
+
+"
+
+1{˜sh+1 = sh+1 } · Dh+1 (o2: t; ˜ s1: t) · exp γ
+
+> h
+
+X
+
+> t=1
+
+rt(˜ st, a t)
+
+#
+
+=Eπ
+
+> P′
+
+"
+
+1{Sh+1 = sh+1 } · Dh+1 (O2: t; S1: t) · exp γ
+
+> h
+
+X
+
+> t=1
+
+rt(St, At) Fh+1 = fh+1 
+
+#
+
+=LHS // Definition B.3 
+
+Remark B.10 . When we specify O′
+
+> h
+
+(·| sh) as the uniform distribution Unif (O), we can write the update formula as ⃗σ h+1 ,f h+1 = Uah,o h+1 ⃗σ h,f h = |O| diag (Oh+1 (oh+1 |· )) Th,a h diag (exp γr h(·, a h)) ⃗σ h,f h (40) 
+
+Remark B.11 . (Initial belief) There are multiple ways to define our initial belief according to Definition B.25, since P0
+
+> h=1
+
+is ill-defined in nature. The optimization problem also poses no restriction on σ1, since we present the optimization objective by σH+1 instead. However, since we wish to represent σH+1 by its predecessors, an appropriate definition of σ1 should be compatible with our update rule, so that we can derive σ1 from the σ2 by Eq. (35) . A simple calculation will show that such constraint impels σ1(s1) = μ1(s1).
+
+Remark B.12 . For simplicity, we have presented the theorem in the tabular case. With slight modifications, similar result holds in the continuous case. However, when the spaces are infinite, the evolution operator U⋆ may not have a matrix representation as presented in Eq.(40). 
+
+B.3. Conjugate Beliefs 
+
+In the analysis of Eq.(31), we can express the objective by the terminal belief {⃗σ H+1 }
+
+J(π; P) = U −1Eπ
+
+> P′
+
+h
+
+⟨⃗σ H+1 ,FH+1 ,⃗ 1S ⟩
+
+i
+
+It is reasonable to express σH+1 by its predecessors, which posses simpler structures. However, as Theorem B.8 suggests, ⃗σ t evolves forward in time, which hinders us from writing σH+1 in terms of {σt}t≤H .
+
+[⃗σ 1]s1 := ⃗μ 1(s1),⃗ σ h+1 ,f h+1 = Uah,o h+1 ⃗σ h,f h , ∀h ∈ [H] (41) To bridge the gap in the the direction of evolution, we would like to introduce another process ⃗ν t that evolves backward in time, so that it is straightforward to express her initial state ⃗ν H+1 by the predecessors, according to the new update rule. We find it convenient to first introduce several concepts that describe how a stochastic process evolves backward in the episodic setting. 
+
+Definition B.13. (Backward History) 
+
+¯F H+1 = ∅ ∀h = H, H − 1, . . . , 1 ¯F h = ( Ah, Oh+1 , . . . , AH−1, OH , AH ), ¯F 0 = τH
+
+∀h ∈ [H] : ¯F h = ( Ah, Oh+1 , ¯F h+1 ) σ( ¯F 0) ⊃ σ( ¯F 1) . . . ⊃ σ( ¯F H+1 ) (42) Definition B.13 implies that { ¯F t}t≥0 and {F t}t≥0 are complementary at all times. 17 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Observation B.14 . (Complementary relation) ∀h = H + 1 , H, · · · , 0, (F h, ¯F h) = τ H
+
+Now we are ready to define the backward process {⃗ν t}t≥0., whose update operator will be the Hilbert-adjoint operator 13 of that of ⃗σ t.
+
+Definition B.15. (Conjugate Beliefs, Definition 2.8 in (James et al., 1994)) ⃗ν H+1 (·) : ≡⃗1S⃗ν h, ¯fh := U⊤
+
+> ah,o h+1
+
+⃗ν h+1 , ¯fh+1 , for all h = H, H − 1, · · · , 1, ¯fh = ( ah, o h+1 , ¯fh+1 ) ∈ A × O × ¯Fh
+
+(43) 
+
+Remark B.16 . In tabular case when we select the emission measure of the reference model as uniform distribution, we have: 
+
+[⃗ν h, ¯fh ]sh = eγr h(sh,a h)
+
+O′(oh+1 )
+
+X
+
+> sh+1 ∈S
+
+Th,a h (sh+1 |sh)Oh+1 (oh+1 |sh+1 )[ ⃗ν h+1 , ¯fh+1 ]sh+1 (44) We have carefully designed the update rule of the conjugate belief: the complementary relation (B.14) immediately implies the inner product between ⃗σ t and ⃗ν t does not change with time. This result helps to excavate the dynamic programming structure hidden within the optimization objective. 
+
+Observation B.17 . (Conjugate evolution, Eq.(2.9) in (James et al., 1994)) For all h ∈ [H + 1] ,
+
+⟨⃗σ H+1 ,f H+1 ,⃗ 1⟩ = ⟨⃗σ h,f h ,⃗ ν h, ¯fh ⟩ = · · · ⟨ ⃗μ 1(s1),⃗ ν 1, ¯f1 ⟩ (45) 
+
+Proof. By the definition of adjoint operator, 
+
+⟨⃗σ t,f t ,⃗ ν t, ¯ft ⟩ = ⟨Uat−1,o t⃗σ t−1,f t−1 ,⃗ ν t, ¯ft ⟩ = ⟨⃗σ t−1,f t−1 , U⊤
+
+> at−1,o t
+
+⃗ν t, ¯ft ⟩ = ⟨⃗σ t−1,f t−1 ,⃗ ν t−1, ¯ft−1 ⟩
+
+Bringing Eq.(45) back to (B.3) we immediately conclude that for all h ∈ [H],
+
+J(π; P) = U −1Eπ
+
+> P′
+
+h
+
+U ⟨⃗σ H+1 ,FH+1 ,⃗ 1) ⟩
+
+i
+
+= U −1Eπ
+
+> P′
+
+U ⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ = U −1Eπ
+
+> P′
+
+U ⟨⃗σ 1,F1 ,⃗ ν 1,¯F1 ⟩ (46) 
+
+B.4. Value functions, Q-functions and Bellman equations 
+
+In this section we derive the value functions and Bellman equations for general tabular POMDP models using arbitrary utility risk measure. Our derivation and Bellman equations are different from previous works including (James et al., 1994; Cavazos-Cadena & Hern´ andez-Hern´ andez, 2005; B¨ aauerle & Rieder, 2017). From the subscripts in Eq. (46) we can witness the trace of time evolution hidden within J(π; P). To expose the dynamic programming structure more explicitly, we will follow the rationale behind the design of belief states, utilizing the iterated expectation formula to define a series of intermediate variables that dissect the information at each step. These variables will be called the partially observable risk-sensitive value functions. For all t ∈ [H + 1] ,
+
+J(π; P) := U −1Eπ
+
+> P
+
+"
+
+U
+
+> H
+
+X
+
+> t=1
+
+rt(St, At)
+
+#
+
+=U −1Eπ 
+
+> P′
+
+[⟨⃗σ H+1 ,FH+1 ,⃗ ν H+1 ,¯FH+1 ⟩] // Belief representation by Eq.(31) 
+
+=U −1Eπ 
+
+> P′
+
+[⟨⃗σ t, Ft ,⃗ ν t, ¯Ft ⟩] // Conjugate evolution property proved in Eq.(45) 
+
+=U −1Eπ
+
+> P′
+
+
+
+U U −1Eπ
+
+> P′
+
+
+
+⟨⃗σ t, Ft ,⃗ ν t, ¯Ft ⟩ Ft
+
+ 
+
+:= U −1Eπ 
+
+> P′
+
+[U Vπt (F t)] 
+
+Now we formally define the family of value functions in our problem. 
+
+> 13
+
+For a rigorous definition please refer to Section G.2. 
+
+18 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Definition B.18. (Partially observable risk-sensitive value functions, Definition 2.13 in (James et al., 1994)) 
+
+VπH+1 (fH+1 ) := U −1Eπ
+
+> P′
+
+
+
+⟨⃗σ H+1 ,FH+1 ,⃗ 1S ⟩ FH+1 = fH+1 
+
+
+
+= U −1∥⃗σ h+1 ,f h+1 ∥1
+
+Vπh (fh) := U −1Eπ
+
+> P′
+
+
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ Fh = fh
+
+
+
+∀2 ≤ h ≤ H, f h ∈ Fh
+
+Vπ 
+
+> 1
+
+(f1) := U −1Eπ
+
+> P′
+
+⟨⃗μ 1,⃗ ν 1, ¯F1 ⟩
+
+(47) 
+
+Remark B.19 . The objective J(π; P) can be expressed by the value function: 
+
+J(π; P) = U −1EP′ [U Vπ 
+
+> 1
+
+] = U −1EP′ ⟨⃗σ 1,⃗ ν 1⟩
+
+In reinforcement learning, we are also curious about how the action to take might affect future rewards. We can separate the stochasticity within π and P by the total expectation formula: 
+
+Vπh (fh) := U −1Eπ
+
+> P′
+
+
+
+⟨⃗σ h(Fh),⃗ ν h( ¯F h)⟩ Fh = fh
+
+
+
+// Definition B.18 
+
+=U −1Eπ
+
+
+
+EP′
+
+
+
+Eπ
+
+> P′
+
+
+
+⟨⃗σ h+1 ,Fh+1 ,⃗ ν h+1 ,¯Fh+1 ⟩ F h, Ah, Oh+1 
+
+
+
+F h, Ah
+
+
+
+Fh = fh
+
+
+
+=U −1Eπ EP′
+
+U −1Vπh+1 (Fh+1 ) F h, Ah
+
+ Fh = fh
+
+
+
+:= U −1Eπ U U −1EP′
+
+U −1Vπh+1 (Fh+1 ) F h, Ah
+
+ Fh = fh
+
+
+
+=U −1Eπ U U −1EP′
+
+U −1Vπh+1 (Fh+1 ) fh, Ah
+
+ Fh = fh
+
+
+
+:= U −1EAh∼πh(·| fh)U Qπh (fh, Ah)
+
+Now we formally introduce the Q functions in our problem: 
+
+Definition B.20. (Partially observable risk-sensitive Q-functions) For all (h, s h, a h) ∈ [H] × S × A ,
+
+Qπh (fh, a h) := U −1EP′
+
+U Vπh+1 (Fh+1 = ( fh, a h, Oh+1 )) fh, a h
+
+
+
+Remark B.21 . We can also represent the Q-function by risk beliefs. Indeed, 
+
+Qπh (fh, a h) = U −1EOh+1 ∼PP′ (·| fh,a h)
+
+U Vπh+1 (fh, a h, Oh+1 )
+
+=U −1EP′
+
+
+
+⟨⃗σ H+1 ,FH+1 ,⃗ ν H+1 ,¯FH+1 ⟩ fh, a h
+
+
+
+= U −1EP′
+
+
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ fh, a h
+
+ (48) where the last step is due to Eq.(45). We can also use (48) as an alternative definition of the Q function. The relationship between the value function and the Q function is summarized as the Bellman equations: 
+
+Corollary B.22. (Bellman equations for risk-sensitive POMDP) 
+
+VπH+1 =U −1∥⃗σ h+1 ,f h+1 ∥1
+
+∀h = H : 1 , Qπh (fh, a h) = U −1EOh+1 ∼O′(·)
+
+U Vπh+1 (fh, a h, Oh+1 )
+
+Vπh (fh) = EAh∼πh(·| fh)Qπh (fh, Ah)
+
+J(π; P) = U −1EP′ [U Vπ 
+
+> 1
+
+]
+
+(49) The expectation in the second equation should have been taken with respect to Pπ 
+
+> P′
+
+(·| fh, a h). However, since the observations are disjoint from the POMDP in the reference model, we obtain a simpler expression in Eq.(49). 
+
+B.5. Optimal Policy Optimal substructure Since our utility risk measure is increasing, to optimize our objective U −1EU (PHh=1 rh) is equivalent to maximize EU (PHh=1 rh). According to Theorem 3.3 of (B ¨aauerle & Rieder, 2017), the latter problem has a globally optimal policy, and so does the former. Moreover, the following theorem shows the existence of an optimal substructure in the planning problem of risk-sensitive POMDP. This result justifies the use of dynamic programming equations in our algorithm. 19 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Theorem B.23. (Bellman optimality equations, extended from theorem 2.5 of (James et al., 1994)) When the utility risk function is strictly increasing and the referential emission matrix O′
+
+> t
+
+(·| s) is irrelevant with the history Fh, the locally optimized policy will bring globally optimized value. Formally, the locally optimal values defined by 
+
+V⋆ 
+
+> 1
+
+:= max  
+
+> π
+
+Vπ 
+
+> 1
+
+, V⋆h(fh) := max  
+
+> π
+
+Vπh (fh), ∀2 ≤ h ≤ H + 1 
+
+can be computed recursively: 
+
+
+
+V ⋆ 
+
+> 1
+
+=max  
+
+> a1∈A
+
+U −1EP′ [U V ⋆ 
+
+> 2
+
+(a1, O2)] 
+
+V ⋆h (fh) =max  
+
+> ah∈A
+
+U −1EP′
+
+U V ⋆h+1 (fh, a h, Oh+1 ) , ∀h = H : 2 
+
+V ⋆H+1 (fH+1 ) = U −1∥⃗σ h+1 ,f h+1 ∥1
+
+(50) 
+
+Proof. 
+
+V ⋆h (fh) :=max 
+
+> ah:H
+
+U −1EP′
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ | Fh = fh
+
+ // Definition of value functions in B.18 
+
+=U −1max 
+
+> ah:H
+
+EP′
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ | Fh = fh
+
+ //U monotonically increases, so does U −1.
+
+=U −1max 
+
+> ah
+
+
+
+max 
+
+> ah+1: H
+
+EP′
+
+ EP′
+
+⟨⃗σ h, Fh ,⃗ ν h, ¯Fh ⟩ Fh+1 
+
+ Fh = fh
+
+ 
+
+=U −1max 
+
+> ah
+
+
+
+max 
+
+> ah+1: H
+
+EP′
+
+h
+
+EP′
+
+h
+
+⟨⃗σ H+1 ,FH+1 ,⃗ ν h+1 , ¯Fh+1 ⟩ Fh+1 
+
+i
+
+Fh = fh
+
+i 
+
+// Observation B.17 
+
+=U −1max 
+
+> ah
+
+
+
+max 
+
+> ah+1: H
+
+EP′
+
+EP′
+
+⟨⃗σ h+1 ,Fh,a h,Oh+1 ,⃗ ν h+1 ,a h+1 ,Oh+2 ,··· ,OH ,a H ⟩ Fh, a h, Oh+1 
+
+ Fh = fh
+
+ 
+
+=U −1max 
+
+> ah
+
+
+
+EP′
+
+
+
+max 
+
+> ah+1: H
+
+EP′
+
+⟨⃗σ h+1 ,Fh,a h,Oh+1 ,⃗ ν h+1 ,a h+1 ,Oh+2 ,··· ,OH ,a H ⟩ Fh, a h, Oh+1 
+
+ Fh = fh
+
+  
+
+=U −1max 
+
+> ah
+
+EP′ [U V ⋆h+1 (Fh+1 = ( Fh, a h, Oh+1 ) Fh = fh]=U −1max 
+
+> ah
+
+EP′ [U V ⋆h+1 (fh, a h, Oh+1 )] //Section B.1 The proof is inspired by (James et al., 1994; B ¨aauerle & Rieder, 2017) and we have generalized their result beyond Gaussian transition matrices and the entropic risk. We will present the proof in the tabular case. Regularity conditions will be needed in the sixth step when we generalize the theorem to the continuous setting. Our proof also yields the following corollary, providing justification for selecting greedy policies in our algorithm: 
+
+Corollary B.24. (Adapted from Theorem 3.3 of (B ¨aauerle & Rieder, 2017)) There always exists an optimal policy for a risk-sensitive tabular POMDP using utility risk measure, which is deterministic and history-dependent. 
+
+B.6. Beta Vectors 
+
+Inspired by the alpha vector representation method in the study of POMDP((Monahan, 1982)), we will exploit the structure of risk-sensitive value functions and represent them in a simple form. Recall that in Definition B.18, the value functions are specified as inner products. Since σ(Fh) is already determined by the condition on fh, we can write the value function as 
+
+Vπh (fh) = U −1 ⃗ σ h,f h , Eπ
+
+> P′
+
+⃗ν h, ¯Fh | Fh = fh
+
+ . , which motivates us to introduce the concept of ”beta” vector. 
+
+Definition B.25. (Beta vector) The beta vector of a risk-sensitive POMDP model P = ( μ1, T, O) under policy π is a series of random vectors in RS , which are specified as ⃗βπH+1 ,FH+1 := ⃗1S⃗βπh, Fh := Eπ
+
+> P′
+
+⃗ν h, ¯Fh |Fh
+
+ , ∀2 ≤ h ≤ H.⃗ βπ 
+
+> 1
+
+:= Eπ 
+
+> P′
+
+[⃗ν 1,F1 ]
+
+(51) 20 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+where νt is the conjugate belief defined in B.15. Next, we will try to obtain the evolution law of the beta vector from the way ⃗ν h is updated: 
+
+[⃗ν h, ¯fh ]sh = 1
+
+O′
+
+> 1
+
+(o1) · eγr h(sh,a h) · X
+
+> sh+1 ∈S
+
+Th,a h (sh+1 |sh)Oh+1 (oh+1 |sh+1 )[ ⃗ν h+1 , ¯fh+1 ]sh+1 (52) Under the reference model P′, we can compute the probability of witnessing an observable trajectory ¯fh given previous history fh by the following equation: 
+
+Pπ 
+
+> P′
+
+( ¯fh|fh) = πh(ah|fh)O′
+
+> 1
+
+(o1)Pπ 
+
+> P′
+
+( ¯fh+1 |fh, a h, o h+1 ) = ( O′
+
+> 1
+
+(o1)) H−h+1 ·
+
+> H
+
+Y
+
+> t=h
+
+πh(at|ft) (53) where ¯fh = ( ah, o h+1 , ¯fh+1 ) = ( ah, o h+1 , · · · , a H−1, o H , a H ). Combining Eqs.(53), (52), we obtain 
+
+Eπ 
+
+> P′
+
+[νh, ¯Fh |fh]= X
+
+> ah
+
+πh(ah|fh) X
+
+> oh+1
+
+O′
+
+> 1
+
+(o1) X
+
+> ¯fh+1
+
+Pπ 
+
+> P′
+
+( ¯fh+1 |fh, a h, o h+1 )1
+
+O′
+
+> 1
+
+(o1) · eγr h(sh,a h) · X
+
+> sh+1 ∈S
+
+Th,a h (sh+1 |sh)Oh+1 (oh+1 |sh+1 )[ ⃗ν h+1 ( ¯fh+1 )] sh+1 
+
+= X
+
+> ah∈A
+
+πh(ah|fh)
+
+eγr h(sh,a h) X
+
+> sh+1 ∈S
+
+Th,a h (sh+1 |sh) X
+
+> oh+1 ∈O
+
+Oh+1 (oh+1 |sh+1 )Eπ
+
+> P′
+
+h⃗ν h+1 ,¯Fh+1 |fh+1 
+
+i
+
+> sh+1
+
+
+
+(54) The previous derivations leads to the fundamental theorem below, which forms the cornerstone of our subsequent analysis: 
+
+Theorem B.26. (β-vector representation of value functions) For any h ∈ { 1, · · · , H + 1 } and fh ∈ Fh, the value function defined in B.18 can be expressed as the inner product between the risk-sensitive beliefs defined in B.3 and the beta vector defined in B.25: 
+
+Vπ 
+
+> 1
+
+=U −1⟨⃗σ 1 ,⃗ β π 
+
+> 1
+
+⟩ = 1
+
+γ ln ⟨⃗σ 1 ,⃗ β π 
+
+> 1
+
+⟩
+
+Vπh (fh) = U −1⟨⃗σ h,f h ,⃗ β πh,f h ⟩ = 1
+
+γ ln ⟨⃗σ h,f h ,⃗ β πh,f h ⟩
+
+Moreover, the beta vectors evolve by the following rule: For all 2 ≤ h ≤ H, f h ∈ Fh, s h ∈ S⃗βH+1 ,f H+1 =⃗1S
+
+h⃗βh,f h
+
+i
+
+> sh
+
+= Eah∼πh(·| fh)eγr h(sh,a h) X
+
+> sh+1
+
+Th,a h (sh+1 |sh) X
+
+> oh+1
+
+Oh+1 (oh+1 |sh+1 )
+
+h⃗βh+1 ,f h+1 =( fh,a h,o h+1 )
+
+i
+
+> sh+1
+
+(55) We remind the reader that this theorem holds for randomized policies. 
+
+Remark B.27 . When it is clear from the context, we omit the policy sign π for the beta vectors. We can also define the beta vectors for the empirical POMDP model by replacing the matrices T and O with their empirical approximations bTk and bOk.The corresponding beta vector will be called the “empirical beta vector”, which is denoted as bβk,π h,f h and abbreviated as bβh.
+
+Remark B.28 . (Motivation behind the beta vector) According to (Monahan, 1982; Pineau et al., 2006; Lee et al., 2023) the value function of a risk-neutral POMDP is the inner product of the risk-neutral belief ⃗ bh and another function named the “alpha vector”. The concept of α−vector has been widely adopted in the algorithm design of POMDPs (Pineau et al., 2006). 
+
+V πh (⃗bh; fh) = Eah∼π(·| fh)
+
+r(⃗ bh, a h; fh) + X
+
+> oh+1 ∈O
+
+ηh(oh+1 |fh, a h)V πh+1 (⃗ bh+1 ; fh+1 = ( fh, a h, o h+1 )) 
+
+
+
+V πh (⃗bh; fh) = ⟨⃗bh, α πh,f h ⟩
+
+
+
+{⃗α πH+1 ,f H+1 ≡ 0
+
+h⃗α πh,f h
+
+i
+
+> sh
+
+= Eah∼π(·| fh)
+
+
+
+r(sh, a h) + P 
+
+> sh+1
+
+Th,a h (sh+1 |sh) P 
+
+> oh+1
+
+Oh+1 (oh+1 |sh+1 )
+
+h⃗α πh+1 ,f h+1 =( fh,a h,o h+1 )
+
+i
+
+> sh+1
+
+
+
+21 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Though the update rule of the value function inevitably relies on the entire history, the alpha vectors evolve in a Markovian way. This finding helps us obtain a polynomial regret bound in risk-neutral POMDP using hindsight observations, which is discovered by (Lee et al., 2023). To gain some insights, recall that the pigeon-hole lemma G.12 suggests that the sum of concentration errors is the polynomial function of the cardinality of the space on which the transition probability is dependent. 
+
+bPh(s′|s, a ) := 
+
+Pkκ=1 1{ˆsκh+1 = s′ , ˆsκh = s , ˆaκh = a}
+
+max 
+
+n
+
+1, bN k+1  
+
+> h
+
+(s, a )
+
+o
+
+> K
+
+X
+
+> k=1
+
+1
+
+q
+
+max {1, N k+1  
+
+> h
+
+(bskh, bakh)}
+
+< 2√K · SA 
+
+In the POMDP setting, if we refuse to represent the value function by the alpha vector, the upper bound in the right should be replaced with 2pK · | Fh × A | = 2 O h 
+
+> 2
+
+A h 
+
+> 2
+
+, which then brings a factor of OH AH to our regret. However, under hindsight observability, since we can calculate the occurrences of the hidden states after each episode, we use the alpha vectors to represent the value function. Consequently, we can replace OH AH with 2√S2, which is polynomial in H again. However, we cannot directly utilize the alpha vector in the risk-sensitive setting, as it may no longer preserve the Markov property. For the reader’s convenience, we excerpt the critical steps in the proof of the evolution law (Monahan, 1982) 
+
+=⟨⃗bh(fh), r h(·, a h)⟩ + ρoh+1 ∼ηh+1 (·| fh,a h)
+
+"* 
+
+diag (Oh+1 (oh+1 |· )) Th,a h⃗ bh(fh)
+
+ηh+1 (oh+1 |fh, a h) , α πh+1 ,f h+1 
+
++# 
+
+=⟨⃗bh(fh), r h(·, a h)⟩ +
+
+* X
+
+> oh+1 ∈O
+
+hhhhhhh hηh+1 (oh+1 |fh, a h) diag (Oh+1 (oh+1 |· )) Th,a h⃗ bh(fh)
+
+hhhhhhh hηh+1 (oh+1 |fh, a h) , α πh+1 ,f h+1 
+
++
+
+In the risk-neutral setting, the risk measure ρ is represented by the expectation operator E. The simple linear structure of E helps to cancel the partition function ηh+1 (·| fh, a h) when the alpha vector updates, thus eliminating the culprit of the exponential dependency on H. However, the previous analysis becomes invalid when using a non-linear risk measure. That’s why the beta vector is introduced in risk-sensitive POMDPs to mitigate the impact of historical dependencies under a non-linear criterion (WATER & Willems, 1981; Whittle, 1991; Baras & James, 1997). 
+
+Remark B.29 . (Comparison with the alpha vector in risk-neutral POMDP) The value function can be expressed as an inner product in risk-sensitive settings, because the utility risk measure keeps a layer of E, which still bears a linear structure. Both α and beta vectors evolve in a Markovian way, making it possible to control the regret under a polynomial upper bound given hindsight observability. However, the terminal value of ⃗ βh,f h is ⃗ 1 while that of ⃗α is ⃗ 0; The beta vector undergoes multiplicative updates, whereas the alpha vector renews through additive increments. If we brutally set γ = 0 we cannot reduce the beta vector to the alpha vector, as γ = 0 is a singular point of the risk measure, which will cause all the beta vectors to collapse to ⃗ 1. We will introduce the correct way to degenerate our result to the classical setting in Section D.4.4. 
+
+## C. Detailed Algorithm Design 
+
+In what follows, we present the algorithm introduced in Section 5 in detail, along with several remarks additional to the discussion in Section 5. 
+
+Remark C.1 . (Computation issues) The BVVI algorithm, as well as other exact algorithms for POMDP, are inefficient in computation complexity(Cassandra, 1998), which is due to the inherent complexity of the POMDP model(Papadimitriou & Tsitsiklis, 1987). Using similar techniques as the point-based algorithms(Pineau et al., 2006), we can develop approximate solutions to our problem based on BVVI. 
+
+Remark C.2 . (Explanation of line 2) The operation in line 2 is equivalent to the assignment below: 
+
+∀s ∈ S :
+
+h bβkh,f h
+
+i
+
+> s
+
+←
+
+
+
+eγ+(H−h+1) ,
+
+h bβkh,f h
+
+i
+
+> s
+
+≥ eγ+(H−h+1) 
+
+eγ−(H−h+1) ,
+
+h bβkh,f h
+
+i
+
+> s
+
+≤ eγ−(H−h+1) 
+
+h bβkh,f h
+
+i
+
+> s
+
+, else (56) 22 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Algorithm 2 Beta Vector Value Iteration(BVVI) 
+
+1: Input risk sensitivity γ̸ = 0 , confidence level δ ∈ (0 , 1) , episode number K, horizon length H. 
+
+2: Initialize bμk 
+
+> 1
+
+(·), bT1
+
+> h,a
+
+(·| s) ← Unif (S ), bO1
+
+> h
+
+(·| s) ← Unif (O) for all (h, s, a, o, s ′) ∈ [H] × S × A × O × S .
+
+3: for k = 1 : K do 
+
+4: //Planning 
+
+5: //Forward belief propagation 
+
+6: bσk 
+
+> 1
+
+← bμk
+
+> 1
+
+7: for h = 1 : H, sh+1 , s h ∈ S , fh+1 = ( fh, a h, o h+1 ) ∈ Fh × A × O do 
+
+8: //Update risk belief by Eq. (35) 
+
+9: 
+
+hbσkh+1 ,f h+1 
+
+i
+
+> sh+1
+
+← P
+
+> sh
+
+bTkh,a h (sh+1 |sh) bOkh+1 (oh+1 |sh+1 ) ·
+
+ eγr h(sh,a h)
+
+> O′
+> h+1 (oh+1 |sh+1 )
+
+ h bσkh,f h
+
+i
+
+> sh
+
+10: //Residue terms 
+
+11: tkh(sh, a h) ← min 
+
+
+
+1, 3
+
+r SH ln KHSOA/δ   
+
+> bNkh(sh,a h)∨1
+
+
+
+12: okh+1 (sh+1 ) ← min 
+
+
+
+1, 3
+
+r OH ln KHSOA/δ   
+
+> bNk+1
+> h+1 (sh+1 )∨1
+
+
+
+13: //Prepare bonus by Eq. (62) 
+
+14: bkh(sh, a h) ← eγ(H−h+1) − 1 · min 
+
+n
+
+1, tkh(sh, a h) + P
+
+> sh+1
+
+bTkh,a h (sh+1 |sh)okh+1 (sh+1 )
+
+o
+
+15: end for 
+
+16: //Backward dynamic programming 
+
+17: bβkH+1 ,f H+1 ←⃗ 1S
+
+18: for h = H : 1 do 
+
+19: for fh = ( a1, o 2, · · · , a h, o h) ∈ Fh, a h ∈ A do 
+
+20: //Invoke Bellman equation (49) under beta vector representation 
+
+21: bQkh(ah; fh) ← 1 
+
+> γ
+
+ln EO′∼Unif O
+
+Dbσkh+1 ,f h+1 =( fh,a h,O′) , bβkh+1 ,f h+1 =( fh,a h,O′)
+
+E
+
+22: bVkh(fh) ← max 
+
+> a∈A
+
+bQkh(ah; fh)
+
+23: bπkh(fh) ← argmax 
+
+> a∈A
+
+bQkh(a; fh) // Obtain the greedy policy 
+
+24: //Update beta vector by Eq. (63) 
+
+25: 
+
+bβkh,f h (sh) ← eγr h(sh,bπkh(fh)) X
+
+> sh+1
+
+bTkh, bπkh(fh)(sh+1 |sh)
+
+X
+
+> oh+1
+
+bOkh+1 (oh+1 |sh+1 )
+
+h bβkh+1 ,f h+1 =( fh,bπkh(fh),o h+1 )
+
+i
+
+> sh+1
+
++ sgn (γ) · bkh+1 (sh, bπkh(fh)) 
+
+26: //Control the range of beta vector 
+
+27: bβkh,f h ← Clip 
+
+ bβkh,f h ,
+
+h
+
+eγ−(H−h+1) , e γ+(H−h+1) 
+
+i 
+
+28: end for 
+
+29: end for 
+
+30: //Learning 
+
+31: Play with the real environment under policy {bπkh}Hh=1 and collect a trajectory (ˆ ak 
+
+> 1
+
+, ˆok 
+
+> 2
+
+, . . . , ˆokH , ˆakH )
+
+32: Reveal the hidden states {ˆskh}Hh=1 in the previous H steps to the agent. //Hindsight observation 
+
+33: // Update the empirical model 
+
+34: for h = 1 : H do 
+
+35: for (s, a, o, s ′) ∈ S × A × O × S do 
+
+36: bN k+1  
+
+> h
+
+(s) ← Pkκ=1 1 {ˆsκh = s} bN k+1  
+
+> h
+
+(s, a ) ← Pkκ=1 1 {ˆsκh = s, ˆaκh = a}
+
+37: bμk 
+
+> 1
+
+(s) ← 1
+
+> k
+
+Pkκ=1 1{bsκ 
+
+> 1
+
+= s}
+
+38: bTk+1  
+
+> h,a
+
+(s′|s) ←    
+
+> Pkκ=1 1{ˆsκh+1 =s′,ˆsκh=s , ˆaκh=a}
+> max
+
+{1, bN k+1  
+
+> h(s,a )
+
+} bOk+1  
+
+> h
+
+(o|s) ←  
+
+> Pkκ=1 1{ˆoκh=o , ˆsκh=s}
+> max
+
+{1, bN k+1  
+
+> h(s)
+
+}
+
+39: end for 
+
+40: end for 
+
+41: end for 
+
+23 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+## D. Regret analysis 
+
+Our regret analysis takes several steps. First, we study the statistical error of the beta vectors and design a new bonus for our problem, which ensures optimism in value functions. Later, we represent the regret by the beta vectors before we roll down the Bellman equations to calculate the error accumulated during the entire Markov process. Several facts will be repeatedly used in the proceeding derivations. 
+
+D.1. Preparation 
+
+The following result captures the empirical error of emission matrix Oh(·| sh):
+
+Fact D.1 . (Empirical error of the emission matrix) With probability at least 1 − δ,
+
+∥ bOkh(·| sh) − Oh(·| sh)∥1 ≤ min 
+
+(
+
+2 ,
+
+s
+
+2O ln KHS δ
+
+N k+1  
+
+> h
+
+(sh) ∨ 1
+
+)
+
+(57) The proof is similar to Lemma C.1 in (Liang & Luo, 2023). This relation holds without hindsight observability. The upper and lower bounds for the beta vectors will also be useful. 
+
+Fact D.2 . (Bounds of the beta vectors) e(H−h+1) γ−
+
+≤
+
+h⃗βh,f h
+
+i
+
+> sh
+
+≤ e(H−h+1) γ+
+
+for all fh ∈ Fh and sh ∈ S .The proof is done by a simple induction on h. 
+
+D.2. Optimism 
+
+D.2.1. S TATISTICAL ERROR OF THE BETA VECTOR 
+
+In this section, we quantify the error in beta vectors caused by the inaccurate approximation of the transition and emission probabilities. For the convenience of narration, we will temporarily view the beta vector as a binary function over the space of S × O. Since our result holds for any given episode, we omit the subscripts k in the following derivations. The update rule of the beta vectors in (55) is equivalent to ⃗βh,f h (sh) = eγr h(sh,π h(fh)) X
+
+> sh+1
+
+Th,π h(fh)(sh+1|sh) X
+
+> oh+1
+
+Oh+1 (oh+1|sh+1)⃗ βh+1 ,f h+1 =( fh,π h(fh),oh+1)(sh+1)=ESh+1 ∼Th,π h(fh)(·| sh),Oh+1∼Oh+1 (·| sh+1)
+
+h
+
+eγr h(sh,π h(fh)) ⃗ βh+1 ,f h+1 =( fh,π h(fh),Oh+1 )(Sh+1 )
+
+i
+
+During the update of beta vectors we view ⃗ βh,f h (sh) as a binary functions over the space of Z := S × O. With a slight abuse of notations, we denote (sh, o h) as zh and write ⃗ βh,f h=( τh−1,o h)(sh) as ⃗ βh(zh; τh−1). We also abbreviate 
+
+rh(sh, π h(fh)) as rh(zh). The transition law of the beta vector can be written as a joint distribution over the space of S × O:
+
+Pπh 
+
+> h
+
+(zh+1 |sh) := Th,π h(fh)(sh+1|sh)Oh+1 (oh+1|sh+1 )
+
+Using the newly introduced short hands we can write the update rule of beta vectors as ⃗βh(zh; τh−1) = EPπhh (·| sh)
+
+h
+
+eγrh(zh)⃗ βh+1 (Zh+1 ; τh)
+
+i
+
+= EPπhh
+
+"
+
+eγ  
+
+> 
+> rh(zh)+ ln ⃗βh+1 (Zh+1 ;τh)
+> γ
+> 
+
+#
+
+= EPπhh
+
+h
+
+eγVh(Zh+1 ;τh)i
+
+We remind the reader that we have introduced a new function Vh(zh+1 ) to abbreviate rh(zh) + ln ⃗ βh+1 (zh+1 ;τh) 
+
+> γ
+
+. The function 
+
+Vh is bounded in [1 , H − h + 1] according to Lemma D.2. Next, we will calculate the approximation error occurred when 24 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+the beta vector updates. The error is caused by the inaccurate estimate of the joint transition law. 
+
+
+
+EbPπhh (·| sh) − EPπhh (·| sh)
+
+
+
+(eγr h⃗ βh+1 (·; τh)) 
+
+= EZh+1 ∼bPπhh (·| sh)[eγVh(Zh+1 ;τh)] − EZh+1 ∼Pπhh (·| sh)[eγVh(Zh+1 ;τh)]
+
+=
+
+ X
+
+sh+1 
+
+bTh,a h (sh+1 |sh) X
+
+oh+1 
+
+bOh+1 (oh+1 |sh+1 ) − X
+
+sh+1 
+
+Th,a h (sh+1 |sh) X
+
+oh+1 
+
+Oh+1 (oh+1 |sh+1 )
+
+ eγVh+1 (sh+1 ,o h+1 ;τh)
+
+= X
+
+sh+1 
+
+bTh,a h (sh+1 |sh) X
+
+oh+1 
+
+bOh+1 (oh+1 |sh+1 ) − Oh+1 (oh+1 |sh+1 )eγVh+1 (sh+1 ,o h+1 ;τh)
+
++ X
+
+sh+1 
+
+bTh,a h (sh+1 |sh) − Th,a h (sh+1 |sh)
+
+
+
+· X
+
+oh+1 
+
+Oh+1 (oh+1 |sh+1 )eγVh+1 (sh+1 ,o h+1 ;τh)
+
+(58) Lemma G.6 implies a natural upper bound for the error in Eq.(58): 
+
+
+
+EbPπhh (·| sh) − EPπhh (·| sh)
+
+
+
+(eγr h⃗ βh+1 (·; τh)) 
+
+≤ eγ+(H−h+1) − eγ−(H−h+1) · ∥ bPπh
+
+h − Pπh
+
+h ∥tv ≤ eγ(H−h+1) − 1
+
+(59) We can also use Lemma G.10 to derive another upper bound. With probability at least 1 − 2δ,
+
+
+
+EbPπhh (·| sh) − EPπhh (·| sh)
+
+
+
+(eγr h(·)⃗ βh+1 (·; τh)) 
+
+≤ eγ(H−h+1) − 1 ·
+
+"
+
+min 
+
+(
+
+1, 3
+
+s
+
+S · H ln KHSOA δ
+
+bN kh (sh, bπkh(sh)) ∨ 1
+
+)
+
++ X
+
+sh+1 
+
+bTkh, bπkh(sh)(sh+1 |sh) min 
+
+ 1, 3
+
+vuut O · H ln KHSOA δ
+
+bN k+1 
+
+h+1 (sh+1 ) ∨ 1
+
+
+
+(60) The additional √H comes from the inherent history-dependency of the of POMDP: 
+
+r
+
+ln KHO (OhAh)
+
+δ ,
+
+r
+
+ln KHSA (OhAh)
+
+δ <
+
+r
+
+H ln KHSOA δ
+
+.Putting Eq.(59) and (60) together, we conclude that with probability at least 1 − 2δ:
+
+ X
+
+sh+1 
+
+bTkh, bπkh(sh)(sh+1 |sh) X
+
+oh+1 
+
+bOkh+1 (oh+1 |sh+1 )
+
+− X
+
+sh+1 
+
+Th,π h(fh)(sh+1 |sh) X
+
+oh+1 
+
+Oh+1 (oh+1 |sh+1 )
+
+ eγr h(sh,bπh(sh)) ⃗ βh+1 ,f h+1 =( fh,π h(fh),o h+1 )(sh+1 )
+
+≤ eγ(H−h+1) − 1 min 
+
+(
+
+1, min 
+
+(
+
+1, 3
+
+s
+
+S · H ln KHSOA δ
+
+bN kh (sh, bπkh(sh)) ∨ 1
+
+)
+
++ X
+
+sh+1 
+
+bTkh, bπkh(sh)(sh+1 |sh) min 
+
+ 1, 3
+
+vuut O · H ln KHSOA δ
+
+bN k+1 
+
+h+1 (sh+1 ) ∨ 1
+
+
+
+(61) We design the exploration bonus according to Eq.(61). 25 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Definition D.3. (Bonus) The bonuses are a series of real-valued functions bkh(·, ·; γ) : S × A → R≥0 specified as 
+
+bkh(sh, a h; γ) := eγ(H−h+1) − 1 · min 
+
+(
+
+1, min 
+
+(
+
+1, 3
+
+s
+
+S · Hln KHSOA δ
+
+bN kh (sh, a h) ∨ 1
+
+)
+
++ X
+
+> sh+1
+
+bTkh, bπkh(sh)(sh+1 |sh) min 
+
+ 1, 3
+
+vuut O · Hln KHSOA δ
+
+bN k+1  
+
+> h+1
+
+(sh+1 ) ∨ 1
+
+ (62) Previously, we have analyzed the upper bound of the approximation error incurred during the update process. We will utilize the relevant results and define the series of “empirical beta vectors” bβh that helps approximate the value function. 
+
+Definition D.4. (Empirical beta vectors) Given any episode k ∈ [K], if we use ah to abbreviate the action selected by the greedy policy bπkh(fh) given by algorithm 2, then the empirical beta vector is defined as 
+
+∀fH+1 ∈ FH+1 , s H+1 ∈ S : bβkH+1 ,f H+1 (sH+1 ) := 1 
+
+∀h ∈ [H], f h ∈ Fh, s h ∈ S ,
+
+bβkh,f h (sh) := eγr h(sh,a h) X
+
+> sh+1 ∈S
+
+bTkh,a h (sh+1 |sh) X oh+1 ∈ O bOkh+1 (oh+1 |sh+1 ) bβkh+1 ,f h+1 =( fh,a h,o h+1 )(sh+1 )+ sgn γ · bkh(sh, a h; γ)
+
+(63) 
+
+Remark D.5 . (Range of the empirical beta vectors) If we pose no further restrictions on the range of bβkh we can show that the upper bound on bβkh will inevitably depend on eγH 2
+
+, which will cause an additional factor of H in our regret. To circumvent this issue we have manually clipped the value of empirical beta vector in our algorithm(line 2), so as to force bβh
+
+to stay in the same range as ⃗ βh. As a consequence, the difference between the two beta vectors, which will be called the “beta-vector error”, is controlled by 
+
+bβkh −⃗ βh ≤ eγ(H−h+1) − 1 (64) Apart from the absolute error between the beta vectors, we are also concerned with their size relationship. 
+
+Corollary D.6. (Size relationship between beta vectors) For all sh ∈ S : bβkh,f h (sh) ≥⃗ βh,f h (sh) when γ > 0 and bβkh,f h (sh) ≤⃗ βh,f h (sh) when γ < 0.Proof. We only prove the case when γ < 0. The other way is similar. The statement holds when h = H + 1 since both vectors are defined to be ⃗ 1S . Suppose that it holds at h+1 , then by the induction hypothesis we have bβkh ≤ bT bOeγr h⃗ βkh+1 −bkh
+
+=
+
+h
+
+(bT bO − TO )eγr h⃗ βkh+1 −bkh
+
+i
+
++ TO ⃗ βkh+1 =
+
+h
+
+(bT bO − TO )eγr h⃗ βkh+1 −bkh
+
+i
+
++⃗ βkh . Equation (61) implies that the terms in the bracket are less than zero, which helps us complete the proof. D.2.2. O PTIMISM IN VALUE FUNCTIONS 
+
+Corollary D.6 directly results in the optimism in value functions: for all k ∈ [K],
+
+V π⋆ 
+
+> 1
+
+≤ bV bπk 
+
+> 1
+
+(65) 
+
+Proof. 
+
+V π⋆ 
+
+> 1
+
+− bV π⋆ 
+
+> 1
+
+= 1
+
+γ ln ⟨⃗σ 1,⃗ β 1⟩ − 1
+
+γ ln ⟨bσk 
+
+> 1
+
+, bβk 
+
+> 1
+
+⟩ = 1
+
+γ ln ⟨⃗μ 1,⃗ β 1⟩ − 1
+
+γ ln ⟨⃗μ 1, bβk 
+
+> 1
+
+⟩ ≤ 0
+
+The last step remaining is the fact that bV π⋆ 
+
+> 1
+
+≤ bV bπk 
+
+> 1
+
+.26 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Additional notations For ease of notations we will abbreviate several upper and lower bounds in the following analysis. Upper and lower bounds on the risk measure Bu := e−γ−
+
+≤ eγr h(sh,a h) ≤ eγ+
+
+:= Bu
+
+Upper and lower bounds on the beta-vectors B⃗ βh := eγ−(H−h+1) ≤⃗ βh ≤ eγ+(H−h+1) := B⃗ βh
+
+Upper bound of the bonus 0 ≤ bkh(sh, a h) ≤ eγ(H−h+1) − 1 := Bbh
+
+Upper bound of the “beta vector error” 0 ≤ bβkh+1 −⃗ βh+1 ≤ eγ(H−h+1) − 1 := B∆⃗ βh+1 
+
+Remark D.7 . According to the update rule in equation (55) and (63) , when the risk-sensitivity parameter γ tends to zero, the beta vectors will degenerate to ⃗ 1. The bonus function, as well as the beta-vector error will vanish with in the rate of H
+
+lim 
+
+> γ→0
+
+⃗ βh = lim 
+
+> γ→0
+
+bβh =⃗ 1 lim  
+
+> γ→0
+
+bkh(·, ·) = lim  
+
+> γ→0
+
+B∆⃗βh = 0 lim 
+
+> γ→0
+
+Bbh
+
+γ = lim 
+
+> γ→0
+
+B∆⃗ βh
+
+γ = H (66) which contributes an additional H to our regret. 
+
+D.3. Regret Calculation 
+
+D.3.1. R EPRESENT THE REGRET BY BETA VECTORS 
+
+The regret can be represented as the approximation error of beta vectors at the initial time step. Regret (K; P) := 
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h
+
+U V π⋆
+
+> 1
+
+i
+
+− U −1EP
+
+h
+
+U V bπk
+
+> 1
+
+i
+
+≤
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h
+
+U bV k, bπk
+
+> 1
+
+i
+
+− U −1EP
+
+h
+
+U V bπk
+
+> 1
+
+i
+
+// Section D.2.2 
+
+=
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h
+
+⟨bσk 
+
+> 1
+
+, bβk, bπk 
+
+> 1
+
+⟩
+
+i
+
+− U −1EP
+
+h
+
+⟨⃗σ 1 ,⃗ β bπk 
+
+> 1
+
+⟩
+
+i
+
+// Theorem B.26 
+
+=
+
+> K
+
+X
+
+> k=1
+
+
+
+U −1EP
+
+h
+
+⟨bσk 
+
+> 1
+
+, bβk, bπk 
+
+> 1
+
+⟩
+
+i
+
+− U −1EP
+
+h
+
+⟨⃗σ 1 , bβk, bπk 
+
+> 1
+
+⟩
+
+i 
+
++
+
+
+
+U −1EP
+
+h
+
+⟨⃗σ 1 , bβk, bπk 
+
+> 1
+
+⟩
+
+i
+
+− U −1EP
+
+h
+
+⟨⃗σ 1 ,⃗ β bπk 
+
+> 1
+
+⟩
+
+i 
+
+=
+
+> K
+
+X
+
+> k=1
+
+U −1⟨bμk 
+
+> 1
+
+, bβk, bπk 
+
+> 1
+
+⟩ − U −1⟨⃗μ 1 , bβk, bπk 
+
+> 1
+
+⟩ +
+
+> K
+
+X
+
+> k=1
+
+U −1ES1∼⃗μ 1
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1ES1∼⃗μ 1
+
+h⃗βbπk 
+
+> 1
+
+(S1)
+
+i
+
+=
+
+> K
+
+X
+
+> k=1
+
+U −1E bPk
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1EP
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i| {z }
+
+> Prior error
+
++
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1EP
+
+h⃗βbπk 
+
+> 1
+
+(S1)
+
+i| {z }
+
+> Evolution error
+
+(67) The terms in the last step of Eq. (67) hold significant physical meanings. The first term, referred to as the “prior error”, is incurred by the imprecise estimate of the prior distribution of the hidden states. The second term, named “evolution error”, represents the accumulation of error throughout the entire horizon of the Markov process, resulting from an inaccurate estimate of the beta vector. In what follows we will try to find upper bounds for the two error terms. D.3.2. B OUND THE PRIOR ERROR 
+
+First, we bound the prior error in Eq. (67). With probability at least 1 − δ,
+
+> K
+
+X
+
+> k=1
+
+U −1E bPk
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1EP
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i| {z }
+
+> Prior error
+
+≤ KγKX
+
+> k=1
+
+X
+
+> s1
+
+ bμk 
+
+> 1
+
+(s1) −⃗μ 1(s1) bβk, bπk 
+
+> 1
+
+(s1)
+
+≤KγKX
+
+> k=1
+
+eγ+H − eγ−H
+
+2 ∥bμk 
+
+> 1
+
+(·) −⃗μ 1(·)∥1 ≤ e(−γ)+
+
+|γ|
+
+> K
+
+X
+
+> k=1
+
+eγ+H − eγ−H
+
+2
+
+r 2Sk ln Kδ ≤ e|γ|H − 1
+
+|γ|
+
+r
+
+2KS ln Kδ
+
+(68) 27 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+where the second and third inequalities are due to Lemma G.6 and Lemma G.5 respectively. D.3.3. C ONTROL THE EVOLUTION ERROR 
+
+Next, we will use the Bellman equations to show that 
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1EP
+
+h⃗βbπk 
+
+> 1
+
+(S1)
+
+i| {z }
+
+> Evolution error
+
+≤ O 
+
+ e|γ|H − 1
+
+|γ| H · H5/2√KS 2OA · ln KHSOA δ
+
+
+
+(69) 
+
+Proof. By the Lipschitz continuity of U , we have 
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1EP
+
+h⃗βbπk 
+
+> 1
+
+(S1)
+
+i| {z }
+
+> Evolution error
+
+=
+
+> K
+
+X
+
+> k=1
+
+1
+
+γ ln EP
+
+h
+
+eγV π⋆
+
+> 1
+
+i
+
+− 1
+
+γ ln EP
+
+
+
+eγV bπk
+
+> 1
+
+
+
+≤ Kγ ·
+
+> K
+
+X
+
+> k=1
+
+EP
+
+h bβk 
+
+> 1
+
+− β1
+
+i
+
+(70) where Kγ = e(−γ)+H 
+
+> |γ|
+
+. Next, we find the recurrence relation between E[ bβh −⃗ βh] and E[ bβh+1 −⃗ βh+1 ].
+
+EP
+
+h bβk, bπk 
+
+> h,f h=(τh−1,Oh)
+
+(Sh) − βbπk 
+
+> h,f h=(τh−1,Oh)
+
+(Sh)
+
+i
+
+= EP
+
+u(Sh, Ah) X
+
+> sh+1 ,o h+1
+
+bTh,a h (sh+1 |sh) bOh+1 (oh+1 |sh+1 ) bβh+1 ,(Fh,A h,O h+1 )(sh+1 ) + sgn (γ)bkh(Sh, A h)
+
+− u(Sh, Ah) X
+
+> sh+1 ,o h+1
+
+Th,a h (sh+1 |sh)Oh+1 (oh+1 |sh+1 )βh+1 ,(Fh,A h,O h+1 )(sh+1 )
+
+
+
+= EP
+
+h
+
+ubT bO bβh+1 − uTO ⃗βh+1 + sgn (γ)bkh
+
+i
+
+:= EP
+
+h
+
+ubT bO bβh+1 − uTO ⃗βh+1 + sgn (γ)bkh + ubT bOβh+1 − ubT bOβh+1 + uTO ( bβh+1 − βh+1 ) − uTO ( bβh+1 − βh+1 )
+
+i
+
+= sgn (γ)EP [bkh]
+
+| {z }
+
+> I
+
++ EP [( bT bO − TO )u⃗β h+1 ]
+
+| {z }
+
+> II
+
++ EP [( bT bO − TO )( u bβh+1 − uβ h+1 )] 
+
+| {z }
+
+> III
+
++ EP [TO (u bβh+1 − uβ h+1 )] 
+
+| {z }
+
+> IV
+
+By Eq. (61) we observe that |II | ≤ EP [bkh]. Similarly, Eq.(64) implies that |III | ≤ 2EP [bkh]. As for IV , we always have 
+
+|IV | ≤ Bu · EP
+
+h bβh+1 −⃗ βh+1 
+
+i
+
+. Putting things together we conclude 
+
+EP [ bβh −⃗ βh] ≤ | I| + |II | + |III | + |IV | ≤ 4 · EP [bkh] + Bu · EP [ bβh+1 −⃗ βh+1 ]
+
+Abbreviating the term EP
+
+h bβkh − βkh
+
+i
+
+as ∆kh, we obtain a recursive equation for the beta vector errors: 
+
+(∆kH+1 =0 ∆kh ≤ Bu · ∆h+1 + 4 EP
+
+bkh
+
+ , ∀h = H : 1 (71) Recall that in Eq.(70) we have shown the regret can be controlled by the “initial beta vector errors”: Regret (K; P, γ ) ≤ Kγ ·
+
+> K
+
+X
+
+> k=1
+
+EP
+
+h bβk 
+
+> 1
+
+− βk
+
+> 1
+
+i
+
+= KγKX
+
+> k=1
+
+∆k
+
+> 1
+
+28 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Using Lemma G.15, we roll down Eq.(71) to solve ∆k 
+
+> 1
+
+, after which we bound the regret by the bonus functions: Regret (K; P, γ ) ≤KγKX
+
+> k=1
+
+EP [ bβk 
+
+> 1
+
+− βk 
+
+> 1
+
+] ≤ 4KγKX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+EP [bkh]
+
+> h−1
+
+Y
+
+> t=1
+
+Bu
+
+<4KγHX
+
+> h=1
+
+Bh−1
+
+> u
+
+" KX
+
+> k=1
+
+ EP [bkh(·, ·; γ)] − bkh(ˆ skh, ˆakh; γ)| {z }
+
+> Sample bias
+
++
+
+> K
+
+X
+
+> k=1
+
+bkh(ˆ skh, ˆakh; γ)
+
+#| {z }
+
+> Bonus sample
+
+(72) We invoke Lemma G.9 to bound the terms in the first curly bracket. With probability at least 1 − δ,
+
+> K
+
+X
+
+> k=1
+
+ EP [bkh(·, ·; γ)] − bkh(ˆ skh, ˆakh; γ)| {z }
+
+> Sample bias
+
+≤ eγ(H−h+1) − 1
+
+r K
+
+2 · ln HSA δ
+
+The terms in the second curly bracket will be controlled by the pigeon hole lemma G.12. Recall that for the empirical data 
+
+(ˆ skh, ˆakh) collected during the learning process (line 2 in algorithm 2), the bonus function picks the value of 
+
+bkh(ˆ skh, ˆakh; γ) = eγ(H−h+1) − 1 · min 
+
+ 1 , tkh(ˆ skh, ˆakh) + X
+
+> sh+1
+
+bTkh,a h (sh+1 |ˆskh)okh+1 (sh+1 )
+
+ (73) In what follows we calculate the summation over the residue terms. With probability at least 1 − 2δ:
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) + X
+
+> sh+1
+
+bTkh, ˆakh
+
+(sh+1 |ˆskh)okh+1 (sh+1 )=
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) + 
+
+ X
+
+> sh+1
+
+bTkh, ˆakh
+
+(sh+1 |ˆskh)okh+1 (sh+1 ) − X
+
+> sh+1
+
+Th, ˆakh (sh+1 |ˆskh)okh+1 (sh+1 )
+
+
+
++ X
+
+> sh+1
+
+Th, ˆakh (sh+1 |ˆskh)okh+1 (sh+1 )
+
+
+
+≤
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) + 1 · tkh(ˆ skh, ˆakh)
+
+| {z }
+
+> transition error
+
++
+
+
+
+Esh+1 ∼Th, ˆakh
+
+> (·| ˆskh)
+
+okh+1 (sh+1 ) − okh+1 (ˆ skh+1 )
+
+| {z }
+
+> Sample bias
+
++ okh+1 (ˆ skh+1 ) // Lemma G.10 
+
+≤ 2
+
+> K
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh)
+
+!
+
++ 2 ·
+
+r K
+
+2 · ln HSA/δ 
+
+| {z }
+
+> Sample bias
+
++
+
+> K
+
+X
+
+> k=1
+
+okh+1 (ˆ skh+1 ) //Lemma G.9 (74) According to the definition of the residue terms in Eq.(62), the pigeon-hole Lemma G.12 suggests that 
+
+> k
+
+X
+
+> k=1
+
+tkh(ˆ skh, ˆakh) ≡
+
+> k
+
+X
+
+> k=1
+
+min 
+
+(
+
+1, 3
+
+s
+
+S · Hln KHSOA δ
+
+bN kh (ˆ skh, ˆakh) ∨ 1
+
+)
+
+≤
+
+
+
+3√SH · ι
+
+
+
+· 2√K · SA 
+
+> K
+
+X
+
+> k=1
+
+okh+1 (ˆ skh+1 ) ≡
+
+> K
+
+X
+
+> k=1
+
+min 
+
+ 1, 3
+
+vuut O · Hln KHSOA δ
+
+bN k+1  
+
+> h+1
+
+(ˆ skh+1 ) ∨ 1
+
+ ≤
+
+
+
+3√OH · ι
+
+
+
+· 2√K · S
+
+(75) 29 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+where ln KHSOA/δ is abbreviated as ι. Then with probability at least 1 − 2δ,
+
+> K
+
+X
+
+> k=1
+
+bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Bonus sample
+
+≤ eγ(H−h+1) − 1 ·
+
+
+
+12 √K · SA · S · H + 6 √K · S · O + pK/ 2
+
+
+
+·
+
+s
+
+ln 
+
+ KHSOA δ
+
+
+
+<12 eγ(H−h+1) − 1
+
+| {z }
+
+> Risk measure
+
+·
+
+√K √SA · √S| {z }
+
+> Hidden state error
+
++√K √S · √O| {z }
+
+> Observation error
+
++ √K|{z} 
+
+> MDS
+
+ · √H ·
+
+s
+
+ln 
+
+ KHSOA δ
+
+| {z }
+
+> History-dependency of POMDP
+
+(76) Putting things together we can safely state that with probability at least 1 − 3δ,
+
+X
+
+> k∈[K]
+
+EP [bkh(·, ·; γ)] − bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Sample bias
+
++
+
+> K
+
+X
+
+> k=1
+
+bkh(ˆ skh, ˆakh; γ)
+
+| {z }
+
+> Bonus samples
+
+≤ 12 · eγ(H−h+1) − 1
+
+| {z }
+
+> Risk measure
+
+·
+
+ √KS 2 A| {z }
+
+> Hidden state error
+
++ √KSO | {z }
+
+> Observation error
+
++ √K|{z} 
+
+> MDS
+
+ · √H ·
+
+s
+
+ln 
+
+ KHSOA δ
+
+| {z }
+
+> History-dependency of POMDP
+
+(77) Bringing Eq.(77)back to Eq.(72), we conclude that with probability at least 1 − 3δ,
+
+> K
+
+X
+
+> k=1
+
+U −1EP
+
+h bβk, bπk 
+
+> 1
+
+(S1)
+
+i
+
+− U −1EP
+
+h⃗βbπk 
+
+> 1
+
+(S1)
+
+i| {z }
+
+> Evolution error
+
+≤ 48 · e|γ|H − 1
+
+|γ| H · H
+
+| {z }
+
+> Risk and bonus
+
+·
+
+ H√KS 2 A| {z }
+
+> Hidden state error
+
++ H√KSO | {z }
+
+> Observation error
+
++ H√K| {z } 
+
+> Sample bias
+
+ · √H
+
+s
+
+ln 
+
+ KHSOA δ
+
+| {z }
+
+> History-dependency of POMDP
+
+(78) 
+
+D.4. Result and Discussion 
+
+We summarize our previous analysis in Section D.3.3 and D.3.2 into the following theorem, which characterizes the upper bound of the regret given by the algorithm of Beta Vector Value Iteration. D.4.1. T HE MAIN THEOREM 
+
+Theorem D.8. (Regret of Beta Vector Value Iteration) Given a POMDP model P, risk-sensitive parameter γ ∈ R \ { 0}
+
+and the number of episodes K ∈ Z+, the regret after running algorithm 2 can be controlled by the following upper bound with probability at least 1 − 4δ:Regret (K; P, γ ) ≤48 · e|γ|H − 1
+
+|γ|
+
+| {z }
+
+> Risk and bonus
+
+·
+
+ √KS | {z } 
+
+> Prior error
+
++ H√KS 2 A| {z }
+
+> Transition error
+
++ H√KSO | {z }
+
+> Emission error
+
++ H√K| {z } 
+
+> Sample bias
+
+ ·
+
+s
+
+H · ln 
+
+ KHSOA δ
+
+| {z }
+
+> History-dependency of POMDP
+
+≤O 
+
+ e|γ|H − 1
+
+|γ| H
+
+| {z }
+
+> Risk-awareness
+
+· H2√KS 2AO | {z }
+
+> Statistical error
+
+· √H
+
+r
+
+ln KHSOA δ
+
+| {z }
+
+> History-dependency
+
+ (79) In what follows, we will provide a technical analysis of the composition of our regret, which is of particular interest to the possible improvements to our algorithm. We will also compare our results with other classical bounds in the related fields of reinforcement learning. 30 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+D.4.2. C OMPOSITION OF THE REGRET 
+
+The factor √K is brought by the pigeon-hole lemma when we sum up several terms across the episodes. Similarly, one factor of H is brought by the summation over the horizon PHh=1 . Another H is brought by the bonus on the beta vector, as is demonstrated in remark D.7. The other √H is incurred by the history-dependency of the POMDP model, as is shown in Eq.(60). The factor √O and one of the √S is brought by the coverage of an Epsilon net when we try to bound the beta vector function using Lemma G.10. The other √SA and √S come from the pigeon-hole lemma, when we sum the residue terms across k ∈ [K].D.4.3. S AMPLE COMPLEXITY 
+
+Based on Theorem D.8 we can use the online-to-PAC conversion argument (cf.Appendix G.1.5) to obtain the sample complexity of algorithm 2. 
+
+Corollary D.9. (Sample complexity of Beta Vector Value Iteration) For any K ≳ 1
+
+> ϵ2δ2
+
+ e|γ|H −1
+
+> |γ|H
+
+2
+
+H5S2OA · ln   KHSOA δ
+
+,with probability at least 1 − δ, the uniform mixture of the output policies of algorithm 1 is ϵ optimal: 
+
+1
+
+K
+
+> K
+
+X
+
+> k=1
+
+V ⋆ 
+
+> 1
+
+− V bπk 
+
+> 1
+
+< ϵ 
+
+D.4.4. C OMPARISON WITH OTHER STUDIES 
+
+In this section, we will try to study what the bound of our regret will be in the risk-neutral case and/or the completely observable scenario, so that we can test whether our algorithm is still provably efficient after the degeneration into simpler settings. 
+
+Comparison with risk-neutral HOMDP When we take the limit γ → 0 to Eq.(79), our regret bound degenerates into 
+
+lim  
+
+> γ→0
+
+Regret (K; P, γ ) = ˜O(H√KSAO · pO2 + H3S) (80) which characterizes the performance of our algorithm in the risk-neutral setting. (Lee et al., 2023) studied risk-neutral POMDP under hindsight observability, whose setting differs from ours only in the risk-sensitivity of the agent. The regret of their algorithm “HOP-B” is provided in theorem C.1 of (Lee et al., 2023), which is 
+
+X
+
+> k∈[K]
+
+v (π⋆) − v (ˆ πk) ≲ pH5K log(2 /δ )
+
+| {z }
+
+> Azuma-Hoeffding
+
++ √OSH 5Kι | {z }
+
+> Emission error
+
++ √SAH 4Kι + H4S2Aι (1 + log( K)) 
+
+| {z }
+
+> Transition error
+
++ H3S√Oι + HSA √H3ι
+
+| {z }
+
+> Residual pigeonhole error
+
+,
+
+(81) We see that our regret improves their result in the order of H, S and A.The sample complexity the BVVI algorithm also nearly reaches the information-theoretic lower bound for the tabular HOMDPs, which is provided in theorem 5.1 of (Lee et al., 2023): 
+
+K = Ω  SO/ϵ 2
+
+Comparison with risk-sensitive MDP Due to the significant difference between the formulation of POMDP and MDP, several adjustments to our algorithm are necessary to adapt to a fully observable environment. We will no longer approximate the emission process and drop the terms in the bonus that is relevant with the emission residue. The confidence level will also be increased for O-times. In the end our algorithm will degenerate into the RSVI2 algorithm proposed by (Fei et al., 2021a). After some revision in the proofs, our regret will drop the terms relevant with O, as well as the additional √H
+
+brought by the history-dependency of POMDP. The regret will take the form of Regret (K; M , γ ) = e|γ|H − 1
+
+|γ| H · ˜O(H2√KS 2A) (82) 31 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+which matches the result of (Fei et al., 2021a): 
+
+Regret( K) ≲ e|γ|H − 1
+
+|γ|H
+
+q
+
+H4S2AK log 2(HSAK/δ ). (83) Consequently, in the MDP case, our regret reaches the lower bound for risk-sensitive RL using the entropic risk(Fei et al., 2020) in terms of K and γH :
+
+Regret( K) ≳ e|γ|H/ 2 − 1
+
+|γ| H · H3/2√K ln KH (84) 
+
+## E. Experimental Details 
+
+In this section, we elaborate on the details of our experiment presented in Section 9. We also provide additional information on the empirical performance of BVVI. We designed a POMDP model with two actions ( A = 2 ), three states ( S = 3 ) and three observations ( O = 3 ). The length of horizon H is set to be 4 and the agent interacts with the POMDP for K = 2 , 000 episodes. We chose confidence level 
+
+δ = 0 .2 and set the risk sensitivity parameter γ to 1.0.For simplicity, in the POMDP, the environment starts deterministically at state 1 and evolves in a time-homogeneous fashion. At each step, the environment transitions from state 1 to state 1, 2 and 3 with probabilities 0.03 , 0.95 , and 0.02 , respectively. When starting from state 2, it transitions to states 1, 2, and 3 with probabilities 0.04 , 0.02 , and 0.94 . The state-transition probabilities become 0.89 , 0.10 , and 0.01 when starting from state 3. In each state, the environment emits three possible observations. In state 1, the agents receives observations 1, 2 or 3 with probabilities 0.83 , 0.08 , and 0.09 , respectively. The observation distributions become 0.05 , 0.79 , 0.06 or 0.02 , 0.09 , 0.89 when in states 2 or 3, respectively. The agent receives a reward of 1 when she takes action 1 in state 1, action 2 in state 2, or action 1 in state 3. In other cases, the agent gains a reward of 0.We train the agent using the BVVI algorithm in the default environment specified above. We then repeat the training procedure in an fully observable environment, which is obtained by replacing the emission kernel of the POMDP with the identity matrix, resulting in Figure 1. We also compare the episodic return of the agent in both POMDP and MDP environments (see Figure 3). Our experiment demonstrates that BVVI converges faster in the MDP environment and that in a POMDP, the agent suffers from higher variance in returns. This can be attributed to the uncertainty of observations confounding the decision-making process.     
+
+> Figure 3: Episodic return J(πk;P, γ )of BVVI(Algorithm 1) in MDP and POMDP.
+
+We also test the performance of BVVI in a POMDP with varying degrees of risk-awareness, as illustrated in Fig-ure 2. Our experiment furthers shows that the agent successfully learns the optimal policy when γ is chosen in 
+
+{− 5.0, −3.0, −1.0, 1.0, 3.0, 5.0}, consistent with Corollary D.9. The findings are demonstrated in Figure 4. 32 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation                 
+
+> Figure 4: Suboptimality J(π⋆;P, γ )−1
+> K
+> PKk=1 K(πk;P, γ )of BVVI(Algorithm 1) with various risk-sensitivity parameters. We pick the risk-level γfrom {− 5.0,−3.0,−1.0,1.0,3.0,5.0}.
+
+.
+
+## F. More Related Work 
+
+Risk-sensitive RL The analytical properties of the risk measures adopted in risk-sensitive RL has been extensively studied in (Boda & Filar, 2006; Sereda et al., 2010; Righi, 2018; Hau et al., 2023). Combined with statistical learning theory, previous works have developed provably efficient algorithms for risk-sensitive RL in both the tabular case (Fei et al., 2020) and the function-approximation setting (Fei et al., 2021b). Entropic risk (Fei et al., 2021a) and CVaR (Du et al., 2022) are among the most popular risk measures adopted in RL. 
+
+Intractability of general POMDP Studies (Papadimitriou & Tsitsiklis, 1987; Jin et al., 2020) have shown that seeking the exact solution to the planning or learning problem of general POMDPs is intractable. For this reason, the planning process in algorithm 2, as well as other exact algorithms for POMDP are inefficient in terms of computation complexity. To obtain polynomial sample complexity, recent research follows two directions: they either assume the structure of the POMDP model could leak certain information about the hidden states, or suggest that the training process will offer more knowledge to the agent. We will introduce the two lines of work in what follows. 
+
+Learning a POMDP with structural assumptions The first line of research considers sub-classes of POMDP with additional structural properties, such as (Golowich et al., 2022a)( γ-observable POMDPs) and (Liu et al., 2022a)( α-weak-revealing POMDPs). In the tabular case, (Jin et al., 2020) assumed that the emission matrix posses a full column rank. In the continuous setting, (Cai et al., 2022) asks the emission kernel to have a left inverse. Once the assumptions fails to be satisfied, their regret bounds could become vacuous (Liu et al., 2022a). It also remains unclear whether these assumptions are acceptable in the application scenarios. 
+
+Learning a POMDP with hindsight observation Another line of research concerning with partially observable RL does not pose structural assumptions on the POMDP model. They consider a friendlier training setting in which the agent could review the sample path of the hidden states at the end of each episode. The new formulation for the POMDP, also referred to as the “Hindsight Observation Markov Decision Process(HOMDP)”, is proposed by (Lee et al., 2023) and echoed by (Sinclair et al., 2023; Shi et al., 2023; Guo et al., 2023). The concept of “hindsight observation” is reasonable both theoretically and empirically. Supported by at least six examples in (Lee et al., 2023), reinforcement learning in a partially observable environment offers hindsight information in various application scenarios. Furthermore, they also showed that the lower bound of sample complexity of learning an HOMDP is polynomial for the sizes of the spaces. For these reasons, we follow the second direction of research. We remind the reader that there is a significant difference between our work and that of (Lee et al., 2023). We propose 33 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+the analytical tool of beta vector, which is different from the risk-neutral counterpart alpha vector. We also deploy a change-of-measure technique. We also adopt different analysis of the statistical errors and improve their regret bound in terms of H, S and A.
+
+Risk-sensitive planning with partial information Risk-aware decision-making in partially observable environments has been studied theoretically: (Whittle, 1991) derived an approximate solution to the continuous-time partially-observed risk-sensitive optimal control problem. (Elliott et al., 1996) developed a risk-sensitive Viterbi algorithm for the hidden Markov models. (Baras & James, 1997) also studied similar control-theoretic problems for the finite-state machines. (James et al., 1994; Cavazos-Cadena & Hern ´andez-Hern ´andez, 2005; B ¨aauerle & Rieder, 2017) considered risk-sensitive planning of a POMDP with the entropy or the utility risk measures. However, these studies did not consider the learning problem of POMDP, not to mention sample complexity. Our framework is built upon the study of (James et al., 1994). However, we should notice that there fundamental differences between the two works. The study of (James et al., 1994) posed strong assumptions on the POMDP model: they set the initial state as a Gaussian random variable and required the transition law of the states and observations to be i.i.d. Gaussian distributions. We generalize their result to accommodate transition matrices beyond Gaussian distributions. The study of (James et al., 1994) did not consider the learning problem as they assumed the transition matrices are fully known, neither have they carried out a regret analysis which thoroughly discusseed in this work. We also propose new concepts such as the beta vectors and the partially observable risk-sensitive Q functions not considered by the work of (James et al., 1994). We also devise a novel bonus function. 
+
+## G. Supplementary Materials 
+
+G.1. Technical Lemmas 
+
+In this section we provide the technical lemmas adopted in this work. We will give the references for existing results and provide a proof for the lemmas developed in this work. G.1.1. R ESULTS FROM REAL AND FUNCTIONAL ANALYSIS 
+
+Theorem G.1. (Lebesgue-Radon-Nikodyn theorem, theorem 6.10 in (Rankin, 1968)) Let M be a σ− algebra of a set X.let λ be a measure on M and μ be a positive σ− finite measure on M . There is a unique pair of measures λa and λs on 
+
+M such that λ = λa + λs, where λ is absolutely continuous with respect to μ (λμ ) while λs and λa are concentrated on disjoint sets ( λs ⊥ μ). Moreover, there is a unique h ∈ L1(μ) such that λa(E) = R 
+
+> E
+
+hdμ for every E ∈ M . We call h the Radon-Nikodyn derivative of the measure λa with respect to μ and we may express the derivative as h = dλ a 
+
+> dμ
+
+.
+
+Theorem G.2. (Hilbert-adjoint operator, theorem 3.9-2 and 3.10-2 in (Kreyszig, 1991)) Let H1 and H2 be two Hilbert spaces and T : H2 → H1 be a bounded linear operator. There exists a unique linear bounded operator T ⋆ with the same norm of T such that for all ⃗x ∈ H1 and ⃗y ∈ H2, ⟨⃗x, T ⋆⃗y ⟩ = ⟨T⃗ x,⃗ y ⟩. If H1 and H2 have finite dimensions so that T could be represented by some matrix, then T ⋆ will be represented by the complex conjugate transpose of that matrix. 
+
+Lemma G.3. (Dirac function and the expectation) 
+
+Z
+
+> X
+
+dx E[f (X, Y)δ(X − x)|Z] = E[f (X, Y)|Z]
+
+Proof. 
+
+LHS =
+
+Z
+
+> X
+
+dx 
+
+Z
+
+> X
+
+dζ 
+
+Z
+
+> Y
+
+dηf (ζ, η )δ(ζ − x)pX,Y|Z(ζ, η |z) = 
+
+Z
+
+> X
+
+dζ 
+
+Z
+
+> X
+
+dxδ (x − ζ)
+
+Z
+
+> Y
+
+dηf (ζ, η )pX,Y|Z(ζ, η |z)=
+
+Z
+
+> X
+
+dζ 
+
+Z
+
+> Y
+
+dηf (ζ, η )pX,Y|Z(ζ, η |z) = RHS 
+
+(85) 
+
+Lemma G.4. (Dirac function, inner product and the expectation) 
+
+⟨ E[δ(X = · )F (X, Y)] , f (·) ⟩ = E[f (X) · F (X, Y))] (86) 34 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Proof. 
+
+LHS =
+
+Z
+
+> X
+
+dxf (x)E[δ(X − x)F (X, Y)] pX,Y (ζ, η ) = 
+
+Z
+
+> X
+
+dxf (x)
+
+Z
+
+> Y
+
+dη 
+
+Z
+
+> X
+
+dζδ (ζ − x) F (ζ, η )pX,Y (ζ, η )=
+
+Z
+
+> X
+
+dζ 
+
+Z 
+
+> X
+
+dxf (x)δ(x − ζ)
+
+Z
+
+> Y
+
+dηF (ζ, η )
+
+
+
+pX,Y (ζ, η ) = 
+
+Z
+
+> X
+
+dζf (ζ)
+
+Z
+
+> Y
+
+dηF (ζ, η )pX,Y (ζ, η )=E[f (X) · F (X, Y)] = RHS 
+
+G.1.2. C ONCENTRATION INEQUALITIES 
+
+Lemma G.5. (Concentration in the ℓ1 norm, fact 4 of (Liang & Luo, 2023), adapted from (Weissman et al., 2003)) Let P be a probability distribution over a finite discrete measurable space (X , Σ) . Let bPn be the empirical distribution of P estimated from n samples. Then with probability at least 1 − δ,
+
+∥ bPn − P ∥1 ≤
+
+r 2 |X | 
+
+n ln 1
+
+δ (87) 
+
+Fact G.6 . (Naive upper bound) For any bounded function f (·) : X → [a, b ] and two probability measures P′, P ∈ ∆( X ),the difference in the expectation can be controlled by the range of the function and the total variance distance between the probability measures. 
+
+|EX∼P′ [f (X)] − EX∼P[f (X)] | ≤ (b − a)2 · ∥ P′(·) − P(·)∥1 (88) 
+
+Proof. By the fact that all probability measures normalize to 1,
+
+LHS = EX∼P′
+
+
+
+f (X) − b − a
+
+2
+
+
+
+− EX∼P
+
+
+
+f (X) − b − a
+
+2
+
+
+
+= X
+
+> x∈X
+
+
+
+f (X) − b − a
+
+2
+
+
+
+· (P′(x) − P(x)) ≤ sup 
+
+> x∈X
+
+f (x) − b − a
+
+2 · ∥ P′(x) − P(x)) ∥1 = RHS 
+
+Remark G.7 . The upper bound provided in this lemma is tight for deterministic variable X, which will be particularly useful when we study how the regret behaves when the risk-sensitivity parameters tends to zero. 
+
+Lemma G.8. (Hoeffding inequality for random variables, adapted from theorem 2.3 in (Boucheron et al., 2003)) Let 
+
+{Yt}nt=1 be a finite set of independent random variables. Suppose that there exists two constant real numbers Y < Y such that Y ≤ Yt ≤ Y holds almost surely for any Yt, then with probability at least 1 − δ,
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+Yi − 1
+
+n
+
+> n
+
+X
+
+> i=1
+
+E[Yi] ≤ (Y − Y )
+
+r 12n ln 2
+
+δ (89) 
+
+Lemma G.9. (Azuma-Hoeffding inequality for martingale difference sequences, theorem 2.16 in (Bercu et al., 2015)) Let 
+
+{Yt}∞ 
+
+> t=1
+
+be a martingale difference sequence with respect to some other stochastic process {Xt }∞
+
+> t=1
+
+. Suppose that there exists two constants a < b such that a ≤ Yt ≤ b almost sure for any t ∈ Z+, then for any n ∈ Z+ the following relation holds with probability at least 1 − δ: nX
+
+> t=1
+
+Yt < (b − a)
+
+r n
+
+2 ln 1
+
+δ (90) 
+
+Lemma G.10. (Hoeffding inequality for the function of random variables,extended from lemma 12 of (Bai & Jin, 2020)) Let X′ be a random variable supported on X that follows an unknown distribution P. Let f (·) be any bounded function that maps X to [a, b ]. We draw N i.i.d. samples from P to construct the empirical distribution bP := 1
+
+> N
+
+PNi=1 1{bx′ 
+
+> i
+
+= x′}.Denote Θ as the set of all the parameters that may distinguish the samples. Then with probability at least 1 − δ,
+
+EX′∼bP(·)[f (X′)] − EX′∼P(·)[f (X′)] ≤ (b − a) · min 
+
+(
+
+1, 3 · p|X | · 
+
+r 1
+
+N ln |Θ|
+
+δ
+
+)
+
+(91) 35 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Remark G.11 . The factor of p|X | comes from the epsilon coverage of the range of f (·), since |X | = ln 1
+
+> ϵ
+> |X |
+
+.
+
+Lemma G.12. (The pigeon-hole lemma, extended from (Azar et al., 2017)) Fix constant h. Suppose that {bzth}Kt=1 are i.i.d. samples drawn from a distribution P over the finite set Z. For any k = 0 , 1, · · · , K , let N k+1  
+
+> h
+
+(·) : Z → [K] be defined as the counter function N k+1  
+
+> h
+
+(z) := Pkt=1 1{bzth = z} that records number of occurrences of z within the first k samples. Let 
+
+f (·) : Z → R be any function that receives integer input. The following relations always hold: 
+
+(1) X
+
+> z∈Z
+
+N k+1  
+
+> h
+
+(z) = k (2) 
+
+> K
+
+X
+
+> k=1
+
+f (N k+1  
+
+> h
+
+(bzkh)) = X  
+
+> z∈Z
+> NK+1
+> h(z)
+
+X
+
+> i=1
+
+f (i) (3) 
+
+> K
+
+X
+
+> k=1
+
+1
+
+q
+
+max {1, N k+1  
+
+> h
+
+(bzkh)}
+
+< 2pK · |Z| 
+
+(92) 
+
+Remark G.13 . The third equation in Lemma G.12 shows that the pigeon-hole upper bound depends on the size of the space 
+
+Z. For MDPs, Z will be replaced by S × A , which is polynomial in the relevant parameters. However in a POMDP, since decision-making depends on the entire history, Z will be replaced with OhA h−1, which causes the regret to be at least of order OH AH .
+
+Lemma G.14. (Linearization of Utility Function, Fact 1(a) in Appendix A of (Fei et al., 2020)) When γ > 0, for all 1 < y < x < e γH , we have 0 < 1
+
+γ ln x − 1
+
+γ ln y < 1
+
+γ (x − y)
+
+When γ < 0, for all eγH < x < y < 1, we have 0 < 1
+
+γ ln x − 1
+
+γ ln y < e|γ|H
+
+|γ| (y − x)
+
+(93) 
+
+Lemma G.14 implies that the differences between the entropic risk measures can be bounded by linear functions of the differences between their variables. 
+
+G.1.3. V ALUE FUNCTIONS USING UTILITY RISK 
+
+Exponential risks belong to a special class of risk criteria, named the utility function, 14 which fits into the definition of both static and dynamic risk measures. For simplicity, we demonstrate this property in the MDP case when actions are deterministic and the initial state s1 is fixed. We use U ◦ to represent a utility function. For entropic risk, U = 1 
+
+> γ
+
+eγ(·).(Static risk-measure narration) Assume that the initial state is fixed, 
+
+J(π; M ) = U −1 ◦ EπM U
+
+> H
+
+X
+
+> h=1
+
+rh(Sh, Ah)
+
+!
+
+V πH+1 ,static =0 V πh, static (sh) = U −1EπM U
+
+" HX
+
+> t=h
+
+rt(St, At) sh
+
+#
+
+(Dynamic risk-measure narration) Assume that the initial state is fixed, 
+
+V πH+1 =0 
+
+Qπh (sh, a h) = rh(sh, a h) +  U −1 ◦ Esh+1 ∼Ph+1 (·| sh,a h)U    V πh+1 (sh+1 )
+
+V πh (sh) = Eah∼πh(·| sh)Qπh (sh, a h)
+
+J(π; M ) = V π 
+
+> 1
+
+(s1)
+
+Next, we show that static and dynamic narrations are equivalent when the policy is deterministic and the initial state is fixed. Precisely speaking, ∀h ∈ [H + 1] , s h ∈ S :
+
+V πh (sh) = V πh, static (sh)
+
+> 14
+
+Readers may refer to (Von Neumann & Morgenstern, 1944; B¨ auerle & Rieder, 2011; B¨ aauerle & Rieder, 2017) for details. 
+
+36 Provably Efficient Partially Observable Risk-sensitive Reinforcement Learning with Hindsight Observation 
+
+Proof. We prove by an induction on h. First, the statement holds obviously at h=H+1. Then 
+
+V πh (sh) = Eπah
+
+Qπh (sh, a h) sh
+
+ = Eπah
+
+"
+
+U −1Esh+1 
+
+"
+
+U rh(sh, a h) + V πh+1 (sh+1 ) sh, a h
+
+#
+
+sh
+
+#
+
+=Eπah
+
+"
+
+U −1Esh+1 
+
+"
+
+U
+
+"
+
+rh(sh, a h) + U −1EπM
+
+"
+
+U
+
+> H
+
+X
+
+> t=h+1
+
+rt(St, At) | sh+1 
+
+## 
+
+sh, a h
+
+#
+
+sh
+
+#
+
+(Induction hypothesis) 
+
+=Eπah
+
+"
+
+U −1Esh+1 
+
+"
+
+U
+
+"
+
+U −1EπM
+
+"
+
+U
+
+> H
+
+X
+
+> t=h
+
+rt(St, At) sh+1 , s h, a h
+
+## 
+
+sh, a h
+
+#
+
+sh
+
+#
+
+(Markov property) 
+
+=Eπah
+
+"
+
+U −1Esh+1 
+
+"
+
+EπM
+
+"
+
+U
+
+> H
+
+X
+
+> t=h
+
+rt(St, At) | sh+1 , s h, a h
+
+#
+
+sh, a h
+
+#
+
+sh
+
+#
+
+=Eπah
+
+"
+
+U −1EπM
+
+"
+
+U
+
+> H
+
+X
+
+> t=h
+
+rt(St, At) | sh, a h
+
+#
+
+sh
+
+#
+
+=U −1EπM
+
+"
+
+U
+
+> H
+
+X
+
+> t=h
+
+rt(St, π t(St)) sh
+
+#
+
+= V πh, static (sh) (Deterministic policy) We stress that the coincidental equivalence between the two narrations arises from the fact that rh(sh, a h) = U −1EπM [U ◦
+
+rh(sh, a h)|sh, a h] and EπM [U P 
+
+> t≥h+1
+
+rt(St, At)|sh+1 ] = EπM [U P 
+
+> t≥h+1
+
+rt(St, At)|sh+1 sh, a h].G.1.4. T HE AUTO -REGRESSIVE EQUATION 
+
+Lemma G.15. The solution to the initial value problem of the equations xN = 0 xn = Anxn+1 + Cn is x1 =
+
+PN −1  
+
+> τ=1
+
+A1: τ −1Cτ
+
+We can obtain this result by an induction argument. 
+
+Remark G.16 . If we restrict xt, A t ∈ R≥0, similarly we can prove that that if xN = 0 , x n ≤ Anxn+1 + Cn we have 
+
+x1 ≤ PN −1  
+
+> τ=1
+
+A1: τ −1Cτ
+
+G.1.5. O NLINE -TO -PAC C ONVERSION 
+
+The relationship between the regret of an online learning algorithm and its sample complexity is studied by (Cesa-Bianchi et al., 2004) and (Jin et al., 2018). In section 3.1 of (Jin et al., 2018) the authors used Markov’s inequality to show that if we choose the output policies {bπk} of an online learning algorithm uniformly at random, then to ensure these policies are provably approximately correct, i.e. 
+
+P
+
+> K
+
+X
+
+> k=1
+
+V ⋆ − V bπk
+
+≤ ϵ
+
+!
+
+≥ 1 − δ
+
+one only needs to ensure that the number of episodes K will make the average expected regret lower than ϵδ 
+
+Regret( K) := 1
+
+K
+
+> K
+
+X
+
+> k=1
+
+V ⋆ − V bπk
+
+≤ ϵδ 
+
+This technique is frequently used in reinforcement learning, such as in the derivation of corollary 5 in (Liu et al., 2022a) and theorem 6.3 of (Lee et al., 2023) and we have invoked this relation in the derivation of Corollary D.9. For an elementary introduction to the conversion argument please refer to (Tirinzoni et al., 2022). 37

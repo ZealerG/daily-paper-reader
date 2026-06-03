@@ -1,0 +1,7278 @@
+Title: Robust Offline Reinforcement Learning with Linearly Structured f-Divergence Regularization
+
+URL Source: https://openreview.net/pdf?id=FzulAfAJxE
+
+Number of Pages: 41
+
+Markdown Content:
+# Robust Offline Reinforcement Learning with Linearly Structured 
+
+# f -Divergence Regularization 
+
+Cheng Tang * 1 Zhishuai Liu * 2 Pan Xu 2
+
+## Abstract 
+
+The Robust Regularized Markov Decision Pro-cess (RRMDP) is proposed to learn policies ro-bust to dynamics shifts by adding regularization to the transition dynamics in the value function. Existing methods mostly use unstructured reg-ularization, potentially leading to conservative policies under unrealistic transitions. To address this limitation, we propose a novel framework, the d-rectangular linear RRMDP ( d-RRMDP), which introduces latent structures into both tran-sition kernels and regularization. We focus on offline reinforcement learning, where an agent learns policies from a precollected dataset in the nominal environment. We develop the Robust Regularized Pessimistic Value Iteration (R2PVI) algorithm that employs linear function approxi-mation for robust policy learning in d-RRMDPs with f -divergence based regularization terms on transition kernels. We provide instance-dependent upper bounds on the suboptimality gap of R2PVI policies, demonstrating that these bounds are in-fluenced by how well the dataset covers state-action spaces visited by the optimal robust policy under robustly admissible transitions. We estab-lish information-theoretic lower bounds to verify that our algorithm is near-optimal. Finally, numer-ical experiments validate that R2PVI learns robust policies and exhibits superior computational effi-ciency compared to baseline methods. 
+
+## 1. Introduction 
+
+Offline reinforcement learning (RL) (Levine et al., 2020) facilitates policy learning from fixed datasets, eliminating the need for direct interaction with the environment. When        
+
+> *Equal contribution 1University of Illinois Urbana-Champaign, work was done when Cheng was in Tsinghua University 2Duke University. Correspondence to: Pan Xu <pan.xu@duke.edu >.
+> Proceedings of the 42 st International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+the policy deployment environment differs from the one where the dataset was collected, robust policies that remain effective under the environment shift are required (Garcıa & Fern ´andez, 2015; Packer et al., 2018; Zhang et al., 2020; Wang et al., 2024b; Guo et al., 2024). A widely adopted framework for learning such policies is the distribution-ally robust Markov decision process (DRMDP) (Iyengar, 2005; Nilim & El Ghaoui, 2005), which models dynam-ics changes as an uncertainty set around the nominal tran-sition kernel. In this setup, an agent seeks policies per-forming well even in the worst-case environment within the uncertainty set. The most common design of uncer-tainty sets is the (s, a )-rectangularity (Iyengar, 2005; Nilim & El Ghaoui, 2005), which independently models uncer-tainty for each state-action pair. Although mathematically elegant, the (s, a )-rectangularity can result in overly conser-vative policies, especially when the state and action spaces are large. To address this issue, Goyal & Grand-Clement (2023) introduce the r-rectangular uncertainty set, which parameterizes transition kernels using latent factors. This concept has since been incorporated into d-rectangular lin-ear DRMDPs ( d-DRMDPs, Ma et al. (2022)), extending its applicability to robust decision-making with linear func-tion approximation. Building on d-DRMDPs, recent works (Blanchet et al., 2024; Wang et al., 2024a; Liu & Xu, 2024b) propose provably efficient algorithms that leverage function approximation for robust policy learning. However, the d-DRMDP framework has several problems that remain unaddressed, which we summarize as follows. 
+
+Theoretical Gaps: Current understanding of d-DRMDPs is largely restricted to uncertainty sets defined by the Total Variation (TV) divergence (Liu & Xu, 2024a;b). For uncer-tainty sets defined by the Kullback-Leibler (KL) divergence, prior works (Ma et al., 2022; Blanchet et al., 2024) rely on additional regularity assumptions regarding the KL dual variable, which is hard to validate in practice. Moreover, the χ2-divergence defined uncertainty set has demonstrated effectiveness in certain empirical applications (Panaganti & Kalathil, 2022; Xu et al., 2023) and has also been ana-lyzed under the (s, a )-rectangularity (Shi et al., 2024). Yet there are no theoretical results or efficient algorithms for 
+
+d-DRMDPs. Practical challenges: Existing practical al-gorithms (Ma et al., 2022; Liu & Xu, 2024b; Wang et al., 1Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+2024a) depend on a dual optimization oracle (see Remark 4.2 in Liu & Xu (2024a)) to estimate the robust value func-tion. The computation complexity of these methods is pro-portional to the feature dimension d and the planning hori-zon H. While heuristic methods like the Nelder-Mead algo-rithm (Nelder & Mead, 1965) can approximate the oracle, they become computationally expensive when dealing with high-dimensional features (large d) and extended planning horizons (large H), which are common in real-world appli-cations. These limitations raise an important question: 
+
+Can we design efficient offline robust RL algorithms using general f -divergence 1 uncertainty models with linearly structured transitions? 
+
+In this work, we provide a positive answer to this ques-tion. Inspired by the robust regularized MDP (RRMDP) framework with the (s, a )-rectangularity condition (Yang et al., 2023; Zhang et al., 2020; Panaganti et al., 2024a), where the uncertainty set constraint in DRMDP is replaced by a regularization penalty term measuring the divergence between the nominal and perturbed dynamics, we propose the d-rectangular linear RRMDP ( d-RRMDP) framework. Specifically, d-RRMDP replaces the d-rectangular uncer-tainty set in d-DRMDPs with a carefully designed penalty term that preserves the linear structure. The motivations are two folds: (1) it has been shown by Yang et al. (2023) that the robust value function under the RRMDP is equiv-alent to that under the DRMDP with (s, a )-rectangularity as long as the regularizer is properly chosen; (2) removing the uncertainty set constraint simplifies the dual problem for certain divergences (Zhang et al., 2024), potentially im-proving computational efficiency and facilitating theoretical analysis. We summarize our contributions as follows: • We establish that key dynamic programming principles, including the robust Bellman equation and the existence of deterministic optimal robust policies, hold under the 
+
+d-RRMDP framework. Additionally, we derive dual for-mulations of robust Q-functions with TV, KL and χ2 di-vergences defined regularization, highlighting their linear structures. • We propose a computationally tractable meta-algorithm, Robust Regularized Pessimistic Value Iteration (R2PVI), for offline d-RRMDPs with general f -divergence regu-larization. For TV, KL, and χ2 divergences, we provide instance-dependent upper bounds on the suboptimality gap of policies learned by R2PVI, in a general form of 
+
+β sup P ∈U λ(P 0)
+
+PHh=1 Eπ⋆,P  P di=1 ∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|
+
+s1 = s, where d is the feature dimension, H is the horizon length, ϕ(s, a ) is the feature mapping, λ is the     
+
+> 1The general f-divergence includes widely studied divergences such as Total Variation, Kullback-Leibler, and χ2divergences.
+
+regularization parameter, and β is a problem-dependent parameter whose specific form depends on the choice of the divergence (see Section 5.1 for details). The set 
+
+Uλ(P 0) is derived from our theoretical analysis, and it does not represent an uncertainty set in the conventional DRMDP framework. We further construct an information-theoretic lower bound, demonstrating that this instance-dependent uncertainty function is intrinsic. • We conduct experiments in simulated environments, in-cluding a linear MDP setting (Liu & Xu, 2024a) and the American Put Option environment (Tamar et al., 2014). Our findings show that: 1. The d-RRMDP framework yields equivalent robust policies as d-DRMDP with appro-priately chosen regularization parameters. 2. R2PVI sig-nificantly improves algorithms designed for d-DRMDPs in terms of the computation complexity, and is compara-ble to algorithms designed for standard linear MDPs. 
+
+Notations. In this paper, we denote ∆( S) as the proba-bility distribution in the state space S. For any H ∈ N,
+
+[H] represents the set {1, 2, 3, · · · , H }. For a vector v ∈
+
+Rd, we denote vi as the i-th element. For any function 
+
+V : S → [0 , H ], we denote Vmin = min s∈S V (s) and 
+
+Vmax = max s∈S V (s). For any distribution μ ∈ ∆( S),we denote Var s∼μ V (s) as the variance of the random vari-able V (s) under μ. For any two probability measures P
+
+and Q satisfying that P is absolute continuous with re-spect to Q, the f -divergence is defined as Df (P ∥Q) = R 
+
+> S
+
+f (P (s)/Q (s)) Q(s)ds, where f is a convex function on R and differentiable on R+ satisfying f (1) = 0 and 
+
+f (t) = + ∞, ∀t < 0. The Total Variation (TV) diver-gence, Kullback-Leibler (KL) divergence and Chi-Square (χ2) divergence between P and Q are defined by f (x) = 
+
+|x − 1|/2, f (x) = x log x, f (x) = ( x − 1) 2, respectively. Given a scalar α, we denote [V (s)] α = min {V (s), α }.Given an interval I, we define [V (s)] I as the result of clip-ping V (s) to lie within the interval I. We denote I as the identity matrix and 1i ∈ Rd as the one-hot vector with the 
+
+i-th element equals to one. 
+
+## 2. Related Work 
+
+Distributionally Robust MDPs. The seminal works of Satia & Lave Jr (1973); Iyengar (2005); Nilim & El Ghaoui (2005) proposed the framework of DRMDP. There are sev-eral lines of works studying DRMDPs under different set-tings. Zhou et al. (2021); Panaganti et al. (2022; 2024b); Shi & Chi (2024); Liu & Xu (2025) studied the offline DRMDP assuming access to an offline dataset and provided sample complexity bounds under the coverage assumption on the offline dataset. Liu & Xu (2024a); Liu et al. (2024); Lu et al. (2024) studied the online DRMDP where an agent learns robust policies by actively interacting with the nominal envi-ronment. Blanchet et al. (2024); Panaganti et al. (2022) stud-2Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+ied the DRMDP with general function approximation, they focused on the offline setting with the (s, a )-rectangularity assumption. Ma et al. (2022); Liu & Xu (2024b); Wang et al. (2024a) studied the offline d-DRMDP, they proposed prov-ably efficient and computationally tractable algorithms and provided sample complexity bounds under different kinds of coverage assumptions on the offline dataset. 
+
+RRMDPs. The work of Yang et al. (2023); Zhang et al. (2024) proposed the RRMDP, which can be regarded as a generalization of the DRMDP by substituting the uncer-tainty set constraint in DRMDP with the regularization term defined as the divergence between the perturbed model and the nominal model. In particular, Yang et al. (2023) studied the tabular RRMDP and proposed a model-free algorithms assuming access to a simulator. Zhang et al. (2024) studied the offline RRMDP, they established connections between RRMDPs with risk sensitive MDPs, and derived the policy gradient principle. Moreover, they studied general function approximation and proposed a computationally efficient al-gorithm, RFZI, for RRMDPs with KL-divergence defined regularization terms. Zhang et al. (2024) firstly discovered that the duality of the robust value function has a closed ex-pression under the KL-divergence. Panaganti et al. (2024a) studied the offline RRMDP with regularization terms de-fined by the general f -divergence. They studied general function approximation and provided sample complexity results. They further proposed a hybrid algorithm, which learns robust policies with both historical data and inter-active data collection, for RRMDPs with TV-divergence defined regularization term. Existing works focus on the 
+
+(s, a )-rectangularity uncertainty regularization, which is dif-ferent from ours. 
+
+## 3. Problem Formulation 
+
+In this section, we provide preliminaries for RRMDPs. 
+
+Markov decision process (MDP). We first introduce the concept of MDPs, which is the basis of our settings. Specif-ically, we denote MDP (S, A, H, P 0, r ) as a finite horizon MDP, where S is the state space, A is the action space, H
+
+is the horizon length, P 0 = {P 0 
+
+> h
+
+}Hh=1 are nominal transi-tional kernels, and the r(s, a ) ∈ [0 , 1] is the deterministic reward function assumed to be known in advance. For any policy π, the value function and Q-function at time step h
+
+are defined as V πh (s) = EP 0  P Ht=h rt(st, a t)|sh = s, π ,and Qπh (s, a ) = EP 0  P Ht=h rt(st, a t)|sh = s, a h = a, π .
+
+Robust regularized MDP (RRMDP) We define a finite horizon RRMDP as RRMDP (S, A, H, P 0, r, λ, D, F),where λ is the regularizer, D is the probabil-ity divergence metric, and F is the feasible set of all perturbed transition kernels. For any pol-icy π, the robust regularized value function is de-fined as V π,λ h (s) = inf P ∈F EP  P Ht=h
+
+rt(st, a t) + 
+
+λD (Pt(·| st, a t)∥P 0 
+
+> t
+
+(·| st, a t))  sh = s, π  and robust Q-function as Qπ,λ h (s, a ) = inf P ∈F EP  P Ht=h
+
+rt(st, a t) + 
+
+λD (Pt(·| st, a t)∥P 0 
+
+> t
+
+(·| st, a t))  sh = s, a h = a, π .The RRMDP framework has been referred to by different names in the literature, including the penalized robust MDP (Yang et al., 2023), the soft robust MDP (Zhang et al., 2024), and the robust ϕ-regularized MDP (Panaganti et al., 2024a). For consistency, we adopt the term RRMDP in this work. In RRMDPs, the perturbed transition kernel class F typi-cally encompasses all possible kernels. However, for envi-ronments with large state-action spaces, F may be overly broad, including transitions that are unrealistic or irrelevant. To address this, we introduce latent structures on transi-tion kernels and design regularization terms that penalize changes in the latent structure, sharing similar ideas with the design of r-rectangular (Goyal & Grand-Clement, 2023) and d-rectangular (Ma et al., 2022) uncertainty sets. 
+
+The d-rectangular linear RRMDP ( d-RRMDP). In this paper, we propose the novel d-RRMDP, which admits a lin-ear structure of the feasible set and reward function. Specif-ically, a d-RRMDP is a RRMDP where the nominal envi-ronment P 0 is a special case of linear MDP with a simplex feature space (Jin et al., 2020, Example 2.2), and the feasible set F involves kernels defined based on the linear structure of the nominal transition kernel. We make the following assumption on reward functions and transition kernels: 
+
+Assumption 3.1 (Jin et al. (2020)) . Given a known state-action feature mapping ϕ : S × A → Rd satisfying 
+
+Pdi=1 ϕi(s, a ) = 1, ϕ i(s, a ) ≥ 0, we assume the re-ward function {rh}Hh=1 and the nominal transition ker-nels {P 0 
+
+> h
+
+}Hh=1 admit linear structures. Specifically, for all 
+
+(h, s, a ) ∈ [H] × S × A , we have rh(s, a ) = ⟨ϕ(s, a ), θh⟩,and P 0 
+
+> h
+
+(·| s, a ) = ⟨ϕ(s, a ), μ0
+
+> h
+
+(·)⟩, where {θh}Hh=1 are known vectors with bounded norm ∥θh∥2 ≤ √d and 
+
+μ0 
+
+> h
+
+= ( μ0
+
+> h, 1
+
+, μ 0
+
+> h, 2
+
+, · · · , μ 0
+
+> h,d
+
+), μ0
+
+> h,i
+
+(·) ∈ ∆( S), ∀i ∈ [d].With Assumption 3.1, the robust regularized value function and Q-function are defined as 
+
+V π,λ h (s) = inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t)+ λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, π 
+
+
+
+, (3.1) 
+
+Qπ,λ h (s, a ) = inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t)+ λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, a h = a, π 
+
+
+
+,
+
+where D(μ|| μ0) = [ D(μi∥μ0 
+
+> i
+
+)] i∈[d]. In other words, we 3Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+only consider perturbed kernels in the linear feasible set 
+
+FL = P = {Ph}Hh=1 |Ph(·| s, a ) = ⟨ϕ(s, a ), μh(·)⟩,
+
+μh = ( μh, 1, μ h, 2, ...μ h,d )⊤, μ h,i (·) ∈ ∆( S), ∀i ∈ [d .
+
+The optimal robust regularized value function and Q-function are defined as: 
+
+V ⋆,λ h (s) = sup 
+
+> π
+
+V π,λ h (s),Q⋆,λ h (s, a ) = sup 
+
+> π
+
+Qπ.λ h (s, a ). (3.2) Based on (3.2) , the optimal robust policy is defined as the policy that achieves the optimal robust regularized value function, π⋆,λ = argmax π V π,λ  
+
+> 1
+
+(s), ∀s ∈ S .
+
+Dynamic programming principles for d-RRMDPs For completeness, we first show that the dynamic programming principles (Sutton & Barto, 2018) hold for d-RRMDPs. 
+
+Proposition 3.2. (Robust Regularized Bellman Equation) Under the d-rectangular linear RRMDP, for any policy π
+
+and any (h, s, a ) ∈ [H] × S × A , we have 
+
+Qπ,λ h (s, a ) = rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩,V π,λ h (s) = Ea∼π(·| s)
+
+Qπ,λ h (s, a ). (3.3) Next, we show that the optimal robust policy is deterministic and stationary. Hence, we can restrict the policy class Π to the deterministic and stationary one. 
+
+Proposition 3.3. Under the d-rectangular linear RRMDP, there exists a deterministic and stationary policy π⋆, such that for any (h, s, a ) ∈ [H] × S × A , V π⋆,λ h (s) = V ⋆,λ h (s),and Qπ⋆,λ h (s, a ) = Q⋆,λ h (s, a ).With Proposition 3.2 and Proposition 3.3, we can derive the following robust regularized Bellman optimality equation: 
+
+Q⋆,λ h (s, a ) = rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+
+
+Es′∼Ph(·| s,a )
+
+V ⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩,V ⋆,λ h (s) = max  
+
+> a∈A
+
+Q⋆,λ h (s, a ). (3.4) A direct consequence of (3.4) is the optimal policy π⋆,λ =
+
+{π⋆,λ h }Hh=1 is the greedy policy with respect to the optimal robust Q-functions {Q⋆,λ h }Hh=1 . Thus, in order to estimate 
+
+π⋆,λ , it suffices to estimate Q⋆,λ h , ∀h ∈ [H].
+
+Offline dataset and learning goal. An agent works with an offline dataset D with K i.i.d. trajectories collected from the nominal environment by a behavior policy πb. Specif-ically, for the τ -th trajectory {(sτh, a τh, r τh)}Hh=1 , we have 
+
+aτh ∼ πbh(·| sτh), rτh = rh(sτh, a τh), and sτh+1 ∼ P 0 
+
+> h
+
+(·| sτh, a τh)
+
+for any h ∈ [H]. The agent aims to learn the optimal robust policy π⋆ from the offline dataset D. Given a learned policy 
+
+ˆπ, we evaluate ˆπ by the suboptimality gap defined as follows SubOpt (ˆ π, s 1, λ ) := V ⋆,λ  
+
+> 1
+
+(s1) − V ˆπ,λ  
+
+> 1
+
+(s1). (3.5) 
+
+## 4. Robust Regularized Pessimistic Value Iteration (R2PVI) 
+
+In this section, we first develop a meta-algorithm for d-RRMDPs with general f -divergence defined regulariza-tion. To instantiate the meta-algorithm under specific f -divergences, we provide exact dual formulations of Q-functions with TV, KL and χ2-divergence defined regu-larization, respectively. We first show that robust Q-functions admit linear represen-tations under d-RRMDPs. 
+
+Proposition 4.1. Under Assumption 3.1, for any tuple 
+
+(π, s, a, h ), we have Qπ,λ h (s, a ) = ⟨ϕ(s, a ), θh + wπ,λ h ⟩,where wπ,λ h =  wπ,λ h, 1 , w π,λ h, 2 , · · · , w π,λ h,d 
+
+⊤ ∈ Rd, and 
+
+wπ,λ h,i := inf μh,i ∈∆( S)
+
+Eμh,i [V π,λ h+1 (s)] + λD (μh,i ∥μ0
+
+> h,i
+
+).The linear representation of the robust Q-function enables linear function approximation for parameter estimation. The definition of parameter wλh involves a regularized optimiza-tion. For any function V : S → R, the dual formulation of the regularized optimization problem (Yang et al., 2023) is: 
+
+inf  
+
+> μ∈∆( S)
+
+Es∼μV (s) + λD f (μ∥μ0)= sup 
+
+> α∈R
+
+h
+
+− λEs∼μ0
+
+h
+
+f ∗ α − V (s)
+
+λ
+
+i 
+
++ α
+
+i
+
+,
+
+where f ∗ is the conjugate function of f . We propose to estimate wλh through the ridge regres-sion. We define the intermediate variable wλh,i (α) := 
+
+Es∼μ0 
+
+> i
+
+[f ∗( α−V (s) 
+
+> λ
+
+)] and obtain an estimation ˆwλh,i (α) := 
+
+ argmin w∈Rd
+
+PKτ =1 (f ∗( α− ˆV λh+1 (s) 
+
+> λ
+
+) − ϕ(sτh, a τh)⊤w)2 +
+
+λ∥w∥22
+
+i = Λ−1 
+
+> h
+
+[PKτ =1 ϕ(sτh, a τh)f ∗( α− ˆV λh+1 (s) 
+
+> λ
+
+)] i. We then estimate wλh,i by ˆwλh,i = sup α∈R{− λ ˆwλh,i (α) + α}.Leveraging Proposition 3.2 and the pessimism principle (Jin et al., 2021) developed to take account for the distribu-tion shift arising from the offline dataset, we propose the meta-algorithm in Algorithm 1. 
+
+Remark 4.2. We emphasize that this general framework may encounter numerical challenges when computing the supremum over α, especially depending on the choice of the divergence function f . In particular, the smoothness and cur-vature of the conjugate function f ∗ can significantly affect the stability and efficiency of the optimization. For instance, some divergences lead to non-smooth or non-strongly con-vex conjugates, making the maximization problem harder to 4Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Algorithm 1 R2PVI under general f -divergence 
+
+Require: Dataset D, Regularizer λ > 0
+
+1: init ˆV λH+1 (·) = 0 
+
+2: for episode h = H, · · · , 1 do 
+
+3: Compute Λh ← PKτ =1 ϕ(sτh, a τh)ϕ(sτh, a τh)⊤ + γI
+
+4: ˆwλh,i (α) ← Λ−1 
+
+> h
+
+[PKτ =1 ϕ(sτh, a τh)f ∗( α− ˆV λh+1 (s) 
+
+> λ
+
+)] i
+
+▷ Duality Estimation for general f -divergence 
+
+5: ˆwλh,i ← sup α∈R{− λ ˆwλh,i (α) + α}
+
+6: Construct the penalty Γh(·, ·).
+
+7: Estimate ˆQλh(·, ·) ← min {⟨ ϕ(·, ·), θh + ˆwλh ⟩ − 
+
+Γh(·, ·), H − h + 1 }+.
+
+8: Construct ˆπh(·|· ) ← argmax πh ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A
+
+and ˆV λh (·) ← ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A.
+
+9: end for 
+
+solve accurately. Therefore, while this framework is general, we highlight that divergence-specific algorithm designs are necessary to ensure tractability and numerical stability. Next, we instantiate the f -divergence with TV, KL and 
+
+χ2-divergences respectively, and specify the estimation pro-cedure corresponding to different divergences. 
+
+4.1. R2PVI with the TV-Divergence 
+
+In this section, we show how to get the estimation in Line 4 and Line 5 of Algorithm 1 for TV divergence defined regularization. We first present the following duality result. 
+
+Proposition 4.3. Given any probability measure μ0 ∈
+
+∆( S) and value function V : S → [0 , H ], if the dis-tance D is chosen as the TV-divergence, the dual for-mulation of the original regularized optimization prob-lem is formed as: inf μ∈∆( S) Es∼μV (s) + λD TV (μ∥μ0) = 
+
+Es∼μ0 [V (s)] Vmin +λ.
+
+Remark 4.4. We compare the duality of the regularized problem in Proposition 4.3 with the duality of the constraint problem in DRMDPs with TV-divergence defined uncer-tainty sets (Shi & Chi, 2024): inf P ∈U ρ  
+
+> TV (P0)
+
+EP V (s) = max α∈[Vmin ,V max ]
+
+EP 0
+
+[V (s)] α − ρ(α − min s′ [V (s′)] α) .The former has a closed form , while the later involves an optimization over the dual variable α. We show later this dis-tinction makes R2PVI much more computationally efficient compared to algorithms designed for DRMDPs. Next, we present the parameter estimation procedure. Given an estimated robust value function ˆV λh+1 , we denote αh+1 =min s′ ˆV λh+1 (s′) + λ. By the linear representation in Proposi-tion 4.1, the duality for TV-divergence in Proposition 4.3 and the linearly structured nominal kernel in Assumption 3.1, we estimate the parameter wλh as follows 
+
+ˆwλh = argmin 
+
+> w∈Rd
+> K
+
+X 
+
+> τ=1
+
+ [ ˆV λh+1 (sτh+1 )] αh+1 
+
+− ϕ(sτh, a τh)⊤w2 + γ∥w∥22,
+
+(4.1) where γ is the regularizer in the ridge regression. 
+
+Remark 4.5. Thanks to the closed form expression of the duality for TV in Proposition 4.3, R2PVI does not need the dual optimization oracle as the DRPVI algorithm proposed for the d-DRMDP (Liu & Xu, 2024b, see their equation (4.4) and Algorithm 1 for more details). DRPVI needs to solve the dual optimization oracle separately for each dimension in each iteration, which is not necessary in our algorithm. 
+
+4.2. R2PVI with the KL-Divergence 
+
+Similar to the TV-divergence, we next derive the estimation in Line 4 and Line 5 of Algorithm 1 for KL divergence defined regularization. We first present the duality result. 
+
+Proposition 4.6. (Zhang et al., 2024, Example 1) Given any probability measure μ0 ∈ ∆( S) and value function V :
+
+S → [0 , H ], if the probability divergence D is chosen as the KL-divergence, then the dual formulation of the original reg-ularized optimization problem is: inf μ∈∆( S) Es∼μV (s) + 
+
+λD KL (μ∥μ0) = −λ log Es∼μ0
+
+e−V (s)/λ .
+
+The duality of KL also has a closed form. we will shown in Section 5 and Section 6 the closed form solution will reduce the computational cost and also ease the theoreti-cal analysis. Next, we present the parameter estimation procedure. According to the linear representation of Q-functions in Proposition 4.1, the duality for KL-divergence in Proposition 4.6 and the linearly structured nominal ker-nel in Assumption 3.1, we estimate the parameter wλh by a two-step procedure. Given an estimated robust value func-tion ˆV λh+1 , we first estimate Es∼μ0 e− ˆV λh+1 (s)/λ by ˆw′ 
+
+> h
+
+=argmin w∈Rd
+
+PKτ =1 
+
+ e− ˆV λh+1 (sτh+1 )/λ − ϕ(sτh, a τh)⊤w2 +
+
+γ∥w∥22. Then we take a log-transformation to get an estima-tion of wλh :
+
+ˆwλh = −λ log max { ˆw′
+
+> h
+
+, e −H/λ }. (4.2) Note that the max operator is to ensure the ridge-regression estimator is well-defined to take the log-transformation, and 
+
+e−H/λ is the lower bound on Es∼μ0 e− ˆV λh+1 (s)/λ .
+
+Remark 4.7. The algorithm proposed by Ma et al. (2022) relies on dual optimization oracles under DRMDPs with KL divergence defined uncertainty sets, while our algorithm takes advantages of the closed-form duality solution. Their algorithm also relies on an additional value shift technique to guarantee the estimated parameter is well-defined to take the log-transformation, while our algorithm does not. 5Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+4.3. R2PVI with the χ2-Divergence 
+
+It remains to derive the estimation in Line 4 and Line 5 of Algorithm 1 for χ2-divergence defined regularization. We first present a result on the duality of the χ2-divergence. 
+
+Proposition 4.8. Given any probability measure μ0 ∈
+
+∆( S) and value function V : S → [0 , H ], if D is chosen as the χ2-divergence, the dual formulation of the original regularized optimization problem is: 
+
+inf  
+
+> μ∈∆( S)
+
+Es∼μV (s) + λD χ2 (μ∥μ0) = (4.3) 
+
+sup 
+
+> α∈[Vmin ,V max ]
+
+Es∼μ0 [V (s)] α − 14λ Var s∼μ0 [V (s)] α .
+
+Next, we present the parameter estimation procedure. Ac-cording to the linear representation of the Q-function in Proposition 4.1, the duality for χ2-divergence in Proposi-tion 4.8 and the linear structure of the nominal kernel in Assumption 3.1, we estimate the parameter wλh as follows. First, we propose a new method motivated by the variance estimation in Liu & Xu (2024b) to estimate the variance of the value function in (4.3) . Specifically, given an esti-mated robust value function ˆV λh+1 and dual variable α, the estimations of Es∼μ0 [ ˆV λh+1 (s)] α and Es∼μ0 [ ˆV λh+1 (s)] 2 
+
+> α
+
+are: 
+
+ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α =
+
+
+
+argmin 
+
+> w∈Rd
+> K
+
+X 
+
+> τ=1
+
+([ ˆV λh+1 (sτh+1 )] α
+
+− ϕ(sτh, a τh)⊤w)2 + γ∥w∥22
+
+i
+
+> [0 ,H ]
+
+, (4.4) 
+
+ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2 
+
+> α
+
+=
+
+
+
+argmin 
+
+> w∈Rd
+> K
+
+X 
+
+> τ=1
+
+([ ˆV λh+1 (sτh+1 )] 2
+
+> α
+
+− ϕ(sτh, a τh)⊤w)2 + γ∥w∥22
+
+i
+
+> [0 ,H 2]
+
+, (4.5) where the superscript i represents the i-th element of a vector. Then we construct the estimator ˆwλh element-wisely: 
+
+ˆwλh,i = max   
+
+> α∈[( ˆVλh+1 )min ,( ˆVλh+1 )max ]
+
+nˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α+14λ (ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α)2 − 14λ ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2
+
+> α
+
+o
+
+.
+
+(4.6) We note that the above parameter estimation procedure in-volves an optimization, which is distinct from that of TV and KL, since the duality of χ2 does not admit a closed form expression. Specifically, it estimates the parameter 
+
+wλh element-wisely. For each dimension, it solves an opti-mization problem over an estimated dual formulation. This parameter estimation procedure shares a similar spirit with that in d-DRMDPs with TV divergence defined uncertainty sets (Liu & Xu, 2024b; Wang et al., 2024a). To conclude, we summarize the TV, KL and χ2 divergences instantiation of Algorithm 1 in Algorithm 2. 
+
+## 5. Suboptimality Analysis 
+
+In this section, we establish theoretical guarantees for al-gorithms proposed in Section 4. First, we derive instance-dependent upper bounds on the suboptimality gap of policies learned by the instantiated algorithms. Next, under a par-tial coverage assumption on the offline dataset, we present instance-independent upper bounds for the suboptimality gap and compare them with results from previous works. Finally, we provide an information-theoretic lower bound to highlight the intrinsic characteristics of offline d-RRMDPs. 
+
+Algorithm 2 R2PVI under TV, KL and χ2 divergence 
+
+Require: Dataset D, Regularizer λ > 0
+
+1: init ˆV λH+1 (·) = 0 
+
+2: for episode h = H, · · · , 1 do 
+
+3: Compute Λh ← PKτ =1 ϕ(sτh, a τh)ϕ(sτh, a τh)⊤ + γI
+
+4: Obtain the parameter estimation ˆwλh as follows: TV-divergence: use (4.1) KL-divergence: use (4.2) ▷ Duality Estimation 
+
+χ2-divergence: use (4.6) 
+
+5: Construct the penalty Γh(·, ·). ▷ Pessimism 
+
+6: Estimate ˆQλh(·, ·) ← min {⟨ ϕ(·, ·), θh + ˆwλh ⟩ − 
+
+Γh(·, ·), H − h + 1 }+.
+
+7: Construct ˆπh(·|· ) ← argmax πh ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A
+
+and ˆV λh (·) ← ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A.
+
+8: end for 5.1. Instance-Dependent Upper Bound Theorem 5.1. Suppose Assumption 3.1 holds. We set γ =1 and Γh(s, a ) = β Pdi=1 ∥ϕi(·, ·)1i∥Λ−1
+
+> h
+
+in Algorithm 2. Let δ ∈ (0 , 1) . β is chosen as follows. • (TV) β = 16 Hd √ξTV ,• (KL) β = 16 dλe H/λ p(H/λ + ξKL ),• ( χ2) β = 8 dH 2(1 + 1 /λ )pξχ2 ,where ξTV = 2 log(1024 Hd 1/2K2/δ ), ξKL =log(1024 dλ 2K3H/δ ) and ξχ2 = log(192 K5H6d3(1 + 
+
+H/ 2λ)3/δ ). Then with probability at least 1 − δ,for any s ∈ S, we have SubOpt (ˆ π, s, λ ) ≤
+
+2β sup P ∈U λ(P 0)
+
+PHh=1 Eπ⋆,P [Pdi=1 ∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|s1 =
+
+s], where Uλ(P 0) is the robustly admissible set defined as 
+
+Uλ(P 0) = O
+
+> (h,s,a )∈[H]×S×A
+
+Uλh (s, a ; μ0
+
+> h
+
+), (5.1) and Uλh (s, a ; μ0
+
+> h
+
+) =  P di=1 ϕi(s, a )μh,i (·) :
+
+D(μh,i ∥μ0
+
+> h,i
+
+) ≤ max s∈S V ⋆,λ h+1 (s)/λ, ∀i ∈ [d] .
+
+Remark 5.2. Theorem 5.1 provides instance-dependent up-per bounds on the suboptimality gap, closely resembling the bounds established for algorithms tailored to d-DRMDPs with TV divergence defined uncertainty sets (Liu & Xu, 6Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+2024b; Wang et al., 2024a). Notably, Uλ(P 0) in Theo-rem 5.1 represents a subset of the feasible set FL in the 
+
+d-RRMDP. While the RRMDP framework does not impose explicit uncertainty set constraints, this term naturally arises from our theoretical analysis (see Lemma C.1 and its proof for details). Specifically, we show that only distributions within Uλ(P 0) are relevant when considering the infimum in the robust regularized value and Q-functions (3.1) . Intu-itively, the regularization term in (3.1) should not exceed the change in expected cumulative rewards, so it should be upper bounded by the optimal value function. Similar terms are also found in Zhang et al. (2024, Definition 1) and Panaganti et al. (2022, Assumption 1). 
+
+5.2. Instance-Independent Upper Bound 
+
+Next, we derive instance-independent upper bounds on the suboptimality gap, building on Theorem 5.1. To achieve this, we adapt the robust partial coverage assumption on the offline dataset, originally proposed for d-DRMDPs (As-sumption A.2 of Blanchet et al. (2024)). This adaptation is straightforward and involves replacing the uncertainty set in the d-DRMDP framework with the robustly admissible set defined in (5.1). 
+
+Assumption 5.3 (Robust Regularized Partial Coverage) .
+
+For the offline dataset D, we assume that there exists some constant c† > 0, such that ∀(h, s, P ) ∈ [H] × S × U λ(P 0),
+
+Λh ⪰ γI + K · c† · Eπ⋆,P ϕ2 
+
+> i
+
+(s, a )1i1⊤ 
+
+> i
+
+|s1 = s.
+
+Intuitively, Assumption 5.3 assumes that the offline dataset has good coverage on the (s, a )-space visited by the optimal robust policy π⋆ under any transition kernel in the robustly admissible set. With Assumption 5.3 and Theorem 5.1, we present instance-independent bounds as follows. 
+
+Corollary 5.4. Under the same setting as Theorem 5.1, if we further assume Assumption 5.3 holds, then for any 
+
+δ ∈ (0 , 1) and s ∈ S , with probability at least 1 − δ, we have • (TV) SubOpt (ˆ π, s, λ ) ≤ 16 H2d2√ξTV /√c†K;• (KL) SubOpt (ˆ π, s, λ ) ≤ 16 λe Hλ d2H( Hλ +ξKL ) 12 /√c†K;• ( χ2) SubOpt (ˆ π, s, λ ) ≤ 8d2H3(1 + 1 /λ )pξχ2 /√c†K.We compare Algorithm 2 with algorithms proposed in pre-vious works for the offline d-DRMDP in Table 1. For the case with TV-divergence, the suboptimality bound of R2PVI matches that of P2MPO (Blanchet et al., 2024) in terms of 
+
+d and H. DRPVI (Liu & Xu, 2024b) and DROP (Wang et al., 2024a) admit tighter bounds on the suboptimality gap, simply because their bounds are derived based on ad-vanced techniques, such as reference-advantage decomposi-tion (Xiong et al., 2022). We remark that our analysis can be tailored to adopt the same techniques and assumption, and thus get tighter bounds. For the case with KL-divergence, existing theoretical results (Ma et al., 2022; Blanchet et al., 2024) rely on an additional regularity assumption regarding the KL dual variable, stat-ing that the optimal dual variable for the KL duality admits a positive lower bound β under any feasible transition kernel (see Blanchet et al. (2024, Assumption F.1)). However, this assumption presents the following drawbacks. First, it is challenging to verify the assumption’s validity in practice; second, even if such a lower bound holds, there is no straight-forward method to determine the magnitude of the lower bound. It can be seen from Table 1 that the suboptimality bound of R2PVI matches that of DRVI-L (Ma et al., 2022) in terms of d and H. However, our result depends on λ
+
+which is the regularization parameter and can be arbitrarily chosen, while the result of DRVI-L depends on β which can be extremely small such that pβe H/β ≫ √λe H/λ . More-over, Zhang et al. (2024) 2 studied the RRMDP with the regularization term defined by the KL-divergence in their Theorem 5 and the suboptimality bound also depends on the term √λe H/λ . Further, comparing the bounds of P2MPO (Blanchet et al., 2024) and R2PVI, we can qualitatively conclude that the regularization parameter λ in d-RRMDPs plays a role analogous to 1/ρ in d-DRMDPs. This relation aligns with the intuition that a smaller λ in d-RRMDPs or a larger ρ in d-DRMDPs can induce a more robust policy. For the case with χ2 divergence, our bound is the first result in literature. Compared with the TV divergence, the com-plexity is higher due to the more complex geometry and dual formulation of χ2 divergence. This observation aligns with findings of tabular DRMDPs with TV and χ2 divergence defined uncertainty sets (Shi et al., 2024). While existing works have focused on the (s, a )-rectangular structured reg-ularization, our work fills the theoretical gap in RRMDPs by introducing the d-rectangular structured regularization, a contribution that may be of independent interest. 
+
+5.3. Information-Theoretic Lower Bound 
+
+We highlight that in Theorem 5.1, suboptimality bounds under cases with TV, KL, χ2-divergence share the same term 
+
+sup P ∈U λ(P 0)
+
+PHh=1 Eπ⋆,P  P di=1 ∥ϕi(sh, a h)1i∥Λ−1
+
+> h
+
+|s1 =
+
+s. In this section, we establish information theoretic lower bounds to show that this term is intrinsic in offline 
+
+d-RRMDPs. In order to give a formal presentation of the information-theoretical lower bound, we define M as a class of d-RRMDPs and SubOpt (M, ˆπ, s, ρ ) as the suboptimality gap specific to one d-RRMDP instance M ∈ M . We state the information-theoretic lower bound in the following theorem.     
+
+> 2Zhang et al. (2024) studied the infinite horizon RRMDP with a discounted factor γ, we replace the effective horizon length 11−γ
+> by the horizon length Hin the finite horizon setting.
+
+7Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization        
+
+> Table 1. Comparison of the suboptimality gap between this and previous works. The ⋆symbol denotes results that require an additional assumption (Assumption 4.4 of Ma et al. (2022) and Assumption F.1 of Blanchet et al. (2024)) on the KL dual variable, an assumption not required by our R2PVI algorithm. The parameter ρrepresents the uncertainty level in DRMDPs, while λrepresents the regularization term in RRMDPs. The Coverage column indicates the assumption used to derive the suboptimality gap: the robust partial coverage assumption refers to Assumption A.2 of Blanchet et al. (2024), and the regularized partial coverage assumption represents Assumption 5.3.
+
+Algorithm Setting Divergence Coverage Suboptimality Gap DRPVI (Liu & Xu, 2024b) d-DRMDP TV full ˜O(dH 2K−1/2)
+
+DROP (Wang et al., 2024a) d-DRMDP TV robust partial ˜O(d3/2H2K−1/2)
+
+P2MPO (TV) (Blanchet et al., 2024) d-DRMDP TV robust partial ˜O(d2H2K−1/2)
+
+R2PVI-TV (ours) d-RRMDP TV regularized partial ˜O(d2H2K−1/2)
+
+DRVI-L (Ma et al., 2022) d-DRMDP KL robust partial ˜O(pβe H/β d2H3/2K−1/2)⋆
+
+P2MPO (KL) (Blanchet et al., 2024) d-DRMDP KL robust partial ˜O(eH/β d2H2ρ−1K−1/2)⋆
+
+R2PVI-KL (ours) d-RRMDP KL regularized partial ˜O(√λe H/λ d2H3/2K−1/2)
+
+R2PVI-χ2 (ours) d-RRMDP χ2 regularized partial ˜O(d2H3(1 + λ−1)K−1/2)
+
+Theorem 5.5. Let K > max { ˜O(d6), ˜O(d3H2/λ 2)} be the sample size, where we have regularizer λ, dimension 
+
+d, horizon length H. There exists a class of d-rectangular linear RRMDPs M and an offline dataset D of size 
+
+K such that for any δ ∈ (0 , 1) , s ∈ S , divergence D
+
+among DTV , D KL and Dχ2 , with probability at least 
+
+1 − δ, we have inf ˆπ sup M ∈M SubOpt (M, ˆπ, s, λ, D ) ≥ c ·
+
+sup P ∈U λ(P 0)
+
+PHh=1 Eπ⋆,P [Pdi=1 ∥ϕi(sh, a h)1i∥Λ−1
+
+> h
+
+s1 =
+
+s], where c is a universal constant. Theorem 5.5 is a universal information theoretic lower bound for d-RRDMPs with all three divergences studied in Section 5. Theorem 5.5 shows that the instance-dependent term is actually intrinsic to the offline d-RRDMPs, and Al-gorithm 2 is near-optimal up to a factor β, for which the definition varies among different divergence metric D as shown in Theorem 5.1. The proof outline of Theorem 5.5 is inspired by that of Theorem 6.1 in Liu & Xu (2024b), but here we need careful treatment on bounding the robust regu-larized value function by duality under different choices of 
+
+f -divergences. We provide more details on the hard instance construction, the proof techniques, and the comparison with existing results in Appendix D. 
+
+## 6. Experiment 
+
+In this section, we conduct numerical experiments to ex-plore (1) the robustness of R2PVI regarding dynamics shifts, (2) how the regularizer λ affects the robustness of R2PVI, and (3) the computation cost of R2PVI. We evalu-ate our algorithm in two off-dynamics problems that have been used in the literature (Ma et al., 2022; Liu & Xu, 2024a). All experiments are conducted on a machine with an 11th Gen Intel(R) Core(TM) i5-11300H @ 3.10GHz processor, featuring 8 logical CPUs, 4 physical cores, and 2 threads per core. The implementation of our R2PVI al-gorithm is available at https://github.com/panxulab/Robust-Regularized-Pessimistic-Value-Iteration. 
+
+Baselines. We compare our algorithms with three types of baseline frameworks: (1) non-robust pessimism-based algorithm: PEVI (Jin et al., 2021), (2) algorithms for d-DRMDPs with TV divergence defined uncertainty sets: DR-PVI (Liu & Xu, 2024b), (3) algorithms for d-DRMDPs with KL divergence defined uncertainty sets: DRVI-L (Ma et al., 2022). We do not implement P2MPO and DROP mentioned in Table 1 in our experiment, due to the lack of code base and numerical experiment in their works. 
+
+6.1. Simulated Linear MDPs 
+
+We borrow the simulated linear MDP constructed in Liu & Xu (2024a) and adapt it to the offline setting. We set the behavior policy πb such that it chooses actions uniformly at random. The sample size of the offline dataset is set to 100. For completeness, we present more details on the experiment set up and results in Appendix A. In Figure 1(a), we compare R2PVI with its non-robust coun-terpart PEVI (Jin et al., 2021). We conclude that PEVI outperforms R2PVI when the perturbation of the environ-ment is small, but underperforms when the environment encounters a significant shift, which verifies the robustness 8Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 0.0 0.2 0.4 0.6 0.8 1.0  
+
+> Perturbation
+> 0.8
+> 0.9
+> 1.0
+> 1.1
+> 1.2
+> 1.3
+> 1.4
+> 1.5
+> Average reward
+> PEVI
+> R2PVI-TV
+> R2PVI-KL
+> R2PVI-2
+
+(a) λ = 0 .10.0 0.2 0.4 0.6 0.8 1.0  
+
+> Perturbation
+> 0.8
+> 1.0
+> 1.2
+> 1.4
+> 1.6
+> Average reward
+> =0.1
+> =0.2
+> =0.3
+> =0.6
+
+(b) R2PVI 0.0 0.2 0.4 0.6 0.8 1.0  
+
+> /
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> 1.1
+> Average reward
+> DRPVI
+> R2PVI
+
+(c) q = 0 .90.2 0.3 0.4 0.5 0.6 0.7 0.8 0.9 1.0  
+
+> price-up probability
+> 0
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> Average Reward
+> PEVI (base)
+> R2PVI
+> DRPVI
+
+(d) (up to down) λ = 1 , 3, 5, ρ =0.2, 0.1, 0.025 .
+
+Figure 1. Simulated results for linear MDP. In Figure 1(a) and Figure 1(b), the x-axis refers to the perturbation in the testing environment. In Figure 1(c), the x-axis represents different robust level ρ and regularized penalty λ, respectively. Figure 1(d) shows the robustness of algorithms under different robust level ρ (DRPVI) or regularization penalty λ (R2PVI). 1 5 10 
+
+> Sample Size N (x10 3)
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> 14
+> Time(s)
+> PEVI (base)
+> R2PVI-TV (ours)
+> R2PVI-KL (ours)
+> DRPVI
+> DRVI-L
+
+(a) execution time w.r.t N. 30 60 120  
+
+> d
+> 0
+> 2
+> 4
+> 6
+> 8
+> 10
+> 12
+> 14
+> 16
+> Time(s)
+> PEVI (base)
+> R2PVI-TV (ours)
+> R2PVI-KL (ours)
+> DRPVI
+> DRVI-L
+
+(b) execution time w.r.t d. 
+
+Figure 2. Simulation results for the simulated American put option task. Figure 2(a) shows the computation time of R2PVI with respect to the sample size N . Figure 2(b) shows the computation time of algorithms with respect to the feature dimension d.
+
+of R2PVI. The regularizer λ controls the extent of robust-ness of R2PVI by determining the magnitude of the penalty as shown in Proposition 3.2. By Figure 1(b), we conclude that a smaller λ leads to a more robust policy. To illustrate the relation between the d-RRMDP and the d-DRMDP, we fix a target environment, and then test R2PVI with different 
+
+λ and DRPVI (Liu & Xu, 2024b) with different ρ. We find from Figure 1(c) that the ranges of the average reward are about the same for the two algorithms, though the behaviors w.r.t. λ and ρ are opposite. Thus, we verify that the regu-larizer λ plays a similar role in the RRMDP as the inverted robustness parameter 1/ρ in the DRMDP. 
+
+6.2. Simulated American Put Option 
+
+In this section, we test our algorithm in a simulated Amer-ican Put Option environment (Tamar et al., 2014; Zhou et al., 2021) that does not belong to the d-rectangular linear RRMDP. This environment is a finite horizon MDP with 
+
+H = 20 , and is controlled by a hyperparameter p0, which is set to be 0.5 in the nominal environment. We collect the offline data from the nominal environment by a uniformly random behavior policy. An agent uses the collected offline dataset to learn a policy which decides at each state whether or not to exercise the option. To implement our algorithm, we use a manually designed feature mapping of dimension 
+
+d. For more details, we refer readers to Appendix A.2. All experiment results are shown in Figure 2. In particular, from Figure 2(a) and Figure 2(b), we can conclude that the computation cost of R2PVI is as low as its non-robust coun-terpart PEVI (Jin et al., 2021), and improves that of DRPVI (Liu & Xu, 2024b) and DRVI-L (Ma et al., 2022) designed for the d-DRMDP. This is due to the closed form duality of TV and KL under the d-RRMDP framework. From Fig-ure 1(d), we conclude that R2PVI not only demonstrates robustness to environment perturbations but also matches DRPVI’s performance for appropriate values of the robust regularizer λ and uncertainty level ρ.
+
+## 7. Conclusion 
+
+We introduced the d-rectangular linear Robust Regularized Markov Decision Process ( d-RRMDP) framework to ad-dress limitations of the d-rectangular DRMDP framework for robust policy learning in literature, improving both the-oretical robustness and computational efficiency. We de-veloped R2PVI, a provably effective algorithm for learning robust policies from offline datasets using f -divergence-based regularization. Our results highlight the advantages of d-RRMDPs, particularly in simplifying the duality oracle. Experiments confirm R2PVI’s robustness and efficiency. It remains an intriguing open question to improve the current upper and lower bounds to study the fundamental hardness of d-RRMDPs. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 9Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+## Acknowledgements 
+
+Z. Liu and P. Xu are supported in part by the National Sci-ence Foundation (DMS-2323112) and the Whitehead Schol-ars Program at the Duke University School of Medicine. 
+
+## References 
+
+Blanchet, J., Lu, M., Zhang, T., and Zhong, H. Double pessimism is provably efficient for distributionally robust offline reinforcement learning: Generic algorithm and robust partial coverage. Advances in Neural Information Processing Systems , 36, 2024. Garcıa, J. and Fern ´andez, F. A comprehensive survey on safe reinforcement learning. Journal of Machine Learning Research , 16(1):1437–1480, 2015. Goyal, V. and Grand-Clement, J. Robust markov decision processes: Beyond rectangularity. Mathematics of Oper-ations Research , 48(1):203–226, 2023. Guo, Y., Wang, Y., Shi, Y., Xu, P., and Liu, A. Off-dynamics reinforcement learning via domain adaptation and reward augmented imitation. In Advances in Neural Informa-tion Processing Systems , volume 37, pp. 136326–136360, 2024. Iyengar, G. N. Robust dynamic programming. Mathematics of Operations Research , 30(2):257–280, 2005. Jin, C., Yang, Z., Wang, Z., and Jordan, M. I. Provably efficient reinforcement learning with linear function ap-proximation. In Conference on Learning Theory , pp. 2137–2143. PMLR, 2020. Jin, Y., Yang, Z., and Wang, Z. Is pessimism provably efficient for offline rl? In International Conference on Machine Learning , pp. 5084–5096. PMLR, 2021. Levine, S., Kumar, A., Tucker, G., and Fu, J. Offline rein-forcement learning: Tutorial, review, and perspectives on open problems. arXiv preprint arXiv:2005.01643 , 2020. Liu, Z. and Xu, P. Distributionally robust off-dynamics reinforcement learning: Provable efficiency with linear function approximation. In International Conference on Artificial Intelligence and Statistics , pp. 2719–2727. PMLR, 2024a. Liu, Z. and Xu, P. Minimax optimal and computation-ally efficient algorithms for distributionally robust offline reinforcement learning. In Advances in Neural Informa-tion Processing Systems , volume 37, pp. 86602–86654, 2024b. Liu, Z. and Xu, P. Linear mixture distributionally robust markov decision processes. arXiv preprint arXiv:2505.18044 , 2025. Liu, Z., Wang, W., and Xu, P. Upper and lower bounds for distributionally robust off-dynamics reinforcement learning. arXiv preprint arXiv:2409.20521 , 2024. Lu, M., Zhong, H., Zhang, T., and Blanchet, J. Distribu-tionally robust reinforcement learning with interactive data collection: Fundamental hardness and near-optimal algorithms. In The Thirty-eighth Annual Conference on Neural Information Processing Systems , 2024. Ma, X., Liang, Z., Xia, L., Zhang, J., Blanchet, J., Liu, M., Zhao, Q., and Zhou, Z. Distributionally robust offline re-inforcement learning with linear function approximation. 
+
+arXiv preprint arXiv:2209.06620 , 2022. Nelder, J. A. and Mead, R. A simplex method for func-tion minimization. The computer journal , 7(4):308–313, 1965. Nilim, A. and El Ghaoui, L. Robust control of markov decision processes with uncertain transition matrices. Op-erations Research , 53(5):780–798, 2005. Packer, C., Gao, K., Kos, J., Kr ¨ahenb ¨uhl, P., Koltun, V., and Song, D. Assessing generalization in deep reinforcement learning. arXiv preprint arXiv:1810.12282 , 2018. Panaganti, K. and Kalathil, D. Sample complexity of ro-bust reinforcement learning with a generative model. In 
+
+International Conference on Artificial Intelligence and Statistics , pp. 9582–9602. PMLR, 2022. Panaganti, K., Xu, Z., Kalathil, D., and Ghavamzadeh, M. Robust reinforcement learning using offline data. Ad-vances in Neural Information Processing Systems , 35: 32211–32224, 2022. Panaganti, K., Wierman, A., and Mazumdar, E. Model-free robust ϕ-divergence reinforcement learning using both offline and online data. In Proceedings of the 41st Inter-national Conference on Machine Learning , pp. 39324– 39363, 2024a. Panaganti, K., Xu, Z., Kalathil, D., and Ghavamzadeh, M. Bridging distributionally robust learning and offline rl: An approach to mitigate distribution shift and partial data coverage. In ICML 2024 Workshop: Foundations of Reinforcement Learning and Control–Connections and Perspectives , 2024b. Satia, J. K. and Lave Jr, R. E. Markovian decision pro-cesses with uncertain transition probabilities. Operations Research , 21(3):728–740, 1973. Shi, L. and Chi, Y. Distributionally robust model-based offline reinforcement learning with near-optimal sample complexity. Journal of Machine Learning Research , 25 (200):1–91, 2024. 10 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Shi, L., Li, G., Wei, Y., Chen, Y., Geist, M., and Chi, Y. The curious price of distributional robustness in reinforcement learning with a generative model. Advances in Neural Information Processing Systems , 36, 2024. Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, 2018. Tamar, A., Mannor, S., and Xu, H. Scaling up robust mdps using function approximation. In International Confer-ence on Machine Learning , pp. 181–189. PMLR, 2014. Tsybakov, A. B. Introduction to Nonparametric Estimation .Springer, New York, 2009. Vershynin, R. Introduction to the non-asymptotic analysis of random matrices. arXiv preprint arXiv:1011.3027 ,2010. Vershynin, R. High-dimensional probability: An introduc-tion with applications in data science , volume 47. Cam-bridge university press, 2018. Wang, H., Shi, L., and Chi, Y. Sample complexity of offline distributionally robust linear markov decision processes. In Reinforcement Learning Conference , 2024a. Wang, R., Yang, Y., Liu, Z., Zhou, D., and Xu, P. Return augmented decision transformer for off-dynamics rein-forcement learning. arXiv preprint arXiv:2410.23450 ,2024b. Xiong, W., Zhong, H., Shi, C., Shen, C., Wang, L., and Zhang, T. Nearly minimax optimal offline reinforcement learning with linear function approximation: Single-agent mdp and markov game. arXiv preprint arXiv:2205.15512 ,2022. Xu, Z., Panaganti, K., and Kalathil, D. Improved sample complexity bounds for distributionally robust reinforce-ment learning. In International Conference on Artificial Intelligence and Statistics , pp. 9728–9754. PMLR, 2023. Yang, W., Wang, H., Kozuno, T., Jordan, S. M., and Zhang, Z. Robust markov decision processes without model estimation. arXiv preprint arXiv:2302.01248 , 2023. Zhang, H., Chen, H., Xiao, C., Li, B., Liu, M., Boning, D., and Hsieh, C.-J. Robust deep reinforcement learning against adversarial perturbations on state observations. 
+
+Advances in Neural Information Processing Systems , 33: 21024–21037, 2020. Zhang, R., Hu, Y., and Li, N. Soft robust mdps and risk-sensitive mdps: Equivalence, policy gradient, and sample complexity. In The Twelfth International Conference on Learning Representations , 2024. Zhou, Z., Zhou, Z., Bai, Q., Qiu, L., Blanchet, J., and Glynn, P. Finite-sample regret bound for distributionally robust offline tabular reinforcement learning. In International Conference on Artificial Intelligence and Statistics , pp. 3331–3339. PMLR, 2021. 11 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+## A. Additional Details on Experiments 
+
+In this section, we provide details on experiment setup. 
+
+A.1. Simulated Linear MDPs Construction of the Simulated Linear MDP We leverage the simulated linear MDP instance proposed by Liu & Xu (2024a). The state space is S = {x1, · · · , x 5} and the action space is A = {− 1, 1}4 ⊂ R4. At each episode, the initial state is always x1. From x1, the next state can be x2, x 4, x 5 with probability defined on the arrows. Both x4 and x5 are absorbing states. x4 is the fail state with 0 reward and x5 is the goal state with reward 1. The hyperparameter ξ ∈ R4 is designed to determine the reward functions and transition probabilities and δ is the parameter defined to determine the environment. We perturb the transition probability at the initial stage to construct the source environment. The extend of perturbation is controlled by the hyperparameter q ∈ (0 , 1) . For more details on the simulated linear DRMDP, we refer readers to the Supplementary A.1 in Liu & Xu (2024a). 
+
+Hyperparameters The hyper-parameters in our setting are shown in Table 2. The horizon is 3, the β, γ, δ are set the same in all tasks, the ∥ξ∥1 is set as 0.3, 0.2, 0.1 in Figure 1 in order to illustrate the versatility of our algorithms.  
+
+> Table 2. Hyper-parameters.
+
+Hyper-parameters Value 
+
+H (Horizon) 3
+
+β (pessimism parameter) 1
+
+γ 0.1 
+
+δ 0.3 
+
+∥ξ∥1 0.3, 0.2, 0.1 
+
+A.2. Simulated American Put Option Construction of the Simulated American Put Option In each episode, there are H = 20 stages, and each state h, the dynamics evolves following the Bernoulli distribution: 
+
+sh+1 =
+
+(
+
+1.02 sh, w.p p0
+
+0.98 sh, w.p 1 − p0
+
+, (A.1) where p0 ∈ (0 , 1) is the probability of price up. At each step, the agent has two actions to take: exercise the option ah = 1 
+
+or not exercise a = 0 . If exercising the option ah = 0 , the agent will obtain reward rh = max {0, 100 − sh} and the state comes to an end. If not exercising the option ah = 1 , The state will continue to transit based on (A.1) and no reward will be received. To implement our algorithms, we use the following feature mapping: 
+
+ϕ (sh, a ) = 
+
+(
+
+[φ1 (sh) , · · · , φ d (sh) , 0] if a = 1 [0 , · · · , 0, max {0, 100 − sh}] if a = 0 ,
+
+where φi(s) = max {0, 1 − | sh − si| /∆}, {si}di=1 are anchor states, s1 = 80 si+1 − si = ∆ and ∆ = 60 /d . For more details on the simulated American put option environment, we refer readers to the Appendix C of Ma et al. (2022). 
+
+Offline Dataset and Hyperparameters We set p0 = 0 .5 in the nominal environment, from which trajectories are collected by fixed behavior policy, which chooses ah = 0 . The β = 0 .1 and γ = 1 are set hyper-parameters in all tasks. For the time efficiency comparison in Figure 2(a) and Figure 2(b), we counted the time it took for the agent to train once and repeated 5 times to take the average. 
+
+## B. Proof of Properties of d-RRMDPs 
+
+In this section, we provide the proofs of results in Sections 3 and 4, namely, the robust regularized Bellman equation, the existence of the optimal robust policy, and the linear representation of the robust regularized Q-function under the 12 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+d-rectangular linear RRMDP. 
+
+B.1. Proof of Proposition 3.2 
+
+Proof. We prove the a stronger proposition by induction from the last stage H. Specifically, besides the equations in Proposition 3.2 hold, we further assume that there exist transition kernels { ˆμt}Ht=1 , ˆPt = ⟨ϕ, ˆμt⟩, such that for any 
+
+(h, s ) ∈ [H] × S ,
+
+V π,λ h (s) = E{ ˆPt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D( ˆ μt|| μ0 
+
+> t
+
+)⟩ sh = s, π 
+
+
+
+. (B.1) As there is no transitional kernel involved, the base case holds trivially. Suppose the conclusion holds for stage h + 1 , that is to say, there exists ˆPt, t = h + 1 , h + 2 , · · · , H such that 
+
+V π,λ h+1 (s) = E{ ˆPi}Hi=h+1 
+
+ HX
+
+> t=h+1
+
+rt(st, a t) + λ⟨ϕ(st, a t), D( ˆ μt|| μ0 
+
+> t
+
+) sh+1 = s, π 
+
+
+
+.
+
+For the case of h, recall the definition of Qπh , we have 
+
+Qπ,λ h (s, a ) = inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, a h = a, π 
+
+
+
+= rh(s, a ) + inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+λ⟨ϕ(sh, a h), D(μh|| μ0
+
+> h
+
+)⟩
+
++
+
+Z
+
+> S
+
+Ph(ds ′|s, a )E{Pt}Ht=h+1 
+
+ HX
+
+> t=h+1
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh+1 = s′, π 
+
+
+
+≤ rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+λ⟨ϕ(sh, a h), D(μh|| μ0
+
+> h
+
+)⟩
+
++
+
+Z
+
+> S
+
+Ph(ds ′|s, a )E{ ˆPt}Ht=h+1 
+
+ HX
+
+> t=h+1
+
+rt(st, a t) + λ⟨ϕ(st, a t), D( ˆ μt|| μ0 
+
+> t
+
+)⟩ sh+1 = s′, π 
+
+
+
+= rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+λ⟨ϕ(sh, a h), D(μh|| μ0
+
+> h
+
+)⟩ + Es′∼Ph(·| s,a )[V π,λ h+1 (s′)] , (B.2) where (B.2) follows by the inductive hypothesis of V π,λ h+1 (s). On the other hand, we can lower bound Qπ,λ h (s, a ) as 
+
+Qπ,λ h (s, a )= rh(s, a ) + inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+λ⟨ϕ(sh, a h), D(μh|| μ0
+
+> h
+
+)⟩
+
++
+
+Z
+
+> S
+
+Ph(ds ′|s, a )E{Pt}Ht=h+1 
+
+ HX
+
+> t=h+1
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh+1 = s′, π 
+
+
+
+≥ rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+λ⟨ϕ(sh, a h), D(μh|| μ0
+
+> h
+
+)⟩ (B.3) 
+
++
+
+Z
+
+> S
+
+P πh (ds ′|s, a ) inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+E{Pt}Ht=h+1 
+
+ HX
+
+> t=h+1
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh+1 = s′, π 
+
+
+
+= rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+λ⟨ϕ(sh, a h), D(μh|| μ0
+
+> h
+
+)⟩ + Es′∼Ph(·| s,a )[V π,λ h+1 (s′)] , (B.4) where (B.3) follows by the Fatou’s lemma, (B.4) follows by the definition of V π,λ h+1 (s). Hence, combining the two above inequalities, we conclude the proof of the first equation. Next we focus on the proof of the (B.1), by which we aim to proof the existence of transition kernel { ˆPt}Ht=h. By the fact that 
+
+Qπ,λ h (s, a ) = rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩,
+
+13 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+we notice that the inf problem above is constraint by the distance D. Therefore by Lagrange duality and the closeness of distribution ∆( S), there exists ˆμh ∈ ∆( S)d, ˆPh = ⟨ϕ, ˆμh⟩ such that 
+
+Qπ,λ h (s, a ) = rh(s, a ) + Es′∼ ˆPh(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D( ˆ μh|| μ0
+
+> h
+
+)⟩. (B.5) Now it remains to proof (3.3). By the definition of V π,λ h (s), we have 
+
+V π,λ h (s) (B.6) 
+
+= inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, π 
+
+
+
+= inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+X
+
+> a∈A
+
+π(a|s)E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, a h = a, π 
+
+
+
+≤ X
+
+> a∈A
+
+π(a|s)E{ ˆPt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D( ˆ μt|| μ0 
+
+> t
+
+)⟩ sh = s, a h = a, π 
+
+
+
+= X
+
+> a∈A
+
+π(a|s)Qπ,λ h (s, a ), (B.7) where (B.7) comes from (B.5) and the inductive hypothesis. On the other hand, by the definition of Qπ,λ h (s, a ), we have 
+
+X
+
+> a∈A
+
+π(a|s)Qπ,λ h (s, a )= X
+
+> a∈A
+
+π(a|s) inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, a h = a, π 
+
+
+
+≤ inf 
+
+> μt∈∆( S)d,P t=⟨ϕ,μt⟩
+
+X
+
+> a∈A
+
+π(a|s)E{Pt}Ht=h
+
+ HX
+
+> t=h
+
+rt(st, a t) + λ⟨ϕ(st, a t), D(μt|| μ0 
+
+> t
+
+)⟩ sh = s, a h = a, π 
+
+
+
+= V π,λ h (s), (B.8) where (B.8) comes from the definition of V π,λ h (s). Combining the two inequalities (B.7) and (B.8), we have 
+
+V π,λ h (s) = Ea∼π(·| s)
+
+Qπh (s, a ).
+
+This proves the (3.3) for stage h. Therefore, by using an induction argument, we finish the proof of Proposition 3.2. 
+
+B.2. Proof of Proposition 3.3 
+
+Proof. We define the optimal stationary policy π⋆ = {π⋆h}Hh=1 as: for all (h, s ) ∈ [H] × S ,
+
+π⋆h(s) = argmax 
+
+> a∈A
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V ⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+.
+
+Now it remains to show that the regularized robust value function V π⋆,λ h , Q π⋆,λ h induced by policy π⋆ is optimal, i.e., for all 
+
+(h, s ) ∈ [H] × S ,
+
+V π⋆,λ h (s) = V ⋆,λ h (s), Q π⋆,λ h (s, a ) = Q⋆,λ h (s, a ).
+
+By the (3.2) , we only need to prove the first equation above, then the optimality of the Q holds trivially. we prove this statement by induction from H to 1. For stage H, the conclusion holds by: 
+
+V ⋆,λ H (s) = sup 
+
+> π
+
+V π,λ H (s)= sup 
+
+> π
+
+inf    
+
+> μH∈∆( S)d,P H=⟨ϕ,μH⟩
+
+EPH
+
+rH (sH , a H ) + λ⟨ϕ(sH , a H ), D(μH || μ0 
+
+> H
+
+)⟩ sH = s, π 
+
+
+
+14 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+= sup 
+
+> π
+
+h
+
+rH (sH , π H (sH )) + inf    
+
+> μH∈∆( S)d,P H=⟨ϕ,μH⟩
+
+λ⟨ϕ(s, a ), D(μH || μ0 
+
+> H
+
+)⟩
+
+i
+
+= V π⋆,λ H (s).
+
+Now assume that the conclusion holds by stage h + 1 . Hence, we have that for all s ∈ S ,
+
+V π⋆,λ h+1 (s) = V ⋆,λ h+1 (s).
+
+For the case of h, by (3.2), we have 
+
+V π⋆,λ h (s)= Ea∼π⋆h(·| s)
+
+h
+
+Qπ⋆,λ h (s, a )
+
+i
+
+= Ea∼π⋆h(·| s)
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+= Ea∼π⋆h(·| s)
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V ⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+(B.9) 
+
+= max 
+
+> a∈A
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V ⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+, (B.10) where (B.9) holds by the inductive hypothesis, (B.10) holds by the definition of π⋆. On the other hand, recall the definition of V ⋆,λ h (s), then for any s ∈ S , by (3.2) we have 
+
+V ⋆,λ h (s)= sup 
+
+> π
+
+V π,λ h (s)= sup 
+
+> π
+
+Ea∼πh(·| s)
+
+h
+
+Qπ,λ h (s, a )
+
+i
+
+= sup 
+
+> π
+
+Ea∼πh(·| s)
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+≤ sup 
+
+> π
+
+Ea∼πh(·| s)
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V ⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+(B.11) 
+
+= max 
+
+> a∈A
+
+h
+
+rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V ⋆,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩i
+
+= V π⋆,λ h (s), (B.12) where (B.11) holds by the fact that V π⋆,λ h+1 (s) ≤ V ⋆,λ h+1 (s), ∀s ∈ S , (B.12) holds by (B.10). In turn, we trivially have 
+
+V ⋆,λ h (s) ≥ V π⋆,λ h (s) due to the optimality of the value function. Hence, we obtain V π⋆,λ h (s) = V ⋆,λ h (s), ∀s ∈ S . Therefore, by the induction argument, we conclude the proof. 
+
+B.3. Proof of Proposition 4.1 
+
+Proof. By Proposition 3.2, we have 
+
+Qπ,λ h (s, a ) = rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩
+
+= ϕ(s, a ), θh + inf 
+
+> μh∈∆( S)d
+
+h
+
+ϕ(s, a ), Es′∼μh [V π,λ h+1 (s′)] + λ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )D(μh,i ∥μ0
+
+> h,i
+
+)
+
+i
+
+= ϕ(s, a ), θh + ϕ(s, a ), wπ,λ h
+
+= ϕ(s, a ), θh + wπ,λ h .
+
+Hence we conclude the proof. 15 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+B.4. Proof of Proposition 4.3 
+
+Proof. The optimization problem can be formalized as: 
+
+inf  
+
+> μ
+
+Es∼μV (s) + λD TV (μ∥μ0) subject to X
+
+> s
+
+μ(s) = 1 , μ (s) ≥ 0.
+
+Denote y(s) = μ(s) − μ0(s), the objective function can be rewritten as: 
+
+Es∼μV (s) + λD TV (μ∥μ0) = X
+
+> s
+
+μ(s)V (s) + λ/ 2 X
+
+> s
+
+|μ(s) − μ0(s)|
+
+= X
+
+> s
+
+V (s)( y(s) + μ0(s)) + λ/ 2 X |y(s)|
+
+= Es∼μ0 V (s) + X
+
+> s
+
+V (s)y(s) + λ/ 2 X |y(s)|.
+
+Recall the constraint P 
+
+> s
+
+y(s) = 0 , y (s) ≥ − μ0(s), by the Lagrange duality, we establish the Lagrangian function: 
+
+L = min  
+
+> y
+
+max 
+
+> μ≥0,r ∈R
+
+ X 
+
+> s
+
+[y(s)( V (s) − μ(s) − r)) + λ/ 2|y(s)|] − X
+
+> s
+
+μ(s)μ0(s)
+
+
+
+.
+
+In order to achieve the minimax optimality, for any s, term y(s)( V (s) − μ(s) − r)) + λ/ 2|y(s)| should obtain a bounded lower bound with respect to y(s), which requires that μ(s), r should satisfy the following conditions: 
+
+∀s ∈ S , |V (s) − μ(s) − r| ≤ λ/ 2 ⇒ max  
+
+> s∈S
+
+{V (s) − μ(s)} − min  
+
+> s∈S
+
+{V (s) − μ(s)} ≤ λ. 
+
+With the constraint above, we denote g(s) := V (s) − μ(s), we have 
+
+L = max  
+
+> μ≥0,r ∈R
+
+min 
+
+> y
+
+n X 
+
+> s
+
+[y(s)( V (s) − μ(s) − r)) + λ/ 2|y(s)|] − X
+
+> s
+
+μ(s)μ0(s)
+
+o
+
+= max      
+
+> max s∈S (V(s)−μ(s)) −min s∈S (V(s)−μ(s)) ≤λ
+
+− X μ(s)μ0(s)= max    
+
+> max sg(s)−min sg(s)≤λ,g (s)≤V(s)
+
+n X g(s)μ0(s)
+
+o
+
+− Es∼μ0 V (s).
+
+Thus we have, 
+
+Es∼μV (s) + λD TV (μ∥μ0)= Es∼μ0 V (s) + max    
+
+> max sg(s)−min sg(s)≤λ,g (s)≤V(s)
+
+n X g(s)μ0(s)
+
+o
+
+− Es∼μ0 V (s)= Es∼μ0 [V (s)] Vmin +λ, (B.13) where (B.13) holds by directly solving the max problem. Hence we conclude the proof. 
+
+B.5. Proof of Proposition 4.8 
+
+Proof. Similar to the proof of Proposition 4.3, define y(s) = μ(s) − μ0(s), with lagrange duality, we have: 
+
+L = X
+
+> s
+
+V (s)( y(s) + μ0(s)) + λ X
+
+> s
+
+y(s)2
+
+μ0(s) − X
+
+> s
+
+(μ0(s) + y(s)) μ(s) − r X
+
+> s
+
+y(s)= X
+
+> s
+
+ λy (s)2
+
+μ0(s) + y(s)( V (s) − μ(s) − r) + X
+
+> s
+
+V (s)μ0(s) − X
+
+> s
+
+μ0(s)μ(s)
+
+
+
+.
+
+Noticing that L is a quadratic function with respect to y(s), therefore after we fix the term μ(s), r and compute the min with respect to y(s), we have 
+
+L = − 14λ
+
+X
+
+> s
+
+μ0(s)( V (s) − μ(s) − r)2 + X
+
+> s
+
+V (s)μ0(s) − X
+
+> s
+
+μ0(s)μ(s)
+
+16 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+= − 14λ
+
+h
+
+Es∼μ0 [V − μ]2 −  Es∼μ0 [V − μ]2i
+
++ Es∼μ0 [V − μ] (B.14) 
+
+= Es∼μ0 [V − μ] − 14λ Var s∼μ0 [V − μ]= sup 
+
+> α∈[Vmin ,V max ]
+
+Es∼μ0 [V (s)] α − 14λ Var s∼μ0 [V (s)] α, (B.15) where (B.14) comes from maximizing r, and (B.15) comes from maximizing μ(s), s ∈ S and the observation that 
+
+μ(s) = 0 or V (s), ∀s ∈ S when achieving its maximum. Hence, we conclude the proof. 
+
+## C. Proof of the Upper Bounds of Suboptimality 
+
+In this section, we prove Theorem 5.1 and Corollary 5.4. For simplicity, we denote ϕτh = ϕ(sτh, a τh). According to the robust regularized Bellman equation in Proposition 3.2, we first define the robust regularized Bellman operator: for any 
+
+(h, s, a ) ∈ [H] × S × A and any function V : S × A → [0 , H ],
+
+T λh V (s, a ) := rh(s, a ) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩. (C.1) We have Qπ,λ h (s, a ) = T λh V π,λ h+1 (s, a ).
+
+C.1. Proof of Theorem 5.1 
+
+We start from bounding the suboptimality gap by the estimation uncertainty in the following Lemma. 
+
+Lemma C.1. If the following inequality holds for any (h, s, a ) ∈ [H] × S × A :
+
+|T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩| ≤ Γh(s, a ),
+
+then we have SupOpt (ˆ π, s, λ ) ≤ 2 sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P Γh(sh, a h)|s1 = s.
+
+C.1.1. P ROOF OF THEOREM 5.1 - C ASE WITH THE TV D IVERGENCE 
+
+Algorithm 3 Robust Regularized Pessimistic Value Iteration under TV distance (R2PVI-TV) 
+
+Require: Dataset D, regularizer λ > 0, γ > 0 and parameter β
+
+1: init ˆV λH+1 (·) = 0 
+
+2: for episode h = H, · · · , 1 do 
+
+3: Λh ← PKτ =1 ϕ(sτh, a τh)( ϕ(sτh, a τh)) ⊤ + γI
+
+4: αh+1 ← min s∈S { ˆV λh+1 (s)} + λ
+
+5: ˆwλh ← Λ−1 
+
+> h
+
+(PKτ =1 ϕ(sτh, a τh)[ ˆV λh+1 (sτh+1 )] αh+1 ) ◁ Estimated by (4.1) 
+
+6: Γh(·, ·) ← β Pdi=1 ∥ϕi(·, ·)1i∥Λ−1
+
+> h
+
+7: ˆQλh(·, ·) ← min {ϕ(·, ·)⊤(θh + ˆ wλh ) − Γh(·, ·), H − h + 1 }+
+
+8: ˆπh(·|· ) ← argmax πh ⟨ ˆQλh(·, ·), π h(·|· )⟩A and ˆV λh (·) ← ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A
+
+9: end for 
+
+For completeness, we present R2PVI specific to the TV distance in Algorithm 3, which gives a closed form solution of (4.1) .Now we present the upper bound of weights as follows. 
+
+Lemma C.2. (Bound of weights - TV) For any h ∈ [H], we have 
+
+∥wλh ∥2 ≤ H√d, ∥ ˆwλh ∥2 ≤ H
+
+s
+
+Kd γ .
+
+17 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Proof of Theorem 5.1 - TV. The R2PVI with TV-divergence is presented in Algorithm 3. We derive the upper bound on the estimation uncertainty Γh(s, a ) to prove the theorem. We first decompose the difference between the regularized robust bellman operator T λh and the empirical regularized robust bellman operator ˆT λh as 
+
+T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩ (C.2) 
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )( wλh,i − ˆwλh,i )
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1i(wλh − ˆwλh )
+
+= γ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1iΛ−1 
+
+> h
+
+wλh +
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1iΛ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 (s)] αh+1 ) (C.3) 
+
+≤ γ
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+∥wλh ∥Λ−1
+
+> h
+
+| {z }
+
+> (i)
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+∥
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 (s)] αh+1 )∥Λ−1
+
+> h
+
+| {z }
+
+> (ii)
+
+, (C.4) where (C.3) comes from the definition of ˆwλh , while (C.4) follows by the Cauchy-Schwartz inequality. By Lemma C.2 and the fact that ˆV λh+1 (s) ≤ H and γ = 1 , we have (i) = ∥wλh ∥Λ−1
+
+> h
+
+≤ ∥ Λ−1 
+
+> h
+
+∥1/2∥wλh ∥2 ≤ H√d, 
+
+where the last inequality comes from the fact that ∥Λ−1 
+
+> h
+
+∥ ≤ γ−1. Now it remains to bound term (ii), as ˆV λh+1 depends on data, which makes it difficult to bound it directly by concentration equality. Instead, we consider focus on the function class 
+
+Vh(R0, B 0, γ ):
+
+Vh(R0, B 0, γ ) = {Vh(x; θ, β, Λ) : S → [0 , H ], ∥θ∥2 ≤ R0, β ∈ [0 , B 0], γ min (Λh) ≥ γ},
+
+where Vh(x; θ, β, Λ) = max a∈A [ϕ(s, a )⊤θ−β Pdi=1 ∥ϕi(s, a )∥Λ−1
+
+> h
+
+][0 ,H −h+1] . By Lemma C.2 and the definition of ˆV λh+1 ,when we set R0 = HpKd/γ, B 0 = β = 16 Hd √ξTV , it suffices to show that ˆV λh+1 ∈ V h+1 (R0, B 0, γ ). Next we aim to find a union cover of the Vh+1 (R0, B 0, γ ), hence the term (ii) can be upper bounded. Let Nh(ϵ; R0, B 0, γ ) be the minimum 
+
+ϵ-cover of Vh(R0, B 0, λ ) with respect to the supreme norm, Nh([0 , H ]) be the minimum ϵ-cover of [0 , H ] respectively. In other words, for any function V ∈ V h(R0, B 0, γ ), α h+1 ∈ [0 , H ], there exists a function V ′ ∈ V h(R0, B 0, γ ) and a real number αϵ ∈ [0 , H ] such that: 
+
+sup 
+
+> s∈S
+
+|V (s) − V ′(s)| ≤ ϵ, |αϵ − αh+1 | ≤ ϵ. 
+
+By Cauchy-Schwartz inequality and the fact that ∥a + b∥2
+
+> Λ−1
+> h
+
+≤ 2∥a∥2
+
+> Λ−1
+> h
+
++ 2 ∥b∥2
+
+> Λ−1
+> h
+
+and the definition of the term (ii), we have (ii) 2 ≤ 2
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αϵ ) 2
+
+> Λ−1
+> h
+
++ 2 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αh+1 − [ ˆV λh+1 ]αϵ ) 2
+
+> Λ−1
+> h
+
+≤ 4
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 4 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 2ϵ2K2
+
+γ , (C.5) where (C.5) follows by the fact that 
+
+2
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αh+1 − [ ˆV λh+1 ]αϵ ) 2
+
+> Λ−1
+> h
+
+≤ 2ϵ2
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ⊤ 
+
+> h
+
+| ≤ 2ϵ2K2
+
+γ .
+
+18 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Meanwhile, by the fact that |[ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ | ≤ | ˆV λh+1 − V ′
+
+> h+1
+
+|, we have 
+
+4
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
+(C.6) 
+
+≤ 4
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+| max |ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ )|2
+
+≤ 4ϵ2
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+|≤ 4ϵ2K2
+
+γ . (C.7) By applying the (C.7) into (C.5), we have 
+
+(ii )2 ≤ 4 sup  
+
+> V′∈N h(ϵ;R0,B 0,γ ),α ϵ∈N h([0 ,H ])
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 6ϵ2K2
+
+γ . (C.8) By Lemma F.3, applying a union bound over Nh(ϵ; R0, B 0, γ ) and Nh([0 , H ]) , with probability at least 1 − δ/ 2H, we have 
+
+4 sup  
+
+> V′∈N h(ϵ;R0,B 0,γ ),α ϵ∈N h([0 ,H ])
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 6ϵ2K2
+
+γ
+
+≤ 4H2
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 6ϵ2K2
+
+γ . (C.9) Applying Lemma F.1, we have 
+
+log |N h(ϵ; R0, B 0, λ )| ≤ d log(1 + 4 R0/ϵ ) + d2 log(1 + 8 d1/2B20 /γϵ 2)= d log(1 + 4 K3/2d−1/2) + d2 log(1 + 8 d−3/2B20 K2H−2)
+
+≤ 2d2 log(1 + 8 d−3/2B20 K2H−2). (C.10) Similarly, by Lemma F.2, we have 
+
+|N h([0 , H ]) | ≤ 3H/ϵ. 
+
+Combining (C.10) with (C.8) and (C.9), by setting ϵ = dH/K , we have (ii) 2 ≤ 4H2
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 6ϵ2K2
+
+γ
+
+≤ 4H2(4 d2 log(1 + 8 d−3/2B20 K2H−2) + log(3 K/d ) + d log(1 + K) + 2 log 2 H/δ ) + 6 d2H2
+
+≤ 16 H2d2(log(1 + 8 d−3/2B20 K2H−2) + log(1 + K)/d + 3 /8 + log H/δ )
+
+≤ 32 H2d2 log 8 d−3/2B20 K2H−1/δ 
+
+= 32 H2d2 log 1024 Hd 1/2K2ξTV /δ 
+
+= 32 H2d2(log 1024 Hd 1/2K2/δ + log ξTV )
+
+≤ 64 H2d2ξTV := β2
+
+4 .
+
+Recall the upper bound in (C.4), we have with probability at least 1 − δ,
+
+|T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩| ≤ γ
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+∥wλh ∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 (s)] αϵ ) Λ−1
+
+> h
+
+19 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≤
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+(H√d + β/ 2) 
+
+≤ β
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+, (C.11) where (C.11) follows by the fact that 2H√d ≤ β. Hence, the prerequisite is satisfied in Lemma C.1, we can upper bound the suboptimality gap as: SubOpt (ˆ π, s, λ ) ≤ 2 sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P Γh(sh, a h)|s1 = s
+
+= 2 β · sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P h dX
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|s1 = s
+
+i
+
+.
+
+This concludes the proof. C.1.2. P ROOF OF THEOREM 5.1 - C ASE WITH KL D IVERGENCE 
+
+Algorithm 4 Robust Regularized Pessimistic Value Iteration under KL distance (R2PVI-KL) 
+
+Require: Dataset D, regularizer λ > 0, γ > 0 and parameter β
+
+1: init ˆV λH+1 (·) = 0 
+
+2: for episode h = H, · · · , 1 do 
+
+3: Λh ← PKτ =1 ϕ(sτh, a τh)( ϕ(sτh, a τh)) ⊤ + γI
+
+4: ˆw′ 
+
+> h
+
+← Λ−1
+
+> h
+
+  P Kτ =1 ϕ(sτh, a τh)e− ˆV λh+1 (sτh+1 )
+
+> λ
+
+
+
+5: ˆwλh ← − λ log max { ˆw′
+
+> h
+
+, e −H/λ }
+
+6: Γh(·, ·) ← β Pdi=1 ∥ϕi(·, ·)1i∥Λ−1
+
+> h
+
+7: ˆQλh(·, ·) ← min {ϕ(·, ·)⊤(θh + ˆ wλh ) − Γh(·, ·), H − h + 1 }+
+
+8: ˆπh(·|· ) ← argmax πh ⟨ ˆQλh(·, ·), π h(·|· )⟩A and ˆV λh (·) ← ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A
+
+9: end for 
+
+For completeness, we present the R2PVI algorithm specific to the KL distance in Algorithm 4. Note that we have used the following closed form solution 
+
+ˆw′ 
+
+> h
+
+= argmin 
+
+> w∈Rd
+> K
+
+X 
+
+> τ=1
+
+
+
+e− ˆV λh+1 (sτh+1 ) 
+
+> λ
+
+− ϕ(sτh, a τh)⊤w
+
+2
+
++ γ∥w∥22. (C.12) 
+
+= Λ−1
+
+> h
+
+  KX 
+
+> τ=1
+
+ϕ(sτh, a τh)e− ˆV λh+1 (sτh+1 )
+
+> λ
+
+. (C.13) Our proof relies on the following lemmas on bounding the regression parameter and ϵ-covering number of the robust value function class. 
+
+Lemma C.3 (Bound of weights - KL) . For any h ∈ [H],
+
+∥wλh ∥2 ≤ √d, ∥ ˆw′
+
+> h
+
+∥2 ≤
+
+s
+
+Kd γ .
+
+Lemma C.4 (Bound of covering number - KL) . For any h ∈ [H], let Vh denote a class of functions mapping from S to R
+
+with the following form: 
+
+Vh(x; θ, β, Λh) = max 
+
+> a∈A
+
+n
+
+ϕ(s, a )⊤θ − λ log 
+
+
+
+1 + β
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(·, ·)1i∥Λ−1
+
+> h
+
+o 
+
+> [0 ,H −h+1]
+
+,
+
+20 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+the parameters (θ, β, Λh) satisfy ∥θ∥2 ≤ L, β ∈ [0 , B ], γ min (Λh) ≥ γ. Let Nh(ϵ) be the ϵ-covering number of V with respect to the distance dist (V1, V 2) = sup x |V1(x) − V2(x)|.Then 
+
+log |N h(ϵ)| ≤ d log(1 + 4 L/ϵ ) + d2 log(1 + 8 λ2d1/2B2/γϵ 2).
+
+Proof. The R2PVI with KL-divergence is presented in Algorithm 4. Similar to the proof of TV divergence, we decompose the estimation uncertainty between T λh and ˆT λh as: 
+
+|T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩| = ϕ(s, a )⊤ θh − λ log wλh − θh + λ log max { ˆw′
+
+> h
+
+, e −H/λ }
+
+= ϕ(s, a )⊤ λ log max { ˆw′
+
+> h
+
+, e −H/λ } − λ log wλh
+
+
+
+= λ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) log max { ˆw′
+
+> h,i
+
+, e −H/λ }
+
+wλh,i 
+
+≤ λ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) log max { ˆw′
+
+> h,i
+
+, e −H/λ }
+
+wλh,i 
+
+≤ λ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) log  1 + eH/λ | max { ˆw′
+
+> h,i
+
+, e −H/λ } − wλh,i | (C.14) 
+
+≤ λ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) log  1 + eH/λ | ˆw′ 
+
+> h,i
+
+− wλh,i | (C.15) 
+
+≤ λ log 
+
+ dX
+
+> i=1
+
+ϕi(s, a ) + eH/λ dX
+
+> i=1
+
+ϕi(s, a )| ˆw′ 
+
+> h,i
+
+− wλh,i |
+
+
+
+(C.16) 
+
+= λ log 
+
+
+
+1 + eH/λ dX
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+| ˆw′ 
+
+> h
+
+− wλh |
+
+
+
+,
+
+where (C.14) and (C.15) comes from the fact that: 
+
+wλh,i = Es′∼μ0
+
+> h,i
+
+h
+
+e− ˆV λh (s′)
+
+> λ
+
+i
+
+≥ Es′∼μ0 
+
+> h,i
+
+[e−H/λ ] = e−H/λ , | log A − log B| = log 
+
+
+
+1 + |A − B|
+
+min {A, B }
+
+
+
+,
+
+and (C.16) comes from the Jensen’s inequality applying to function log( x). Therefore, our next goal is to bound the term 
+
+Pdi=1 ϕi(s, a )1⊤ 
+
+> i
+
+| ˆw′ 
+
+> h
+
+− wλh |. Specifically, we have 
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+| ˆw′ 
+
+> h
+
+− wλh |
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+wλh − Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+(ϕτh)e− ˆV λh+1 (sh+1 )
+
+> λ
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+wλh − Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕτh(ϕτh)⊤wλh + Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕτh(ϕτh)⊤wλh − Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+(ϕτh)e− ˆV λh+1 (sh+1 )
+
+> λ
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤
+
+> i
+
+
+
+wλh − Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕτh(ϕτh)⊤wλh
+
+| {z }
+
+> (i)
+
++ Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕτh(ϕτh)⊤wλh − Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+(ϕτh)e− ˆV λh+1 (sh+1 )
+
+> λ
+
+| {z }
+
+> (ii)
+
+
+
+.
+
+Next, we upper bound term (i) and (ii), respectively. For the first term, we have: 
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+· (i) =
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+(|wλh − Λ−1 
+
+> h
+
+(Λh − γI)wλh |)
+
+21 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+= γ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+Λ−1 
+
+> h
+
+|wλh |≤ γ
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+∥wλh ∥Λ−1
+
+> h
+
+(C.17) 
+
+≤ γ√d
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+, (C.18) where (C.17) follows from the Cauchy-Schwartz inequality, (C.18) follows from the fact that: 
+
+∥wλh ∥Λ−1
+
+> h
+
+≤ ∥ Λ−1 
+
+> h
+
+∥1/2∥wλh ∥2 ≤ pd/γ, 
+
+where the last inequality follows from Lemma C.3 and the fact that ∥Λ−1 
+
+> h
+
+∥ ≤ γ−1. Now it remains to bound the term (ii), by the definition of ητh(f ) = Es′∼P 0 
+
+> h(·| sτh,a τh)
+
+[f (s′)] − f (sτh+1 ), the term (ii) can be rewritten as: (ii) =
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕτh
+
+h
+
+(ϕτh)⊤wλh − e− ˆV λh+1 (sh+1 )
+
+> λ
+
+i
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1⊤ 
+
+> i
+
+Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− ˆV λh+1 (s)
+
+> λ
+
+
+
+≤
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− ˆV λh+1 (s)
+
+> λ
+
+
+
+> Λ−1
+> h
+
+| {z }
+
+> (iii)
+
+.
+
+For the rest of the proof, it’s left to bound the term (iii). As the ˆV λh+1 depends on the offline dataset, which makes it difficult to upper bound directly from concentration equality due to the dependence issue, we seek for providing a uniform concentration bound applied to the term (iii), i.e. we aim to upper bound the following term: 
+
+sup  
+
+> V∈V h+1 (R,B,γ )
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh(e− Vλ ) Λ−1
+
+> h
+
+.
+
+Here for all h ∈ [H], the function class is defined as: 
+
+Vh(R, B, γ ) = {Vh(x; θ, β, Λh) : ∥θ∥2 ≤ R, β ∈ [0 , B ], γ min (Λh) ≥ γ},
+
+where Vh(x; θ, β, Λh) = max a∈A {ϕ(s, a )⊤θ − λ log(1 + β Pdi=1 ∥ϕi(·, ·)1i∥Λ−1
+
+> h
+
+)}[0 ,H −h+1] . In order to ensure ˆV λh+1 ∈Vh+1 (R0, B 0, λ ), we need to bound ˆθh = θh − λ log max { ˆw′
+
+> h
+
+, e −H/λ }. Following the fact that: 
+
+∥ ˆθh∥2 ≤ ∥ θh∥2 + λ∥ log max { ˆw′
+
+> h
+
+, e −H/λ }∥ 2.
+
+By Lemma C.3, e−H/λ ≤ max { ˆw′
+
+> h,i
+
+, e −H/λ } ≤ max {∥ ˆw′
+
+> h
+
+∥, e −H/λ } ≤ max {pKd/λ, e −H/λ }, therefore the term can be bounded as: 
+
+∥ ˆθh∥2 ≤ √d + λ√d max 
+
+
+
+log 
+
+r Kd λ , H/λ 
+
+
+
+≤ H√d + d√Kλ 
+
+≤ 2Hd √Kλ. (C.19) Hence, we can choose R0 = 2 Hd √Kλ and B0 = β = 16 dλe H/λ p(H/λ + ξKL ), then we have for all h ∈ [H], ˆV λh+1 ∈Vh+1 (R0, B 0, λ ). Next we aim to find a union cover of the Vh+1 (R0, B 0, γ ), hence the term (iii) can be upper bounded. 22 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+For all ϵ ∈ (0 , λ ), h ∈ [H], let Nh(ϵ; R, B, λ ) := Nh(ϵ) denote the minimal ϵ-cover of Vh(R, B, λ ) with respect to the supreme norm. In other words, for any function ˆV λ ∈ V h(R, B, λ ), there exists a function V ′ ∈ N h+1 (ϵ) such that 
+
+sup 
+
+> x∈S
+
+| ˆV λh+1 (x) − V ′
+
+> h+1
+
+(x)| ≤ ϵ. 
+
+Hence, given ˆV λh+1 , V ′ 
+
+> h+1
+
+satisfying the inequality above, recall the definition of ητh = ητh(f ) = Es′∼P 0 
+
+> h(·| sτh,a τh)
+
+[f (s′)] −
+
+f (sτh+1 ), we have: 
+
+ητh
+
+
+
+e− ˆV λh+1 (s)
+
+> λ
+
+
+
+− ητh
+
+
+
+e− V ′
+
+> h+1 (s)
+> λ
+
+
+
+≤ Es∼P 0 
+
+> h(·| sτh,a τh)
+
+h
+
+e− ˆV λh+1 (s) 
+
+> λ
+
+− e− V ′
+
+> h+1 (s)
+> λ
+
+i
+
+− e− ˆV λh+1 (sh+1 ) 
+
+> λ
+
++ e− V ′
+
+> h+1 (sh+1 )
+> λ
+
+≤ Es∼P 0 
+
+> h(·| sτh,a τh)
+
+h
+
+e− ˆV λh+1 (s) 
+
+> λ
+
+− e− V ′
+
+> h+1 (s)
+> λ
+
+i
+
++ e− ˆV λh+1 (sh+1 ) 
+
+> λ
+
+− e− V ′
+
+> h+1 (sh+1 )
+> λ
+
+≤ 2ϵ/λ + 2 ϵ/λ = 4 ϵ/λ, (C.20) where (C.20) follows from the fact that for any s ∈ S ,
+
+e− ˆV λh+1 (s) 
+
+> λ
+
+− e− V ′ 
+
+> h+1 (s)
+> λ
+
+≤ e | ˆV λh+1 (s)−V ′ 
+
+> h+1 (s)|
+> λ
+
+− 1 ≤ e ϵλ − 1 ≤ 2ϵ/λ, 
+
+where the last inequality is held by the fact that ϵ ∈ (0 , λ ). By the Cauchy-Schwartz inequality, for any two vectors a, b ∈ Rd
+
+and positive definite matrix Λ ∈ Rd×d, it holds that ∥a + b∥2 
+
+> Λ
+
+≤ 2∥a∥2 
+
+> Λ
+
++ 2 ∥b∥2
+
+> Λ
+
+, hence for all h ∈ [H], we have: 
+
+|(iii) |2 ≤ 2
+
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− V ′
+
+> h+1 (s)
+> λ
+
+ 2
+
+> Λ−1
+> h
+
++ 2 
+
+> K
+
+X 
+
+> τ=1
+
+ϕτh
+
+h
+
+ητh
+
+
+
+e− V ′
+
+> h+1 (s)
+> λ
+
+
+
+− ητh
+
+
+
+e− ˆV λh+1 (s)
+
+> λ
+
+i 2
+
+> Λ−1
+> h
+
+≤ 2
+
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− V ′
+
+> h+1 (s)
+> λ
+
+ 2
+
+> Λ−1
+> h
+
++ 32 ϵ2/λ 2
+
+> K
+
+X 
+
+> τ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+|≤ 2 sup  
+
+> V∈N h+1 (ϵ)
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− V (s)
+
+> λ
+
+ 2
+
+> Λ−1
+> h
+
++ 32 ϵ2K2
+
+λ2γ . (C.21) We set f (s) = e− V (s) 
+
+> λ
+
+, by applying Lemma F.3, for any fixed h ∈ [H], δ ∈ (0 , 1) , we have: 
+
+P
+
+
+
+sup  
+
+> V∈N h+1 (ϵ)
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− V (s)
+
+> λ
+
+ 2
+
+> Λ−1
+> h
+
+≥ 4
+
+
+
+2 log H|N h+1 (ϵ)|
+
+δ + d log 
+
+
+
+1 + Kγ
+
+ 
+
+≤ δ/H. (C.22) Hence, combining (C.22) with (C.21) and let γ = 1 , then for all h ∈ [H], it holds that 
+
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− ˆV λh+1 (s)
+
+> λ
+
+ 2
+
+> Λ−1
+> h
+
+≤ 8
+
+
+
+2 log H|N h+1 (ϵ)|
+
+δ + d log(1 + K) + 4ϵ2K2
+
+λ2
+
+
+
+, (C.23) with probability at least 1 − δ. By Lemma C.4, recall L = R0 = 2 Hd √Kλ in this setting, we have 
+
+log( |N h+1 (ϵ)|) ≤ d log(1 + 4 R0/ϵ ) + d2 log(1 + 8 λ2d1/2B2/ϵ 2). (C.24) We then set ϵ = dλ/K ∈ (0 , λ ) and define β′ = β/λe H/λ = 16 dp(H/λ + ξKL ) for brevity, then (C.24) can be bounded as: 
+
+log( |N h+1 (ϵ)|) ≤ d log(1 + 4 R0K/dλ ) + d2 log(1 + 8 λ2K2d−3/2e 2Hλ β′2)= d log(1 + 4 R0K/dλ ) + d2 log( e−2H/λ + 8 λ2K2d−3/2β′2) + 2 d2H/λ 
+
+≤ 2d2 log(8 λ2K2d−3/2β′2) + 2 d2H/λ. 
+
+23 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Therefore, by combining the result with the inequality (C.23), we can get 
+
+> K
+
+X 
+
+> τ=1
+
+ϕτhητh
+
+
+
+e− ˆV λh+1 (s)
+
+> λ
+
+ 2
+
+> Λ−1
+> h
+
+≤ 8
+
+
+
+2 log Hδ + 4 d2H/λ + 4 d2 log(8 λ2K2d−3/2β′2) + 4 d2 + d log(1 + K)
+
+
+
+≤ 8(4 d2H/λ + 4 d2 log(8 λ2K3Hd −3/2β′2/δ )) (C.25) 
+
+= 8(4 d2H/λ + 4 d2 log(8 λ2K3Hd −3/2/δ ) + 4 d2 log( β′2)) 
+
+≤ β′2/4, (C.26) where (C.25) follows by the fact that 2 log Hδ + 4 d2 + d log(1 + K) ≤ 4d2 log( HK δ ), and (C.26) is held due to the fact that 
+
+β′2/4 = 64 d2
+
+H/λ + log 1024 dλ 2K3Hδ
+
+
+
+= 8 
+
+
+
+8d2H/λ + 4 d2 log(8 λ2K3Hd −3/2/δ ) + 4 d2 log 1024 d7/2λ2K3Hδ + 4 d2 log(128) 
+
+
+
+≥ 8
+
+
+
+4d2H/λ + 4 d2 log(8 λ2K3Hd −3/2/δ ) + 4 d2 log( β′2)
+
+
+
+, (C.27) where (C.27) holds by 
+
+log( β′2) = log 
+
+
+
+256 d2
+
+H/λ + log 1024 dλ 2K3Hδ
+
+ 
+
+≤ log(256 d2) + 
+
+
+
+H/λ + log 1024 dλ 2K3Hδ
+
+
+
+≤ log(128) + log 1024 d7/2λ2K3Hδ + H/λ. 
+
+By the bound on (i), (ii), (iii), for all h ∈ H and (s, a ) ∈ S × A , with probability at least 1 − δ, it holds that 
+
+|T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩| ≤ λ log 
+
+
+
+1 + eH/λ (√d + β′/2) 
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+
+
+≤ λ log 
+
+
+
+1 + eH/λ β′
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+
+
+(C.28) 
+
+≤ β
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+, (C.29) where (C.28) follows by the fact that β′ ≥ 2√d, (C.29) follows by the fact that log(1 + x) ≤ x holds for any positive x.Thus, by Lemma C.1, we can upper bound the suboptimality gap as: SubOpt (ˆ π1, s ) ≤ 2 sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P [Γ h(sh, a h)|s1 = s]= 2 β sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P h dX
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|s1 = s
+
+i
+
+.
+
+Therefore, we conclude the proof. C.1.3. P ROOF OF THEOREM 5.1 - C ASE WITH χ2 DIVERGENCE 
+
+For completeness, we present the R2PVI algorithm specific to the χ2 distance in Algorithm 5, which gives closed form solution of (4.4) and (4.5). Before the proof, we first present the bound on weights under χ2-divergence: 
+
+Lemma C.5 (Bound of weights - χ2). For any h ∈ [H],
+
+∥ ˆwλh ∥2 ≤ √d
+
+
+
+H + H2
+
+2λ
+
+
+
+.
+
+24 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Algorithm 5 Robust Regularized Pessimistic Value Iteration under χ2 distance (R2PVI-χ2)
+
+Require: Dataset D, regularizer λ > 0, γ > 0 and parameter β
+
+1: init ˆV λH+1 (·) = 0 
+
+2: for episode h = H, · · · , 1 do 
+
+3: Λh ← PKτ =1 ϕ(sτh, a τh)( ϕ(sτh, a τh)) ⊤ + γI
+
+4: ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α ← [Λ −1 
+
+> h
+
+(PKτ =1 ϕ(sτh, a τh)⊤[ ˆV λh+1 (sτh+1 )] α)] [0 ,H ] ◁ Estimated by (4.4) 
+
+5: ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2 
+
+> α
+
+← [Λ −1 
+
+> h
+
+(PKτ =1 ϕ(sτh, a τh)⊤[ ˆV λh+1 (sτh+1 )] 2
+
+> α
+
+)] [0 ,H 2] ◁ Estimated by (4.5) 
+
+6: Estimate ˆwλh,i according to (4.6) 
+
+7: Γh(·, ·) ← β Pdi=1 ∥ϕi(·, ·)∥Λ−1
+
+> h
+
+8: ˆQλh(·, ·) ← min {ϕ(·, ·)⊤(θh + ˆ wλh ) − Γh(·, ·), H − h + 1 }+
+
+9: ˆπh(·|· ) ← argmax πh ⟨ ˆQλh(·, ·), π h(·|· )⟩A and ˆV λh (·) ← ⟨ ˆQλh(·, ·), ˆπh(·|· )⟩A
+
+10: end for 
+
+Proof of Theorem 5.1 - χ2. The R2PVI with χ2-divergence is presented in Algorithm 5. By the definition of T λh , ˆT λh , we have 
+
+T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩
+
+= ϕ(s, a )⊤(θh + wλh − θh − ˆwλh )=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )( wλh,i − ˆw′
+
+> h,i
+
+)=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )
+
+h
+
+sup 
+
+> α∈[0 ,H ]
+
+n
+
+Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α + 14λ (Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α)2 − 14λ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2
+
+> α
+
+o
+
+− sup 
+
+> α∈[0 ,H ]
+
+nˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α + 14λ (ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α)2 − 14λ ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2
+
+> α
+
+oi 
+
+. (C.30) To continue, for any i ∈ [d], we denote 
+
+αi = argmax 
+
+> α∈[0 ,H ]
+
+n
+
+Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α + 14λ (Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α)2 − 14λ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2
+
+> α
+
+o
+
+.
+
+Hence, (C.30) can be further upper bounded as 
+
+T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩≤
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+ 14λ
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+ + 1 
+
+| {z }
+
+> (i)
+
+−
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2 
+
+> αi
+
+− ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2
+
+> αi
+
+| {z }
+
+> (ii)
+
+. (C.31) Next, we bound (i) and (ii), respectively. 
+
+Bounding term (i). We define 
+
+˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α =
+
+h
+
+argmin 
+
+> w∈Rd
+> K
+
+X 
+
+> τ=1
+
+([ ˆV λh+1 (sτh+1 )] α − ϕ(sτh, a τh)⊤w)2 + γ∥w∥22
+
+ii
+
+.
+
+25 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Considering the gap between the ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi and ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi due to the definition that ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi =[˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi ][0 ,H ], we eliminate the clip operator at first. We rewrite (i) as follows: (i) =
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+ 14λ
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+ + 1 
+
+
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )( Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi )
+
+×
+
+ 14λ
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+ + 1 
+
+ Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+| {z }
+
+> := Ci
+
+.
+
+We claim that |Ci| ≤ 1 + H/ 2λ, ∀i ∈ [H]. We prove the claim by discussing the value of ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi in the following three cases: 
+
+Case I. ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi ≤ 0. By the fact that Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi ≤ H, we have: 
+
+|Ci| =
+
+ 14λ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + 1 
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+≤ 1 + H/ 4λ, 
+
+where the equality holds by 14λ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + 1 ≤ 1 + H/ 4λ. Hence the claim holds by Case I .
+
+Case II. 0 ≤ ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi ≤ H. The claim holds trivially, as we have: 
+
+|Ci| = 14λ
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+ + 1 ≤ 1 + H/ 2λ. 
+
+Hence, we conclude the claim. 
+
+Case III. ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi > H . Notice that 
+
+|Ci| =
+
+ 14λ
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + H + 1 
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − H
+
+Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+=
+
+ 14λ
+
+ Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi + H + 1 
+
+ H − Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi
+
+≤ H/ 2λ + 1 , (C.32) where (C.32) holds by the fact that ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi > H .With the upper bound for Ci, we can upper bound (i) as 
+
+|(i) | =
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )( Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi − ˜Eμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] αi )Ci
+
+= γ
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1iΛ−1 
+
+> h
+
+Eμ0 
+
+> h
+
+[ ˆV λh (s)] αi Ci +
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )1iΛ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αi )Ci
+
+≤ (1 + H/ 2λ)
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+
+
+γH +
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αi ) Λ−1
+
+> h
+
+
+
+. (C.33) 26 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Bounding term (ii). Similar to bounding (i), we can deduce that: 
+
+|(ii) | =
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )( Es∼μ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2 
+
+> αi
+
+− ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2 
+
+> αi
+
+)
+
+≤ γH 2
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2 
+
+> αi
+
+) Λ−1
+
+> h
+
+, (C.34) where (C.34) follows by the Cauchy Schwartz inequality and the fact that Es∼μ0 
+
+> h,i
+
+[ ˆV λh (s)] 2 
+
+> αi
+
+≤ H2, ∀i ∈ [d]. Hence combining (C.31), (C.33) and (C.34), we have 
+
+T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩≤ (1 + H/ 2λ)
+
+
+
+γH 
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]α′ 
+
+> i
+
+) Λ−1
+
+> h
+
+
+
++ γH 2
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2 
+
+> α′
+> i
+
+) Λ−1
+
+> h
+
+.
+
+On the other hand, we can similarly deduce that there exists α′ 
+
+> i
+
+s.t. 
+
+⟨ϕ(s, a ), ˆwλh ⟩ − T λh ˆV λh+1 (s, a )
+
+≤ (1 + H/ 2λ)
+
+
+
+γH 
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]α′ 
+
+> i
+
+) Λ−1
+
+> h
+
+
+
++ γH 2
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2 
+
+> α′
+> i
+
+) Λ−1
+
+> h
+
+.
+
+Then for all i ∈ [d], there exists ˆαi ∈ { αi, α ′
+
+> i
+
+}, such that 
+
+|T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩| ≤ (1 + H/ 2λ)
+
+
+
+γH 
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+
+
++ γH 2
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+
+
+(1 + H/ 2λ)
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]ˆαi ) Λ−1
+
+> h
+
++
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2ˆαi ) Λ−1
+
+> h
+
+
+
+.
+
+Now it remains to bound the terms 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]ˆαi ) Λ−1
+
+> h
+
+| {z }
+
+> (iii )
+
+and 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2ˆαi ) Λ−1
+
+> h
+
+| {z }
+
+> (iv)
+
+.
+
+Similar to the proof in KL divergence, we aim to find a union function class Vh+1 (R0, B 0, λ ), which holds uniformly that 
+
+ˆV λh+1 ∈ V h+1 (R0, B 0, λ ), here for all h ∈ [H], the function class is defined as: 
+
+Vh(R0, B 0, λ ) = {Vh(x; θ, β, Λ) : S → [0 , H ], ∥θ∥2 ≤ R0, β ∈ [0 , B 0], γ min (Λh) ≥ γ},
+
+where Vh(x; θ, β, Λ) = max a∈A [ϕ(s, a )⊤θ − β Pdi=1 ∥ϕi(s, a )∥Λ−1
+
+> h
+
+][0 ,H −h+1] . By Lemma C.5, when we set R0 =
+
+√d(H + H2/2λ), B 0 = β = 8 dH 2(1 + 1 /λ )pξχ2 , it suffices to show that ˆV λh+1 ∈ V h+1 (R0, B 0, γ ). Next we aim to find a union cover of the Vh+1 (R0, B 0, γ ), hence the term (iii) and (iv) can be upper bounded. Let Nh(ϵ; R0, B 0, γ ) be the minimum ϵ-cover of Vh(R, B, λ ) with respect to the supreme norm, Nh([0 , H ]) be the minimum ϵ-cover of [0 , H ]
+
+27 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+respectively. In other words, for any function V ∈ V h(R, B, λ ), α ∈ [0 , H ], there exists a function V ′ ∈ V h(R, B, λ ) and a real number αϵ ∈ [0 , H ] such that: 
+
+sup 
+
+> s∈S
+
+|V (s) − V ′(s)| ≤ ϵ, |α − αϵ| ≤ ϵ. 
+
+Recall the definition of (iii) and (iv). By Cauchy-Schwartz inequality and the fact that ∥a + b∥2
+
+> Λ−1
+> h
+
+≤ 2∥a∥2
+
+> Λ−1
+> h
+
++ 2 ∥b∥2
+
+> Λ−1
+> h
+
+,we have (iii) 2 ≤ 2
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αϵ ) 2
+
+> Λ−1
+> h
+
++ 2 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]ˆα − [ ˆV λh+1 ]αϵ ) 2
+
+> Λ−1
+> h
+
+≤ 4
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 4 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 2ϵ2K2
+
+γ , (C.35) where (C.35) follows by the fact that 
+
+2
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]ˆα − [ ˆV λh+1 ]αϵ ) 2
+
+> Λ−1
+> h
+
+≤ 2ϵ2
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+| ≤ 2ϵ2K2
+
+γ .
+
+Meanwhile, by the fact that |[ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ | ≤ | ˆV λh+1 − V ′
+
+> h+1
+
+|, we have 
+
+4
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
+≤ 4
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+| max |ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ )|2
+
+≤ 4ϵ2
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+|≤ 4ϵ2K2
+
+γ .
+
+By applying the above two inequalities and the union bound into (C.35), we have 
+
+(iii )2 ≤ 4 sup  
+
+> V′∈N h(ϵ;R0,B 0,γ ),α ϵ∈N h([0 ,H ])
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 6ϵ2K2
+
+γ .
+
+By Lemma F.3, applying a union bound over Nh(ϵ; R0, B 0, γ ) and Nh([0 , H ]) , with probability at least 1 − δ/ 2H, we have 
+
+4 sup  
+
+> V′∈N h(ϵ;R0,B 0,γ ),α ϵ∈N h([0 ,H ])
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]αϵ ) 2
+
+> Λ−1
+> h
+
++ 6ϵ2K2
+
+γ
+
+≤ 4H2
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 6ϵ2K2
+
+γ .
+
+Similarly, by the fact that ∥a + b∥2
+
+> Λ−1
+> h
+
+≤ 2∥a∥2
+
+> Λ−1
+> h
+
++ 2 ∥b∥2
+
+> Λ−1
+> h
+
+, noticing (iv) has the almost same form as (iii), we have (iv) 2 ≤ 2
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2 
+
+> αϵ
+
+) 2
+
+> Λ−1
+> h
+
++ 2 
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2ˆα − [ ˆV λh+1 ]2 
+
+> αϵ
+
+) 2
+
+> Λ−1
+> h
+
+≤ 4
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ V ′
+
+> h+1
+
+]2 
+
+> αϵ
+
+) 2
+
+> Λ−1
+> h
+
++ 24 H2ϵ2K2
+
+γ , (C.36) 28 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+where (C.36) follows by the fact that 
+
+2
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2ˆα − [ ˆV λh+1 ]2 
+
+> αϵ
+
+) 2
+
+> Λ−1
+> h
+
+≤ 8H2ϵ2
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+| ≤ 8H2ϵ2K2
+
+γ ,
+
+and 
+
+4∥
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2 
+
+> αϵ
+
+− [V ′
+
+> h+1
+
+]2 
+
+> αϵ
+
+)∥2
+
+> Λ−1
+> h
+
+≤ 4
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+| max |ητh([ ˆV λh+1 ]αϵ − [V ′
+
+> h+1
+
+]αϵ )|2
+
+≤ 16 H2ϵ2
+
+> K
+
+X  
+
+> τ=1 ,τ ′=1
+
+|ϕτhΛ−1 
+
+> h
+
+ϕτ ′ 
+
+> h
+
+|≤ 16 H2ϵ2K2
+
+γ .
+
+We apply the union bound and Lemma F.3, with probability at least 1 − δ/ 2H
+
+(iv) 2 ≤ 4H4
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 24 H2ϵ2K2
+
+γ .
+
+Therefore, with probability at least 1 − δ,
+
+|T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩| (C.37) 
+
+≤ γH (1 + H/ 2λ)
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++ γH 2
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
++
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+
+
+(1 + H/ 2λ)
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]ˆαi ) Λ−1
+
+> h
+
++
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh([ ˆV λh+1 ]2ˆαi ) Λ−1
+
+> h
+
+
+
+≤
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+"
+
+γH (1 + H + H/ 2λ)+ (1 + H/ 2λ)
+
+s
+
+4H2
+
+
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 6ϵ2K2
+
+γ
+
++
+
+s
+
+4H4
+
+
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 24 H2ϵ2K2
+
+γ
+
+#
+
+. (C.38) By the fact that R0 = √d(H + H2/2λ), Lemma F.1 and Lemma F.2, we can upper bound the term |N h(ϵ; R0, B 0, γ )| and 
+
+|N h([0 , H ]) | as follows: 
+
+log |N h(ϵ; R0, B 0, γ )| ≤ d log(1 + 4 R0/ϵ ) + d2 log(1 + 8 d1/2B2/γϵ 2), log |N h([0 , H ]) | ≤ log(3 H/ϵ ).
+
+We set ϵ = 1 
+
+> K
+
+, γ = 1 , with the upper bound above, we have 
+
+4H2
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 6ϵ2K2
+
+γ
+
+≤ 4H2
+
+2 log 6H2Kδ + d log(1 + K) + d log(1 + d1/2(1 + H/ 2λ)K) + d2 log(1 + d1/2B2K2) + 3 /2
+
+
+
+≤ 4H2
+
+2d log 6H2Kδ + 2 d log( K) + d log( d1/2(1 + H/ 2λ)K) + 2 d2 log d1/2B2K2
+
+29 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≤ 8H2d2
+
+log 6H2Kδ + log( K) + log( d1/2(1 + H/ 2λ)K) + log 8 d1/2B2K2
+
+= 8 H2d2(log 48 K5H2B2d(1 + H/ 2λ)/δ ).
+
+Similarly, we can upper bound the third term in (C.38) as follows: 
+
+4H4
+
+2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )
+
+
+
++ 24 H2ϵ2K2
+
+γ
+
+= H2
+
+4H2(2 log 2H|N h(ϵ; R0, B 0, γ )∥N h([0 , H ]) |
+
+δ + d log(1 + K/γ )) + 24 ϵ2K2
+
+γ
+
+
+
+≤ 8H4d2(log 48 K5H2B2d(1 + H/ 2λ)/δ ).
+
+Hence, we apply this bound into the (C.38), we have 
+
+|⟨ ϕ(s, a ), ˆwλh ⟩ − T λh ˆV λh+1 (s, a )|≤
+
+> d
+
+X
+
+> i=1
+
+∥ϕ(s, a )1i∥Λ−1
+
+> h
+
+(H(1 + H + H/ 2λ)+ (1 + H/ 2λ + H)p8H2d2(log 48 K5H2B2d(1 + H/ 2λ)/δ )) 
+
+≤
+
+> d
+
+X
+
+> i=1
+
+∥ϕ(s, a )1i∥Λ−1
+
+> h
+
+2( H/λ + H)p8H2d2(log 48 K5H2B2d(1 + H/ 2λ)/δ ) (C.39) 
+
+≤
+
+> d
+
+X
+
+> i=1
+
+∥ϕ(s, a )1i∥Λ−1
+
+> h
+
+2( H/λ + H)Hd 
+
+q
+
+8(log 192 K5H6d3(1 + H/ 2λ)3/δ ) + log ξχ2 )=
+
+> d
+
+X
+
+> i=1
+
+∥ϕ(s, a )1i∥Λ−1
+
+> h
+
+2( H/λ + H)Hd 
+
+q
+
+8( ξχ2 + log ξχ2 )
+
+≤ β
+
+> d
+
+X
+
+> i=1
+
+∥ϕ(s, a )1i∥Λ−1
+
+> h
+
+, (C.40) where (C.39) comes from the fact that 1 + 1 /λ ≤ 1 + H/ 2λ, the (C.40) comes from the fact that log ξχ2 ≤ ξχ2 . Hence, the prerequisite is satisfied in Lemma C.1, we can upper bound the suboptimality gap as: SubOpt (ˆ π, s, λ ) ≤ 2 sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P Γh(sh, a h)|s1 = s
+
+= 2 β sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P h dX
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|s1 = s
+
+i
+
+.
+
+This concludes the proof. 
+
+C.2. Proof of Corollary 5.4 
+
+Proof. The proof follows the argument in (F.15) and (F.16) of (Blanchet et al., 2024). Specifically, we denote 
+
+ΛPh,i = Eπ⋆,P h
+
+(ϕi(sh, a h)1i)( ϕi(sh, a h)1i)⊤ s1 = s
+
+i
+
+, ∀(h, i, P ) ∈ [H] × [d] × U λ(P 0). (C.41) By Assumption 5.3, setting γ = 1 , we have 
+
+sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P 
+
+ dX
+
+> i=1
+
+∥ϕi(sh, a h)1i∥Λ−1
+
+> h
+
+s1 = s
+
+
+
+= sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+> d
+
+X
+
+> i=1
+
+Eπ⋆,P hq 
+
+Tr  (ϕi(sh, a h)1i)( ϕi(sh, a h)1i)⊤Λ−1
+
+> h
+
+ s1 = s
+
+i
+
+30 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≤ sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+> d
+
+X
+
+> i=1
+
+q
+
+Tr  Eπ⋆,P (ϕi(sh, a h)1i)( ϕi(sh, a h)1i)⊤|s1 = sΛ−1
+
+> h
+
+ (C.42) 
+
+≤ sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+> d
+
+X
+
+> i=1
+
+q
+
+Tr  ΛPh,i ·  I + K · c† · ΛPh,i 
+
+−1 (C.43) 
+
+= sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+> d
+
+X
+
+> i=1
+
+s
+
+(Eπ⋆,P [ϕi(sh, a h)|s1 = s]) 2
+
+1 + c† · K · (Eπ⋆,P [ϕi(sh, a h)|s1 = s]) 2
+
+≤ sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+> d
+
+X
+
+> i=1
+
+r 1
+
+c† · K (C.44) 
+
+= dH 
+
+√c†K ,
+
+where (C.42) is due to the Jensen’s inequality, (C.43) holds by the definition in (C.41) and Assumption 5.3, (C.44) holds by the fact that the only nonzero element of ΛPh,i is the i-th diagonal element. Thus, by Theorem 5.1, with probability at least 
+
+1 − δ, for any s ∈ S the suboptimality can be upper bounded as: SubOpt (ˆ π, s, λ ) ≤ β sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P h dX
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+s1 = s
+
+i
+
+≤ βdH 
+
+√c†K ,
+
+where 
+
+β =
+
+
+
+16 Hd √ξTV , if D is TV; 
+
+16 dλe H/λ p(H/λ + ξKL ), if D is KL; 
+
+8dH 2(1 + 1 /λ )pξχ2 , if D is χ2.Hence, we conclude the proof. 
+
+## D. Proof of the Information-Theoretic Lower Bound 
+
+In this section, we prove the information-theoretic lower bound. We first introduce the construction of hard instances in Appendix D.1, then we prove Theorem 5.5 in Appendix D.2 
+
+D.1. Construction of Hard Instances 
+
+s1 s2
+
+1 − ϵ 1
+
+ϵ
+
+(a) The source MDP environment. 
+
+s1 s2
+
+1 − ϵ − ∆λh(ϵ, D ) 1
+
+ϵ + ∆ λh(ϵ, D )
+
+(b) The target MDP environment. 
+
+Figure 3. The nominal environment and the worst case environment. The value on each arrow represents the transition probability. The MDP has two states, s1 and s2, and H steps. For he nominal environment on the left, the s1 is the good state where the transition is determined by an error term ϵ, and s2 is a fail state with reward 0 and only transitions to itself. The worst case environment on the right is obtained by perturbing the transition probability at each step of the nominal environment. The magnitude of the perturbation ∆λh(ϵ, D ) at each stage h depends on the divergence metric D, the regularized λ and the parameter ϵ.
+
+The construction of the information-theoretic lower bound relies on a novel family of hard instances. We illustrate one such instance in Figure 3. Both the nominal and target environments satisfy Assumption 3.1. The environment consists of 31 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+two states, s1 and s2. In the nominal environment Figure 3(a), s1 represents the good state with a positive reward. For any transition originating from s1, there is a 1 − ϵ probability of transitioning to itself and an ϵ probability of transitioning to s2
+
+regardless of the action taken, where ϵ is a parameter to be determined. The state s2 is a fail state with zero reward and can only transition to itself. The worst-case target environment Figure 3(b) is obtained by perturbing the transition probabilities in the nominal environment. The perturbation magnitude ∆λh(ϵ, D ) depends on the stage h, regularizer λ, divergence metric 
+
+D, and parameter ϵ.The family of d-rectangular linear RRMDPs are parameterized by a Boolean vector ξ = {ξh}h∈[H], where ξh ∈ {− 1, 1}d.For a given ξ and regularizer λ, the corresponding d-rectangular linear RRMDP M ρ 
+
+> ξ
+
+is constructed as follows. The state space S = {x1, x 2} and the action space A = {0, 1}d. The initial state distribution μ0 is defined as 
+
+μ0(s1) = d + 1 
+
+d + 2 and μ0(x2) = 1
+
+d + 2 .
+
+The feature mapping ϕ : S × A → Rd+2 is defined as 
+
+ϕ(s1, a )⊤ =
+
+ a1
+
+d , a2
+
+d , · · · , ad
+
+d , 1 −
+
+> d
+
+X
+
+> i=1
+
+ai
+
+d , 0
+
+
+
+,
+
+ϕ(s2, a )⊤ =  0, 0, · · · , 0, 0, 1,
+
+which satisfies ϕi(s, a ) ≥ 0 and Pdi=1 ϕi(s, a ) = 1 . The nominal distributions {μ0
+
+> h
+
+}h∈[H] are defined as 
+
+μ0 
+
+> h
+
+=   (1 − ϵ)δs1 + ϵδ s2 , (1 − ϵ)δs1 + ϵδ s2 , · · · , (1 − ϵ)δs1 + ϵδ s2
+
+| {z } 
+
+> d+ 1
+
+, δ s2
+
+⊤, ∀h ∈ [H],
+
+where ϵ is an error term injected into the nominal model, which is to be determined later. Thus, the transition is homogeneous and does not depend on action but only on state. The reward parameters {θh}h∈[H] are defined as 
+
+θ⊤ 
+
+> h
+
+= δ ·
+
+ ξh1 + 1 2 , ξh2 + 1 2 , · · · ξhd + 1 2 , 12 , 0
+
+
+
+, ∀h ∈ [H],
+
+where δ is a parameter to control the differences among instances, which is to be determined later. The reward rh is generated from the normal distribution rh ∼ N (rh(sh, a h), 1) , where rh(s, a ) = ϕ(s, a )⊤θh. Note that 
+
+rh(s1, a ) = ϕ(s1, a )⊤θh = δ
+
+2d
+
+ ⟨ξh, a ⟩ + d ≥ 0 and rh(s2, a ) = ϕ(s2, a )⊤θh = 0 , ∀a ∈ A ,
+
+Thus, the worst case transition kernel should have the highest possible transition probability to s2, and the optimal robust policy should lead to a transition probability to s2 as small as possible. Therefore the optimal action at step h is 
+
+a⋆h =
+
+ 1 + ξh1
+
+2 , 1 + ξh2
+
+2 · · · , 1 + ξhd 
+
+2
+
+
+
+.
+
+We illustrate the designed d-rectangular linear RRMDP M λ 
+
+> ξ
+
+in Figure 3(a) and Figure 3(b). Finally, the offline dataset is collected by the following procedure: the behavior policy πb = {πbh}h∈[H] is defined as 
+
+πbh ∼ Unif  {e1, · · · , ed, 0}, ∀h ∈ [H],
+
+where {ei}i∈[d] are the canonical basis vectors in Rd. The initial state is generated according to μ0 and then the behavior policy interact with the nominal environment K episodes to collect the offline dataset D.
+
+Remark D.1. We would like to highlight the difference between our hard instances and the hard instances developed in Liu & Xu (2024b). We find out that instances developed in Liu & Xu (2024b) only allow perturbations measured in TV-divergence. The reason is that in their nominal environment, both s1 and s2 are absorbing states, and thus P 0 
+
+> h
+
+(·| s, a )
+
+only has support on s, which could be either s1 or s2. In this case, any perturbation to P 0 
+
+> h
+
+(·| s, a ) would cause a violation of the absolute continuous condition in the definition of the KL-divergence and the χ2-divergence 3. In comparison, we inject a 
+
+> 3It has been shown in Proposition 2.5 of Lu et al. (2024) that the TV divergence can be extended to allow for two distributions with different support.
+
+32 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+small error ϵ in the nominal kernel such that P 0 
+
+> h
+
+(·| s1, a ) has full support {s1, s 2} when the transition starts from s1. Hence, we can make perturbations on P 0 
+
+> h
+
+(·| s1, a ) safely without violating the absolutely continuous condition. Additionally, Liu & Xu (2024b) only construct perturbation in the first stage, while we admit perturbation in every stage h in order to make our instance more general. 
+
+D.2. Proof of Theorem 5.5 
+
+With this family of hard instances, we are ready to prove the information-theoretic lower bound. For any ξ ∈ {− 1, 1}dH , let 
+
+Qξ denote the distribution of dataset D collected from the instance Mξ. Denote the family of parameters as Ω = {− 1, 1}dH 
+
+and the family of hard instances as M = {Mξ : ξ ∈ Ω}. Before the proof, we introduce the following lemma bounding the robust value function. 
+
+Lemma D.2. Under the constructed hard instances in Appendix D.1, let δ = d3/2/√2K and K > d 3H2/(2 λ2). For any 
+
+h ∈ [H] , we have 
+
+0 ≤ δ
+
+2d
+
+> H
+
+X
+
+> j=h
+
+(1 − ϵ)j−h
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+− V π,λ h (s1) ≤ f λh (ϵ), (D.1) where f λh (ϵ) is a error term, which is defined as: 
+
+f λh (ϵ) = 
+
+
+
+0, if D is TV; 
+
+(H − h)λϵ (e − 1) , if D is KL; 
+
+(H − h)λϵ (1 − ϵ)/4, if D is χ2.Furthermore, if we set the ϵ as 
+
+ϵ =
+
+
+
+1 − 2−1/H , if D is TV; 
+
+min {1 − 2−1/H , d 3/2/(64 λ√2K)}, if D is KL; 
+
+min {1 − 2−1/H , d 3/2/(8 λ√2K)}, if D is χ2,(D.2) then we have f λh (ϵ) ≤ d3/2H/ 32 √2K.
+
+Proof of Theorem 5.5. Invoking Lemma D.2, we have 
+
+V π⋆,λ  
+
+> 1
+
+(s1) − V π,λ  
+
+> 1
+
+(s1) ≥ δ
+
+2d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+(1 − ϵ)j−1 1 + ξji 
+
+2 − ξji Eπ aji 
+
+
+
+− f λ 
+
+> 1
+
+(ϵ)= δ
+
+4d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+(1 − ϵ)j−1(1 − ξji Eπ (2 aji − 1)) − f λ 
+
+> 1
+
+(ϵ)= δ
+
+4d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+(1 − ϵ)j−1(ξji − Eπ (2 aji − 1)) ξji − f λ 
+
+> 1
+
+(ϵ)= δ
+
+4d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+(1 − ϵ)j−1|ξji − Eπ (2 aji − 1) | − f λ 
+
+> 1
+
+(ϵ) (D.3) 
+
+≥ δ
+
+4d (1 − ϵ)H−1
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+|ξji − Eπ (2 aji − 1) | − f λ 
+
+> 1
+
+(ϵ), (D.4) where (D.3) follows from the fact that ξji ∈ {− 1, 1}. To continue, 
+
+δ
+
+4d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+|ξji − Eπ (2 aji − 1) | ≥ δ
+
+4d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+|ξji − Eπ (2 aji − 1) |1{ξhi ̸ = sign( E(2 aji − 1)) }| 
+
+33 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≥ δ
+
+4d
+
+> H
+
+X
+
+> j=1
+> d
+
+X
+
+> i=1
+
+1{ξhi ̸ = sign( E(2 aji − 1)) }| 
+
+= δ
+
+4d DH (ξ, ξ π ), (D.5) where DH (·, ·) is the Hamming distance. Then applying the Assouad’s method (Lemma 2.12 in Tsybakov (2009)), we have 
+
+inf  
+
+> π
+
+sup 
+
+> ξ∈Ω
+
+Eξ [DH (ξ, ξ π )] ≥ dH 
+
+2 min    
+
+> DH(ξ,ξ π)=1
+
+inf  
+
+> ϕ
+
+[Qξ (ψ(D)̸ = ξ) + Qξπ (ψ(D)̸ = ξπ )] 
+
+≥ dH 
+
+2
+
+
+
+1 −
+
+ 12 max    
+
+> DH(ξ,ξ π)=1
+
+DKL (Qξ ∥Qξπ )
+
+1/2
+
+, (D.6) where DKL represents the KL divergence. Next we bound DKL (Qξ ∥Qξπ ), according to the definition of Qξ (D), we have 
+
+Qξ (D) = 
+
+> K
+
+Y
+
+> k=1
+> H
+
+Y 
+
+> τ=1
+
+πbh(aτh|sτh)P 0 
+
+> h
+
+(sτh+1 |sτh, a τh)Rh(rτh|sτh, a τh),
+
+where Rh(rτh|sτh, a τh) refers to the density function of N (rh(sτh, a τh), 1) at rτh. By the fact that the difference between the two distributions Qξ (D) and Qξπ (D) lie only in the reward distribution corresponding to the index where ξ and ξπ differ, we have 
+
+DKL (Qξ (D)∥Qξπ (D)) = 
+
+> Kd+2
+
+X 
+
+> τ=1
+
+DKL 
+
+
+
+N
+
+ d + 1 2d δ, 1
+
+
+
+∥N 
+
+ d − 12d δ, 1
+
+ 
+
+= Kd + 2 
+
+δ2
+
+d2 ≤ 12 , (D.7) where the last inequality follows from the definition of δ. By the fact that δ = d3/2/√2K, we have 
+
+inf  
+
+> ˆπ
+
+sup  
+
+> M∈M
+
+subopt (M, ˆπ, s, λ ) ≥ δH (1 − ϵ)H−1
+
+4
+
+
+
+1 −
+
+ 12 max    
+
+> DH(ξ,ξ π)=1
+
+DKL (Qξ ∥Qξπ )
+
+1/2
+
+− f λh (ϵ) (D.8) 
+
+≥ δH (1 − ϵ)H−1
+
+8 − f λh (ϵ) (D.9) 
+
+= d3/2H(1 − ϵ)H−1
+
+8√2K − f λh (ϵ)
+
+≥ d3/2H
+
+16 √2K − d3/2H
+
+32 √2K (D.10) 
+
+≥ 1128 √2
+
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P h dX
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|s1 = s
+
+i
+
+, (D.11) where (D.8) holds by applying the inequality (D.4) , (D.5) and (D.6) in order, (D.9) holds by (D.7), (D.10) holds by the definition of ϵ in (D.2) , and (D.11) holds by Lemma F.4. Hence, it is sufficient for taking c = 1 /128 √2. This concludes the proof. 
+
+## E. Proof of Technical Lemmas 
+
+E.1. Proof of Lemma C.1 
+
+Proof. We first decompose the SubOpt (π, s, λ ) as follows: SubOpt (ˆ π, s, λ ) = V ⋆,λ  
+
+> 1
+
+(s) − V ˆπ,λ  
+
+> 1
+
+(s)= V ⋆,λ  
+
+> 1
+
+(s) − ˆV λ 
+
+> 1
+
+(s)
+
+| {z }
+
+> (i)
+
++ ˆV λ 
+
+> 1
+
+(s) − V ˆπ,λ  
+
+> 1
+
+(s)
+
+| {z }
+
+> (ii)
+
+,
+
+34 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+where ˆV λ 
+
+> 1
+
+(s) is computed in the algorithm. We next bound the term (i) and (ii) respectively. For term (i), the error comes from the estimated error of the value function and the Q-function, therefore by (3.2) and the definition of the ˆQλh(s, a ) in meta-algorithm, for any h ∈ [H], we can decompose the error as: 
+
+V π⋆,λ h (s) − ˆV λh (s) = Qπ⋆,λ h (s, π ⋆h(s)) − ˆQλh(s, ˆπh(s)) 
+
+≤ Qπ⋆,λ h (s, π ⋆h(s)) − ˆQλh(s, π ⋆(s)) (E.1) 
+
+= T λh V π⋆,λ h+1 (s, π ⋆h(s)) − T λh ˆV λh+1 (s, π ⋆h(s)) + T λh ˆV λh+1 (s, π ⋆h(s)) − ˆQλh(s, π ⋆(s)) = T λh V π⋆,λ h+1 (s, π ⋆h(s)) − T λh ˆV λh+1 (s, π ⋆h(s)) + δλh (s, π ⋆h(s)) , (E.2) where (E.1) comes from the fact that ˆπh is the greedy policy with respect to ˆQλh(s, a ), the regularized robust Bellman update error δλh is defined as: 
+
+δλh (s, a ) := T λh ˆV λh+1 (s, a ) − ˆQλh(s, a ), ∀(s, a ) ∈ S × A , (E.3) which aims to eliminate the clip operator in the definition of ˆQλh(s, a ). Denote the worst transition kernel w.r.t the regularized Bellman operator as ˆP = { ˆPh}h∈[H], where ˆPh is defined as: 
+
+ˆPh(·| s, a ) = argmin 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+ ˆV λh+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a ) argmin 
+
+> μh,i ∈∆( S)
+
+Es′∼μh,i [ ˆV λh+1 (s′)] + λD (μh,i ∥μ0
+
+> h,i
+
+)
+
+=
+
+> d
+
+X
+
+> i=1
+
+ϕi(s, a )ˆ μh,i (·),
+
+where the ˆμh,i is defined as ˆμh,i = argmin μh,i ∈∆( S)
+
+Es′∼μh,i [ ˆVh+1 (s′)] + λD (μh,i ∥μ0
+
+> h,i
+
+). Hence the difference between the regularized Bellman operator and the empirical regularized Bellman operator can be bounded as 
+
+T λh V π⋆,λ h+1 (s, π ⋆h(s)) − T λh ˆV λh+1 (s, π ⋆h(s)) = rh(s, π ⋆h(s)) + inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,π ⋆h(s)) 
+
+V π⋆,λ h+1 (s′) + λ⟨ϕ(s, π ⋆h(s)) , D(μh|| μ0
+
+> h
+
+)⟩
+
+− rh(s, π ⋆h(s)) − inf 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,π ⋆h(s)) 
+
+ ˆV λh+1 (s′) + λ⟨ϕ(s, π ⋆h(s)) , D(μh|| μ0
+
+> h
+
+)⟩
+
+≤ Es′∼ ˆPh(·| s,π ⋆h(s)) [ ˆV λh+1 (s′)] − Es′∼ ˆPh(·| s,π ⋆h(s)) [V ⋆,λ h+1 (s′)] = Es′∼ ˆPh(·| s,π ⋆h(s)) [ ˆV λh+1 (s′) − V ⋆,λ h+1 (s′)] . (E.4) Combining inequality (E.2) and (E.4), we have for any h ∈ [H]
+
+V π⋆,λ h (s) − ˆV λh (s) ≤ Es′∼ ˆPh(·| s,π ⋆h(s)) [ ˆV λh+1 (s′) − V ⋆,λ h+1 (s′)] + δλh (s, π ⋆h(s)) . (E.5) Recursively applying (E.5), we have (i) = V π⋆,λ  
+
+> 1
+
+(s) − ˆV λ 
+
+> 1
+
+(s) ≤
+
+> H
+
+X
+
+> h=1
+
+Eπ⋆, ˆP δλh (sh, a h)∥s1 = s.
+
+Next we bound term (ii), similar to term (i), by (C.1), the error can be decomposed to 
+
+ˆV λh (s) − V ˆπ,λ h (s) = ˆQλh(s, ˆπh(s)) − Qˆπ,λ h (s, ˆπh(s)) = T λh ˆV λh+1 (s, ˆπh(s)) − δλh (s, ˆπh(s)) − T λh V ˆπ,λ h+1 (s, ˆπh(s)) . (E.6) Denote P ˆπ = {P ˆπh }h∈[H] where P ˆπh is defined as: ∀(s, a ) ∈ S × A ,
+
+P ˆπh (·| s, a ) = argmin 
+
+> μh∈∆( S)d,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+ ˆV ˆπh+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩.
+
+35 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Hence similar to the bound in (E.4), the difference between the regularized Bellman operator and the empirical regularized Bellman operator can be bounded as 
+
+T λh ˆV λh+1 (s, ˆπh(s)) − T λh V ˆπ,λ h+1 (s, ˆπh(s)) ≤ Es′∼P ˆπh (·| s, ˆπh(s)) [ ˆV λh+1 (s′) − V ˆπ,λ h+1 (s′)] . (E.7) Combining inequality (E.6), (E.7), we have for any h ∈ [H]ˆV λh (s) − V ˆπ,λ h (s) ≤ Es′∼P ˆπh (·| s, ˆπh(s)) [ ˆV λh+1 (s′) − V ˆπ,λ h+1 (s′)] − δλh (s, ˆπh(s)) . (E.8) Recursively applying (E.8), we have the ”pessimisim” of the estimated value function that ∀h ∈ [H]ˆV λ 
+
+> 1
+
+(s) − V ˆπ,λ  
+
+> 1
+
+(s) ≤
+
+> H
+
+X
+
+> h=1
+
+Eˆπ,P ˆπ  − δλh (sh, a h)∥s1 = s.
+
+Therefore combining the two bounds above, we have SubOpt (ˆ π, s, λ ) = (i) + (ii) ≤
+
+> H
+
+X
+
+> h=1
+
+Eπ⋆, ˆP δλh (sh, a h)|s1 = s +
+
+> H
+
+X
+
+> h=1
+
+Eˆπ,P ˆπ  − δλh (sh, a h)∥s1 = s. (E.9) Hence, it requires to estimate the range of the regularized Bellman update error δλh (s, a ). Recall the definition in (E.3), we claim that 
+
+0 ≤ δλh (s, a ) ≤ 2Γ h(s, a ) (E.10) holds for ∀(s, a, h ) ∈ S × A × [H]. For the LHS of (E.10) , first we notice that if ⟨ϕ(s, a ), ˆwλh ⟩ − Γh(s, a ) ≤ 0, the inequality holds trivially as ˆQλh(s, a ) = 0 . Next we consider the case where ⟨ϕ(s, a ), ˆwλh ⟩ − Γh(s, a ) ≥ 0. By the definition of ˆQλh(s, a ) and the assumption in the lemma, we have 
+
+δλh (s, a ) = T λh ˆV λh+1 (s, a ) − ˆQλh(s, a )= T λh ˆV λh+1 (s, a ) − min ⟨ϕ(s, a ), ˆwλh ⟩ − Γh(s, a ), H − h + 1 
+
+≥ T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩ + Γ h(s, a )
+
+≥ 0.
+
+On the other hand, by the assumption in the lemma, we have 
+
+⟨ϕ(s, a ), ˆwλh ⟩ − Γh(s, a ) ≤ T λh ˆV λh+1 (s, a ) ≤ H − h + 1 .
+
+Hence, we can upper bound δλh (s, a ) as 
+
+δλh (s, a ) = T λh ˆV λh+1 (s, a ) − ˆQλh(s, a )= T λh ˆV λh+1 (s, a ) − max ⟨ϕ(s, a ), ˆwλh ⟩ − Γh(s, a ), 0
+
+≤ T λh ˆV λh+1 (s, a ) − ⟨ ϕ(s, a ), ˆwλh ⟩ + Γ h(s, a )
+
+≤ 2Γ h(s, a ).
+
+This concludes the claim. Now it remains to bound the empirical transition kernel ˆP . Noticing the fact that ∀h ∈
+
+[H], (s, a ) ∈ S × A ,λD (ˆ μh,i ∥μ0
+
+> h,i
+
+) ≤ Es′∼ˆμh,i [ ˆV λh+1 (s′)] + λD (ˆ μh,i ∥μ0
+
+> h,i
+
+)= inf 
+
+> μh,i ∈∆( S)
+
+Es′∼μh,i [ ˆVh+1 (s′)] + λD (μh,i ∥μ0
+
+> h,i
+
+)
+
+≤ inf 
+
+> μh,i ∈∆( S)
+
+Es′∼μh,i [V ⋆,λ h+1 (s′)] + λD (μh,i ∥μ0
+
+> h,i
+
+) (E.11) 
+
+≤ Es′∼μ0 
+
+> h,i
+
+[V ⋆,λ h+1 (s′)] 
+
+36 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≤ max  
+
+> s∈S
+
+V ⋆,λ h+1 (s),
+
+where (E.11) comes from the pessimism of value function, i.e ˆV λh+1 (s) ≤ V ⋆,λ h (s), ∀h ∈ [H]. Hence, the empirical transition kernel ˆPh(·| s, a ) is contained in the set Uλ(P 0) defined in (5.1). Hence, by (E.9) and (E.10), we have SubOpt (ˆ π, s, λ ) ≤
+
+> H
+
+X
+
+> h=1
+
+Eπ⋆, ˆP δλh (sh, a h)|s1 = s +
+
+> H
+
+X
+
+> h=1
+
+Eˆπ,P ˆπ  − δλh (sh, a h)∥s1 = s
+
+≤ 2
+
+> H
+
+X
+
+> h=1
+
+Eπ⋆, ˆP Γh(sh, a h)|s1 = s
+
+≤ 2 sup   
+
+> P∈U λ(P0)
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P Γh(sh, a h)|s1 = s.
+
+This concludes the proof. 
+
+E.2. Proof of Lemma C.2 
+
+Proof. For all h ∈ [H], from the definition of wh,
+
+∥wλh ∥2 = ∥Es∼μ0 
+
+> h
+
+[ ˆV λh+1 (s)] αh+1 ∥2 ≤ H√d, 
+
+where the inequality follows from the fact that ˆV λh+1 ≤ H, for all h ∈ [H]. Meanwhile, by the definition of ˆwλh in Algorithm 3, and the triangle inequality, 
+
+∥ ˆwλh ∥2 = Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)[ ˆV λh+1 (s)] αh+1 2
+
+≤ H
+
+> K
+
+X 
+
+> τ=1
+
+∥Λ−1 
+
+> h
+
+ϕ(sτh, a τh)∥2
+
+= H
+
+> K
+
+X 
+
+> τ=1
+
+q
+
+ϕ(sτh, a τh)⊤Λ−1/2 
+
+> h
+
+Λ−1 
+
+> h
+
+Λ−1/2 
+
+> h
+
+ϕ(sτh, a τh)
+
+≤ H
+
+√γ
+
+> K
+
+X 
+
+> τ=1
+
+q
+
+ϕ(sτh, a τh)⊤Λ−1 
+
+> h
+
+ϕ(sτh, a τh) (E.12) 
+
+≤ H√K
+
+√γ
+
+vuut KX 
+
+> τ=1
+
+ϕ(sτh, a τh)⊤Λ−1 
+
+> h
+
+ϕ(sτh, a τh) (E.13) 
+
+= H√K
+
+√γ
+
+q
+
+Tr (Λ−1 
+
+> h
+
+(Λh − γI)) 
+
+≤ H√K
+
+√γ
+
+pTr (I)= H
+
+s
+
+Kd γ ,
+
+where (E.12) follows from the fact that ∥Λ−1 
+
+> h
+
+∥ ≤ γ−1, (E.13) follows from the Cauchy-Schwartz inequality. Then we conclude the proof. 
+
+E.3. Proof of Lemma C.3 
+
+Proof. By definition, we have 
+
+wλh ∥2 = Es∼μ0
+
+> h
+
+h
+
+e− ˆV λh+1 (s)
+
+> λ
+
+i
+
+> 2
+
+=
+
+Z
+
+> S
+
+e− ˆV λh+1 (s) 
+
+> λ
+
+μ0
+
+> h
+
+(s) 2
+
+ds ≤
+
+Z
+
+> S
+
+∥μ0
+
+> h
+
+(s)∥2ds ≤ √d, 
+
+37 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+this concludes the proof of wλh . For ˆwλh ,
+
+∥ ˆwλh ∥2 = Λ−1
+
+> hK
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)e− ˆV λh+1 (sh+1 )
+
+> λ
+> 2
+
+≤
+
+> K
+
+X 
+
+> τ=1
+
+∥Λ−1 
+
+> h
+
+ϕ(sτh, a τh)∥2
+
+=
+
+> K
+
+X 
+
+> τ=1
+
+q
+
+ϕ(sτh, a τh)⊤Λ−1/2 
+
+> h
+
+Λ−1 
+
+> h
+
+Λ−1/2 
+
+> h
+
+ϕ(sτh, a τh)
+
+≤ 1
+
+√γ
+
+> K
+
+X 
+
+> τ=1
+
+q
+
+ϕ(sτh, a τh)⊤Λ−1 
+
+> h
+
+ϕ(sτh, a τh) (E.14) 
+
+≤√K
+
+√γ
+
+vuut KX 
+
+> τ=1
+
+ϕ(sτh, a τh)⊤Λ−1 
+
+> h
+
+ϕ(sτh, a τh) (E.15) 
+
+=
+
+√K
+
+√γ
+
+q
+
+Tr (Λ−1 
+
+> h
+
+(Λh − γI)) 
+
+≤√K
+
+√γ
+
+pTr (I) = 
+
+s
+
+Kd γ ,
+
+where (E.14) follows from the fact that ∥Λ−1 
+
+> h
+
+∥ ≤ γ−1, (E.15) follows from the Cauchy-Schwartz inequality. Then we conclude the proof. 
+
+E.4. Proof of Lemma C.4 
+
+Proof. Denote A = β2Λ−1 
+
+> h
+
+, then we have ∥θ∥2 ≤ L, ∥A∥2 ≤ B2γ−1. For any two functions V1, V 2 ∈ V with parameters 
+
+(θ1, A1), (θ2, A2), since both {·} [0 ,H −h+1] and max a are contraction maps, dist (V1, V 2) (E.16) 
+
+≤ sup 
+
+> s,a
+
+ϕ(s, a )⊤(θ1 − θ2) − λ
+
+
+
+log 
+
+
+
+1 + 
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥A1
+
+
+
+− log 
+
+
+
+1 + 
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥A2
+
+ 
+
+≤ sup 
+
+> ϕ∈Rd,∥ϕ∥≤ 1
+
+ϕ⊤(θ1 − θ2) − λ log 1 + Pdi=1 ∥ϕi(s, a )1i∥A1
+
+1 + Pdi=1 ∥ϕi(s, a )1i∥A2
+
+≤ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+
+|ϕ⊤(θ1 − θ2)| + λ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+
+log 1 + Pdi=1 ∥ϕi(s, a )1i∥A1
+
+1 + Pdi=1 ∥ϕi(s, a )1i∥A2
+
+, (E.17) we notice the fact that: for any x > 0, y > 0,
+
+log 1 + x
+
+1 + y = log 
+
+ x − y
+
+1 + y + 1 
+
+
+
+≤ log( |x − y| + 1) ≤ | x − y|.
+
+Therefore, (E.17) can be bounded as: (E.17) ≤ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+
+|ϕ⊤(θ1 − θ2)| + λ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥A1 −
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(s, a )1i∥A2
+
+= sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+
+|ϕ⊤(θ1 − θ2)| + λ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+> d
+
+X
+
+> i=1
+
+q
+
+ϕi1⊤ 
+
+> i
+
+A1ϕi1i −
+
+> d
+
+X
+
+> i=1
+
+q
+
+ϕi1⊤ 
+
+> i
+
+A2ϕi1i
+
+≤ ∥ θ1 − θ2∥2 + λ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+> d
+
+X
+
+> i=1
+
+q
+
+ϕi1⊤ 
+
+> i
+
+(A1 − A2)ϕi1i (E.18) 38 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≤ ∥ θ1 − θ2∥2 + λp∥A1 − A2∥ sup 
+
+> ϕ∈Rd:∥ϕ∥≤ 1
+> d
+
+X
+
+> i=1
+
+∥ϕi1i∥≤ ∥ θ1 − θ2∥2 + λp∥A1 − A2∥F , (E.19) where the (E.18) follows from the triangular inequality and the fact |√x − √y| ≤ p|x − y|, and ∥ · ∥ F denotes the Frobenius norm. We next define that Cθ is an ϵ/ 2-cover of {θ ∈ Rd|∥ θ∥2 ≤ L}, and the CA is an ϵ2/4λ2-cover of 
+
+{A ∈ Rd×d|∥ A∥F ≤ d1/2B2γ−1}. By Lemma F.5, we have that: 
+
+|C θ | ≤ (1 + 4 L/ϵ )d, |C A| ≤ (1 + 8 λ2d1/2B2/γϵ 2)d2
+
+.
+
+By (E.19), for any V1 ∈ V , there exists θ2 ∈ C θ and A2 ∈ C A s.t V2 parametrized by (θ2, A2) satisfying dist (V1, V 2) ≤ ϵ.Therefore, we have the following: 
+
+log |N (ϵ)| ≤ log |C θ | + log |C A| ≤ d log(1 + 4 L/ϵ ) + d2 log(1 + 8 λ2d1/2B2/γϵ 2).
+
+Hence we conclude the proof. 
+
+E.5. Proof of Lemma C.5 
+
+Proof. By definition, we have that 
+
+∥ ˆwλh ∥2
+
+=
+
+h
+
+max   
+
+> α∈[( ˆVλh+1 )min ,( ˆVλh+1 )max ]
+
+nˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α + 14λ (ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α)2 − 14λ ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2
+
+> α
+
+oi  
+
+> i∈[d]2
+
+≤
+
+h
+
+H + H2
+
+2λ
+
+i 
+
+> i∈[d]2
+
+(E.20) 
+
+= √d
+
+
+
+H + H2
+
+2λ
+
+
+
+,
+
+where (E.20) follows by the fact that ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] α ∈ [0 , H ], ˆEμ0 
+
+> h,i
+
+[ ˆV λh+1 (s)] 2 
+
+> α
+
+∈ [0 , H 2].
+
+E.6. Proof of Lemma D.2 
+
+Proof. We first proof the LHS of the lemma by induction from last stage H. From the definition of V π,λ H and θh, we can learn that 
+
+V π,λ H (s1) = rH (s1, π H (s1)) = ϕ(s1, π (s1)) ⊤θh = δ
+
+2d
+
+
+
+d +
+
+> d
+
+X
+
+> i=1
+
+ξHi Eπ aHi 
+
+
+
+.
+
+This is the base case. Now suppose the conclusion holds for stage h + 1 , that is to say, 
+
+V π,λ h+1 (s1) ≤ δ
+
+2d
+
+> H
+
+X
+
+> j=h+1
+
+(1 − ϵ)j−h−1
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+.
+
+Recall the regularized robust bellman equation in Proposition 3.2 and the regularized duality of the three divergences, we have 
+
+Qπ,λ h (s1, a ) = rh(s1, a ) + inf 
+
+> μh∈∆( S)d+2 ,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩
+
+≤ rh(s1, a ) + Es′∼P 0 
+
+> h(·| s1,a )
+
+[V π,λ h+1 (s′)] (E.21) 
+
+= rh(s1, a ) + (1 − ϵ)V π,λ h+1 (s1). (E.22) Then with regularized robust bellman equation in Proposition 3.2 and the inductive hypothesis, we have 
+
+V π,λ h (s1) = Qπ,λ h (s1, π (s1)) 
+
+39 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+≤ rh(s1, π h(s1)) + (1 − ϵ)V π,λ h+1 (s1) (E.23) 
+
+= δ
+
+2d
+
+
+
+d +
+
+> d
+
+X
+
+> i=1
+
+ξhi Eπ ahi 
+
+
+
++ δ
+
+2d
+
+> H
+
+X
+
+> j=h+1
+
+(1 − ϵ)j−h
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+= δ
+
+2d
+
+> H
+
+X
+
+> j=h
+
+(1 − ϵ)j−h
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+.
+
+Hence, by the induction argument, we conclude the proof of the RHS. Furthermore, for any h ∈ [H], we can upper bound 
+
+V π,λ h (s) as 
+
+V π,λ h (s) ≤ δ
+
+2d
+
+> H
+
+X
+
+> j=h
+
+(1 − ϵ)j−h
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+≤ δ(H − h) ≤ λ(H − h)/H ≤ λ, (E.24) where the third inequality holds by the definition of δ. For the left, we prove by discussing the KL, χ2 and TV cases respectively. 
+
+Case I - TV. The case for TV holds trivially as by Proposition 4.3, we have 
+
+Qπ,λ h (s1, a ) = rh(s1, a ) + inf 
+
+> μh∈∆( S)d+2 ,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩
+
+= rh(s1, a ) + ⟨ϕ(s1, a ), Es′∼μ0 
+
+> h
+
+[V π,λ h+1 (s′)] min s′ (V π,λ h+1 (s′))+ λ⟩ (E.25) 
+
+= rh(s1, a ) + Es′∼P 0 
+
+> h(·| s,a )
+
+[V π,λ h+1 (s′)] min s′ (V π,λ h+1 (s′))+ λ
+
+= rh(s1, a ) + (1 − ϵ)V π,λ h+1 (s1), (E.26) where (E.26) holds by (E.24). Hence, the inequality in (E.23) holds for equality. This concludes the proof for TV-divergence. 
+
+Case II - KL. We prove by induction. The case holds trivially in last stage H. Suppose 
+
+V π,λ h+1 (s1) ≥ δ
+
+2d
+
+> H
+
+X
+
+> j=h+1
+
+(1 − ϵ)j−h−1
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+− (H − h)λϵ (e − 1) .
+
+Recall the duality form of Proposition 4.6, the Q-function at stage h can be upper bounded as: 
+
+Qπ,λ h (s1, a ) = rh(s1, a ) + inf 
+
+> μh∈∆( S)d+2 ,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩
+
+= rh(s1, a ) + ⟨ϕ(s1, a ), −λ log Es′∼μ0 
+
+> h
+
+e−V π,λ h+1 (s′)/λ ⟩
+
+= rh(s1, a ) − λ log  ϵ + (1 − ϵ)e−V π,λ h+1 (s1)/λ 
+
+= rh(s1, a ) + V π,λ h+1 (s1) − λ log  ϵe V π,λ h+1 (s1)/λ + (1 − ϵ)
+
+≥ rh(s1, a ) + V π,λ h+1 (s1) − λϵ  eV π,λ h+1 (s1)/λ − 1 (E.27) 
+
+≥ rh(s1, a ) + V π,λ h+1 (s1) − λϵ (e − 1) , (E.28) where (E.27) follows by the fact that log(1 + x) ≤ x, ∀x > 0, (E.28) follows by (E.24). Therefore, by the inductive hypothesis, we have 
+
+V π,λ h (s1) = Qπ,λ h (s1, π (s1)) 
+
+≥ rh(s1, π h(s1)) + (1 − ϵ)V π,λ h+1 (s1) − λϵ (e − 1) = δ
+
+2d
+
+> H
+
+X
+
+> j=h
+
+(1 − ϵ)j−h
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+− (H − h)λϵ (e − 1) .
+
+This finishes the KL setting. 40 Robust Offline Reinforcement Learning with Linearly Structured f -Divergence Regularization 
+
+Case III - χ2. Similar to the case in TV, KL, by the duality of χ2 in Proposition 4.8, we have 
+
+Qπ,λ h (s1, a ) = rh(s1, a ) + inf 
+
+> μh∈∆( S)d+2 ,P h=⟨ϕ,μh⟩
+
+Es′∼Ph(·| s,a )
+
+V π,λ h+1 (s′) + λ⟨ϕ(s, a ), D(μh|| μ0
+
+> h
+
+)⟩
+
+= rh(s1, a ) + (1 − ϵ) sup 
+
+> α∈[Vmin ,V max ]
+
+n
+
+[V π,λ h+1 (s1)] α − ϵ
+
+4λ [V π,λ h+1 (s1)] 2
+
+> α
+
+o
+
+≥ rh(s1, a ) + (1 − ϵ)
+
+h
+
+V π,λ h+1 (s1) − ϵ
+
+4λ [V π,λ h+1 (s1)] 2i
+
+≥ rh(s1, a ) + (1 − ϵ)V π,λ h+1 (s1) − ϵλ (1 − ϵ)4 , (E.29) where (E.29) follows by (E.24). Hence, similar to Case II , by induction, we have 
+
+V π,λ h (s1) ≥ δ
+
+2d
+
+> H
+
+X
+
+> j=h
+
+(1 − ϵ)j−h
+
+d +
+
+ dX
+
+> i=1
+
+ξji Eπ aji 
+
+ 
+
+− (H − h) ϵλ (1 − ϵ)4 .
+
+This finishes the χ2 setting, and we complete the proof. 
+
+## F. Auxiliary Lemmas 
+
+Lemma F.1 (Lemma D.3 of Liu & Xu (2024a)) . For any h ∈ [H], let Vh denote a class of functions mapping from S to R
+
+with the following form: 
+
+Vh(x; θ, β, Λh) = max 
+
+> a∈A
+
+n
+
+ϕ(s, a )⊤θ − β
+
+> d
+
+X
+
+> i=1
+
+∥ϕi(·, ·)1i∥Λ−1
+
+> h
+
+o
+
+> [0 ,H −h+1]
+
+,
+
+the parameters (θ, β, Λh) satisfy ∥θ∥2 ≤ L, β ∈ [0 , B ], γ min (Λh) ≥ γ. Let Nh(ϵ) be the ϵ-covering number of V with respect to the distance dist (V1, V 2) = sup x |V1(x) − V2(x)|. Then 
+
+log Nh(ϵ) ≤ d log(1 + 4 L/ϵ ) + d2 log(1 + 8 d1/2B2/γϵ 2).
+
+Lemma F.2 (Corollary 4.2.11 of Vershynin (2018)) . Denote the ϵ-covering number of the closed interval [a, b ] for some real number b > a with respect to the distance metric d(α1, α 2) = |α1 − α2| as Nϵ([ a, b ]) , then we have Nϵ([ a, b ]) ≤ 3( b − a)/ϵ .
+
+Lemma F.3 (Lemma B.2 of Jin et al. (2021)) . Let f : S → [0 , R − 1] be any fixed function. For any δ ∈ (0 , 1) , we have 
+
+P
+
+
+
+∥
+
+> K
+
+X 
+
+> τ=1
+
+ϕ(sτh, a τh)ητh(f )∥2Λ−1
+
+> h
+
+≥ R2(2 log(1 /δ ) + d log(1 + K/γ )) 
+
+
+
+≤ δ, 
+
+where ητh(f ) = Es′∼P 0 
+
+> h(·| sτh,a τh)
+
+[f (s′)] − f (sτh+1 ).
+
+Lemma F.4 (Lemma F.3 of Liu & Xu (2024b)) . If K ≥ O (d6) and the feature map is define as Appendix D.1, then with probability at least 1 − δ, we have for any transition P, 
+
+> H
+
+X
+
+> h=1
+
+Eπ⋆,P h dX
+
+> i=1
+
+∥ϕi(s, a )1i∥Λ−1
+
+> h
+
+|s1 = s1
+
+i
+
+≤ 4d3/2H
+
+√K .
+
+Lemma F.5 (Lemma 5.2 of Vershynin (2010)) . For any ϵ > 0, the ϵ -covering number of the Euclidean ball in Rd with radius R > 0 is upper bounded by (1 + 2 R/ϵ )d.41

@@ -1,0 +1,1126 @@
+Title: Enhancing Diversity In Parallel Agents:  A Maximum State Entropy Exploration Story
+
+URL Source: https://openreview.net/pdf?id=51SFypI0J8
+
+Number of Pages: 21
+
+Markdown Content:
+# Enhancing Diversity In Parallel Agents: A Maximum State Entropy Exploration Story 
+
+Vincenzo De Paola 1 Riccardo Zamboni 1 Mirco Mutti 2 Marcello Restelli 1
+
+# Abstract 
+
+Parallel data collection has redefined Reinforce-ment Learning (RL), unlocking unprecedented efficiency and powering breakthroughs in large-scale real-world applications. In this paradigm, N
+
+identical agents operate in N replicas of an envi-ronment simulator, accelerating data collection by a factor of N . A critical question arises: Does spe-cializing the policies of the parallel agents hold the key to surpass the N factor acceleration? In this paper, we introduce a novel learning frame-work that maximizes the entropy of collected data in a parallel setting. Our approach carefully balances the entropy of individual agents with inter-agent diversity, effectively minimizing re-dundancies. The latter idea is implemented with a centralized policy gradient method, which shows promise when evaluated empirically against sys-tems of identical agents, as well as synergy with batch RL techniques that can exploit data diver-sity. Finally, we provide an original concentration analysis that shows faster rates for specialized par-allel sampling distributions, which supports our methodology and may be of independent interest. 
+
+# 1. Introduction 
+
+Exploration , or taking sub-optimal decisions to gather in-formation about the task, lies at the heart of Reinforcement Learning (RL, Bertsekas, 2019) from its very foundation. When the task of interest is defined through a reward func-tion, exploration shall be carefully balanced with the ex-ploitation of the current information to maximize the re-wards collected over time (Mnih et al., 2013). When a task is not known at the time of the interaction, exploration be-      
+
+> 1AIRLAB, Politecnico di Milano, Milan, Italy 2Technion, Is-rael Intitute of Technology, Haifa, Israel. Correspondence to: Vin-cenzo De Paola <vincenzo.depaola@polimi.it >, Riccardo Zam-boni <riccardo.zamboni@polimi.it >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+comes an objective per se , in order to foster the collection of maximally informative data. A common formulation of the latter pure exploration setting is state entropy maximization (Hazan et al., 2019), in which the agent aims to maximize the entropy of the data distribu-tion induced by its policy. The state entropy objective has been widely studied in the literature, e.g., to provide data col-lection strategy for offline RL (Yarats et al., 2022; Park et al., 2023), experimental design (Tarbouriech & Lazaric, 2019), or transition model estimation (Tarbouriech et al., 2020), and as a surrogate loss for policy pre-training in reward-free settings (Mutti & Restelli, 2020). All of the above uphold the status of state entropy maximization as a flexible tool for exploration. To this day, however, an important gap remains in how to deploy state entropy maximization on parallel simulators. Let us picture an illustrative example to guide our thoughts: A robotic arm control task. We may want the robot to be able to perform a wide range of tasks, such as interacting with a diverse set of objects. A good strategy is to exploit a simulator of the robotic arm to learn good manipulation policies in advance, instead of relying on costly online in-teractions, in which exploration may be unsafe. Since not all of the future tasks may be known in advance, one could opt for state entropy maximization, in order to collect ex-ploration data once and for all. Collecting those data on complex simulators may be inefficient though, resulting in long simulation times. However, one crucial advantage of sampling in simulation rather than the physical system is that the sampling process does not have to be sequential. In many modern simulators (NVIDIA Isaac Sim; Genesis, 2024; Todorov et al., 2012), the process of learning is ac-celerated by instantiating vectorized instances of agents and environments simultaneously. Parallelization was shown to be a game-changing approach that allowed for unprece-dented performance in standard RL (Espeholt et al., 2018), and the use of a multitude of identical agents operating on copies of the same environment allowed RL systems to tackle increasingly complex and large-scale problems. While the maximum entropy formulation has been widely adopted in prior works, how to better take advantage of parallel exploration agents is still to be investigated. 1Enhancing Diversity in Parallel Agents 
+
+This is far from being a trivial problem. Zhong et al. (2024) recently showed that not explicitly caring for redundant be-haviors among the agents often results in inefficient use of computational resources, which is why parallelization is employed in the first place. Additionally, as highlighted in Rudin et al. (2022), solving complex problems necessi-tates intelligent strategies for constructing experience that accelerate algorithmic convergence. This challenge is fur-ther compounded in scenarios where access to real-world process data is limited, examples are scarce, or simulators are computationally expensive. Following these considera-tions, our study is centered around the following questions: 
+
+How should parallel agents optimize their policies for efficient exploration? What is the best way to leverage parallelism in state entropy maximization? 
+
+In this paper, we generally address this question by extend-ing state entropy maximization to incorporate the role of parallel agents, enabling a deeper investigation into their ex-ploration efficiency. First, we introduce a specific problem formulation that can explicitly leverage parallelism. Rather than considering agents independently, we look at them as a whole, and consider the distribution a single one virtual agent would induce if it was following a uniform mixture of the agents’ policies. Additionally, we theoretically char-acterize how the entropy of the distribution of state visits concentrates in the single-agent and parallel-agent cases and demonstrate the significant impact of parallelization on the rate of entropy stabilization and exploration diversity. Then, we shift our attention to how to solve the problem of parallel state exploration in practice , by proposing a policy gradient strategy (Williams, 1992) that explicitly optimizes for the objective at hand. Finally, we use illustrative experiments to show that the proposed algorithm is indeed able to optimize for the state entropy and that the induced behavior enables agents to balance individual exploration with inter-agent di-versity. This synergy is particularly relevant when integrated with batch RL techniques (Levine et al., 2020). 
+
+Original Contributions. Throughout the paper, we make the following contributions: • We define the problem of State Entropy Maximization in Parallel MDPs (Section 3); • We provide high-probability concentration bounds de-scribing the rate at which the entropy of empirical distri-butions converges to the entropy of their stationary distri-butions. The proofs employ novel techniques that may be of independent interest (Section 4); • We introduce a policy gradient algorithm to take advan-tage of parallel agents for maximizing the entropy of the visited states (Section 5); • We provide numerical experiments to corroborate our findings, both in terms of state entropy maximization and batch RL on the collected data (Section 6). 
+
+# 2. Preliminaries 
+
+Before diving into the technical contributions of our work, we introduce the notation and the relevant background. 
+
+Notation. We denote [N ] := {1, 2, . . . , N } for a con-stant N < ∞. We denote a set with a calligraphic letter A
+
+and its size as |A| . We denote AT := ×Tt=1 A the T -fold Cartesian product of A. The simplex on A is denoted as 
+
+∆A := {p ∈ [0 , 1] |A| | P 
+
+> a∈A
+
+p(a) = 1 } and ∆BA denotes the set of conditional distributions p : A → ∆B. Let X, X ′
+
+random variables on the set of outcomes X and correspond-ing probability measures pX , p X′ , we denote the Shannon entropy of X as H(X) = − P 
+
+> x∈X
+
+pX (x) log( pX (x)) and the Kullback-Leibler (KL) divergence as DKL (pX ∥pX′ ) = P 
+
+> x∈X
+
+pX (x) log( pX (x)/p X′ (x)) .
+
+Interaction Model. As a base model for interaction, we consider a finite-horizon Parallel Markov Decision Pro-cess (PMDP, Sucar, 2007) without rewards. A PMDP 
+
+Mp = ( Mi)i∈[m] consists of m ∈ N+ copies of the same MDP Mi = ( S, A, P, T, μ ), composed of a set S of states and a set A of actions, which we let discrete and finite with size |S| , |A| respectively. A set of m independent agents interact with each copy Mi, according to the fol-lowing protocol. At the start of an episode, the initial state is drawn from an initial state distribution si 
+
+> 0
+
+∼ μ.Then the i-th agent takes action ai 
+
+> 0
+
+and the state transi-tions to si 
+
+> 1
+
+∼ P (·| si
+
+> 0
+
+, a i
+
+> 0
+
+) according to the transition kernel 
+
+P : S × A → ∆S . Those steps are repeated until siT is reached, being T < ∞ the horizon of an episode. The 
+
+i-th agent takes actions according to a policy πi ∈ ∆AS
+
+such that πi(ai|si) denotes the conditional probability of taking action ai upon observing si. Overall, we refer with 
+
+parallel policy the collection of policies πp = ( πi)i∈[m].1
+
+Each interaction episode is collected into a trajectory τ i := (si
+
+> 0
+
+, a i
+
+> 0
+
+, . . . , s iT −1, a iT −1, s iT ) ∈ K = ST × A T , where K is the set of all trajectories of length T .
+
+Trajectory and State Distributions in MDPs. Here we consider a single MDP Mi for the purpose of expanding the connection between trajectories and distribution over states, temporarily dropping the index i from all the quantities. A policy π interacting with Mi induces a distribution over the generated trajectories. In particular, a set of n ∈ N+
+
+trajectories τ = ( τj )j∈[n] are distributed according to a probability measure pπ ∈ ∆K defined as: 
+
+pπ (τ ) = 
+
+> n
+
+Y
+
+> j=1
+
+μ(s0,j ) 
+
+> T−1
+
+Y
+
+> t=0
+
+π(at,j | st,j )P (st+1 ,j | st,j , a t,j ).   
+
+> 1In general, we will denote the set of valid per-agent policies with Πiand the set of joint policies with Π.
+
+2Enhancing Diversity in Parallel Agents 
+
+From the realization of these trajectories, one can extract their empirical distribution ρn ∈ ∆K defined as ρn(τ ) = 
+
+> 1
+> n
+
+Pnj=1 1(τj = τ ), where τj is the trajectory at episode 
+
+j in the history of interactions. Additionally, a trajectory obtained from an interaction episode induces an empirical distribution over states dn ∈ ∆S given by 
+
+dn(s) = 1
+
+nT 
+
+> n
+
+X 
+
+> j=1
+> T−1
+
+X
+
+> t=0
+
+1(St,j = s) ∈ ∆S .
+
+With a slight overload of notation, we will denote as dn ∼
+
+pπ an empirical state distribution obtained from a sequence of trajectories of length T , and with τt ∼ ptπ a sub-trajectory 
+
+of length t < T drawn from pπ . Finally, we denote the expectation of the empirical state distribution under the policy π as dπ (s) = Edn∼pπ [dn(s)] , such that dπ ∈ ∆S is called the state distribution induced by π.
+
+State Entropy Maximization in MDPs. In standard RL (Sutton & Barto, 2018), an agent interacts with an environment to maximize the (cumulative) reward col-lected from the MDP. In the absence of a reward, previous works (Hazan et al., 2019; Mutti & Restelli, 2020; Mutti et al., 2021) investigated the effects of optimizing a different metric, namely the state entropy Hs defined as: 
+
+Hs(π) ≜ H(dπ ) := − X
+
+> s∈S
+
+dπ (s) log dπ (s).
+
+More recently, Mutti et al. (2023) noted that only a finite number of episodes (called trials ) can be drawn in many practical scenarios. When only n trajectories can be ob-tained, they propose to focus on dn rather than its expec-tation dπ , translating the infinite-trials objective of Eq. (2) with the finite-trials version 
+
+Js(π) ≜ Edn∼pπ H(dn).
+
+The Jensen’s inequality relates the two formulations as 
+
+Hs(π) ≥ J s(π).
+
+# 3. Problem Formulation 
+
+In this section, we extend the concept of state entropy to a novel objective able to incorporate parallel agents interact-ing with independent copies of the environment. In order to do so, we first need to introduce the following objects: 
+
+Definition 3.1 (Distributions in PMDPs) . Let Mp a PMDP with an interaction over n ∈ N episodes, then overall set of trajectories τ = {τ ij }i∈[m] 
+
+> j∈[n]
+
+is distributed according to the following probability measure: 
+
+pπp (τ ) := pπ1,...,π m (τ ) = 1
+
+m
+
+> m
+
+X
+
+> i=1
+> n
+
+X
+
+> j=1
+
+pπi (τ ij ),
+
+while the states are distributed according to the following mixture distribution: 
+
+dπp (s) = 1
+
+m
+
+> m
+
+X
+
+> i=1
+
+dπi (s).
+
+Collecting data from all agents induces an empirical (paral-lel) distribution over states which we denote as dn,p ∈ ∆S ,so that it is possible to define the mixture distribution as the expectation of the empirical state distribution under the par-allel policies, namely dπp (s) = Edn,p ∼pπp [dn,p (s)] . This object allows us to define objectives specifically designed for PMDPs, that are then able to leverage their structural properties. First of all, we introduce the following: 
+
+Definition 3.2 (Parallel Learning Objective in Infinite Tri-als) . Let Mm a PMDP, then the corresponding infinite trials objective can be defined as: 
+
+Hs,p (π) ≜ H(dπp ) := − X
+
+> s∈S
+
+dπp (s) log dπp (s).
+
+Now, while this objective will be shortly shown to enjoy rather interesting concentration properties, we are building over the motivating interest of exploring with a handful of trials. These considerations lead to: 
+
+Definition 3.3 (Parallel Learning Objective in Finite Trials) .
+
+Let Mm a PMDP with an interaction over n ∈ N episodes, then the corresponding finite trials objective can be defined as: 
+
+Jp(πp) ≜ Edn,p ∼pπp H(dn,p ).
+
+We are now ready to state the novel problem of interest: 
+
+Parallel State Entropy Maximization 
+
+max  
+
+> πp∈Π
+
+Jp(πp) = max 
+
+> πp∈Π
+
+n
+
+Edn,p ∼pπp H(dn,p )
+
+o
+
+(1) We denote by π⋆p ∈ arg max π Jp(π) a parallel policy that maximizes the parallel states entropy. In the next sections, we will show that Parallel Learning Objectives enjoy ex-tremely nice properties: first of all, they concentrate faster than their non-parallel counterparts, motivating the need for parallel exploration; moreover, they can be easily optimized in a decentralized fashion through policy gradient methods. 
+
+# 4. Fast Concentration of the Entropy in Parallel Settings 
+
+In this section, we present theoretical results that illus-trate how the (infinite-trials) entropy of the state (or tra-jectory) distribution concentrates. We will use these results to demonstrate the significant impact of parallelization on the rate of entropy stabilization and exploration diversity. 3Enhancing Diversity in Parallel Agents 
+
+Key Remarks. While the following theorems are instan-tiated for state distributions, they are of broader theoretical interest and apply equally to distributions over trajectories .2
+
+Additionally, we adopt the convention of referring to the entropy and variance of distributions rather than those of random variables, as a slight abuse of terminology, since these quantities are technically defined for random variables but naturally extend to their associated distributions. We start by analyzing the entropy of state distributions in MDPs, for which the following result holds: 
+
+Theorem 4.1. Let dπ be the (categorical) distribution induced by π over the finite set S with |S| = S, and let dn be the empirical distribution obtained from n
+
+independent samples drawn from dπ . Then, for any 
+
+ϵ > 0, the following bound holds: 
+
+P (H(dπ )−H (dn) > ϵ ) ≤ 2S exp 
+
+
+
+−n ϵ2Var( dπ )2S3H2(dπ )
+
+
+
+,
+
+where H(dn) and H(dπ ) denote the entropy of the empirical and true distributions, respectively, and 
+
+Var( dπ ) = P 
+
+> s∈[S]
+
+dπ (s)(1 − dπ (s)) is the variance of a random variable associated with the categorical distribution dπ . Furthermore, to ensure this concen-tration with confidence 1 − δ, the number of samples 
+
+n must satisfy the following lower bound: 
+
+n ≥ 2S3H2(dπ )
+
+ϵ2Var( dπ ) · ln 2Sδ .
+
+This theorem establishes an upper bound on the probability that the entropy difference between the true and empiri-cal distributions exceeds ϵ. Specifically, the probability of large deviations between these two entropies decreases exponentially with n, with the rate of convergence influ-enced by the entropy of the true distribution dπ . Notably, as 
+
+lim H(dπ )→0 H2(dπ )Var( dπ ) = 0 , distributions with lower entropy require fewer samples for concentration, implying they are easier to approximate empirically. The full proof can be found in Appendix A. 
+
+Primary Insight. This result suggests a key advantage of parallel exploration: when multiple agents explore the envi-ronment simultaneously, each can focus on different regions of the state space. As a result, they induce distributions with lower entropy compared to a single policy covering the entire space. We now consider the case of PMDPs with m parallel agents, each independently collecting n/m samples from the en-  
+
+> 2The number of samples nwill represent the number of episodes for trajectory distributions or the number of steps for state distributions.
+
+vironment for a total of n samples. This setting induces mixture distributions dπp and empirical mixture distribu-tions dn,p as defined in the previous sections. The entropy of the mixture distributions decomposes as follows: 
+
+H(dπp ) = 1
+
+m
+
+> m
+
+X
+
+> i=0
+
+H(dπi ) + 1
+
+m
+
+> m
+
+X
+
+> i=0
+
+DKL (dπi || dπp ),
+
+where the first term is the average entropy of the individual agent distributions, and the second term captures diversity among these distributions via the KL divergence. By analyz-ing this decomposition, we can get insights into the potential advantages of parallel exploration versus single-agent explo-ration. To achieve high-entropy mixture distributions, we have two key strategies: 
+
+Homogeneous Exploration: All agents follow the same entropy-maximizing policy, leading to a mixture with an entropy equivalent to that of a single agent (the average of the entropies is equal to the single-agent en-tropy, and the second term in the above decomposition is equal to zero). The primary benefit of parallelism, in this case, is computational speedup rather than sample complexity reduction. 
+
+Diverse Exploration: Agents follow distinct policies with lower individual entropy, but their induced distribu-tions are maximally different. Here, the average en-tropy remains low, but the overall mixture entropy is high due to diversity (i.e., high values of the KL diver-gences). For example, if m agents induce distributions with disjoint supports, the entropy of the mixture increases by log( m)
+
+while maintaining low individual entropy, enabling faster concentration. However, if the agents’ distributions overlap, the average KL divergence term decreases, necessitating higher individual entropies to maintain high mixture entropy, thereby increasing sample complexity. This analysis shows that parallel exploration is beneficial not only for reducing data collection time but also for improving sample efficiency by enabling broader state-space coverage with fewer samples. 
+
+# 5. Policy Gradient for Parallel Exploration with a Handful of Trials 
+
+As stated before, a core motivation of this work is address-ing the problem of exploration in practical scenarios, where a strong parallelization of the environment is used to over-come the difficulty to sample from complex simulators or even physical instantiations of the agents. In such setting, it 4Enhancing Diversity in Parallel Agents 
+
+is crucial to achieve good performances over a finite number of realizations, and for this reason our attention now shifts towards finite trials objectives. Specifically, we will focus on the single trial case, i.e., n = 1 , and show that rather than instantiating m copies of the same algorithm, the paral-lel learning objective allows for an alternative formulation, where agents explicitly leverage parallelization. The core idea lies in the implementation of a policy gradient of the parallel formulation of Eq. 3.3 on a set of parametric policies 
+
+πθi : S → ∆A, where θi ∈ Θi ⊂ Rd is a parameter vector in a d-dimensional space, uniquely associated with the agent 
+
+i. The parallel policy is then defined as πθ = ( πθi )i∈[m].In the following, we derive the gradient of the parallel ob-jective with respect to the policy parameters. For the sake of simplifying the notation, we will refer to dn,p as dp for simplicity. Starting from the cost function: 
+
+J (πp) = 
+
+Z
+
+pπp (dp)H(dp),
+
+we take the derivative with respect to the parameters θi:
+
+∂J (πp)
+
+∂θ i
+
+= ∂∂θ i
+
+Z
+
+pπp (dp)H(dp).
+
+Since θi only appears in pπp (·), we can then write: 
+
+∂J (πp)
+
+∂θ i
+
+=
+
+Z ∂p πp (dp)
+
+∂θ i
+
+H(dp),
+
+Now, we can employ standard log-trick arguments after noticing that the parameter θi only appears in agent i’s policy, that is conditioned over the respective trajectory τi,allowing one to write: 
+
+∂p πp (dp)
+
+∂θ i
+
+= pπp (dp) 
+
+> T−1
+
+X
+
+> t=0
+
+∂ log πθi (ait|sit)
+
+∂θ i
+
+,
+
+Then, after substituting back into the original integral we get: 
+
+∂J (πp)
+
+∂θ i
+
+=
+
+Z
+
+pπp (dp) log πθi H(dp).
+
+defining the so-called score function as log πθi ≜
+
+PT −1 
+
+> t=0
+
+∇θ log πθi (at|st), with πθi (at|st) being the prob-ability for agent i of taking action at in state st in trajectory 
+
+τi. On the other hand, one should note that the entropy is computed over the empirical distribution dp induced by all 
+
+the agents. In other words, each agent can independently perform gradient updates via a joint estimation of the en-tropy feedback. In the following, we estimate the gradient of the parallel objective J (πθ ) with respect to its policy pa-rameters θi using an unbiased Monte-Carlo estimator over 
+
+K ∈ N sampled parallel trajectories: 
+
+∇θi J (πθ ) ≈ 1
+
+K
+
+> K
+
+X 
+
+> k=1
+> T−1
+
+X
+
+> t=0
+
+∇θ log πθi (ait,k |sit,k )
+
+!
+
+H(dkp ).
+
+Algorithm 1 : Policy Gradient for Parallel States Entropy maximization ( PGPSE ) 
+
+> 1:
+
+Input : Episodes N, Trajectories K, Batch Size B, Learning Rate α, Parameters θ = ( θi)i∈[m] 
+
+> 2:
+
+for e ∈ { 1, . . . , N } do  
+
+> 3:
+
+for itr ∈ { 1, . . . , B } do  
+
+> 4:
+
+for k ∈ { 1, . . . , K } do  
+
+> 5:
+
+τ ∼ πθ {Sample parallel trajectories } 
+
+> 6:
+
+log πθi ← PT −1 
+
+> t=1
+
+∇θ log πθ (at | st) 
+
+> 7:
+
+dp(s) ← 1
+
+> km
+
+Pm,k,T j,i,t =1 1(st,i,j = s) 
+
+> 8:
+
+∇θ J (θ) += log πθi · H (dp) 
+
+> 9:
+
+end for  
+
+> 10:
+
+end for  
+
+> 11:
+
+∇θ J (θ) ← 1 
+
+> B
+
+∇θ J (θ) 
+
+> 12:
+
+θ ← θ + α∇θ J (θ) 
+
+> 13:
+
+end for  
+
+> 14:
+
+Output : Policies πθ = ( πiθi )i∈[m]
+
+Thus, the partial gradient update consists of an internal sum-mation over the log of the i-th policy executed by agent i, as it interacts over the horizon T , experiencing various action-state combinations. This internal summation is further ag-gregated across the external summation over K trajectories. This estimator approximates the true gradient by averag-ing the score function of sampled trajectories, weighted by the entropy of such induced state distribution. By limiting parallel agents to experience only one trajectory per each, we average over a mini-batch B = {(τi)}ni=1 to reduce the variance of the reinforce estimator, with B = |B| being the batch-size. The pseudo-code of the resulting Algorithm, called Policy Gradient for Parallel States Entropy maximiza-tion (PGPSE ), is reported in Algorithm 1. 
+
+# 6. Empirical Corroboration 
+
+We report numerical experiments in simple yet illustrative domains to demonstrate the advantage of exploration with distinct parallel agents over single agents. The section is organized into three parts: • Policy Gradient Optimization : This part analyzes the results of the learning process based on Algorithm 1, eval-uating the performance of the learned policy in terms of normalized entropy and support size. • Dataset Entropy Evaluation : This part takes a deeper look at the entropy of a dataset collected from the policies trained as in the previous section. • Offline RL : This part provides a comparative analysis of how the dataset collected with parallel maximum entropy agents benefits the performance of offline RL. For all the experiments, we consider variations of discrete grid-world domains, which we depicted in Appendix B (see 5Enhancing Diversity in Parallel Agents               
+
+> 2 Agents 1 Agent K′= 2 K6 Agents 1 Agent K′= 6 K
+> (a) State Entropy ( Room-det )(b) State Entropy ( Room-stoc )(c) State Entropy ( Maze-det )(d) State Entropy ( Maze-stoc )
+> (e) Support size ( Room-det )(f) Support size ( Room-stoc )(g) Support size ( Maze-det )(h) Support size ( Maze-stoc )
+> Figure 1. The top row (a–d) shows the progression of normalized state entropy across different environments, while the bottom row (e–h) depicts the corresponding size of the support of the entropy. Each plot shows the performance of parallel agents (2 or 6) against single agents taking 2 and 6 trajectories, respectively. We report average results and standard deviation over 5 independent runs.
+
+Figures 5, 6). One family (referred to as Room ) is composed of two rooms connected by a narrow corridor, with a total of 43 states and 4 actions (one to move in each direction). The other (referred to as Maze ) is a maze of various connected paths, with same number of total states and actions as before. For each family, we consider a deterministic version ( det )and a stochastic version ( stoc ) in which the agent’s chosen actions are flipped to random actions with some probabil-ity. Appendix C reports further experimental details, with additional visualizations and results. 
+
+Policy Gradient Optimization. First of all, we test the ability of PGPSE (Algorithm 1) in addressing maximum state entropy exploration with parallel agents. We run mul-tiple instances of the algorithm with an increasing number of agents m ∈ { 2, 4, 6}.3 As a baseline, we consider the performance of the same algorithm training a single agent for the finite-trial objective (Eq. 2), with a number of trials 
+
+K′ matching the number of trajectories taken by the parallel agents. We compare the results in terms of (normalized) state entropy and the size of the entropy support (i.e., the number of unique visited states) in all the domains. Figure 1 reports the resulting learning curves, obtained over five independent runs. For a fair comparison of al-
+
+> 3In the main text we omit the result with 4 agents, which are reported in Figure 7 of the Appendix.
+
+gorithms with varying number of agents, the performance is reported as a function of the policy updates, which translate to B × m × K × T total interactions with the environment. Across the board, the performance of parallel agents (solid lines) consistently outperforms the single agent counterparts (dashed lines). Indeed, they achieve higher entropy values, thanks to their ability to explore more states as it is evident from the larger size of the support. This behavior can be attributed to the intrinsic diversity introduced by parallel agents: To optimize the team state distribution, each agent learns an individual behavior that is synergic with the others. 
+
+Dataset Entropy Evaluation. Then, we tested the ca-pabilities of the trained policies in collecting diverse ex-periences, by analyzing the properties of a single dataset. Figure 2 illustrates the normalized empirical state entropy of each dataset collected by the m agents, compared against the entropy of the dataset collected by a single agent over 
+
+K = m trajectories (trained to maximize the entropy on the corresponding number of trajectories), and a random policy. To construct these datasets, we sample one trajectory per agent from the parallel policies, evaluating them across five seeds. This procedure reveals that datasets generated through parallel exploration exhibit higher entropy than those collected by a single agent or a random policy. It is noteworthy that experience collected in parallel also ex-6Enhancing Diversity in Parallel Agents       
+
+> 2 Agents 1 Agent K′
+> = 2 K6 Agents 1 Agent K′
+> = 6 KRandom
+
+(a) Dataset Entropy ( Room-det ) (b) Dataset Entropy ( Room-stoc )
+
+(c) Dataset Entropy ( Maze-det ) (d) Dataset Entropy ( Maze-stoc )
+
+Figure 2. Entropy evaluation of the dataset generated by sampling from parallel policies, compared against both random and single-baselines across different environments. With the notation K′ =
+
+mK we denoted the set in which the single agent had access to a multiple m of trajectories available to the parallel agents. We report average and standard deviation over 5 independent runs. 
+
+hibits minimal variance across runs, indicating that agents tend to generate trajectories in a quasi-deterministic manner, preserving consistency in the collected data. 
+
+Offline RL. Finally, we address the following ques-tion: Can datasets collected with parallel maximum en-tropy agents benefit offline RL algorithms? One practical application of the policies learn with PGPSE, in line with the motivation of this work, is to utilize the experience gained during the exploration phase to construct informative datasets for offline RL (Yarats et al., 2022). Starting from the datasets collected as for Figure 2, we re-label the transitions with sparse reward functions, assigning rewards of +1 for a specific goal state and 0 otherwise. We then train an agent with offline Q-learning (Watkins & Dayan, 1992). At each training step, the agent samples a mini-batch of transitions (s, a, r, s ′) from the dataset and updates its Q-value as Q(s, a ) ← Q(s, a ) + 
+
+α [r + γ max a′ Q(s′, a ′) − Q(s, a )] where α is the learning rate, γ is the discount factor, and max a′ Q(s′, a ′) represents the best estimated discounted future reward. In Figure 3, we report the barplots of the corresponding 
+
+(a) Success Rate, Parallel Dataset ( Room-det )
+
+(b) Success Rate, Parallel Dataset ( Maze-det )
+
+(c) Success Rate, Single Agent Dataset ( Room-det )
+
+(d) Success Rate, Single Agent Dataset ( Maze-det )
+
+(e) Success Rate, Random Dataset ( Room-det )
+
+(f) Success Rate, Random Dataset ( Maze-det )
+
+Figure 3. Offline Q-learning success rate for various goal positions: Each subplot depicts the agent’s ability to reach a goal state posi-tioned at a different location (one for each state). The results refer to datasets obtained over 5 independent runs. 
+
+offline RL success rate on each dataset relabeled, one for every possible goal state, ordering the results according to their respective success rate. Notably, a dataset collected with parallel agents allows to achieve the best offline RL performance across a large number of states, far greater than datasets collected with a single maximum entropy agent or a random policy. In Appendix C, we provide further heatmaps visualizations showing the goal positions that offline RL algorithm is able to reach (Figure 9), and how each dataset is looking in terms of their empirical state distribution (Figure 8). 
+
+Takeaways. Parallel State Entropy Maximization leads to better exploration, diverse data collection and improved performances in offline learning in PMDPs. 7Enhancing Diversity in Parallel Agents 
+
+# 7. Related Work 
+
+In the following, we summarize the most relevant works this paper sets its root in, spanning from entropy maximization, multi-agent exploration to diverse skill discovery. 
+
+State Entropy Maximization. State entropy maximiza-tion in MDPs has been introduced in Hazan et al. (2019), from which followed a variety of subsequent works focusing on the problem from various perspectives (Lee et al., 2019; Mutti & Restelli, 2020; Mutti et al., 2021; 2022a;b; Mutti, 2023; Zhang et al., 2021a; Guo et al., 2021; Liu & Abbeel, 2021b;a; Seo et al., 2021; Yarats et al., 2021; Nedergaard & Cook, 2022; Yang & Spaan, 2023; Tiapkin et al., 2023; Jain et al., 2023; Kim et al., 2023; Zisselman et al., 2023; Zamboni et al., 2024a;b; 2025). 
+
+Policy Gradient. In the RL literature, first-order meth-ods have been extensively employed to address non-concave policy optimization (Sutton et al., 1999; Peters & Schaal, 2008). In this work, we proposed a vanilla policy gradi-ent estimator (Williams, 1992) as a first step, yet several further refinements could be made, such as natural gradi-ent (Kakade, 2001), trust-region schemes (Schulman et al., 2015), and importance sampling (Metelli et al., 2018). 
+
+Exploration with Multiple Agents. The problem of exploration in the presence of multiple agents is a vast and diverse topic. Among others, concurrent exploration (Guo & Brunskill, 2015; Parisotto et al., 2019; Jung et al., 2020; Chen et al., 2022; Qin et al., 2022) has focused on scenarios where multiple agents operate within the same environment and learn simultaneously. Of particular interest are the works that investigate the role of information sharing be-tween the agents (Alfredo & Arjun, 2017; Holen et al., 2023) or the ones that characterize the theoretical conditions for efficient coordinated exploration to happen and scale (Di-makopoulou & Van Roy, 2018; Dimakopoulou et al., 2018). Finally, exploration in Multi-Agent RL (MARL, Albrecht et al., 2024) has gained attention but was almost limited to reward-shaping techniques based on many heuristics Wang et al. (2019); Zhang et al. (2021b); Xu et al. (2024). In par-ticular, Zhang et al. (2023) proposes a term maximizing the deviation from (jointly) explored regions. Yet, we highlight a key distinction: In conventional MARL, multiple agents operate concurrently within a shared environment, requiring coordination due to the interdependence of their trajectories; In contrast, our setting involves multiple agents interact-ing with independent instances of the environment. While coordination remains beneficial for enabling specialization and aligning agents with distinct objectives, their trajecto-ries are decoupled. This structural difference fundamentally separates our framework from typical MARL formulations like Li et al. (2021), Zhao et al. (2021) and Lupu et al. (2021). 
+
+Diverse Skills Discovery. The problem of learning a set of diverse skills and/or policies is somehow linked to the problem of diversifying exploration via parallelization, and it has been addressed by a plethora of recent works (Hansen et al., 2019; Sharma et al., 2020; Campos et al., 2020; Liu & Abbeel, 2021a; He et al., 2022). The results provided by Gregor et al. (2017); Eysenbach et al. (2019) are particu-larly relevant for this work, in which the mutual information between visited states and skills is maximized, toghether with the ones in Zahavy et al. (2022), that explicitly maxi-mizes the diversity between policies. 
+
+# 8. Conclusions 
+
+This paper targeted the critical challenge of efficient explo-ration in reinforcement learning, particularly in scenarios with slow environment simulators or limited interaction bud-gets. We introduced a novel parallel learning framework that leverages the power of multiple agents to maximize state entropy while explicitly promoting diversity in their exploration strategies. Unlike traditional approaches that rely on multiple instances of identical agents, our method, PGPSE based on policy gradient techniques, employs a cen-tralized learning mechanism that balances individual agent entropy with inter-agent diversity, effectively minimizing redundancy and maximizing the information gained from parallel exploration. Our theoretical analysis demonstrated the significant impact of parallelization on the rate of entropy stabilization and exploration diversity. Specifically, we showed that parallel agents, by focusing on different parts of the state space, can achieve faster convergence to high-entropy distributions compared to a single agent. These theoretical findings were strongly corroborated by our empirical results on various gridworld environments. PGPSE consistently outperformed single-agent baselines in terms of both state entropy and sup-port size, demonstrating the effectiveness of our diversity-promoting approach. Furthermore, we showed that the datasets collected by par-allel agents exhibit higher entropy and lead to improved performance in offline settings, highlighting the practical value of our method for data-efficient learning. While our results are promising, we acknowledge certain limitations. Our current framework is evaluated primarily on discrete gridworld environments. Future work will involve extend-ing PGPSE to continuous and more complex environments, such as those found in robotics and control problems.Future work will extend, the concept of state entropy maximization to the trajectory based one, with centrally, the benefit of parallelizing the exploration strategy to achieve wider and diverse skills acquisition over complicated real world prob-lems. These extensions will be crucial for demonstrating the scalability of our approach to a broader use case. 8Enhancing Diversity in Parallel Agents 
+
+# Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+# Acknowledgment 
+
+This paper is supported by FAIR (Future Artificial Intelli-gence Research) project, funded by the NextGenerationEU program within the PNRR-PE-AI scheme (M4C2, Invest-ment 1.3, Line on Artificial Intelligence). This work is supported by Siemens Digital Industry Italy. 
+
+# References 
+
+Albrecht, S. V., Christianos, F., and Sch ¨afer, L. Multi-Agent Reinforcement Learning: Foundations and modern approaches . MIT Press, 2024. Alfredo, C. and Arjun, C. Efficient parallel methods for deep Reinforcement Learning. In The Multi-disciplinary Con-ference on Reinforcement Learning and Decision Making (RLDM) , pp. 1–6, 2017. Bertsekas, D. Reinforcement Learning and optimal control ,volume 1. Athena Scientific, 2019. Campos, V., Trott, A., Xiong, C., Socher, R., Gir ´o-i Nieto, X., and Torres, J. Explore, discover and learn: Unsuper-vised discovery of state-covering skills. In International Conference on Machine Learning , 2020. Chen, Y., Dong, P., Bai, Q., Dimakopoulou, M., Xu, W., and Zhou, Z. Society of agents: Regret bounds of concurrent thompson sampling. Advances in Neural Information Processing Systems , 35:7587–7598, 2022. Dimakopoulou, M. and Van Roy, B. Coordinated explo-ration in concurrent Reinforcement Learning. In Interna-tional Conference on Machine Learning , pp. 1271–1279. PMLR, 2018. Dimakopoulou, M., Osband, I., and Van Roy, B. Scalable co-ordinated exploration in concurrent Reinforcement Learn-ing. Advances in Neural Information Processing Systems ,31, 2018. Espeholt, L., Soyer, H., Munos, R., Simonyan, K., Mnih, V., Ward, T., Doron, Y., Firoiu, V., Harley, T., Dun-ning, I., Legg, S., and Kavukcuoglu, K. Impala: Scal-able distributed deep-rl with importance weighted actor-learner architectures. CoRR , abs/1802.01561, 2018. URL 
+
+http://arxiv.org/abs/1802.01561 .Eysenbach, B., Gupta, A., Ibarz, J., and Levine, S. Diversity is all you need: Learning skills without a reward function. In International Conference on Learning Representations ,2019. Genesis. A universal and generative physics engine for robotics and beyond, December 2024. URL https: //github.com/Genesis-Embodied-AI/ Genesis .Gregor, K., Rezende, D. J., and Wierstra, D. Variational intrinsic control. In International Conference on Learning Representations , 2017. Guo, Z. and Brunskill, E. Concurrent PAC RL. In Proceed-ings of the AAAI Conference on Artificial Intelligence ,volume 29, 2015. Guo, Z. D., Azar, M. G., Saade, A., Thakoor, S., Piot, B., Pires, B. A., Valko, M., Mesnard, T., Lattimore, T., and Munos, R. Geometric entropic exploration. arXiv preprint arXiv:2101.02055 , 2021. Hansen, S., Dabney, W., Barreto, A., Warde-Farley, D., Van de Wiele, T., and Mnih, V. Fast task inference with variational intrinsic successor features. In International Conference on Learning Representations , 2019. Hazan, E., Kakade, S., Singh, K., and Van Soest, A. Prov-ably efficient Maximum Entropy Exploration. In Interna-tional Conference on Machine Learning , pp. 2681–2691. PMLR, 2019. He, S., Jiang, Y., Zhang, H., Shao, J., and Ji, X. Wasser-stein unsupervised Reinforcement Learning. In AAAI Conference on Artificial Intelligence , 2022. Holen, M., Andersen, P.-A., Knausg ˚ard, K. M., and Good-win, M. Loss and reward weighing for increased learning in distributed Reinforcement Learning. arXiv preprint arXiv:2304.12778 , 2023. Jain, A. K., Lehnert, L., Rish, I., and Berseth, G. Maximum state entropy exploration using predecessor and succes-sor representations. In Advances in Neural Information Processing Systems , 2023. Jung, W., Park, G., and Sung, Y. Population-guided parallel policy search for Reinforcement Learning. arXiv preprint arXiv:2001.02907 , 2020. Kakade, S. M. A natural policy gradient. In Advances in Neural Information Processing Systems , 2001. Kim, D., Shin, J., Abbeel, P., and Seo, Y. Accelerating Reinforcement Learning with value-conditional state en-tropy exploration. In Advances in Neural Information Processing Systems , 2023. 9Enhancing Diversity in Parallel Agents 
+
+Lee, L., Eysenbach, B., Parisotto, E., Xing, E., Levine, S., and Salakhutdinov, R. Efficient exploration via state marginal matching. arXiv preprint arXiv:1906.05274 ,2019. Levine, S., Kumar, A., Tucker, G., and Fu, J. Offline Rein-forcement Learning: Tutorial, review, and perspectives on open problems. CoRR , abs/2005.01643, 2020. URL 
+
+https://arxiv.org/abs/2005.01643 .Li, C., Wu, C., Wang, T., Yang, J., Zhao, Q., and Zhang, C. Celebrating diversity in shared multi-agent Reinforce-ment Learning. CoRR , abs/2106.02195, 2021. URL 
+
+https://arxiv.org/abs/2106.02195 .Liu, H. and Abbeel, P. APS: Active pretraining with suc-cessor features. In International Conference on Machine Learning , 2021a. Liu, H. and Abbeel, P. Behavior from the void: Unsuper-vised active pre-training. In Advances in Neural Informa-tion Processing Systems , 2021b. Lupu, A., Cui, B., Hu, H., and Foerster, J. Trajectory diver-sity for zero-shot coordination. In Meila, M. and Zhang, T. (eds.), Proceedings of the 38th International Confer-ence on Machine Learning , volume 139 of Proceedings of Machine Learning Research , pp. 7204–7213. PMLR, 18–24 Jul 2021. URL https://proceedings.mlr. press/v139/lupu21a.html .Metelli, A. M., Papini, M., Faccio, F., and Restelli, M. Pol-icy optimization via importance sampling. In Advances in Neural Information Processing Systems , 2018. Mnih, V., Kavukcuoglu, K., Silver, D., Graves, A., Antonoglou, I., Wierstra, D., and Riedmiller, M. A. Play-ing ATARI with deep Reinforcement Learning. CoRR ,abs/1312.5602, 2013. URL http://arxiv.org/ abs/1312.5602 .Mutti, M. Unsupervised Reinforcement Learning via state entropy maximization . PhD Thesis, Universit `a di Bologna, 2023. Mutti, M. and Restelli, M. An intrinsically-motivated ap-proach for learning highly exploring and fast mixing poli-cies. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 34, pp. 5232–5239, 2020. Mutti, M., Pratissoli, L., and Restelli, M. Task-agnostic exploration via policy gradient of a non-parametric state entropy estimate. In Proceedings of the AAAI Conference on Artificial Intelligence , volume 35, pp. 9028–9036, 2021. Mutti, M., De Santi, R., and Restelli, M. The importance of non-Markovianity in maximum state entropy explo-ration. In International Conference on Machine Learning ,2022a. Mutti, M., Mancassola, M., and Restelli, M. Unsupervised Reinforcement Learning in multiple environments. In 
+
+AAAI Conference on Artificial Intelligence , 2022b. Mutti, M., Santi, R. D., Bartolomeis, P. D., and Restelli, M. Challenging common assumptions in convex Reinforce-ment Learning, 2023. URL https://arxiv.org/ abs/2202.01511 .Nedergaard, A. and Cook, M. k-Means Maximum Entropy Exploration. arXiv preprint arXiv:2205.15623 , 2022. NVIDIA Isaac Sim. NVIDIA. 2021.https://developer.nvidia.com/isaac-sim. Parisotto, E., Ghosh, S., Yalamanchi, S. B., Chinnaobireddy, V., Wu, Y., and Salakhutdinov, R. Concurrent meta Rein-forcement Learning. arXiv preprint arXiv:1903.02710 ,2019. Park, S., Ghosh, D., Eysenbach, B., and Levine, S. HIQL: Offline goal-conditioned RL with latent states as actions. 
+
+Advances in Neural Information Processing Systems , 36: 34866–34891, 2023. Peters, J. and Schaal, S. Reinforcement Learning of motor skills with policy gradients. Neural Networks , 2008. Qin, C., Wen, Z., Lu, X., and Van Roy, B. An analysis of ensemble sampling. Advances in Neural Information Processing Systems , 35:21602–21614, 2022. Rudin, N., Hoeller, D., Reist, P., and Hutter, M. Learning to walk in minutes using massively parallel deep rein-forcement learning. In Conference on Robot Learning ,pp. 91–100. PMLR, 2022. Schulman, J., Levine, S., Abbeel, P., Jordan, M., and Moritz, P. Trust region policy optimization. In International conference on machine learning , 2015. Seo, Y., Chen, L., Shin, J., Lee, H., Abbeel, P., and Lee, K. State entropy maximization with random encoders for efficient exploration. In International Conference on Machine Learning , 2021. Sharma, A., Gu, S., Levine, S., Kumar, V., and Hausman, K. Dynamics-aware unsupervised discovery of skills. In 
+
+International Conference on Learning Representations ,2020. Sucar, L. E. Parallel markov decision processes. Advances in Probabilistic Graphical Models , pp. 295–309, 2007. 10 Enhancing Diversity in Parallel Agents 
+
+Sutton, R. S. and Barto, A. G. Reinforcement Learning: An introduction . MIT press, 2018. Sutton, R. S., McAllester, D., Singh, S., and Mansour, Y. Policy gradient methods for Reinforcement Learning with function approximation. In Advances in Neural Informa-tion Processing Systems , 1999. Tarbouriech, J. and Lazaric, A. Active exploration in Markov decision processes. In International Conference on Artificial Intelligence and Statistics , 2019. Tarbouriech, J., Shekhar, S., Pirotta, M., Ghavamzadeh, M., and Lazaric, A. Active model estimation in Markov decision processes. In Conference on Uncertainty in Artificial Intelligence , 2020. Tiapkin, D., Belomestny, D., Calandriello, D., Moulines, E., Munos, R., Naumov, A., Perrault, P., Tang, Y., Valko, M., and Menard, P. Fast rates for maximum entropy exploration. In International Conference on Machine Learning , pp. 34161–34221. PMLR, 2023. Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics engine for model-based control. In 2012 IEEE/RSJ Inter-national Conference on Intelligent Robots and Systems ,pp. 5026–5033. IEEE, 2012. doi: 10.1109/IROS.2012. 6386109. Towers, M., Kwiatkowski, A., Terry, J., Balis, J. U., Cola, G. D., Deleu, T., Goul ˜ao, M., Kallinteris, A., Krimmel, M., KG, A., Perez-Vicente, R., Pierr ´e, A., Schulhoff, S., Tai, J. J., Tan, H., and Younis, O. G. Gymnasium: A standard interface for Reinforcement Learning envi-ronments, 2024. URL https://arxiv.org/abs/ 2407.17032 .Wang, T., Wang, J., Wu, Y., and Zhang, C. Influence-based multi-agent exploration. arXiv preprint arXiv:1910.05512 , 2019. Watkins, C. J. and Dayan, P. Q-learning. Machine learning ,8:279–292, 1992. Williams, R. J. Simple statistical gradient-following algo-rithms for connectionist Reinforcement Learning. Ma-chine Learning , 8:229–256, 1992. Xu, P., Zhang, J., and Huang, K. Population-based di-verse exploration for sparse-reward multi-agent tasks. In 
+
+Proceedings of the Thirty-Third International Joint Con-ference on Artificial Intelligence , pp. 283–291, 2024. Yang, Q. and Spaan, M. T. CEM: Constrained entropy maximization for task-agnostic safe exploration. In AAAI Conference on Artificial Intelligence , 2023. Yarats, D., Fergus, R., Lazaric, A., and Pinto, L. Rein-forcement Learning with prototypical representations. In 
+
+International Conference on Machine Learning , 2021. Yarats, D., Brandfonbrener, D., Liu, H., Laskin, M., Abbeel, P., Lazaric, A., and Pinto, L. Don’t change the algorithm, change the data: Exploratory data for offline Reinforce-ment Learning. arXiv preprint arXiv:2201.13425 , 2022. Zahavy, T., Schroecker, Y., Behbahani, F., Baumli, K., Flen-nerhag, S., Hou, S., and Singh, S. Discovering policies with DOMiNO: Diversity optimization maintaining near optimality. arXiv preprint arXiv:2205.13521 , 2022. Zamboni, R., Cirino, D., Restelli, M., and Mutti, M. How to explore with belief: state entropy maximization in POMDPs. In Proceedings of the 41st International Conference on Machine Learning , ICML’24. JMLR.org, 2024a. Zamboni, R., Cirino, D., Restelli, M., and Mutti, M. The limits of pure exploration in POMDPs: When the observation entropy is enough. RLJ , 2:676– 692, 2024b. URL https://rlj.cs.umass.edu/ 2024/papers/Paper95.html .Zamboni, R., Mutti, M., and Restelli, M. Towards principled multi-agent task agnostic exploration. arXiv preprint arXiv:2502.08365 , 2025. Zhang, C., Cai, Y., Huang, L., and Li, J. Exploration by maximizing R ´enyi entropy for reward-free RL framework. In AAAI Conference on Artificial Intelligence , 2021a. Zhang, S., Cao, J., Yuan, L., Yu, Y., and Zhan, D.-C. Self-motivated multi-agent exploration. arXiv preprint arXiv:2301.02083 , 2023. Zhang, T., Rashidinejad, P., Jiao, J., Tian, Y., Gonzalez, J. E., and Russell, S. MADE: Exploration via maximizing deviation from explored regions. Advances in Neural Information Processing Systems , 34:9663–9680, 2021b. Zhao, R., Song, J., Hu, H., Gao, Y., Wu, Y., Sun, Z., and Wei, Y. Maximum entropy population based training for zero-shot human-ai coordination. CoRR ,abs/2112.11701, 2021. URL https://arxiv.org/ abs/2112.11701 .Zhong, D., Yang, Y., and Zhao, Q. No prior mask: Elimi-nate redundant action for deep reinforcement learning. In 
+
+Proceedings of the AAAI Conference on Artificial Intelli-gence , volume 38, pp. 17078–17086, 2024. Zisselman, E., Lavie, I., Soudry, D., and Tamar, A. Explore to generalize in zero-shot RL. In Advances in Neural Information Processing Systems , 2023. 11 Enhancing Diversity in Parallel Agents 
+
+# A. Main Proofs and Additional Results 
+
+Concentration Properties. In the following, we present the proofs of the theoretical results that highlight how the entropy of the distribution of state or trajectory visits concentrates in the single-agent and parallel-agent cases. 
+
+Theorem A.1. Let dπ be the (categorical) distribution induced by π over the finite set S with |S| = S, and let dn be the empirical distribution obtained from n independent samples drawn from dπ . Then, for any ϵ > 0, the following bound holds: 
+
+P (H(dπ )−H (dn) > ϵ ) ≤ 2S exp 
+
+
+
+−n ϵ2Var( dπ )2S3H2(dπ )
+
+
+
+,
+
+where H(dn) and H(dπ ) denote the entropy of the empirical and true distributions, respectively, and Var( dπ ) = P 
+
+> s∈[S]
+
+dπ (s)(1 − dπ (s)) is the variance of a random variable associated with the categorical distribution dπ . Fur-thermore, to ensure this concentration with confidence 1 − δ, the number of samples n must satisfy the following lower bound: 
+
+n ≥ 2S3H2(dπ )
+
+ϵ2Var( dπ ) · ln 2Sδ .
+
+Proof. The proof consists of three main steps. In order to keep the derivation agnostic from the state or trajectory-based setting, we will now introduce a different yet equivalent notation: let p be a categorical distribution over a finite set X with 
+
+|X | = K, and let ˆp be the empirical distribution obtained from n.
+
+Decomposing the Problem via Union Bound. First, we expand the entropy terms to highlight the contribution of the single components: 
+
+P(H(p) − H (ˆ p) > ϵ ) ≤ P
+
+> K
+
+X
+
+> i=1
+
+pi log 
+
+ 1
+
+pi
+
+
+
+− ˆpi log 
+
+ 1ˆpi
+
+
+
+> ϵ 
+
+!
+
+= P
+
+> K
+
+X
+
+> i=1
+
+h(pi) − h(ˆ pi) > ϵ 
+
+!
+
+,
+
+where pi = P(X = xi) and h(x) = x log   1
+
+> x
+
+.Applying the union bound to the previous result, we get: 
+
+P(H(p) − H (ˆ p) > ϵ ) ≤
+
+> K
+
+X
+
+> i=1
+
+P
+
+
+
+h(pi) − h(ˆ pi) > ϵK
+
+
+
+. (2) 
+
+Bounding the Entropy of the Components using a Linear Approximation. Now, we focus on finding an upper bound to h(pi) − h(ˆ pi). We introduce a lower bound to h(ˆ pi) obtained by a combination of functions that are linear in the deviation |pi − ˆpi|:
+
+h(ˆ pi) ≥ h(pi) − h(pi)|pi − ˆpi|
+
+min( pi, 1 − pi) ≥ h(pi) − h(pi)|pi − ˆpi|
+
+pi(1 − pi) .
+
+As a consequence 
+
+P (h(pi) − h(ˆ pi) > ϵ ) ≤ P
+
+ h(pi)|pi − ˆpi|
+
+pi(1 − pi) > ϵ 
+
+
+
+≤ P
+
+
+
+|pi − ˆpi| > pi(1 − pi)
+
+h(pi) ϵ
+
+
+
+. (3) Thanks to this last inequality, we can now focus on the concentration inequality of the Bernoulli distributions associated with the parameters pi.
+
+Applying a Concentration Inequality for Bernoulli Distributions. Finally, we use a concentration inequality on the estimation of a Bernoulli-distributed parameter to express this probability bound in terms of the variance of pi
+
+(Var( pi) = pi(1 − pi)). Leveraging Chernoff bound for Bernoulli distributions, we get: 
+
+P(|pi − ˆpi| > ϵ ) ≤ e−nD KL (pi+ϵ|| pi) + e−nD KL (pi−ϵ|| pi) ≤ 2e− nϵ 22pi(1 −pi) = 2 e− nϵ 22Var( pi) . (4) 12 Enhancing Diversity in Parallel Agents 
+
+0 0.2 0.4 0.6 0.8 1
+
+0
+
+1
+
+2
+
+pi
+
+> Values
+
+H(pi)
+
+Var (pi)
+
+> Var (pi)
+> H(pi)2
+
+Figure 4. The plot shows that H(pi) and Var( pi) are concave symmetric function with their maximum located at pi = 0 .5, while Var (pi)
+
+> H(pi)2
+
+is a convex symmetric function with its minimum located at pi = 0 .5.
+
+We now complete the proof by combining the results in Eqs (2), (3), and (4): 
+
+P(H(p) − H (ˆ p) > ϵ ) ≤
+
+> K
+
+X
+
+> i=1
+
+P
+
+
+
+h(pi) − h(ˆ pi) > ϵK
+
+
+
+≤
+
+> K
+
+X
+
+> i=1
+
+P
+
+
+
+|pi − ˆpi| > pi(1 − pi)
+
+Kh (pi) ϵ
+
+
+
+≤ 2
+
+> K
+
+X
+
+> i=1
+
+e− nϵ 2pi(1 −pi)2K2h2(pi) . (5) In order to remove the summation over the K components of the distribution, we need to find a lower bound to the term  
+
+> pi(1 −pi)
+> H2(pi)
+
+that is independent of the specific component parameter pi. Here, we show the chain of passages that achieve this goal: 
+
+min 
+
+> i
+
+pi(1 − pi)
+
+h2(pi) ≥ min 
+
+> i
+
+pi(1 − pi)
+
+H2(pi) = max i pi(1 − pi)max i H2(pi) ≥
+
+P 
+
+> i
+
+pi(1 − pi)
+
+K max i H2(pi) ≥ Var( p)
+
+KH2(p) .
+
+The motivations for each step are: 1. H(pi) ≥ h(pi).2. The value of pi that minimizes pi(1 −pi) 
+
+> H2(pi)
+
+is the one with the highest entropy (see Figure4). The ration between the variance p(1 − p) and the squared entropy H2(p) is symmetric about p = 12 and it has negative derivative for p < 12
+
+and positive derivative for p > 12 . Since the higher the entropy H(pi), the higher is also the variance pi(1 − pi), we can restate the minimization problem as the ratio of two maximization problems. 3. The term in the numerator is the maximum variance, which can be lower bounded by the average variance. 4. The maximum entropy among the Bernoulli distributions associated with all the components is upper bounded by the entropy of the categorical distribution p.Leveraging this result in Eq. (5) concludes the proof. 13 Enhancing Diversity in Parallel Agents 
+
+Frank-Wolfe for Parallel Exploration with Infinite Trials Frank-Wolfe Algorithms have gained much attention for their strong theoretical guarantees in MDPs (Hansen et al., 2019). In this section, we show that by performing Frank-Wolfe-like updates in a parallel fashion over infinite-trials objectives as reported in Algorithm 2, it is possible to obtain faster convergence rates with respect to the non-parallel formulation, through a convenient scaling factor of 1/N with N being the number of parallel instantiations. In order to allow for a simpler derivation, we will assume access to two kinds of oracles. First, some approximate planning oracles (one per each agent) that given a reward function (on states) r : S → R and a sub-optimality gap ϵ1, returns a policy π = APPROXPLAN (r, ϵ 1) with the guarantee that H(π) ≥ max ¯π H(¯ π)−ϵ1. In addition, some state distribution estimate oracles (one per each agent) that estimate the state distribution ˆd = DENSITYEST (π, ϵ 0)
+
+of any given (non-stationary) policy π, guaranteeing that ∥dπ − ˆd∥∞ ≤ ϵ1. In addition, we will assume that the entropy functional H is β-smooth, B-bounded, and that it satisfies the following inequality for all X, Y :
+
+∥∇H (X) − ∇H (Y )∥ ≤ β∥X − Y ∥∞
+
+−βI ≤ ∇ 2H(X) ≤ βI; ∥∇H (X)∥∞ ≤ B
+
+Under these assumptions, it follows that Algorithm 2 enjoys the following: 
+
+Theorem A.2 (Convergence Rate) . For any ε > 0, set ε1 = 0 .1ε, ε0 = 0 .1β−1ε, and η = 0 .1|S| −1β−1N ε , where Algorithm 2 is run for T iterations over N agents in parallel where: 
+
+T ≥ 10 β|S| N −1ε−1 log 10 Bε −1 ,
+
+we have that: 
+
+H(πmix ,T ) ≥ max  
+
+> π
+
+H(dπ ) − ε . 
+
+Proof of Theorem A.2. Let π∗ be a maximum-entropy policy, ie. π∗ ∈ argmax π H(dπ ).
+
+H(dπmix ,t +1 ) = H((1 − η)dπmix ,t + ηd πt+1 )
+
+≥H(dπmix ,t ) + η⟨dπt+1 − dπmix ,t , ∇H(dπmix ,t )⟩ − η2β∥dπt+1 − dπmix ,t ∥22
+
+≥H(dπmix ,t ) + ηN
+
+X
+
+> i
+
+⟨dπit+1 − dπmix ,t , ∇H(dπmix ,t )⟩ − η2βN 2
+
+X
+
+> i
+
+∥dπit+1 − dπmix ,t ∥22
+
+The second inequality follows from the smoothness of H, the third applies the definition of distributions induced by mixture policies. Now, to incorporate the error due to the two oracles, observe that for each agent it holds 
+
+⟨dπit+1 , ∇H(dπmix ,t )⟩ ≥ ⟨ dπit+1 , ∇H( ˆdiπmix ,t )⟩ − β∥dπmix ,t − ˆdiπmix ,t ∥∞
+
+≥ ⟨ dπ∗ , ∇H( ˆdiπmix ,t )⟩ − βε 0 − ε1
+
+≥ ⟨ dπ∗ , ∇H(dπmix ,t )⟩ − 2βε 0 − ε1
+
+The first and last inequalities invoke the assumptions on the entropy functional. Note that the second inequality above follows from the defining character of the planning oracle. Using the above fact and continuing on 
+
+H(dπmix ,t +1 ) ≥H(dπmix ,t ) + ηN
+
+X
+
+> i
+
+⟨dπit+1 − dπmix ,t , ∇H(dπmix ,t )⟩ − η2βN 2
+
+X
+
+> i
+
+∥dπit+1 − dπmix ,t ∥22
+
+≥H(dπmix ,t ) + η⟨dπ⋆ − dπmix ,t , ∇H(dπmix ,t )⟩ − 2βηε 0 − ηε 1 − η2βN |S| ≥(1 − η)H(dπmix ,t ) + ηH (dπ∗ ) − 2ηβε 0 − ηε 1 − η2β|S| 
+
+N
+
+The last step here utilizes the concavity of H. It follows that 14 Enhancing Diversity in Parallel Agents 
+
+H(dπ∗ ) − H(dπmix ,t +1 ) ≤ (1 − η)( H(dπ∗ ) − H(dπmix ,t )) + 2 ηβε 0 + ηε 1 + η2β|S| 
+
+N .
+
+Telescoping the inequality, this simplifies to 
+
+H(dπ∗ ) − H(dπmix ,T ) ≤ (1 − η)T (H(dπ∗ ) − H(dπmix ,0 )) + 2 βε 0 + ε1 + ηβ 
+
+≤ Be −T η + 2 βε 0 + ε1 + η2β|S| 
+
+N .H(dπ∗ ) − H(dπmix ,T )
+
+≤ (1 − η)T (H(dπ∗ ) − H(dπmix ,0 )) + 2 βε 0 + ε1 + ηβ |S| 
+
+N
+
+≤ Be −T η + 2 βε 0 + ε1 + ηβ |S| 
+
+N .
+
+Setting ε1 = 0 .1ε, ε0 = 0 .1β−1ε, η = 0 .1N |S| −1β−1ε, T = η−1 log 10 Bε −1 leads to the final result. 
+
+Algorithm 2 Parallel Frank-Wolfe. 
+
+1: Input: Step size η, number of iterations T , number of agents N , planning oracle tolerance ε1 > 0, distribution estimation oracle tolerance ε0 > 0.
+
+2: Set {Ci 
+
+> 0
+
+= {πi
+
+> 0
+
+}} i∈N where πi 
+
+> 0
+
+is an arbitrary policy, αi 
+
+> 0
+
+= 1 .
+
+3: for t = 0 , . . . , T − 1 do 
+
+4: Each agent call the state distribution oracle on πmix ,t = 1
+
+> N
+
+P
+
+> i
+
+(αit, C it ):
+
+ˆdiπmix ,t = DENSITY EST (πmix ,t , ε 0)
+
+5: Define the reward function rit for each agent i as 
+
+rit(s) = ∇H( ˆdiπmix ,t ) := dH(X)
+
+dX X= ˆdiπmix ,t 
+
+.
+
+6: Each agent computes the (approximately) optimal policy on rt:
+
+πit+1 = APPROX PLAN 
+
+ rit, ε 1
+
+ .
+
+7: Each agent updates 
+
+Cit+1 = ( πi
+
+> 0
+
+, . . . , π it, π it+1 ), (6) 
+
+αit+1 = ((1 − η)αit, η ). (7) 
+
+8: end for 
+
+9: πmix ,T = 1
+
+> N
+
+P
+
+> i
+
+(αiT , C iT ).15 Enhancing Diversity in Parallel Agents    
+
+> Figure 5. Two rooms gridworld, with starting position in the corridor and goal state in the left bottom corner. Figure 6. Maze gridworld, with multiple path, goal state in the upper section
+
+# B. Experimental Details 
+
+Environments. In this paper, we present two distinct grid-world environments designed to illustrate the effectiveness of parallel exploration in enabling agents to overcome exploration bottlenecks and efficiently discover optimal trajectories in both structured and intricate scenarios.. In the first, two rooms are connected through a corridor with the goal positioned in the left room. In the second one, we considered a maze-like space, with a more complex layout with many bifurcations but only one path leading to a goal. The two environments are shown in Figures 5 and 6. In the following, we briefly describe the two environments more thorough. 
+
+B.1. Room 
+
+This is a 5 × 11 grid world inspired by the toy example from Towers et al. (2024). It consists of two rooms connected by a single horizontal corridor. The agent moves until reaching the goal or the episode terminates. The starting position is fixed at the center of the corridor, (2 , 5) . The agent navigates the grid using actions from {0, 1, 2, 3}, where the index indicate 0:
+
+Move left , 1: Move down , 2: Move right , 3: Move up . The observation space represents the player’s current position as an index computed by obs = row × ncols + col where rows and columns are zero-indexed. For instance, the goal position (4 , 0) 
+
+is mapped to 4 × 11 + 0 = 44 .. The total number of observations depends on the grid size. The environment is evaluated in both reward-free and sparse-reward settings, where in the latter case reward function r : S × A → R with r = 1 upon reaching the goal and 0 otherwise. Throughout the paper, we consider two configurations: • Room-det : A deterministic version where executing an action a under policy πθ always results in the intended movement. • Room-stoc : A stochastic variant where the agent plays the intended action with probability 1 − p and deviate from it with p.
+
+B.2. Maze 
+
+This is a grid world 10 × 10 . The environment consists of a discrete grid-based navigation task, where an agent must reach a goal position while navigating through a structured maze. The grid is structured to restricting movement to specific corridors. The agent, starts from an initial position (5 , 6) and can move in four directions: up, down, left, or right, as in the B.1 case. The goal serves as the terminal state, where the episode ends upon successful navigation or after a number of maximum steps. Upon a different structure, the environment shares with the previous environment the reward function, the action space and the state index conversion. In the paper we present two different version of the environment as following defined: • Maze-det : A deterministic version where executing an action a under policy πθ always results in the intended movement. • Maze-stoc : A stochastic variant where the agent plays the intended action with probability 1 − p and deviate from it with p.
+
+Implementation Details of Algorithm 1. As outlined in the pseudocode of Algorithm 1, in each episode, a batch 
+
+|B| = 40 , of K trajectories are experienced by parallel learners. K is fixed during the experiment always to 1, due to 16 Enhancing Diversity in Parallel Agents 
+
+the assumption of having access to the minimum size of possible interactions that the agents can have with respect to the environment. To reproduce the policy gradient performance of the single agent, this K should coincide to the number of agent m, at which the single is compared to. Indeed, in the 1 with respectively {2, 6} agents involved, the single agent experiences K = {2, 6} trajectories, from which the state distribution dn is derived. Over the 10 k episodes, the parallel agents interact with the environment with finite trajectories of lenght T that in the Room-det and Room-stoc environments is set to 8, while in Maze-det and Maze-stoc , due to a bigger state space, is set to 10 .The parallel policy, as collection of parametric single policy on θ, is a Softmax function defined as: 
+
+πθ (a|s) = eθ·s
+
+P 
+
+> a′∈A
+
+eθ·s
+
+θ parameters are updated via gradient ascent maximization, with learning rate α set initially to 0.1 with exponential decay rate λ of 0.999. The training is performed over 5 different seeds {0, 1, 2, 42 , 133 }.
+
+# C. Further Experimental Details and Analysis 
+
+The code to reproduce the experiments is made available at the following link. 
+
+C.1. Performance of Four Parallel Agents 
+
+To further validate our approach, we extend the experimental analysis presented in the main body by including results for four parallel agents. Figure 7 illustrates the performance of this configuration in terms of normalized state entropy (top row) and support size (bottom row) across the four environments: Room-det , Room-stoc , Maze-det , and Maze-stoc .As observed, the four-agent configuration consistently outperforms the single-agent baseline, achieving significantly higher normalized entropy and support size. This demonstrates the continued effectiveness of our parallelized exploration strategy, with the centralized update mechanism of Algorithm 1 enabling the agents to collectively learn policies that lead to a more diverse and comprehensive exploration of the state space. However, it is also evident that the marginal benefit of adding more agents diminishes as the number of agents increases. This phenomenon is likely attributable to the relatively small size of the state space in the considered environments. With more agents, the overlap in their explored trajectories increases, leading to a less pronounced improvement for each additional agent. 
+
+C.2. Dataset Analysis 
+
+To further understand the benefits of parallel exploration, we analyze the datasets generated by the learned parametric policies. These datasets are constructed analogously to those in the single-agent case and the random policy baseline. Specifically, for each parallel-agent configuration, we sample K = m trajectories to ensure a consistent comparison across settings. The mean and standard deviation of the state entropy are computed over these trajectories and averaged across the five random seeds used during training. Let’s look deeply at the dataset created from the paralell agents, when interacting with the more complex Maze environment. Figures 8 present heatmaps visualizing the state occupancy distributions for the 
+
+Maze environments, respectively the deterministic and stochastic case. These heatmaps provide a qualitative comparison of the exploration patterns achieved by single agents, parallel agents, in the two implemented versions. 
+
+C.3. Offline Q-Learning Implementation 
+
+While single agents might discover effective exploration strategies, it is the diversity inherent to our parallel policy induction that ensures robust and consistent state space coverage, even in stochastic environments. This diversity, validated across multiple random seeds, translates into a highly informative dataset for downstream learning tasks. The effectiveness of our approach is further highlighted by the fact that this valuable dataset is constructed from a mere six trajectories per agent, a significant improvement over the data generated by untrained policies. Combined with an offline procedure, the parallel approach incredibly speedup the learning procedure. For the construction of Figure 3, we implement an offline Q-learning algorithm. The agent learns from a replay buffer with a batch size of 20 (s, a, s ′, r ) interactions. The experiences collected from the parallel agents are incorporated into the replay buffer, without interacting with the environment. The Q-learning agent is trained for 100 episodes, with the Q-value function Q(s, a ) being updated using a learning rate of α = 0 .1 and a 17 Enhancing Diversity in Parallel Agents          
+
+> 2 Agents 1 Agent K′= 2 K
+> 4 Agents 1 Agent K′= 4 K
+> 6 Agents 1 Agent K′= 6 K
+
+(a) State Entropy ( Room-det ). (b) State Entropy ( Room-stoc ). (c) State Entropy ( Maze-det ). (d) State Entropy ( Maze-stoc ). 
+
+(e) Support ( Room-det ). (f) Support ( Room-stoc ). (g) Support ( Maze-det ). (h) Support ( Maze-stoc ). 
+
+Figure 7. Performance of four parallel agents. The top row (a–d) shows the progression of normalized state entropy across different environments, while the bottom row (e–h) depicts the corresponding support size dynamics. Each plot illustrates the performance of parallel agents against a single instance visiting a number of trajectories corresponding to the number of parallel agents. 
+
+discount factor of γ = 0 .99 according to the Bellman equation update rule. The high quality of the dataset generated by our parallel agents is further evidenced in Figure 9. The offline agent, trained solely on this data, demonstrates significantly improved goal-reaching capabilities, even in the stochastic environment, as indicated by the broader and warmer-colored regions of the heatmap, particularly for goals distant from the starting location. 
+
+C.4. Diversity Analysis 
+
+Figure 10 provides a visual comparison of the learned policies for parallel agents versus single agents in both Room-det 
+
+and Maze-det environments. In the single-agent setting (Figures 10a and 10b), the agent tends to develop policies with higher stochasticity in its action choices. This is a consequence of the need to explore a larger portion of the state space alone, necessitating a more randomized approach to discover high-entropy trajectories. In contrast, the parallel agent setting (Figures 10c and 10d) reveals that the centralized update mechanism, based on the aggregate state distribution dn,encourages individual agents to specialize in more deterministic policies. 18 Enhancing Diversity in Parallel Agents 
+
+(a) Parallel Agents ( Maze-det ). (b) Parallel Agents ( Maze-stoc ). 
+
+(c) Single Agent ( Maze-det ). (d) Single Agent ( Maze-stoc ). 
+
+Figure 8. Dataset extrapolation based on the Maze environments. 
+
+19 Enhancing Diversity in Parallel Agents 
+
+(a) Offline Goal Reachability, learning from the parallel agents experience. 
+
+(b) Offline Goal Reachability, learning from the single agents experience. 
+
+(c) Offline Goal Reachability, learning from a random policy experience. 
+
+Figure 9. Offline Result of Gained Experience 
+
+20 Enhancing Diversity in Parallel Agents 
+
+(a) Single Agent ( Room-det ). (b) Single Agent ( Maze-det ). 
+
+(c) Parallel Agents ( Room-det ). 
+
+(d) Parallel Agents ( Maze-det ). 
+
+Figure 10. Analysis of stochasticity and determinism of parallel vs. single agents. 
+
+21

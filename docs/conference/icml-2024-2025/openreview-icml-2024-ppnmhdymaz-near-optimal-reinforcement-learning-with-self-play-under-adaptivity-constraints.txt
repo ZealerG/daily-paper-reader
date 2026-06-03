@@ -1,0 +1,2493 @@
+Title: Near-Optimal Reinforcement Learning with Self-Play  under Adaptivity Constraints
+
+URL Source: https://openreview.net/pdf?id=pPNMhdYMaz
+
+Number of Pages: 26
+
+Markdown Content:
+# Near-Optimal Reinforcement Learning with Self-Play under Adaptivity Constraints 
+
+Dan Qiao 1 Yu-Xiang Wang 2
+
+## Abstract 
+
+We study the problem of multi-agent reinforce-ment learning (MARL) with adaptivity con-straints — a new problem motivated by real-world applications where deployments of new policies are costly and the number of policy up-dates must be minimized. For two-player zero-sum Markov Games, we design a (policy) elimi-nation based algorithm that achieves a regret of 
+
+eO(√H3S2ABK ), while the batch complexity is only O(H + log log K). In the above, S denotes the number of states, A, B are the number of ac-tions for the two players respectively, H is the horizon and K is the number of episodes. Further-more, we prove a batch complexity lower bound 
+
+Ω( H  
+
+> log AK
+
++ log log K) for all algorithms with 
+
+eO(√K) regret bound, which matches our upper bound up to logarithmic factors. As a byproduct, our techniques naturally extend to learning bandit games and reward-free MARL within near opti-mal batch complexity. To the best of our knowl-edge, these are the first line of results towards understanding MARL with low adaptivity. 
+
+## 1. Introduction 
+
+This paper considers the problem of multi-agent reinforce-ment learning (multi-agent RL), where multiple agents aim to make decisions simultaneously in an unfamiliar envi-ronment to maximize their individual cumulative rewards. Multi-agent RL is used not only in large-scale strategy games like Go (Silver et al., 2017), Poker (Brown and Sand-holm, 2019) and MOBA games (Ye et al., 2020), but also in various real-world applications such as autonomous driv-       
+
+> 1Department of Computer Science, University of California, Santa Barbara (UCSB), USA 2Halıcıo ˘glu Data Science Institute, University of California, San Diego (UCSD), USA. Correspon-dence to: Dan Qiao <danqiao@ucsb.edu >, Yu-Xiang Wang <yux-iangw@ucsd.edu >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+ing (Shalev-Shwartz et al., 2016), household power man-agement (Chung et al., 2020), and computer networking (Bhattacharyya et al., 2019). The sheer amount of computation needed for self-play-based learning in these applications often demands the algorithm to run in a distributed fashion where the communication cost becomes a bottleneck. In such circumstances, instead of syncing up after each single trajectory, a more practi-cal alternative is to assign a larger batch of work for each machine to perform independently and sync up only spo-radically. The need for infrequent communication could be hard constraints in applications such as autonomous driving (Shalev-Shwartz et al., 2016). Deploying new policies to vehicle firmware takes weeks, while new data are being collected in millions of cars every second. These constraints render standard multi-agent RL algorithms that require al-tering the policy after each new data point impractical. In the scenarios discussed above, the agent needs to min-imize the number of policy deployments while learning a good policy using (nearly) the same number of samples as its fully-adaptive counterparts. Previous works brought up different notions to measure the adaptivity of an online RL algorithm, including switching cost (Bai et al., 2019; Zhang et al., 2020c; Qiao et al., 2022; Gao et al., 2021; Wang et al., 2021; He et al., 2023; Qiao et al., 2023; Kong et al., 2021; Velegkas et al., 2022; Zhao et al., 2023; Xiong et al., 2023), batch complexity (Perchet et al., 2016; Gao et al., 2019; Qiao et al., 2022; Zhang et al., 2022; Wang et al., 2021; Johnson et al., 2023; Xiong et al., 2023) and deployment efficiency (Matsushima et al., 2020; Huang et al., 2022b; Qiao and Wang, 2023; Modi et al., 2021). Although algo-rithms with low adaptivity have been designed for various Markov decision process (MDP) settings, all of the previous works focused on the single-agent setting while the solu-tion to multi-agent RL with low adaptivity is still unknown. Therefore it is natural to question: 
+
+Question 1.1. Is it possible to design a self-play algorithm to solve Markov games while achieving near optimal adap-tivity and sample complexity simultaneously? 
+
+Our contributions. In this paper, we answer the above question affirmatively by proposing a new low-adaptive 1Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Algorithms for Markov games Single-agent (B=1)? Regret Batch complexity 
+
+VI-ULCB (Bai and Jin, 2020) No eO(√H3S2ABT ) K
+
+Nash VI (Liu et al., 2021) No eO(√H2SABT ) K
+
+Algorithm 1 in Zhang et al. (2022) ∗ Yes eO(√H2SAT ) O(H + log log K)
+
+Our Algorithm 1 (Theorem 4.1) No eO(√H2S2ABT ) O(H + log log K)
+
+Lower bound (Bai and Jin, 2020) No Ω( pH2S(A + B)T ) No constraints. Lower bound (Theorem 4.2) No if eO(√T ) (“Optimal regret”) Ω( H  
+
+> log AK
+
++ log log K)
+
+Algorithms for bandit games Single-agent (B=1)? Regret Batch complexity 
+
+BaSE (Gao et al., 2019) † Yes eO(√AK ) O(log log K)
+
+Our Algorithm 6 (Theorem 5.1) No eO(√ABK ) O(log log K)
+
+Algorithms for reward-free exploration Single-agent (B=1)? Sample (episode) complexity Batch complexity 
+
+VI-Explore (Bai and Jin, 2020) No eO( H5S2AB ϵ2 ) eO( H7S4AB ϵ )‡
+
+LARFE (Qiao et al., 2022) ⋆ Yes eO( H5S2Aϵ2 ) O(H)
+
+Our Algorithm 4 (Theorem 5.2) No eO( H3S2AB ϵ2 ) O(H)                            
+
+> Table 1. Comparison of our results (in blue) to existing work regarding problem type, regret/sample complexity, and batch complexity. A “Yes” in the column “Single-agent (B=1)?” means that the work is specific to the single-agent case ( B= 1 ) and cannot be directly applied under the two-player game setting ( B > 1) as in this paper. We list such works here for comparison. In the above, Sdenotes the number of states, A, B are the number of actions for the two players respectively, His the horizon and Kis the number of episodes ( T=HK
+> is the number of steps). ∗: This result is derived under the special case of single-agent MDP (Markov game with B= 1 ). In this case, our Algorithm 1 achieves the same batch complexity and a regret bound sub-optimal by √S.†: The result is derived under the batched multi-armed bandits setting (bandit games with B= 1 ). In this case, our Algorithm 6 achieves the same guarantees as BaSE. ‡: For the first part of the algorithm, there are eO(H7S4AB ϵ)episodes of data collected using EULER, which can lead to the same number of batch complexity in the worst case. ⋆: This result is derived under the special case of single-agent MDP. Directly applying our Algorithm 4 to the setting will lead to a significant improvement of H2in sample complexity.
+
+algorithm (Algorithm 1). Furthermore, the framework of Algorithm 1 naturally adapts to the bandit game setting and the more challenging low adaptive reward-free setting. Our concrete contributions are summarized as follows. • We design a new policy elimination based algorithm (Algorithm 1) that achieves O(H + log log K) batch complexity and eO(√H2S2ABT ) regret bound (The-orem 4.1). To our knowledge, this provides the first result under multi-agent RL with low adaptivity. More-over, the regret bound has optimal dependence on T
+
+while the batch complexity is optimal up to logarith-mic factors among all algorithms with eO(√T ) regret bound (due to our Theorem 4.2). • Under the bandit game setting (a special case of Markov game with H = S = 1 ), Algorithm 6 achieves 
+
+O(log log K) batch complexity and eO(√ABK ) regret (Theorem 5.1). The batch complexity is optimal and the result strictly generalizes the best known result of batched multi-armed bandits (Gao et al., 2019). • We also propose a new low-adaptive algorithm (Algo-rithm 4) for reward-free exploration in Markov games. It comes with an optimal batch complexity of O(H)
+
+and provably identifies an ϵ-approximate Nash policy simultaneously for all possible reward functions (The-orem 5.2). The result improves over previous results in both sample complexity and batch complexity. 
+
+Related work. There is a large and growing body of lit-erature on the statistical theory of reinforcement learning that we will not attempt to thoroughly review. Detailed comparisons with existing work on multi-agent RL (Bai and Jin, 2020; Liu et al., 2021), batched RL (Zhang et al., 2022), batched multi-armed bandits (Gao et al., 2019) and reward-free exploration (Bai and Jin, 2020; Qiao et al., 2022) are given in Table 1. For more details about related works, please refer to Appendix A and the references therein. No-tably, all existing algorithms with low adaptivity focus on the single-agent case. In comparison, our results work for the more general multi-player setting, and thus can be con-sidered as generalization of previous results. A recent line of works provide non-asymptotic guarantees for learning Markov Games. Bai and Jin (2020) devel-oped the first provably-efficient algorithms in MGs based on optimistic value iteration, whose result is improved by Liu et al. (2021) using model-based approach. Meanwhile, model-free approaches are shown to break the curse of mul-tiagency and improve the dependence on action space (Bai et al., 2020; Jin et al., 2021; Mao et al., 2022; Wang et al., 2023; Cui et al., 2023). Following works also extended the results to MGs with function approximation (Xie et al., 2Multi-Agent Reinforcement Learning with low Adaptivity 
+
+2020; Huang et al., 2022a; Jin et al., 2022; Li et al., 2022). However, all these works applied fully adaptive algorithms, which can be difficult to implement in practical scenarios. In comparison, our algorithms achieve near optimal adaptivity. In this paper, we measure the adaptivity by batch complexity (Zhang et al., 2022) which requires decisions about policy updates to be made at only a few predefined checkpoints. 1
+
+Besides, there are other measurements of adaptivity. The most prevalent measurement is switching cost , which mea-sures the number of policy switches. However, previous works minimizing switching cost only allow usage of deter-ministic policies (Bai et al., 2019; Zhang et al., 2020c; Qiao et al., 2022). It is known that in many Markov games like Rock paper scissors, the Nash policy can only be stochastic and running deterministic policies will lead to a linear regret. Therefore, switching cost is not an appropriate measure-ment for the multi-agent case. 2 Meanwhile, Matsushima et al. (2020) proposed the notion of deployment efficiency ,which is similar to batched RL with additional requirement that each policy deployment should have similar size. De-ployment efficient RL is studied by some following works (Huang et al., 2022b; Qiao and Wang, 2023; Modi et al., 2021). However, as pointed out by Qiao and Wang (2023), deployment complexity is not a good measurement of adap-tivity when studying regret minimization. 
+
+## 2. Problem Setup 
+
+Notations. Throughout the paper, for n ∈ Z+, [n] = 
+
+{1, 2, · · · , n }. For any set U , ∆( U ) denotes the set of all possible distributions over U . In addition, we use standard notations such as O and Ω to absorb constants while eO and 
+
+eΩ suppress logarithmic factors. 
+
+Markov Games. Markov Games (MGs) generalize the standard Markov Decision Processes (MDPs) into the multi-player setting, where each player aims to maximize her own reward. We consider two-player zero-sum episodic Markov Games, denoted by a tuple MG = ( H, S, A, B, P h, r h),where H is the horizon, S is the state space with S := |S| .
+
+A and B are the action space for the max-player (who aims to maximize the total reward) and the min-player (who aims to minimize the total reward) respectively, where A := 
+
+|A| , B := |B| are finite. The non-stationary transition kernel has the form Ph : S ×A×B×S 7 → [0 , 1] with Ph(s′|s, a, b )
+
+representing the probability of transition from state s, action 
+
+(a, b ) to next state s′ at time step h. In addition, rh(s, a, b )
+
+denotes the known 3 expected (immediate) reward function. 
+
+> 1The formal def. of batch complexity is deferred to Section 2.
+> 2While it is true that we can generalize the definition of switch-ing cost to support general (stochastic) policies, in this case the guarantee of batched RL is stronger due to its nature that the timestep to switch policy is predetermined.
+> 3Our results easily generalize to the case with stochastic reward.
+
+Without loss of generality, we assume each episode starts from a fixed initial state s1.4 At time step h ∈ [H], two players observe sh and choose their actions ah ∈ A and 
+
+bh ∈ B at the same time. Then both players observe the action of their opponent and receive reward rh(sh, a h, b h),the environment will transit to sh+1 ∼ Ph(·| sh, a h, b h).
+
+Markov policy, value function. A (Markov) policy μ of the max-player can be seen as a series of mappings μ =(μ1, · · · , μ H ), where each μh maps each state s ∈ S to a probability distribution over actions A, i.e. μh : S → ∆( A).A Markov policy ν for the min-player is defined similarly. Given a pair of policies (μ, ν ) and h ∈ [H], the value func-tion V μ,ν h (·) and Q-value function Qμ,ν h (·, ·, ·) are defined as: V μ,ν h (s) = Eμ×ν [PHt=h rt|sh = s], Q μ,ν h (s, a, b ) = 
+
+Eμ×ν [PHt=h rt|sh, a h, b h = s, a, b ], ∀ s, a, b ∈ S × A × B .
+
+Then the Bellman equation follows ∀ h ∈ [H]:
+
+Qμ,ν h (s, a, b ) = [ rh + PhV μ,ν h+1 ]( s, a, b ),V μ,ν h (s) = [ Eμ×ν Qμ,ν h ]( s).
+
+In this work, we will consider different MGs with respective transition kernels and reward functions. We define the value function for policy π = ( μ, ν ) under MG (er, eP ) as below 
+
+V π (er, eP ) = Eπ
+
+" HX
+
+> h=1
+
+erh | eP
+
+#
+
+.
+
+Best responses, Nash equilibrium. For any policy μ of the max-player, there exists a best response policy ν†(μ)
+
+of the min-player such that V μ,ν †(μ) 
+
+> h
+
+(s) = inf ν V μ,ν h (s) for all (s, h ) ∈ S × [H]. For simplicity, we denote V μ, † 
+
+> h
+
+:= 
+
+V μ,ν †(μ) 
+
+> h
+
+. Also, μ†(ν) and V †,ν h can be defined similarly. It is shown (Filar and Vrieze, 2012) that there exists a pair of policies (μ⋆, ν ⋆) that are best responses against each other, 
+
+i.e. for all (s, h ) ∈ S × [H],
+
+V μ⋆,† 
+
+> h
+
+(s) = V μ⋆,ν ⋆ 
+
+> h
+
+(s) = V †,ν ⋆ 
+
+> h
+
+(s).
+
+We call the pair of policies Nash equilibrium of the Markov game, which further satisfies the following minimax prop-erty: for all (s, h ) ∈ S × [H],
+
+sup 
+
+> μ
+
+inf  
+
+> ν
+
+V μ,ν h (s) = V μ⋆,ν ⋆ 
+
+> h
+
+(s) = inf  
+
+> ν
+
+sup 
+
+> μ
+
+V μ,ν h (s).
+
+The value functions of (μ⋆, ν ⋆) are called Nash value func-tions and we denote V ⋆h = V μ⋆,ν ⋆ 
+
+> h
+
+, Q ⋆h = Qμ⋆,ν ⋆ 
+
+> h
+
+for sim-plicity. Intuitively speaking, Nash equilibrium means that no player could benefit from switching her own policy. 
+
+> 4The generalized case where the initial distribution is an arbi-trary distribution can be recovered from this setting by adding one layer to the MG.
+
+3Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Non-Markov policies. In this work, we consider general, history-dependent policies that may not be Markov policies. A general policy μ of the max-player is a set of mappings 
+
+μ = {μh : Ω × (S × A × B × R)h−1 × S → ∆( A)}.The choice of the action at time step h ∈ [H] depends on the history and a random sample w ∈ Ω that is shared among all time steps. A special case of general policies is a mixture of Markov policies, which will be used in this work. General policies for the min-player, the best response of a general policy can be defined similarly as Markov policies. Note that the best response to a non-Markov policy may be non-Markov. 
+
+Learning objective: regret. Suppose K is the number of episodes the agent plan to play and μk is the policy executed by the max-player in the k-th episode. Then the regret of the max-player is defined as Regret (K) := 
+
+> K
+
+X
+
+> k=1
+
+[V ⋆ 
+
+> 1
+
+(s1) − V μk ,† 
+
+> 1
+
+(s1)] .
+
+Same as Jin et al. (2022), our goal is to minimize the regret of the max-player, which focuses on learning the Nash pol-icy of the max-player. By symmetry, the techniques readily extend to learning the Nash policy of the min-player. 
+
+Batched reinforcement learning. We measure the adaptiv-ity of an online RL algorithm by batch complexity. 
+
+Definition 2.1. We say an algorithm has batch complex-ity M , if the algorithm pre-determines a group of lengths 
+
+{Ti}i∈[M ] such that PMi=1 Ti = K. At the beginning of the i-th batch, the agent determines a general policy 
+
+πi = ( μi, ν i) and follows πi for Ti episodes. Our goal is to minimize the batch complexity of our algo-rithm while achieving near-optimal regret. 
+
+Remark 2.2. We highlight that our setting strictly gener-alizes the batched (single-agent) RL setting in Qiao et al. (2022); Zhang et al. (2022). This is because when the min-player plays a fixed and known policy, the definitions of MG, regret and batch complexity will reduce to the single-agent RL setting. Therefore, our setting is more complex and technically demanding by incorporating the min-player. 
+
+## 3. Main algorithms 
+
+In order to attain a batch complexity that is near-optimal, we extend the batch schedule derived from the arm-elimination algorithm for bandits (Cesa-Bianchi et al., 2013) to an elim-ination based algorithm for RL. The core concept behind our policy elimination approach revolves around maintain-ing a version space ΠA that encompasses the remaining policies for the max-player. In each batch, we enhance the estimated values of all policies within ΠA and utilize these values to eliminate policies that cannot possibly be Nash policies. The overarching goal is that as the algorithm pro-gresses, the policies remaining after elimination are already in approximate alignment with Nash equilibrium. 
+
+Algorithm 1 Main algorithm  
+
+> 1:
+
+Require : Number of episodes K. The known reward r.Universal constants C, N . Failure probability δ. 
+
+> 2:
+
+Initialize : T (k) = K1− 12k , k ≤ K0 = O(log log K),
+
+Π1 
+
+> A
+
+:= {All Markov policies for the max-player },
+
+ΠB := {All Markov policies for the min-player }, ι =log(2 HSABK/δ ). 
+
+> 3:
+
+for k = 1 , 2, · · · , K 0 do  
+
+> 4:
+
+⋄ Number of episodes in k-th stage:  
+
+> 5:
+
+if (N +1) T (1) +(1+( k −1) N )T (2) +Pki=1 T (i) ≥
+
+K then  
+
+> 6:
+
+T (k) = K − (N + 1) T (1) − (1 + ( k − 1) N )T (2) −
+
+Pk−1 
+
+> i=1
+
+T (i) (o.w. T (k) = K1− 12k ).  
+
+> 7:
+
+end if  
+
+> 8:
+
+end for  
+
+> 9:
+
+for k = 1 , 2 do  
+
+> 10:
+
+⋄ Update the infrequent set F and construct an em-pirical estimate bP of the absorbing MG:  
+
+> 11:
+
+Fk, P int,k , πk = Crude Exploration (Π kA, ΠB , T (k)). 
+
+> 12:
+
+bP k = Fine Exploration (Fk, P int,k ,
+
+ΠkA, ΠB , T (k), π k, N T (k)). 
+
+> 13:
+
+⋄ Policy elimination for the max-player:  
+
+> 14:
+
+Πk+1  
+
+> A
+
+← {μ ∈ ΠkA | inf ν∈ΠB V μ,ν (r, bP k) ≥
+
+sup μ∈ΠkA inf ν∈ΠB V μ,ν (r, bP k) − 2C(
+
+q H3S2ABι T (k) +  
+
+> H5S3A2B2ιT(k)
+
+)}. 
+
+> 15:
+
+end for  
+
+> 16:
+
+for k = 3 , 4, · · · , K 0 do  
+
+> 17:
+
+⋄ Only update the empirical transition kernel:  
+
+> 18:
+
+bP k = Fine Exploration (F2, P int, 2,
+
+ΠkA, ΠB , T (k), π 2, N T (2) ). 
+
+> 19:
+
+Πk+1  
+
+> A
+
+← {μ ∈ ΠkA | inf ν∈ΠB V μ,ν (r, bP k) ≥
+
+sup μ∈ΠkA inf ν∈ΠB V μ,ν (r, bP k) − 2C(
+
+q H3S2ABι T (k) +  
+
+> H5S3A2B2ιT(2)
+
+)}. 
+
+> 20:
+
+end for 
+
+The primary hurdle lies in efficiently estimating the value function for all policy pairs with minimal sample usage. The challenge of uniform convergence typically involves esti-mating transition kernels, compounded by the necessity to address an exploration problem to visit specific state-action pairs at least once. Additionally, certain states may not be frequently visited by any policy pair. To tackle these chal-lenges, we construct a surrogate Markov Game termed an “absorbing MG” featuring an absorbing state. This absorb-ing MG replaces problematic states with an absorbing state, denoted as s†. Consequently, all remaining states can be ad-equately visited by some policy in ΠA × ΠB . Furthermore, its value function uniformly approximates the original MG 4Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Algorithm 2 Crude Exploration  
+
+> 1:
+
+Input : Policy sets ΠA (max) and ΠB (min). Number of episodes T . Universal constant C1. 
+
+> 2:
+
+Initialize : T0 = TH , F = ∅, D = ∅, ι =log(2 HSABK/δ ). 1h,s,a,b is a reward function r′
+
+where r′ 
+
+> h′
+
+(s′, a ′, b ′) = 1[( h′, s ′, a ′, b ′) = ( h, s, a, b )] .
+
+s† is an additional absorbing state. P int is a transi-tion kernel over the extended space S ∪ { s†} × A × B ,initialized arbitrarily . 
+
+> 3:
+
+Output : Infrequent tuples F. Intermediate transition kernel P int . A uniformly explorative policy π. 
+
+> 4:
+
+for h = 1 , 2, · · · , H do  
+
+> 5:
+
+⋄ Construct and run policies to visit each state-action:  
+
+> 6:
+
+for (s, a, b ) ∈ S × A × B do  
+
+> 7:
+
+πh,s,a,b = argmax (μ,ν )∈ΠA×ΠB V μ,ν (1 h,s,a,b , P int ). 
+
+> 8:
+
+end for  
+
+> 9:
+
+Run πh = uniform mixture of {πh,s,a,b }(s,a,b ) for T0
+
+episodes, and add the trajectories into data set D. 
+
+> 10:
+
+for (s, a, b, s ′) ∈ S × A × B × S do  
+
+> 11:
+
+Nh(s, a, b, s ′) = count of (h, s, a, b, s ′) in D. 
+
+> 12:
+
+end for  
+
+> 13:
+
+⋄ Use F to store the infrequent tuples:  
+
+> 14:
+
+F = F ∪ { (h, s, a, b, s ′)|Nh(s, a, b, s ′) ≤ C1H2ι}. 
+
+> 15:
+
+⋄ Update the intermediate transition kernel using Algorithm 5:  
+
+> 16:
+
+P int = EstimateTransition (D, F, s †, h, P int ) 
+
+> 17:
+
+Reset data set D = ∅. 
+
+> 18:
+
+end for  
+
+> 19:
+
+⋄ Construct a uniformly explorative policy:  
+
+> 20:
+
+Policy π ← uniform mixture of {πh,s,a,b }(h,s,a,b ). 
+
+> 21:
+
+Return : {F , P int , π }.for all relevant policies, thereby simplifying the problem to estimating the transition kernel of the absorbing MG. 
+
+Main algorithm. Given a budget of K episodes, Algo-rithm 1 divides it into multiple stages with increasing length 
+
+T (k) := K1−1/2k
+
+for k = 1 , 2, 3, ..., K 0. It is known (Cesa-Bianchi et al., 2013) that the total number of stages K0 is bounded by O(log log K).In Algorithm 1, the first two stages involve three steps while all the following stages only contain the last two steps. Be-fore we introduce the steps, we remark that such design is due to technical reasons. First, two implementations of Crude exploration could give an “absorbing” MG model that is sufficient for our purpose. In addition, to achieve the optimal batch complexity, the number of Crude exploraion’s can only be a constant. Therefore, we give up the cleaner schedule where each stage contains all the three steps and choose the current schedule. Below is the three steps: 
+
+Step 1. Crude exploration Explore each (h, s, a, b ) pair layer-by-layer using policies from the current version-
+
+Algorithm 3 Fine Exploration  
+
+> 1:
+
+Input : Infrequent tuples F. Intermediate transition ker-nel P int . Policy sets ΠA and ΠB . Number of episodes 
+
+T . Auxiliary policy π′ with number of episodes T ′. 
+
+> 2:
+
+Initialize : D = ∅. bP = P int . 1h,s,a,b is a reward function r′ where r′ 
+
+> h′
+
+(s′, a ′, b ′) = 1[( h′, s ′, a ′, b ′) = (h, s, a, b )] . 
+
+> 3:
+
+Output : Empirical estimate bP . 
+
+> 4:
+
+Construct explorative policy π according to (1).  
+
+> 5:
+
+Run π for T episodes and run π′ for T ′ episodes, add all the trajectories into data set D. 
+
+> 6:
+
+⋄ Construct an empirical estimate for eP using Algo-rithm 5:  
+
+> 7:
+
+for h ∈ [H] do  
+
+> 8:
+
+bP = EstimateTransition( D, F, s †, h, bP ). 
+
+> 9:
+
+end for  
+
+> 10:
+
+Return bP .space ΠkA (and ΠB ). Establish an absorbing MG eP
+
+and a crude intermediate estimate ( P int ) of eP .
+
+Step 2. Fine exploration Solve for a uniformly explo-rative policy to explore all tuples based on the crude estimate ( P int ) of the absorbing MG. Construct a more accurate estimate ( bP ) of the absorbing MG eP .
+
+Step 3. Policy elimination Evaluate all policies in ΠA us-ing inf ν∈ΠB V μ,ν (r, bP ) as an estimate of V μ, †(r, P ).Update the version space ΠA by eliminating all poli-cies whose empirical value inf ν∈ΠB V μ,ν (r, bP ) is sub-optimal by a gap depending on the batch size. As the algorithm advances, assuming the high probability event that our confidence bounds hold, the Nash policy of the max-player is unlikely to be eliminated. At each stage, the remaining policies consistently outperform the LCB of the Nash policy, which will converge to the Nash value. Next, we explain the first two steps of Algorithm 1: Crude Exploration (Alg. 2) and Fine Exploration (Alg. 3). 
+
+Layer-by-layer Exploration in Algorithm 2. Our Algo-rithm 2 is a generalization of Algorithm 2 of Qiao et al. (2022) to the multi-agent case. The motivation is that if we visit some tuple (h, s, a, b, s ′) for O(H2ι) times, the em-pirical estimate of Ph(s′|s, a, b ) would be multiplicatively accurate. Therefore, the challenge would be to visit each tu-ple as much as possible using policies from the input policy sets ΠA and ΠB . However, some (h, s, a, b, s ′) tuples may be hard to reach by any policy in the policy set. To tackle this issue, we construct the set F to be all the tuples that do not have enough visitations. Consequently, for the tuples not in F, the empirical estimate of transition is accurate enough, while for the tuples in F, we will prove that no policy in the policy set could visit the tuple frequently thus 5Multi-Agent Reinforcement Learning with low Adaptivity 
+
+they have little influence on the value function. More specifically, we explore the MG layer-by-layer. When exploring the h-th layer, we construct πh,s,a,b ’s to be the greedy policies under P int , i.e. πh,s,a,b could visit 
+
+(h, s, a, b ) with the largest probability under P int . Then we run a uniform mixture of {πh,s,a,b }(s,a,b ) (which is a general policy) for several episodes to collect the samples 
+
+D, after which we update the h-th layer of P int (i.e. P int h )using Algorithm 5 and D. Finally, a uniformly explorative policy π that can visit all tuples is stored for future use. Based on infrequent tuples F, the absorbing MG is estab-lished according to Definition 3.1. The construction is equiv-alent to first letting eP = P , and then moving the probability of ePh(s′|s, a, b ) to ePh(s†|s, a, b ) for (h, s, a, b, s ′) ∈ F .
+
+Definition 3.1 (The absorbing MG eP ). Given F and P ,
+
+∀ (h, s, a, b, s ′) /∈ F , let ePh(s′|s, a, b ) = Ph(s′|s, a, b ).
+
+For any (h, s, a, b, s ′) ∈ F , ePh(s′|s, a, b ) = 0 . For any 
+
+(h, s, a, b ) ∈ [H] × S × A × B , ePh(s†|s†, a, b ) = 1 and 
+
+ePh(s†|s, a, b ) = 1 − X 
+
+> s′∈S :( h,s,a,b,s ′)/∈F
+
+ePh(s′|s, a, b ).
+
+Remark 3.2. Such absorbing structure has been applied under the single-agent case (Qiao et al., 2022; Zhang et al., 2022; Zhang and Zanette, 2023), and here we gen-eralize the definition to the multi-agent case. It will be shown that with high probability, for (h, s, a, b, s ′), ei-ther (1 − 1 
+
+> H
+
+)P int h (s′|s, a, b ) ≤ ePh(s′|s, a, b ) ≤ (1 +  
+
+> 1
+> H
+
+)P int h (s′|s, a, b ) or P int h (s′|s, a, b ) = ePh(s′|s, a, b ) = 0 .Therefore, πh,s,a,b ’s are efficient in exploration. Algorithm 5 and corresponding explanations are deferred to Appendix B due to space limit. Here we remark that P int is the empirical estimate of eP using the samples in D. Besides, we discuss about the transition between the original MG and the absorbing MG in Appendix C. 
+
+Fine exploration by Algorithm 3. The key behind Algo-rithm 3 is that with high probability, V μ,ν (1 h,s,a,b , P int ) is multiplicatively close to V μ,ν (1 h,s,a,b , eP ) for all (h, s, a, b )
+
+and remaining (μ, ν ). Therefore, P int can be used to guide the exploration. We construct the exploration policy π as: 
+
+π = argmin π∈∆(Π A×ΠB ) sup 
+
+> (μ′,ν ′)∈ΠA×ΠB
+> H
+
+X
+
+> h=1
+
+X
+
+> s,a,b
+
+V μ′,ν ′
+
+(1 h,s,a,b , P int )
+
+V π (1 h,s,a,b , P int ) ,
+
+(1) which is a mixture of several policies from the current ver-sion space that could provide uniform coverage of all re-maining policies. Then we run both π (which is a general policy) and an auxiliary policy π′5 to collect samples. At last, bP is calculated as an empirical estimate of eP by using Algorithm 5 and the data set D.Details about the implementation and computational effi-ciency of the algorithms are deferred to Section 4. 
+
+## 4. Main results 
+
+In this section, we will state our main results, which formal-ize the algorithmic ideas explained in the previous section. 
+
+Theorem 4.1 (Regret and batch complexity of Algorithm 1) .
+
+With probability 1 − δ, Algorithm 1 will have regret bounded by eO(√H2S2ABT ), where T := KH is the number of steps. Furthermore, the batch complexity of Algorithm 1 is bounded by O(H + log log K).
+
+Theorem 4.1 says that Algorithm 1 is able to achieve a regret bound with optimal dependence on K while using only O(log log K) batches. Due to space limit, the proof is sketched in Section 6 with details in the Appendix. Now we discuss a few interesting aspects of the result. 
+
+Near optimal batch complexity. We state the following lower bound of batch complexity for all algorithms with 
+
+eO(√K) regret bound, which implies that the batch com-plexity of our Algorithm 1 is nearly optimal. 
+
+Theorem 4.2 (Lower bound) . For any algorithm with 
+
+O(poly( S, A, B, H )√K) regret bound, the batch complex-ity is at least Ω( H/ log A K + log log K).
+
+Due to space limit, the proof is deferred to Appendix F. 
+
+Transformation to PAC guarantee. Various MARL appli-cations require outputting a near optimal policy at the end of the algorithm. Below we provide a sample complexity upper bound for finding an ϵ-approximate Nash policy for the max-player. We highlight that although we run general policies in the algorithm, the output policy can be a single Markov policy that is convenient to store and execute. 
+
+Theorem 4.3 (Sample complexity) . For any ϵ > 0 and δ > 
+
+0, with probability 1−δ, Algorithm 1 could output a Markov 
+
+policy μ of the max-player in eO
+
+ H3S2AB ϵ2
+
+
+
+episodes such that μ is ϵ-approximate Nash, i.e. 
+
+V ⋆(r, P ) − V μ, †(r, P ) ≤ ϵ. 
+
+The proof is deferred to Appendix F. By symmetry, an ϵ-approximate Markov Nash policy for the min-player can be found using the same number of episodes. 
+
+Dependence on H, S, A, B in the regret. Our regret bound is optimal in T . However, there is a gap of pS min {A, B }
+
+when compared to the information-theoretic limit of 
+
+> 5Running a uniformly explorative policy is for technical reason.
+
+6Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Ω( pH2S(A + B)T ) that covers all algorithms (including those without adaptivity constraints) (Bai and Jin, 2020). When applying our Algorithm 1 to the single-agent MDP setting where the min-player plays a fixed and known policy (B = 1 ), the regret bound and batch complexity will be 
+
+eO(√H2S2AT ) and O(H + log log K), respectively. The batch complexity is known to be optimal (Zhang et al., 2022) while the regret is suboptimal by √S when compared to the lower bound of Ω( √H2SAT ) (Jin et al., 2018). We believe our analysis is tight and further improvements on S will require new algorithmic ideas to handle the larger policy space compared to the single agent case. It is an intriguing open problem whether we can design an algorithm with both optimal batch complexity and optimal regret bound. 
+
+Computational efficiency. Our Main Algorithm (Algo-rithm 1) is not computationally efficient in general, since the algorithm needs to explicitly go over the remaining pol-icy set to implement policy elimination, construct policy 
+
+πh,s,a,b ’s in Crude exploration and π in Fine exploration. These steps can be solved approximately in exponential time by enumerating over a tight covering set of Markov policies. For efficient surrogate of Algorithm 1, we remark that a possible method is to apply softmax (or other differentiable) representation of the policy space and use gradient-based optimization techniques to find approximate solutions. 
+
+## 5. Some discussions 
+
+5.1. Application to bandit games ( H = S = 1 )
+
+If for a two-player zero-sum Markov game, there is no multi-ple time steps and no states ( H = S = 1 ), then the Markov game reduces to a two-player zero-sum bandit game, which has wide real-world applications. According to Theorem 4.1, a direct application of Algorithm 1 under the bandit set-ting will lead to a regret bound of eO(√ABK ) and a batch complexity bound of O(log log K). Moreover, with some mild revision to Algorithm 1, the implementation can be computationally efficient. The result is summarized in The-orem 5.1 below. Note that the definition of batch complexity and regret is identical to the Markov game case. 
+
+Theorem 5.1. If we run Algorithm 6 (adapted from Algo-rithm 1) under a two-player zero-sum bandit game for K
+
+episodes, the batch complexity is bounded by O(log log K)
+
+while the regret is eO(√ABK ) with high probability. Fur-thermore, the algorithm is computationally efficient. 
+
+Due to space limit, Algorithm 6 and proof of Theorem 5.1 are deferred to Appendix G.1. To the best of our knowl-edge, Theorem 5.1 is the first result for learning multi-player bandit games with low adaptivity, and the batch complex-ity is optimal while the regret has optimal dependence on 
+
+K. The special case of bandit games where B = 1 is the well-studied multi-armed bandits setting (Auer et al., 2002). Previous works (Perchet et al., 2016; Gao et al., 2019) designed algorithms for the MAB setting which achieve 
+
+O(log log K) batch complexity and eO(√AK ) regret simul-taneously, where both bounds are shown to be minimax optimal. In comparison, the above upper bounds can be achieved by directly plugging in B = 1 to Theorem 5.1. Therefore, our result can be considered as a provably effi-cient generalization of Gao et al. (2019) to the game setting. 
+
+5.2. Extension to the reward-free case 
+
+In this part, we further consider the setting of low adaptive reward-free exploration (Jin et al., 2020), where the goal is to output a near Nash policy for any possible reward func-tion. Specifically, due to its nature that Crude Exploration (Algorithm 2) and Fine Exploration (Algorithm 3) do not use any information about the reward function r, these two algorithms can be leveraged in reward-free setting. Algo-rithm 4 uses Crude Exploration to construct the infrequent tuples F and the intermediate MG P int . Then the algorithm uses Fine Exploration to get an empirical estimate bP of the absorbing MG eP . At last, for any reward function r, the algorithm outputs the Nash policy under the empirical MG. 
+
+Algorithm 4 Algorithm for reward-free case  
+
+> 1:
+
+Input : Episodes for crude exploration N0, episodes for fine exploration N1. Universal constant N . Failure probability δ. 
+
+> 2:
+
+Initialize : ι = log(2 HSAB (N0 + N1)/δ ),
+
+ΠA := {All Markov policies for the max-player },
+
+ΠB := {All Markov policies for the min-player }. 
+
+> 3:
+
+Output : πr = ( μr , ν r ) for any reward function r. 
+
+> 4:
+
+F, P int , π = Crude Exploration (Π A, ΠB , N 0). 
+
+> 5:
+
+bP = Fine Exploration (F, P int , ΠA, ΠB , N 1, π, N N 0). 
+
+> 6:
+
+μr = argmax μ∈ΠA inf ν∈ΠB V μ,ν (r, bP ) for any r. 
+
+> 7:
+
+νr = argmin ν∈ΠB sup μ∈ΠA V μ,ν (r, bP ) for any r. 
+
+> 8:
+
+Return {πr = ( μr , ν r )}r .The batch complexity and sample complexity of Algorithm 4 is summarized in Theorem 5.2 below (whose proof is deferred to Appendix G.2 due to space limit). 
+
+Theorem 5.2. The batch complexity of Algorithm 4 is bounded by H + 2 . There exists a constant c > 0 such that, for any ϵ > 0 and any δ > 0, if the number of total episodes K satisfies that 
+
+K > c 
+
+ H3S2ABι ′
+
+ϵ2 + H5S3A2B2ι′
+
+ϵ
+
+
+
+,
+
+where ι′ = log( HSAB ϵδ ), then there exists a choice of N0
+
+and N1 such that N0 + N1 = K and with probability 1 − δ,for any reward function r, Algorithm 4 will output a policy pair πr = ( μr , ν r ) that is ϵ-approximate Nash. 
+
+7Multi-Agent Reinforcement Learning with low Adaptivity 
+
+The batch complexity of Algorithm 4 is known to be opti-mal up to logarithmic factors (Huang et al., 2022b) while the sample complexity is optimal in ϵ (Jin et al., 2020). Moreover, when applied to the special case of single-agent MDP, our sample complexity is eO( H3S2Aϵ2 ), which matches the best known results even without adaptivity constraints (M ´enard et al., 2021; Zhang et al., 2020b). We highlight that our sample complexity improves significantly over previous algorithms with near optimal adaptivity (Qiao et al., 2022; Qiao and Wang, 2023), whose sample complexities are both 
+
+eO( H5S2Aϵ2 ). Last but not least, compared to Algorithm 1, our Algorithm 4 could output near Nash policies for both players simultaneously by running a single algorithm. 
+
+## 6. Proof overview 
+
+In this section, we summarize the proof of Theorem 4.1. The analysis contains two main parts: the batch complexity bound and the regret bound. The batch complexity bound can be directly derived from the schedule of Algorithm 1. 
+
+Upper bound for batch complexity. Crude exploration (Al-gorithm 2) can be run in H batches while Fine exploration (Algorithm 3) can be run in 2 batches. Since Algorithm 1 contains 2 Crude exploration’s and O(log log K) Fine explo-ration’s, we have the conclusion that the batch complexity of Algorithm 1 is bounded by O(H + log log K).However, such an elimination schedule requires the algo-rithm to run the same exploration policy for a large number of episodes before being able to switch to another policy, which is the main technical hurdle to the regret analysis. 
+
+Regret upper bound. The core of the regret analysis is to construct a uniform off-policy evaluation bound that covers all remaining policies. The remaining policy set (for the max-player) at the beginning of stage k is ΠkA. Assume with high probability, for all (μ, ν ) ∈ ΠkA × ΠB , we can estimate 
+
+V μ,ν (r, P ) to ϵk accuracy using bP k, then the difference between inf ν∈ΠB V μ,ν (r, bP k) and V μ, †(r, P ) is bounded by ϵk uniformly for all μ ∈ ΠkA. Therefore if we eliminate all policies μ that are at least 2ϵk sub-optimal in the sense of inf ν∈ΠB V μ,ν (r, bP k), the Nash policy will not be elimi-nated and all the policies remaining will be 4ϵk-approximate Nash. Summing up the regret of all stages, we have with high probability, the total regret is bounded by Regret (K) ≤ O(HT (1) ) + O
+
+> K0
+
+X
+
+> k=2
+
+T (k) × ϵk−1
+
+!
+
+. (2) The following key lemma provides an upper bound of ϵk−1
+
+given that we use the empirical transition kernel bP k in Al-gorithm 1 to estimate V μ,ν (r, P ).
+
+Lemma 6.1. W.h.p, for any k and (μ, ν ) ∈ ΠkA × ΠB ,
+
+V μ,ν (r, bP k) − V μ,ν (r, P ) ≤ eO
+
+r H3S2AB T (k)
+
+!
+
+.
+
+The proof of Lemma 6.1 requires controlling both the “bias” and “variance” part of estimation error. The “bias” refers to the difference between the true MG and the absorbing MG, while the “variance” refers to the statistical error in estimating the value functions of the absorbing MG using 
+
+bP k. For simplicity, in the following discussion, we omit the stage number k and the discussion holds true for all k.
+
+The “bias”: difference between P and eP . First, it holds that if the visitation number of a tuple (h, s, a, b, s ′) is larger than O(H2ι), with high probability, 
+
+(1 − 1
+
+H )P int h (s′|s, a, b ) ≤ ePh(s′|s, a, b )
+
+≤ (1 + 1
+
+H )P int h (s′|s, a, b ).
+
+According to the definition of F in Algorithm 2, we have the above inequality is true for any (h, s, a, b, s ′). Then we have for any (h, s, a, b ) and any policy (μ, ν ) ∈ ΠA × ΠB ,
+
+14 V μ,ν (1 h,s,a,b , P int ) ≤ V μ,ν (1 h,s,a,b , eP )
+
+≤ 3V μ,ν (1 h,s,a,b , P int ).
+
+Due to the construction of πh,s,a,b , we can see that it is efficient in visiting the tuple (h, s, a, b ) under the true MG. Therefore, we are able to bound the difference between P
+
+and eP in the sense of value function. 
+
+Lemma 6.2. W.h.p, for any policy (μ, ν ) ∈ ΠA × ΠB ,
+
+V μ,ν (r, eP ) − V μ,ν (r, P ) ≤ eO
+
+ H5S3A2B2
+
+T
+
+
+
+.
+
+The “variance”: difference between bP and eP . Since P int 
+
+is close to eP , we can prove the following lemma. 
+
+Lemma 6.3. W.h.p, for any policy (μ, ν ) ∈ ΠA × ΠB ,
+
+V μ,ν (r, bP ) − V μ,ν (r, eP ) ≤ eO
+
+r H3S2AB T
+
+!
+
+.
+
+Put everything together. Combining the bounds of the “bias” term and the “variance” term, because of triangular inequality, we have the conclusion in Lemma 6.1 holds (the “bias” term is lower order). Then the proof of regret bound is completed by plugging in ϵk = eO
+
+q H3S2AB T (k)
+
+
+
+in (2) .8Multi-Agent Reinforcement Learning with low Adaptivity 
+
+## 7. Conclusion 
+
+In this paper, we take the initial step to study the well-motivated problem of low adaptive multi-agent reinforce-ment learning. We design Algorithm 1 that achieves the optimal batch complexity of O(H + log log K) and near optimal regret of eO(√H2S2ABT ). Furthermore, our tech-niques naturally extend to bandit games and reward-free exploration with low adaptivity, where our results general-ize or improve various previous works in the single-agent case. Future extensions are numerous, it remains open to address the computational efficiency, study Markov Games with general function approximation, as well as make the algorithms practical. We leave those as future works. 
+
+## Acknowledgements 
+
+The research is partially supported by NSF Awards 
+
+#2007117 and #2003257. YW was with the Computer Sci-ence Department at UCSB when the work was completed and submitted for peer review at ICML. 
+
+## Impact Statement 
+
+This paper is a theory paper that studies multi-agent RL with adaptivity constraints, where the goal is to advance the field of machine learning. Therefore, there will not be ethical issues or negative potential broader impact. 
+
+## References 
+
+Yasin Abbasi-Yadkori, D ´avid P ´al, and Csaba Szepesv ´ari. Improved algorithms for linear stochastic bandits. In Ad-vances in Neural Information Processing Systems , pages 2312–2320, 2011. Peter Auer, Nicolo Cesa-Bianchi, and Paul Fischer. Finite-time analysis of the multiarmed bandit problem. Machine learning , 47(2):235–256, 2002. Yu Bai and Chi Jin. Provable self-play algorithms for com-petitive reinforcement learning. In International Con-ference on Machine Learning , pages 551–560. PMLR, 2020. Yu Bai, Tengyang Xie, Nan Jiang, and Yu-Xiang Wang. Provably efficient q-learning with low switching cost. 
+
+Advances in Neural Information Processing Systems , 32, 2019. Yu Bai, Chi Jin, and Tiancheng Yu. Near-optimal rein-forcement learning with self-play. Advances in neural information processing systems , 33:2159–2170, 2020. Rajarshi Bhattacharyya, Archana Bura, Desik Rengarajan, Mason Rumuly, Srinivas Shakkottai, Dileep Kalathil, Ricky KP Mok, and Amogh Dhamdhere. Qflow: A rein-forcement learning approach to high qoe video streaming over wireless networks. In Proceedings of the twentieth ACM international symposium on mobile ad hoc network-ing and computing , pages 251–260, 2019. Noam Brown and Tuomas Sandholm. Superhuman ai for multiplayer poker. Science , 365(6456):885–890, 2019. Nicolo Cesa-Bianchi, Ofer Dekel, and Ohad Shamir. Online learning with switching costs and other adaptive adver-saries. In Advances in Neural Information Processing Systems , pages 1160–1168, 2013. Jinglin Chen, Aditya Modi, Akshay Krishnamurthy, Nan Jiang, and Alekh Agarwal. On the statistical efficiency of reward-free exploration in non-linear rl. Advances in Neural Information Processing Systems , 35:20960– 20973, 2022. Xiaoyu Chen, Jiachen Hu, Lin F Yang, and Liwei Wang. Near-optimal reward-free exploration for lin-ear mixture mdps with plug-in solver. arXiv preprint arXiv:2110.03244 , 2021. Herman Chernoff et al. A measure of asymptotic efficiency for tests of a hypothesis based on the sum of observations. 
+
+The Annals of Mathematical Statistics , 23(4):493–507, 1952. Hwei-Ming Chung, Sabita Maharjan, Yan Zhang, and Frank Eliassen. Distributed deep reinforcement learning for in-telligent load scheduling in residential smart grids. IEEE Transactions on Industrial Informatics , 17(4):2752–2763, 2020. Qiwen Cui, Kaiqing Zhang, and Simon Du. Breaking the curse of multiagents in a large state space: Rl in markov games with independent linear function approximation. In 
+
+The Thirty Sixth Annual Conference on Learning Theory ,pages 2651–2652. PMLR, 2023. Christoph Dann, Tor Lattimore, and Emma Brunskill. Uni-fying pac and regret: Uniform pac bounds for episodic reinforcement learning. In Advances in Neural Informa-tion Processing Systems , pages 5713–5723, 2017. Jerzy Filar and Koos Vrieze. Competitive Markov decision processes . Springer Science & Business Media, 2012. Minbo Gao, Tianle Xie, Simon S Du, and Lin F Yang. A provably efficient algorithm for linear markov deci-sion process with low switching cost. arXiv preprint arXiv:2101.00494 , 2021. Zijun Gao, Yanjun Han, Zhimei Ren, and Zhengqing Zhou. Batched multi-armed bandits problem. Advances in Neu-ral Information Processing Systems , 32, 2019. 9Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Yanjun Han, Zhengqing Zhou, Zhengyuan Zhou, Jose Blanchet, Peter W Glynn, and Yinyu Ye. Sequential batch learning in finite-action linear contextual bandits. 
+
+arXiv preprint arXiv:2004.06321 , 2020. Jiafan He, Heyang Zhao, Dongruo Zhou, and Quanquan Gu. Nearly minimax optimal reinforcement learning for linear markov decision processes. In International Conference on Machine Learning , pages 12790–12822. PMLR, 2023. Pihe Hu, Yu Chen, and Longbo Huang. Towards mini-max optimal reward-free reinforcement learning in lin-ear mdps. In The Eleventh International Conference on Learning Representations , 2023. Baihe Huang, Jason D Lee, Zhaoran Wang, and Zhuoran Yang. Towards general function approximation in zero-sum markov games. In 10th International Conference on Learning Representations, ICLR 2022 , 2022a. Jiawei Huang, Jinglin Chen, Li Zhao, Tao Qin, Nan Jiang, and Tie-Yan Liu. Towards deployment-efficient rein-forcement learning: Lower bound and optimality. In 
+
+International Conference on Learning Representations ,2022b. Xiang Ji and Gen Li. Regret-optimal model-free reinforce-ment learning for discounted mdps with short burn-in time. arXiv preprint arXiv:2305.15546 , 2023. Chi Jin, Zeyuan Allen-Zhu, Sebastien Bubeck, and Michael I Jordan. Is q-learning provably efficient? In Ad-vances in Neural Information Processing Systems , pages 4863–4873, 2018. Chi Jin, Akshay Krishnamurthy, Max Simchowitz, and Tiancheng Yu. Reward-free exploration for reinforce-ment learning. In International Conference on Machine Learning , pages 4870–4879. PMLR, 2020. Chi Jin, Qinghua Liu, Yuanhao Wang, and Tiancheng Yu. V-learning–a simple, efficient, decentralized algorithm for multiagent rl. arXiv preprint arXiv:2110.14555 , 2021. Chi Jin, Qinghua Liu, and Tiancheng Yu. The power of exploiter: Provable multi-agent rl in large state spaces. In International Conference on Machine Learning , pages 10251–10279. PMLR, 2022. Emmeran Johnson, Ciara Pike-Burke, and Patrick Rebes-chini. Sample-efficiency in multi-batch reinforcement learning: The need for dimension-dependent adaptivity. 
+
+arXiv preprint arXiv:2310.01616 , 2023. Emilie Kaufmann, Pierre M ´enard, Omar Darwiche Domingues, Anders Jonsson, Edouard Leurent, and Michal Valko. Adaptive reward-free exploration. In 
+
+Algorithmic Learning Theory , pages 865–891. PMLR, 2021. Dingwen Kong, Ruslan Salakhutdinov, Ruosong Wang, and Lin F Yang. Online sub-sampling for reinforcement learn-ing with general function approximation. arXiv preprint arXiv:2106.07203 , 2021. Chris Junchi Li, Dongruo Zhou, Quanquan Gu, and Michael Jordan. Learning two-player markov games: Neural func-tion approximation and correlated equilibrium. Advances in Neural Information Processing Systems , 35:33262– 33274, 2022. Gen Li, Yuling Yan, Yuxin Chen, and Jianqing Fan. Minimax-optimal reward-agnostic exploration in rein-forcement learning. arXiv preprint arXiv:2304.07278 ,2023. Qinghua Liu, Tiancheng Yu, Yu Bai, and Chi Jin. A sharp analysis of model-based reinforcement learning with self-play. In International Conference on Machine Learning ,pages 7001–7010. PMLR, 2021. Weichao Mao, Lin Yang, Kaiqing Zhang, and Tamer Basar. On improving model-free algorithms for decentralized multi-agent reinforcement learning. In International Conference on Machine Learning , pages 15007–15049. PMLR, 2022. Tatsuya Matsushima, Hiroki Furuta, Yutaka Matsuo, Ofir Nachum, and Shixiang Gu. Deployment-efficient rein-forcement learning via model-based offline optimization. In International Conference on Learning Representations ,2020. Andreas Maurer and Massimiliano Pontil. Empirical bern-stein bounds and sample variance penalization. arXiv preprint arXiv:0907.3740 , 2009. Pierre M ´enard, Omar Darwiche Domingues, Anders Jon-sson, Emilie Kaufmann, Edouard Leurent, and Michal Valko. Fast active learning for pure exploration in re-inforcement learning. In International Conference on Machine Learning , pages 7599–7608. PMLR, 2021. Sobhan Miryoosefi and Chi Jin. A simple reward-free ap-proach to constrained reinforcement learning. In Inter-national Conference on Machine Learning , pages 15666– 15698. PMLR, 2022. Aditya Modi, Jinglin Chen, Akshay Krishnamurthy, Nan Jiang, and Alekh Agarwal. Model-free representation learning and exploration in low-rank mdps. arXiv preprint arXiv:2102.07035 , 2021. George Nemhauser and Laurence Wolsey. Polynomial-time algorithms for linear programming. Integer and Combi-natorial Optimization , pages 146–181, 1988. 10 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Vianney Perchet, Philippe Rigollet, Sylvain Chassang, and Erik Snowberg. Batched bandit problems. The Annals of Statistics , 44(2):660–681, 2016. Dan Qiao and Yu-Xiang Wang. Near-optimal deployment ef-ficiency in reward-free reinforcement learning with linear function approximation. In The Eleventh International Conference on Learning Representations , 2023. Dan Qiao, Ming Yin, Ming Min, and Yu-Xiang Wang. Sample-efficient reinforcement learning with loglog(T) switching cost. In International Conference on Machine Learning , pages 18031–18061. PMLR, 2022. Dan Qiao, Ming Yin, and Yu-Xiang Wang. Logarithmic switching cost in reinforcement learning beyond linear mdps. arXiv preprint arXiv:2302.12456 , 2023. Shuang Qiu, Jieping Ye, Zhaoran Wang, and Zhuoran Yang. On reward-free rl with kernel and neural function ap-proximations: Single-agent mdp and markov game. In 
+
+International Conference on Machine Learning , pages 8737–8747. PMLR, 2021. Yufei Ruan, Jiaqi Yang, and Yuan Zhou. Linear bandits with limited adaptivity and learning distributional optimal design. In Proceedings of the 53rd Annual ACM SIGACT Symposium on Theory of Computing , pages 74–87, 2021. Shai Shalev-Shwartz, Shaked Shammah, and Amnon Shashua. Safe, multi-agent, reinforcement learning for autonomous driving. arXiv preprint arXiv:1610.03295 ,2016. M Shi, Y Liang, and N Shroff. Near-optimal adversarial reinforcement learning with switching costs. In Interna-tional Conference on Learning Representations (ICLR) ,2023. David Silver, Julian Schrittwieser, Karen Simonyan, Ioannis Antonoglou, Aja Huang, Arthur Guez, Thomas Hubert, Lucas Baker, Matthew Lai, Adrian Bolton, et al. Master-ing the game of go without human knowledge. nature ,550(7676):354–359, 2017. David Simchi-Levi and Yunzong Xu. Phase transitions and cyclic phenomena in bandits with switching constraints. 
+
+Advances in Neural Information Processing Systems , 32, 2019. Grigoris Velegkas, Zhuoran Yang, and Amin Karbasi. The best of both worlds: Reinforcement learning with log-arithmic regret and policy switches. arXiv preprint arXiv:2203.01491 , 2022. Andrew J Wagenmaker, Yifang Chen, Max Simchowitz, Si-mon Du, and Kevin Jamieson. Reward-free rl is no harder than reward-aware rl in linear markov decision processes. In International Conference on Machine Learning , pages 22430–22456. PMLR, 2022. Ruosong Wang, Simon S Du, Lin Yang, and Russ R Salakhutdinov. On reward-free reinforcement learning with linear function approximation. Advances in neural information processing systems , 33:17816–17826, 2020. Tianhao Wang, Dongruo Zhou, and Quanquan Gu. Prov-ably efficient reinforcement learning with linear function approximation under adaptivity constraints. Advances in Neural Information Processing Systems , 34, 2021. Yuanhao Wang, Qinghua Liu, Yu Bai, and Chi Jin. Breaking the curse of multiagency: Provably efficient decentral-ized multi-agent rl with function approximation. arXiv preprint arXiv:2302.06606 , 2023. Qiaomin Xie, Yudong Chen, Zhaoran Wang, and Zhuoran Yang. Learning zero-sum simultaneous-move markov games using function approximation and correlated equi-librium. In Conference on learning theory , pages 3674– 3682. PMLR, 2020. Nuoya Xiong, Zhuoran Yang, and Zhaoran Wang. A general framework for sequential decision-making under adaptiv-ity constraints. arXiv preprint arXiv:2306.14468 , 2023. Shusheng Xu, Yancheng Liang, Yunfei Li, Simon Shaolei Du, and Yi Wu. Beyond information gain: An empirical benchmark for low-switching-cost reinforcement learn-ing. Transactions on Machine Learning Research , 2022. Yunchang Yang, Han Zhong, Tianhao Wu, Bin Liu, Liwei Wang, and Simon S Du. A reduction-based framework for sequential decision making with delayed feedback. 
+
+arXiv preprint arXiv:2302.01477 , 2023. Deheng Ye, Guibin Chen, Wen Zhang, Sheng Chen, Bo Yuan, Bo Liu, Jia Chen, Zhao Liu, Fuhao Qiu, Hong-sheng Yu, et al. Towards playing full moba games with deep reinforcement learning. Advances in Neural Infor-mation Processing Systems , 33:621–632, 2020. Andrea Zanette and Emma Brunskill. Tighter problem-dependent regret bounds in reinforcement learning with-out domain knowledge using value function bounds. In 
+
+International Conference on Machine Learning , pages 7304–7312. PMLR, 2019. Andrea Zanette, Alessandro Lazaric, Mykel J Kochenderfer, and Emma Brunskill. Provably efficient reward-agnostic navigation with linear value iteration. Advances in Neural Information Processing Systems , 33:11756–11766, 2020. Ruiqi Zhang and Andrea Zanette. Policy finetuning in re-inforcement learning via design of experiments using offline data. In Thirty-seventh Conference on Neural Information Processing Systems , 2023. 11 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Weitong Zhang, Dongruo Zhou, and Quanquan Gu. Reward-free model-based reinforcement learning with linear func-tion approximation. Advances in Neural Information Processing Systems , 34:1582–1593, 2021. Xuezhou Zhang, Adish Singla, et al. Task-agnostic explo-ration in reinforcement learning. Advances in Neural Information Processing Systems , 2020a. Zihan Zhang, Simon S Du, and Xiangyang Ji. Nearly mini-max optimal reward-free reinforcement learning. arXiv preprint arXiv:2010.05901 , 2020b. Zihan Zhang, Yuan Zhou, and Xiangyang Ji. Almost op-timal model-free reinforcement learning via reference-advantage decomposition. Advances in Neural Informa-tion Processing Systems , 33:15198–15207, 2020c. Zihan Zhang, Yuhang Jiang, Yuan Zhou, and Xiangyang Ji. Near-optimal regret bounds for multi-batch reinforcement learning. Advances in Neural Information Processing Systems , 35:24586–24596, 2022. Heyang Zhao, Jiafan He, and Quanquan Gu. A nearly opti-mal and low-switching algorithm for reinforcement learn-ing with general function approximation. arXiv preprint arXiv:2311.15238 , 2023. 12 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+## A. Extended related work 
+
+Low switching algorithms for bandits and RL. Auer et al. (2002) first studied multi-armed bandits with low switching cost by proposing the famous UCB2 algorithm. The optimal switching cost bound is later achieved by Cesa-Bianchi et al. (2013). For multi-armed bandits with A arms and T episodes, they designed an algorithm with the optimal eO(√AT ) regret while the switching cost is only O(A log log T ). Simchi-Levi and Xu (2019) generalized the result by showing that a switching cost of order A log log T is necessary for getting the optimal eO(√T ) regret bound. For stochastic linear bandits, Abbasi-Yadkori et al. (2011) achieved the optimal regret eO(d√T ) with O(d log T ) policy switches by applying doubling trick. Under a slightly different setting, Ruan et al. (2021) improved the result by reducing the switching cost to O(log log T )
+
+while keeping the regret bound. Bai et al. (2019) first studied the problem under tabular MDP. They reached regret bound of eO(√H3SAT ) with local switching cost O(H3SA log T ) by applying doubling trick to Q-learning. Both regret and switching cost are improved by Zhang et al. (2020c) using advantage decomposition. Qiao et al. (2022) established that a global switching cost of order HSA log log T is enough and necessary to achieve the optimal eO(√T ) regret. For linear MDP, Gao et al. (2021) arrived at regret bound eO(√d3H3T ) with global switching cost O(dH log T ) by applying doubling trick to LSVI-UCB. Wang et al. (2021) generalized the above result to work for arbitrary budget of switching cost. Later, the regret bound is improved to the minimax optimal rate eO(√d2H2T ) by He et al. (2023), while the switching cost remains the same. Beyond the linear MDP model, Qiao et al. (2023) designed low switching algorithms for linear Bellman complete MDP and MDP with general linear approximation, while Kong et al. (2021); Velegkas et al. (2022); Zhao et al. (2023); Xiong et al. (2023) considered MDPs with general function approximation. All of these algorithms achieved a switching cost bound depending only logarithmically on T . Shi et al. (2023) considered low switching adversarial reinforcement learning. On the empirical side, Xu et al. (2022) constructed an empirical benchmark for low switching RL. In addition, low switching algorithms can be further applied to deal with RL with delayed feedback (Yang et al., 2023) or to achieve short burn-in time under discounted MDPs (Ji and Li, 2023). 
+
+Batched bandits and RL. For multi-armed bandits with A arms and T episodes, Cesa-Bianchi et al. (2013) designed an algorithm with eO(√AT ) regret while the batch complexity is only O(log log T ). Perchet et al. (2016) proved that 
+
+Ω(log log T ) batches are necessary for a regret bound of eO(√T ) under 2-armed bandits. The result is generalized to 
+
+K-armed bandits by Gao et al. (2019). For stochastic linear bandits, Han et al. (2020) achieved a regret bound of eO(√T )
+
+while the batch complexity is only O(log log T ). The result is improved by Ruan et al. (2021) via using weaker assumptions. For batched RL setting, Qiao et al. (2022) showed that their algorithm uses the optimal O(H + log log T ) batches to achieve the optimal eO(√T ) regret. Later, Zhang et al. (2022) incorporated the idea of optimal experimental design to get near optimal regret bound and computational efficiency. For linear MDP, Wang et al. (2021) first designed an algorithm with low batch complexity. Later, Johnson et al. (2023) proved a dimension-dependent lower bound of batch complexity for any sample-efficient algorithms. The deployment efficient algorithms for pure exploration by Huang et al. (2022b); Qiao and Wang (2023) also satisfy the definition of batched RL. Beyond linear MDPs, Modi et al. (2021) designed deployment efficient algorithms for low rank MDPs while Xiong et al. (2023) proposed batched algorithms for MDPs with general function approximation. 
+
+Reward-free exploration. The problem of reward-free exploration is first studied by Jin et al. (2020). They used the EULER algorithm (Zanette and Brunskill, 2019) to visit each state-action pair as much as possible, and their sample complexity is eO(H5S2A/ϵ 2). Kaufmann et al. (2021) designed an algorithm which requires eO(H4S2A/ϵ 2) episodes to output a near-optimal policy for any reward function. M ´enard et al. (2021) further improved the sample complexity to 
+
+eO(H3S2A/ϵ 2). Zhang et al. (2020b) considered a more general horizon-free setting with stationary transition kernel. They constructed a novel condition to achieve the optimal sample complexity eO(S2A/ϵ 2) under their specific setting. Also, their result can be transferred to achieve eO(H3S2A/ϵ 2) sample complexity under the standard setting where rh ∈ [0 , 1] and the transition kernel is non-stationary. When considering low adaptivity, Qiao et al. (2022) designed an algorithm with the optimal O(HSA ) switching cost and eO(H5S2A/ϵ 2) sample complexity. There is a relevant setting named task-agnostic exploration. Zhang et al. (2020a) designed an algorithm that could find ϵ-optimal policies for N arbitrary tasks within at most 
+
+eO(H5SA log N/ϵ 2) exploration episodes. Recently, Li et al. (2023) studied reward-agnostic exploration in reinforcement learning, which incorporates the two settings above. For MDP with linear function approximation, a series of papers (Wang et al., 2020; Zanette et al., 2020; Zhang et al., 2021; Chen et al., 2021; Wagenmaker et al., 2022; Huang et al., 2022b; Qiao and Wang, 2023; Hu et al., 2023) analyzed reward-free exploration. Among the works, Huang et al. (2022b); Qiao and Wang (2023) achieved near optimal adaptivity at the same time. Beyond linear MDPs, Qiu et al. (2021); Chen et al. (2022) considered reward-free exploration in MDPs with general function approximation. Reward-free RL is also known to be 13 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+helpful to constrained reinforcement learning (Miryoosefi and Jin, 2022). 
+
+## B. Missing algorithm: EstimateTransition (Algorithm 5) and some explanation 
+
+Our Algorithm 5 is a generalization of Algorithm 5 in Qiao et al. (2022) to the multi-agent case. The algorithm takes a data set D, a set of infrequent tuples F, a transition model P and the target layer h to update as inputs. The output is an updated transition model where the h-th layer is derived according to D while the remaining layers stay the same. The construction of Ph is for the tuples in F, Ph(s′|s, a, b ) = 0 . For the tuples not in F, Ph(s′|s, a, b ) is the empirical estimate from D. At last, Ph(s†|s, a, b ) = 1 − P  
+
+> s′∈S :( h,s,a,b,s ′)/∈F
+
+Ph(s′|s, a, b ) holds so that Ph is a valid transition kernel. In other words, the construction is similar to the construction of eP . We first let P be the empirical estimate based on D, then for (h, s, a, b, s ′) ∈ F , we move the probability of Ph(s′|s, a, b ) to Ph(s†|s, a, b ).
+
+Algorithm 5 Compute Transition Kernel (EstimateTransition)  
+
+> 1:
+
+Require : Data set D, infrequent tuples F, absorbing state s†, the target layer h, transition kernel P . 
+
+> 2:
+
+Output : Estimated transition kernel P from data set D. 
+
+> 3:
+
+⋄ Count the visitation number of each state-action pairs from the target layer h: 
+
+> 4:
+
+for (s, a, b, s ′) ∈ S × A × B × S do  
+
+> 5:
+
+Nh(s, a, b, s ′) = count of (h, s, a, b, s ′) in D. 
+
+> 6:
+
+Nh(s, a, b ) = count of (h, s, a, b ) in D. 
+
+> 7:
+
+end for  
+
+> 8:
+
+⋄ Update the h-th layer of the transition kernel:  
+
+> 9:
+
+for (s, a, b, s ′) ∈ S × A × B × S s.t. (h, s, a, b, s ′) ∈ F do  
+
+> 10:
+
+Ph(s′|s, a, b ) = 0 . 
+
+> 11:
+
+end for  
+
+> 12:
+
+for (s, a, b, s ′) ∈ S × A × B × S s.t. (h, s, a, b, s ′) /∈ F do  
+
+> 13:
+
+Ph(s′|s, a, b ) = Nh(s,a,b,s ′) 
+
+> Nh(s,a,b )
+
+. 
+
+> 14:
+
+end for  
+
+> 15:
+
+for (s, a, b ) ∈ S × A × B do  
+
+> 16:
+
+Ph(s†|s, a, b ) = 1 − P  
+
+> s′∈S :( h,s,a,b,s ′)/∈F
+
+Ph(s′|s, a, b ). 
+
+> 17:
+
+end for  
+
+> 18:
+
+for (a, b ) ∈ A × B do  
+
+> 19:
+
+Ph(s†|s†, a, b ) = 1 . 
+
+> 20:
+
+end for  
+
+> 21:
+
+Return P .
+
+## C. Transition between original MG and absorbing MG 
+
+For any reward function r defined under the original MG P , we overload the notation and also use it under the absorbing MG. The extended definition of r under the absorbing MG is shown below: 
+
+r(s, a, b ) = 
+
+(
+
+r(s, a, b ), s ∈ S ,
+
+0, s = s†.
+
+For any policy π = ( μ, ν ) defined under the original MG P , we overload the notation and also use it under the absorbing MG. The extended definition of (μ, ν ) under the absorbing MG is shown below: 
+
+μ(·| s) = 
+
+(
+
+μ(·| s), s ∈ S ,
+
+arbitrary distribution, s = s†.ν(·| s) = 
+
+(
+
+ν(·| s), s ∈ S ,
+
+arbitrary distribution, s = s†.
+
+14 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+With the definition of r and π, the value function under the absorbing MG is independent of the arbitrary distribution since there will be no more reward once the agent enters the absorbing state s†. The policies defined under the absorbing MG can be directly applied under the real MG because such policies have definition for any s ∈ S .In this paper, P is the real MG, which is under original MG. In each stage, eP is an absorbing MG constructed based on infrequent tuples F and the real MG P . When we run the algorithm, we do not have access to eP , but we know exactly the intermediate transition kernel P int , which is also an absorbing MG. In Algorithm 3, the bP we construct is the empirical estimate of eP , which is also an absorbing MG. In the proof of this paper, a large part of discussion is under the framework of absorbing MG. When we specify that the discussion is under absorbing MG with absorbing state s†, any transition kernel 
+
+P ′ satisfies P ′
+
+> h
+
+(s†|s†, a, b ) = 1 for any (a, b, h ) ∈ A × B × [H]. For the reward functions in this paper, they are all defined under original MG, when applied under absorbing MG, the transition rule follows what we just discussed. 
+
+## D. Proof of lemmas regarding Crude Exploration (Algorithm 2) 
+
+We first prove an upper bound for batch complexity. 
+
+Lemma D.1. The batch complexity of Algorithm 2 is bounded by H.Proof of Lemma D.1. Since each πh = uniform mixture of {πh,s,a,b }(s,a,b ) is one general policy and we run H such πh’s in total, the number of batches is bounded by H.Note that our Crude Exploration (Algorithm 2) is adapted from Algorithm 2 in Qiao et al. (2022) for the single-agent RL case, and the difference is that here we replace the single version space ϕ in Qiao et al. (2022) with a product policy space 
+
+ΠA × ΠB . Therefore, the results in Qiao et al. (2022) directly extend to the multi-agent case. We begin with the property of 
+
+P int and eP .
+
+Lemma D.2 (Lemma E.3 in Qiao et al. (2022)) . With probability 1 − Sδ K , ∀ (h, s, a, b, s ′) ∈ [H] × S × A × B × S such that (h, s, a, b, s ′) /∈ F , it holds that 
+
+(1 − 1
+
+H )P int h (s′|s, a, b ) ≤ ePh(s′|s, a, b ) ≤ (1 + 1
+
+H )P int h (s′|s, a, b ).
+
+In addition, we have that ∀ (h, s, a, b, s ′) ∈ F , ePh(s′|s, a, b ) = P int h (s′|s, a, b ) = 0 .
+
+From Lemma D.2, we can see that for those tuples (h, s, a, b, s ′) not in F, the estimate of the transition kernel satisfies 
+
+(1 − 1 
+
+> H
+
+)P int h (s′|s, a, b ) ≤ ePh(s′|s, a, b ) ≤ (1 + 1 
+
+> H
+
+)P int h (s′|s, a, b ) with high probability. In addition, for those states 
+
+(h, s, a, b, s ′) ∈ F , P int h (s′|s, a, b ) = ePh(s′|s, a, b ) = 0 , which means this inequality holds for all (h, s, a, b, s ′) ∈
+
+[H] × S × A × B × S . For simplicity, we use a new definition θ-multiplicatively accurate to describe the relationship between P int and eP .
+
+Definition D.3 (θ-multiplicatively accurate for transition kernels (under absorbing MGs)) . Under the absorbing MG with absorbing state s†, a transition kernel P ′ is θ-multiplicatively accurate to another transition kernel P ′′ if 
+
+(1 − θ)P ′
+
+> h
+
+(s′|s, a, b ) ≤ P ′′  
+
+> h
+
+(s′|s, a, b ) ≤ (1 + θ)P ′
+
+> h
+
+(s′|s, a, b )
+
+for all (h, s, a, b, s ′) ∈ [H] × S × A × B × S and there is no requirement for the case when s′ = s†.Because of Lemma D.2, we have that with probability 1 − Sδ K , P int is 1 
+
+> H
+
+-multiplicatively accurate to eP . Next, we will compare the visitation probability of each state (h, s, a, b ) under two transition kernels that are close to each other. 
+
+Lemma D.4 (Lemma E.5 in Qiao et al. (2022)) . Define 1h,s,a,b to be the reward function r′ such that r′ 
+
+> h′
+
+(s′, a ′, b ′) = 
+
+1[( h′, s ′, a ′, b ′) = ( h, s, a, b )] . Similarly, define 1h,s to be the reward function r′ such that r′ 
+
+> h′
+
+(s′, a ′, b ′) = 1[( h′, s ′) = (h, s )] . Then V μ,ν (1 h,s,a,b , P ′) and V μ,ν (1 h,s , P ′) denote the visitation probability of (h, s, a, b ) and (h, s ), respectively, under (μ, ν ) and P ′. Under the absorbing MG with absorbing state s†, if P ′ is 1 
+
+> H
+
+-multiplicatively accurate to P ′′ , for any policy pair (μ, ν ) and any (h, s, a, b ) ∈ [H] × S × A × B , it holds that 
+
+14 V μ,ν (1 h,s,a,b , P ′) ≤ V μ,ν (1 h,s,a,b , P ′′ ) ≤ 3V μ,ν (1 h,s,a,b , P ′).
+
+15 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Combining Lemma D.2 and Lemma D.4, we have with high probability, for any policy pair (μ, ν ) and any (h, s, a, b ) ∈
+
+[H] × S × A × B , 14 V μ,ν (1 h,s,a,b , P int ) ≤ V μ,ν (1 h,s,a,b , eP ) ≤ 3V μ,ν (1 h,s,a,b , P int ). (3) The structure of the absorbing MG also gives rise to the following lemma about the relationship between eP and P .
+
+Lemma D.5 (Lemma E.6 in Qiao et al. (2022)) . For any policy pair (μ, ν ) and any (h, s, a, b ) ∈ [H] × S × A × B ,
+
+V μ,ν (1 h,s,a,b , P ) ≥ V μ,ν (1 h,s,a,b , eP ).
+
+Now we are ready to state the key lemma about the difference between eP and P .
+
+Lemma D.6 (Lemma E.12 in Qiao et al. (2022)) . There exists a universal constant c1 > 0, such that with probability 
+
+1 − 2Sδ K , it holds that for any policy pair (μ, ν ) ∈ ΠA × ΠB and reward function r′,
+
+0 ≤ V μ,ν (r′, P ) − V μ,ν (r′, eP ) ≤ c1H5S3A2B2ιT .
+
+Recall that at the end of Crude Exploration (Algorithm 2), we store a policy π = uniform mixture of {πh,s,a,b }(h,s,a,b ) for future use. Below we prove some properties of the uniformly explorative policy π.
+
+Lemma D.7. There exists a universal constant c2, with probability at least 1 − Sδ K , the policy π = uniform mixture of 
+
+{πh,s,a,b }(h,s,a,b ) satisfies that for all (h, s, a, b, s ′) ∈ [H] × S × A × B × S such that (h, s, a, b, s ′) /∈ F ,
+
+T · Pπ [( h, s, a, b, s ′)|P ] ≥ c2H2ι, 
+
+where Pπ [( h, s, a, b, s ′)|P ] means the probability of reaching (s, a, b, s ′) at time step h under policy π and original MG P .Proof of Lemma D.7. Recall that we run πh = uniform mixture of {πh,s,a,b }(s,a,b ) for T0 = TH episodes in Algorithm 2. Denote Eh,s,a,b,s ′ = T · Pπ [( h, s, a, b, s ′)|P ] and Eh,s,a,b,s ′ = TH · Pπh [( h, s, a, b, s ′)|P ]. Then it holds that Eh,s,a,b,s ′ ≥
+
+Eh,s,a,b,s ′ , because π is equivalent to a uniform mixture of {πh}h∈[H]. Therefore, for any (h, s, a, b, s ′) /∈ F , with probability 1 − δHSABK ,
+
+Eh,s,a,b,s ′ + p3Eh,s,a,b,s ′ ι ≥ Eh,s,a,b,s ′ +
+
+q
+
+3Eh,s,a,b,s ′ ι
+
+≥visitation count of (h, s, a, b, s ′) ≥ C1H2ι, 
+
+(4) where the second inequality holds with probability 1 − δHSABK due to Multiplicative Chernoff bound (Lemma H.1). The last inequality results from the definition of infrequent tuples F.Finally, based on (4) , with probability 1 − δHSABK , Eh,s,a,b,s ′ ≥ c2H2ι. The conclusion holds because of a union bound over (h, s, a, b, s ′) /∈ F .
+
+## E. Proof of lemmas regarding Fine Exploration (Algorithm 3) 
+
+We first state a conclusion about the batch complexity of Algorithm 3. 
+
+Lemma E.1. The batch complexity of Algorithm 3 is bounded by 2. Proof of Lemma E.1. Algorithm 3 will just run two general policies: π and π′ for several episodes. Below we analyze the properties of the two policies π and π′. Recall that π is constructed as below. 
+
+π = argmin π∈∆(Π A×ΠB ) sup 
+
+> (μ′,ν ′)∈ΠA×ΠB
+> H
+
+X
+
+> h=1
+
+X
+
+> s,a,b
+
+V μ′,ν ′
+
+(1 h,s,a,b , P int )
+
+V π (1 h,s,a,b , P int ) . (5) We begin with the uniform coverage property of the policy π in Algorithm 3. 16 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Lemma E.2. The policy π in Algorithm 3 satisfies that 
+
+sup 
+
+> (μ′,ν ′)∈ΠA×ΠB
+> H
+
+X
+
+> h=1
+
+X
+
+> s,a,b
+
+V μ′,ν ′
+
+(1 h,s,a,b , P int )
+
+V π (1 h,s,a,b , P int ) ≤ HSAB. 
+
+Proof of Lemma E.2. The proof is by plugging X = {{ V μ,ν (1 h, ·,·,·, P int )}Hh=1 | (μ, ν ) ∈ ΠA × ΠB }, d = SAB and 
+
+m = H into Lemma H.6. Together with the relationship between P int and eP ((3)), we can replace the P int with eP .
+
+Lemma E.3. Conditioned on the high-probability case in Lemma D.2, the policy π in Algorithm 3 satisfies that 
+
+sup 
+
+> (μ′,ν ′)∈ΠA×ΠB
+> H
+
+X
+
+> h=1
+
+X
+
+> s,a,b
+
+V μ′,ν ′
+
+(1 h,s,a,b , eP )
+
+V π (1 h,s,a,b , eP ) ≤ 12 HSAB. 
+
+Proof of Lemma E.3. For some pair of (μ′, ν ′), it holds that 
+
+L.H.S =
+
+> H
+
+X
+
+> h=1
+
+X
+
+> s,a,b
+
+V μ′,ν ′
+
+(1 h,s,a,b , eP )
+
+V π (1 h,s,a,b , eP )
+
+≤
+
+> H
+
+X
+
+> h=1
+
+X
+
+> s,a,b
+
+3V μ′,ν ′
+
+(1 h,s,a,b , P int ) 
+
+> 14
+
+V π (1 h,s,a,b , P int )
+
+≤ 12 HSAB, 
+
+(6) where the first inequality is because of Lemma D.4, the last inequality holds due to Lemma E.2. Now we state the properties of the auxiliary policy π′. Recall that according to the main algorithm (Algorithm 1), when the input infrequent set and intermediate transition kernel are Fk and P int,k respectively ( k = 1 , 2), we have the auxiliary policy π′ = πk and the number of episodes T ′ = N T (k) (N is the constant in Algorithm 1). Due to the conclusion of Lemma D.7, we have the following lemma for π′ and T ′.
+
+Lemma E.4. There exists a universal constant N > 0, such that with probability at least 1 − 2Sδ K , for all possible F, π′, T ′
+
+that appear in Algorithm 3, it holds that for all (h, s, a, b, s ′) /∈ F ,
+
+T ′ · Pπ′ [( h, s, a, b, s ′)|P ] ≥ 3C1H2ι, 
+
+where C1 is the universal constant in Algorithm 2, Pπ [( h, s, a, b, s ′)|P ] means the probability of reaching (s, a, b, s ′) at time step h under policy π and original MG P .Proof of Lemma E.4. According to Lemma D.7, for a fixed pair of Fk, πk and T (k), with probability at least 1 − Sδ K , it holds that for all (h, s, a, b, s ′) /∈ F k,
+
+T (k) · Pπk [( h, s, a, b, s ′)|P ] ≥ c2H2ι. 
+
+Therefore, choosing π′ = πk and T ′ = N T (k) with N > 3C1 
+
+> c2
+
+implies that for a fixed pair of Fk, πk and T (k), with probability at least 1 − Sδ K , it holds that for all (h, s, a, b, s ′) /∈ F k,
+
+N T (k) · Pπk [( h, s, a, b, s ′)|P ] ≥ 3C1H2ι. 
+
+Finally, with a union bound over k = 1 , 2, the proof is complete. The goal of running the auxiliary policy π′ for T ′ episodes is to visit each state action pair not in the infrequent set for sufficient times. The property is summarized as below. 17 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Lemma E.5. Under the high-probability case in Lemma E.4, if we run policy π′ for T ′ episodes, with probability 1 − Sδ K , it holds that for all (h, s, a, b, s ′) /∈ F ,
+
+Nh(s, a, b, s ′) ≥ C1H2ι, 
+
+where Nh(s, a, b, s ′) is the visitation count of (h, s, a, b, s ′).Proof of Lemma E.5. Under the high-probability case in Lemma E.4, for a fixed (h, s, a, b, s ′) /∈ F ,
+
+T ′ · Pπ′ [( h, s, a, b, s ′)|P ] ≥ 3C1H2ι. 
+
+Then according to Lemma H.5, with probability 1 − δHSABK , it holds that 
+
+Nh(s, a, b, s ′) ≥ 12 T ′ · Pπ′ [( h, s, a, b, s ′)|P ] − ι ≥ C1H2ι. 
+
+Finally, the proof is complete due to a union bound over (h, s, a, b, s ′) /∈ F .Therefore, we could guarantee that with high probability, the refined transition kernel estimate bP is 1 
+
+> H
+
+-multiplicatively accurate to the absorbing MG eP , which is summarized in the lemma below. 
+
+Lemma E.6. Under the high probability case in Lemma E.5, with probability 1 − Sδ K , the output bP of Algorithm 3 is  
+
+> 1
+> H
+
+-multiplicatively accurate to eP .Proof of Lemma E.6. The proof is identical to the proof of Lemma D.2 (and Lemma E.3 in Qiao et al. (2022)). It is known that the uncertainty of estimating ePh(·| s, a, b ) is proportional to 
+
+q 1 
+
+> Nh(s,a,b )
+
+, where Nh(s, a, b ) is the visitation count of (h, s, a, b ) in the data set. Therefore, we prove the following lemma regarding Nh(s, a, b )’s. 
+
+Lemma E.7. Under the high probability case in Lemma E.4, if we run π for T episodes and π′ for T ′ episodes, with probability 1 − δK , for all (h, s, a, b ) ∈ [H] × S × A × B , at least one of the following two statements hold: (1) For all s′ ∈ S , (h, s, a, b, s ′) ∈ F , i.e. ePh(s†|s, a, b ) = 1 is fixed and known. (2) Nh(s, a, b ) ≥ 12 T V π (1 h,s,a,b , eP ).Proof of Lemma E.7. For any (h, s, a, b ) ∈ [H] × S × A × B , if there exists some s′ ∈ S , (h, s, a, b, s ′) /∈ F , then the expected visitation count of (h, s, a, b ) from running π′ for T ′ episodes is 
+
+E1 
+
+> h,s,a,b
+
+= T ′Pπ′ [( h, s, a, b )|P ] ≥ T ′Pπ′ [( h, s, a, b, s ′)|P ] ≥ 3C1H2ι, 
+
+where the last inequality results from Lemma E.4. In addition, the expected visitation count of (h, s, a, b ) from running π for T episodes is 
+
+E2 
+
+> h,s,a,b
+
+= T V π (1 h,s,a,b , P ) ≥ T V π (1 h,s,a,b , eP ),
+
+where the inequality is because of Lemma D.5. Combining the expectations, the total expected visitation count of (h, s, a, b ) is 
+
+Eh,s,a,b = E1 
+
+> h,s,a,b
+
++ E2 
+
+> h,s,a,b
+
+≥ T V π (1 h,s,a,b , eP ) + 3 C1H2ι. 
+
+According to Lemma H.5, with probability 1 − δHSABK , it holds that 
+
+Nh(s, a, b ) ≥ 12 Eh,s,a,b − ι ≥ 12 T V π (1 h,s,a,b , eP ).
+
+Finally, the proof is complete due to a union bound over all (h, s, a, b ) ∈ [H] × S × A × B .Now we are ready to prove the following key lemma that bounds the difference between bP and eP .18 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Lemma E.8. Under the high-probability cases in Lemma E.3, Lemma E.6 and Lemma E.7, with probability 1 − Sδ K , the output bP of Algorithm 3 satisfies that for all (μ, ν ) ∈ ΠA × ΠB and any reward function r′,
+
+V μ,ν (r′, bP ) − V μ,ν (r′, eP ) ≤ c3
+
+r H3S2ABι T + c3
+
+H2S2ABι T , (7) 
+
+where c3 is a universal constant. Proof of Lemma E.8. Define Nh(s, a, b ) to be the visitation count of (h, s, a, b ) in the data set D. Then according to Bernstein’s inequality (Lemma H.2), with probability 1 − Sδ K , for all (h, s, a, b, s ′) ∈ [H] × S × A × B × S ,
+
+bPh(s′|s, a, b ) − ePh(s′|s, a, b ) ≤
+
+s
+
+2 ePh(s′|s, a, b )ιNh(s, a, b ) + 2ι
+
+3Nh(s, a, b ) . (8) Based on the above event and the high-probability cases in Lemma E.3, Lemma E.6 and Lemma E.7, for any (μ, ν ) ∈
+
+ΠA × ΠB and reward function r′, we define {fh(·)}H+1  
+
+> h=1
+
+to be the value function of (μ, ν ) under eP and r′ (fH+1 (·) = 0 ). Then it holds that 
+
+V μ,ν (r′, bP ) − V μ,ν (r′, eP ) ≤ X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , bP )
+
+ bP − eP
+
+
+
+· fh+1 (s, a, b )
+
+≤ X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , bP ) · X
+
+> s′
+
+ bPh(s′|s, a, b ) − ePh(s′|s, a, b )
+
+
+
+·
+
+
+
+fh+1 (s′) − ePh(·| s, a, b ) · fh+1 (·)
+
+
+
+≤ X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , bP ) · X
+
+> s′
+
+s
+
+2 ePh(s′|s, a, b )ιNh(s, a, b ) + 2ι
+
+3Nh(s, a, b )
+
+ · fh+1 (s′) − ePh(·| s, a, b ) · fh+1 (·)
+
+≤4 X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP ) ·
+
+s
+
+2Sι · Var ePh(·| s,a,b )fh+1 (·)
+
+Nh(s, a, b ) + HSι Nh(s, a, b )
+
+
+
+≤4√2Sι ·
+
+vuuuuutX
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP )
+
+Nh(s, a, b )
+
+| {z }
+
+> (i)
+
+·
+
+vuuuutX
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP )Var ePh(·| s,a,b )fh+1 (·)
+
+| {z }
+
+> (ii)
+
++ 4 HSι X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP )
+
+Nh(s, a, b )
+
+| {z }
+
+> (i)
+
+≤c3
+
+r H3S2ABι T + c3
+
+H2S2ABι T .
+
+(9) The first inequality is because of simulation lemma (Lemma H.7). The second inequality holds since ePh(·| s, a, b ) · fh+1 (·) is independent of s′. The third inequality results from (8) . The forth inequality is derived via Cauchy-Schwarz inequality and Lemma E.6. The fifth inequality is derived via Cauchy-Schwarz inequality. The last inequality comes from the inequalities (10) and (11) below. The upper bound for (i) is shown below: 
+
+(i) = X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP )
+
+Nh(s, a, b ) ≤ X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP ) 
+
+> 12
+
+T V π (1 h,s,a,b , eP ) ≤ 24 HSAB T . (10) The first inequality is because of Lemma E.7 while the second inequality is due to Lemma E.3. The upper bound for (ii) is shown below: 
+
+(ii) = X
+
+> h,s,a,b
+
+V μ,ν (1 h,s,a,b , eP )Var ePh(·| s,a,b )fh+1 (·) ≤ H2, (11) where the inequality results from a recursive application of Law of Total Variance. 19 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+## F. Proof of main theorems 
+
+F.1. Proof of Theorem 4.1 
+
+We first give a proof for the upper bound on the number of stages. 
+
+Lemma F.1. If T (k) = K1− 12k for k = 1 , 2 · · · , we have 
+
+K0 ≤ min {j :
+
+> j
+
+X
+
+> k=1
+
+T (k) ≥ K} = O(log log K).
+
+Proof of Lemma F.1. Take j = log 2 log 2 K, we have T (j) = KK(log 2 K)−1 = K 
+
+> 2
+
+, which means that 
+
+K0 ≤ log 2 log 2 K + 2 = O(log log K).
+
+Then we are able to bound the batch complexity of Algorithm 1. 
+
+Lemma F.2. The batch complexity of Algorithm 1 is bounded by O(H + log log K).Proof of Lemma F.2. According to Lemma D.1 and Lemma E.1, the batch complexity for each of the first two stages is bounded by H + 2 , while the batch complexity for each of the remaining stages is bounded by 2. Therefore the total batch complexity is bounded by 2H + 2 K0 = O(H + log log K).Recall that in Algorithm 1, in each stage k (k = 1 , 2), we run Algorithm 2 to construct the infrequent tuples Fk and the intermediate transition kernel P int,k . The absorbing MG eP k is constructed as in Definition 3.1 based on Fk and the real MG P . Then we run Algorithm 3 to construct an empirical estimate of eP k, which is bP k. After the first two stages, for the following stages ( k = 3 , 4, · · · , K 0), we keep the infrequent tuples F2, the absorbing MG eP 2 and the intermediate transition kernel P int, 2. In each stage, we run Algorithm 3 to construct an empirical estimate of eP 2, which is bP k.
+
+Lemma F.3. There exists a universal constant C > 0, such that with probability 1 − δ, for any k = 1 , 2 and (μ, ν ) ∈
+
+ΠkA × ΠB ,
+
+|V μ,ν (r, bP k) − V μ,ν (r, P )| ≤ C
+
+r H3S2ABι T (k) + H5S3A2B2ιT (k)
+
+!
+
+,
+
+while for any k ≥ 3 and (μ, ν ) ∈ ΠkA × ΠB ,
+
+|V μ,ν (r, bP k) − V μ,ν (r, P )| ≤ C
+
+r H3S2ABι T (k) + H5S3A2B2ιT (2) 
+
+!
+
+.
+
+Proof of Lemma F.3. Conditioned on the high probability case in Lemma D.6 (for k = 1 , 2), it holds that for any k = 1 , 2
+
+and (μ, ν ) ∈ ΠkA × ΠB ,
+
+V μ,ν (r, P ) − V μ,ν (r, eP k) ≤ c1H5S3A2B2ιT (k) ,
+
+where c1 is a universal constant and r is the real reward function. In addition, conditioned on the high probability case in Lemma E.8 (for k = 1 , 2, · · · , K 0), it holds that for k = 1 and any 
+
+(μ, ν ) ∈ Π1 
+
+> A
+
+× ΠB ,
+
+V μ,ν (r, bP 1) − V μ,ν (r, eP 1) ≤ c3
+
+r H3S2ABι T (1) + c3
+
+H2S2ABι T (1) ,
+
+while for any k ≥ 2 and (μ, ν ) ∈ ΠkA × ΠB ,
+
+V μ,ν (r, bP k) − V μ,ν (r, eP 2) ≤ c3
+
+r H3S2ABι T (k) + c3
+
+H2S2ABι T (k) .
+
+By combining the above inequalities and choosing C = c1 + c3, the conclusion holds. The failure probability is bounded by O   Sδ K
+
+ × O(log log K) ≤ δ, if K ≥ eΩ( S).20 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Based on the above high-probability case, the estimations of value functions are uniformly accurate for all policy pairs, which implies a sub-optimality bound for the remaining policies in the version space. 
+
+Lemma F.4. With probability 1 − δ, for the policies that have not been eliminated at stage k, i.e. μ ∈ Πk+1  
+
+> A
+
+, we have that 
+
+V ⋆(r, P ) − V μ, †(r, P ) ≤ 4C
+
+r H3S2ABι T (k) + H5S3A2B2ιT (k)
+
+!
+
+, k = 1 , 2.V ⋆(r, P ) − V μ, †(r, P ) ≤ 4C
+
+r H3S2ABι T (k) + H5S3A2B2ιT (2) 
+
+!
+
+, k ≥ 3.
+
+Proof of Lemma F.4. We only prove the case for k = 1 , the remaining cases can be proven similarly. We prove under the high probability case in Lemma F.3, which says that for any (μ, ν ) ∈ Π1 
+
+> A
+
+× ΠB ,
+
+|V μ,ν (r, bP 1) − V μ,ν (r, P )| ≤ C
+
+r H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+!
+
+.
+
+Recall that μ⋆ is the Nash policy of the max-player. Then it holds that 
+
+sup 
+
+> μ∈Π1
+> A
+
+inf 
+
+> ν∈ΠB
+
+V μ,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP 1) = inf 
+
+> ν∈ΠB
+
+V bμ,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP 1)
+
+≤ inf 
+
+> ν∈ΠB
+
+V bμ,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V bμ,ν (r, P ) + inf 
+
+> ν∈ΠB
+
+V bμ,ν (r, P ) − inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, P )+ inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, P ) − inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP 1)
+
+≤2C
+
+r H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+!
+
+,
+
+where the last inequality holds due to Lemma H.8. Therefore, the Nash policy μ⋆ will not be eliminated. In addition, for μ ∈ Π2
+
+> A
+
+,
+
+inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V μ,ν (r, bP 1) ≤ sup 
+
+> μ∈Π1
+> A
+
+inf 
+
+> ν∈ΠB
+
+V μ,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V μ,ν (r, bP 1)
+
+≤2C
+
+r H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+!
+
+.
+
+Finally, together with Lemma H.8, it holds that 
+
+V ⋆(r, P ) − V μ, †(r, P )
+
+≤ V ⋆(r, P ) − inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP 1) + inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V μ,ν (r, bP 1) + inf 
+
+> ν∈ΠB
+
+V μ,ν (r, bP 1) − inf 
+
+> ν∈ΠB
+
+V μ,ν (r, P )
+
+≤4C
+
+r H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+!
+
+.
+
+The conclusions for the remaining stages can be proven by identical techniques and induction. Given the sub-optimality bound for the policies, we are ready to provide the final regret bound. 
+
+Lemma F.5. Conditioned on the high probability event in Lemma F.3, if K ≥ eΩ( H14 S8A6B6), the total regret is bounded by eO(√H2S2ABT ), where T := HK is the number of steps. 
+
+21 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Proof of Lemma F.5. The regret for the first stage (stage 1) is at most (N + 2) HT (1) = O(HK 12 ).Because of Lemma F.4, the regret for the second stage (stage 2) is at most (N + 2) T (2) × 4C
+
+q H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+
+
+.For stage k ≥ 3, since the remaining policies (any μ ∈ ΠkA) are at most 4C
+
+q H3S2ABι T (k−1) + H5S3A2B2ιT (2) 
+
+
+
+sub-optimal and the policy π is a mixture of remaining policies, the regret due to running π for T episodes is at most 4CT (k)
+
+q H3S2ABι T (k−1) + H5S3A2B2ιT (2) 
+
+
+
+. Besides, the regret due to running π2 for N T (2) episodes is bounded by N T (2) × 4C
+
+q H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+
+
+. Combining the results, the regret for the k-th stage is at most 
+
+O
+
+
+
+T (k)
+
+q H3S2ABι T (k−1) + H5S3A2B2ιT (2) 
+
+
+
++ T (2) 
+
+q H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+ 
+
+.
+
+Adding up the regret for each stage , we have that the total regret is bounded by Regret (K) ≤ O(HK 12 ) + O
+
+> K0
+
+X
+
+> k=2
+
+T (k)
+
+r H3S2ABι T (k−1) 
+
+!
+
++ O
+
+
+
+K · H5S3A2B2ιT (2) 
+
+
+
++ O T (2) 
+
+r H3S2ABι T (1) + H5S3A2B2ιT (1) 
+
+!! 
+
+· O(log log K)= O(HK 12 ) + O(√H3S2ABKι · log log K) + O(H5S3A2B2K 14 ι · log log K)= eO(√H3S2ABK ),
+
+where the last equality is because K ≥ eΩ( H14 S8A6B6).Then Theorem 4.1 holds because of Lemma F.2, Lemma F.3 and Lemma F.5. 
+
+F.2. Proof of Theorem 4.2 
+
+Since two-player zero-sum MG strictly generalizes single-agent MDPs, the lower bound directly follows from Theorem 2 of Zhang et al. (2022). 
+
+F.3. Proof of Theorem 4.3 
+
+We can output any policy μ in the remaining policy set ΠK0+1  
+
+> A
+
+(μ is a Markov policy). Because there are K0 = O(log log K)
+
+stages in total, the maximal T (k) is larger than Ω( K  
+
+> log log K
+
+). According to Lemma F.4, for any μ ∈ ΠK0+1  
+
+> A
+
+,
+
+V ⋆(r, P ) − V μ, †(r, P ) ≤ 4C
+
+r H3S2ABι T (k) + H5S3A2B2ιT (2) 
+
+!
+
+, ∀ k = 2 , 3, · · · , K 0.
+
+Combining these two results, we have for any μ ∈ ΠK0+1  
+
+> A
+
+,
+
+V ⋆(r, P ) − V μ, †(r, P ) ≤ eO
+
+r H3S2AB K
+
+!
+
+.
+
+Then K = eO
+
+ H3S2AB ϵ2
+
+
+
+bounds the above by ϵ.
+
+## G. Proof for the results in Section 5 
+
+G.1. Details for the bandit game setting 
+
+Recall that bandit game is a special case of Markov games where H = S = 1 . The action set for the max-player is A
+
+(A := |A| ) and the action set for the min-player is B (B := |B| ). Therefore, a policy μ for the max-player is a distribution 22 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+over A while a policy ν for the min-player is a distribution over B. For simplicity, here we denote the reward function by 
+
+r(a, b ). In addition, the value function under policy pair (μ, ν ) and the Nash value are denoted by r(μ, ν ) and r⋆ respectively. The goal is to minimize the regret for the max-player: Regret (K) = 
+
+> K
+
+X
+
+> k=1
+
+r⋆ − r(μk, †) =
+
+> K
+
+X
+
+> k=1
+
+h
+
+r⋆ − inf  
+
+> ν
+
+r(μk, ν )
+
+i
+
+.
+
+Now we apply Algorithm 1 (with some revision) to the bandit game setting. The main difference is that now we do not need to construct the absorbing model since we can directly try each action. The detailed algorithm is shown below. 
+
+Algorithm 6 Algorithm for bandit games  
+
+> 1:
+
+Require : Number of episodes K. Universal constant C. Failure probability δ. 
+
+> 2:
+
+Initialize : T (k) = K1− 12k , k ≤ K0 = O(log log K). Π1 
+
+> A
+
+:= {All stochastic policies for the max-player }, μ0 := 
+
+uniform distribution over A, ν0 := uniform distribution over B. ι = log(2 ABK/δ ), T 0 = 2 ABι . Data set D = ∅. 
+
+> 3:
+
+for k = 1 , 2, · · · , K 0 do  
+
+> 4:
+
+⋄ Number of episodes in k-th stage:  
+
+> 5:
+
+if Pki=1 T (i) + kT 0 ≥ K then  
+
+> 6:
+
+T (k) = K − kT 0 − Pk−1 
+
+> i=1
+
+T (i) (o.w. T (k) = K1− 12k ).  
+
+> 7:
+
+end if  
+
+> 8:
+
+end for  
+
+> 9:
+
+for k = 1 , 2, · · · , K 0 do  
+
+> 10:
+
+⋄ Construct an explorative policy for the max-player:  
+
+> 11:
+
+Construct policy μ = argmin μ∈ΠkA sup μ′∈ΠkA
+
+P 
+
+> a∈A
+> μ′(a)
+> μ(a)
+
+. 
+
+> 12:
+
+⋄ Run the explorative policy and the uniform policy for several episodes:  
+
+> 13:
+
+Run π = ( μ, ν 0) for T (k) episodes and store the rewards in D. 
+
+> 14:
+
+Run π0 = ( μ0, ν 0) for T 0 episodes and store the rewards in D. 
+
+> 15:
+
+Construct an empirical reward function brk(a, b ) (and therefore brk(μ, ν )) using D. 
+
+> 16:
+
+⋄ Policy elimination for the max-player:  
+
+> 17:
+
+Πk+1  
+
+> A
+
+←
+
+n
+
+μ ∈ ΠkA | min b∈B brk(μ, b ) ≥ sup μ∈ΠkA min b∈B brk(μ, b ) − 2C
+
+q ABι T (k)
+
+o 
+
+. 
+
+> 18:
+
+⋄ Reset the data set:  
+
+> 19:
+
+Clear the data set: D ← ∅ . 
+
+> 20:
+
+end for 
+
+Now we restate the upper bounds and give a proof. 
+
+Theorem G.1 (Restate Theorem 5.1) . If we run Algorithm 6 (adapted from Algorithm 1) under a two-player zero-sum bandit game for K episodes, the batch complexity is bounded by O(log log K) while the regret is eO(√ABK ) with high probability. Furthermore, the algorithm is computationally efficient. Proof of Theorem G.1. Using identical proof of Lemma F.1, we have the number of stages K0 ≤ O(log log K). In addition, in each stage, we only run two policies π and π0, which can be done in two batches. Therefore, the batch complexity is bounded by 2K0 = O(log log K).For the regret part, we first have the following property of the μk constructed in k-th stage: for any μ′ ∈ ΠkA,
+
+X
+
+> a∈A
+
+μ′(a)
+
+μk(a) ≤ A, 
+
+which follows from Lemma H.6. In addition, using identical proof of Lemma E.7, it holds that with probability 1 − δ/ 2, for all (k, a, b ) ∈ [K0] × A × B ,
+
+N k(a, b ) ≥ T (k)
+
+2 · μk(a)
+
+B ,
+
+where N k(a, b ) is the visitation count of (a, b ) in the data set D from the k-th stage. 23 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Now we are ready to bound the estimation error of brk. With probability 1 − δ, uniformly for all (k, μ, b ) ∈ [K0] × ΠkA × B ,
+
+brk(μ, b ) − r(μ, b ) ≤ X
+
+> a∈A
+
+μ(a)|brk(a, b ) − r(a, b )|≤C X
+
+> a∈A
+
+μ(a)
+
+r ιN k(a, b ) ≤ C X
+
+> a∈A
+
+μ(a)
+
+s
+
+Bι T (k)μk(a)
+
+≤C
+
+s
+
+Bι X
+
+> a∈A
+
+μ(a) ·
+
+sX
+
+> a∈A
+
+μ(a)
+
+T (k)μk(a) ≤ C
+
+r ABι T (k) ,
+
+where the second inequality holds for some universal constant C with probability 1 − δ/ 2 due to Hoeffding’s inequality. The forth inequality holds due to Cauchy-Schwarz inequality. Based on the uniform estimation error, the regret bound of eO(√ABK ) can be derived using identical proof as Lemma F.4 and Lemma F.5. Lastly, we deal with the computational complexity. Note that any policy μ for the max-player can be represented as a vector 
+
+μ = ( p1, · · · , p A) such that PAi=1 pi = 1 . We prove by induction that the constrains on the remaining policy set are at most 
+
+O(B log log K) linear constraints and all steps are efficient. Assume the induction assumption is true at the beginning of the k-th stage, then μ = argmin μ∈ΠkA sup μ′∈ΠkA
+
+P 
+
+> a∈A
+> μ′(a)
+> μ(a)
+
+can be constructed (approximately) in poly( A, B, K ) time according to Lemma H.6. Then given the data set Dk, we do policy elimination. Recall that we will keep the policy μ if 
+
+min b∈B brk(μ, b ) ≥ sup μ∈ΠkA min b∈B brk(μ, b ) − 2C
+
+q ABι T (k)
+
+
+
+. Now we consider the computation. The computation of the R.H.S is equivalent to solving 
+
+max x s.t. x ≤ PAi=1 pibrk(i, b ) for all b ∈ B and the previous conditions on (p1, · · · , p A).According to the induction assumption, the previous conditions are at most O(B log log K) linear constraints. Therefore the problem is a linear programming (LP) problem with at most A + 1 variables and O(B log log K) linear constraints, which can be solved in polynomial time (Nemhauser and Wolsey, 1988). With the value c of R.H.S, the elimination step is equivalent to adding the following B linear constraints to the policy set: PAi=1 pibrk(i, b ) ≥ c for all b ∈ B . Since there are 
+
+O(log log K) stages in total, the total number of linear constraints is bounded by O(B log log K).As a result, the induction assumption always holds and the computation is efficient. 
+
+G.2. Proof for Theorem 5.2 
+
+In this part, we restate Theorem 5.2 and provide a proof. 
+
+Theorem G.2 (Restate Theorem 5.2) . The batch complexity of Algorithm 4 is bounded by H + 2 . There exists a constant 
+
+c > 0 such that, for any ϵ > 0 and any δ > 0, if the number of total episodes K satisfies that 
+
+K > c 
+
+ H3S2ABι ′
+
+ϵ2 + H5S3A2B2ι′
+
+ϵ
+
+
+
+,
+
+where ι′ = log( HSAB ϵδ ), then there exists a choice of N0 and N1 such that N0 + N1 = K and with probability 1 − δ, for any reward function r, Algorithm 4 will output a policy pair πr = ( μr , ν r ) that is ϵ-approximate Nash. Proof of Lemma G.2. We first prove the batch complexity upper bound. According to Lemma D.1 and Lemma E.1, the batch complexity of Algorithm 4 is bounded by H + 2 .For the sample complexity, due to Lemma D.6, with probability 1 − δ/ 2, for any policy pair (μ, ν ) ∈ ΠA × ΠB and reward function r, it holds that (for some universal constant c1)
+
+V μ,ν (r, P ) − V μ,ν (r, eP ) ≤ c1H5S3A2B2ιN0
+
+.
+
+24 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+In addition, resulting from Lemma E.8, with probability 1 − δ/ 2, for all (μ, ν ) ∈ ΠA × ΠB and any reward function r, it holds that (for some universal constant c3)
+
+V μ,ν (r, bP ) − V μ,ν (r, eP ) ≤ c3
+
+s
+
+H3S2ABι N1
+
++ c3
+
+H2S2ABι N1
+
+. (12) Combining the results, we have with probability 1 − δ, for all (μ, ν ) ∈ ΠA × ΠB and any reward function r,
+
+V μ,ν (r, bP ) − V μ,ν (r, P ) ≤ c1H5S3A2B2ιN0
+
++ c3
+
+s
+
+H3S2ABι N1
+
++ c3
+
+H2S2ABι N1
+
+. (13) Therefore there exists some universal constant c such that by choosing N0 = cH 5S3A2B2ι′ 
+
+> 4ϵ
+
+and N1 = cH 3S2ABι ′ 
+
+> ϵ2
+
++ 
+
+> cH 2S2ABι ′
+> 2ϵ
+
+, the R.H.S of (13) is bounded by ϵ/ 2. In this case, the total sample complexity is cH 5S3A2B2ι′ 
+
+> 2ϵ
+
++ cH 3S2ABι ′ 
+
+> ϵ2
+
++ 
+
+> cH 2S2ABι ′
+> 2ϵ
+
+≤ c
+
+ H3S2ABι ′ 
+
+> ϵ2
+
++ H5S3A2B2ι′
+
+> ϵ
+
+
+
+.Finally, we prove that μr = argmax μ∈ΠA inf ν∈ΠB V μ,ν (r, bP ) is ϵ-approximate Nash. Due to Lemma H.8, we have 
+
+V ⋆(r, P ) − V μr ,†(r, P ) = V ⋆(r, P ) − inf 
+
+> ν∈ΠB
+
+V μr ,ν (r, P )
+
+≤ inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, P ) − inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP ) + inf 
+
+> ν∈ΠB
+
+V μ⋆,ν (r, bP ) − inf 
+
+> ν∈ΠB
+
+V μr ,ν (r, bP )+ inf 
+
+> ν∈ΠB
+
+V μr ,ν (r, bP ) − inf 
+
+> ν∈ΠB
+
+V μr ,ν (r, P )
+
+≤ ϵ
+
+2 + 0 + ϵ
+
+2 = ϵ. 
+
+The conclusion that νr is also ϵ-approximate Nash is proven by symmetry. 
+
+## H. Technical lemmas 
+
+Lemma H.1 (Multiplicative Chernoff bound (Chernoff et al., 1952)) . Let X be a Binomial random variable with parameter 
+
+p, n . For any δ ∈ [0 , 1] , we have that P[X > (1 + δ)pn ] <
+
+ eδ
+
+> (1+ δ)1+ δ
+
+np 
+
+. A slightly looser bound that suffices for our propose: 
+
+P[X > (1 + δ)pn ] < e − δ2pn  
+
+> 3
+
+.
+
+Lemma H.2 (Bernstein’s inequality) . Let x1, · · · , x n be independent bounded random variables such that E[xi] = 0 and 
+
+|xi| ≤ A with probability 1. Let σ2 = 1
+
+> n
+
+Pni=1 Var[ xi], then with probability 1 − δ we have 
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xi ≤
+
+r 2σ2 log(2 /δ )
+
+n + 2A
+
+3n log(2 /δ ).
+
+Lemma H.3 (Empirical Bernstein’s inequality (Maurer and Pontil, 2009)) . Let x1, · · · , x n be i.i.d random variables such that |xi| ≤ A with probability 1. Let x = 1
+
+> n
+
+Pni=1 xi, and bVn = 1
+
+> n
+
+Pni=1 (xi − x)2, then with probability 1 − δ we have 
+
+1
+
+n
+
+> n
+
+X
+
+> i=1
+
+xi − E[x] ≤
+
+s
+
+2 bVn log(2 /δ )
+
+n + 7A
+
+3n log(2 /δ ).
+
+Lemma H.4 (Lemma F.4 in (Dann et al., 2017)) . Let Fi for i = 1 , · · · be a filtration and X1, · · · , X n be a sequence of Bernoulli random variables with P(Xi = 1 |Fi−1) = Pi with Pi being Fi−1-measurable and Xi being Fi measurable. It holds that 
+
+P
+
+"
+
+∃ n :
+
+> n
+
+X
+
+> t=1
+
+Xt <
+
+> n
+
+X
+
+> t=1
+
+Pt/2 − W
+
+#
+
+≤ e−W .
+
+25 Multi-Agent Reinforcement Learning with low Adaptivity 
+
+Lemma H.5. Let Fi for i = 1 , · · · be a filtration and X1, · · · , X n be a sequence of Bernoulli random variables with 
+
+P(Xi = 1 |Fi−1) = Pi with Pi being Fi−1-measurable and Xi being Fi measurable. It holds that 
+
+P
+
+"
+
+∃ n :
+
+> n
+
+X
+
+> t=1
+
+Xt <
+
+> n
+
+X
+
+> t=1
+
+Pt/2 − ι
+
+#
+
+≤ δHSABK ,
+
+where ι = log(2 HSABK/δ ).Proof of Lemma H.5. Directly plug in W = ι in lemma H.4. 
+
+Lemma H.6 (Lemma 1 in Zhang et al. (2022)) . Let d > 0 be an integer. Let X ⊂ (∆ d)m. Then there exists a distribution 
+
+D over X , such that 
+
+max 
+
+> x={xi}dm i=1 ∈X
+> dm
+
+X
+
+> i=1
+
+xi
+
+yi
+
+= md, 
+
+where y = {yi}dm i=1 = Ex∼D [x]. Moreover, if X has a boundary set ∂X with finite cardinality, we can find an approximation solution for D in poly( |∂X | ) time. 
+
+Lemma H.7 (Simulation lemma (Dann et al., 2017)) . For any two MGs M ′ and M ′′ with rewards r′ and r′′ and transition probabilities P′ and P′′ , the difference in values V ′, V ′′ with respect to the same policy pair (μ, ν ) can be written as 
+
+V ′
+
+> h
+
+(s) − V ′′  
+
+> h
+
+(s) = EM ′′ ,μ,ν 
+
+" HX
+
+> i=h
+
+[r′
+
+> i
+
+(si, a i, b i) − r′′  
+
+> i
+
+(si, a i, b i) + ( P′ 
+
+> i
+
+− P′′  
+
+> i
+
+)V ′
+
+> i+1
+
+(si, a i, b i)] | sh = s
+
+#
+
+.
+
+Lemma H.8. If for transition kernels P ′ and P ′′ , a constant ϵ > 0, a reward function r and policy sets ΠA, ΠB , it holds that for any (μ, ν ) ∈ ΠA × ΠB , |V μ,ν (r, P ′) − V μ,ν (r, P ′′ )| ≤ ϵ, then we have for all μ ∈ ΠA,
+
+inf 
+
+> ν∈ΠB
+
+V μ,ν (r, P ′) − inf 
+
+> ν∈ΠB
+
+V μ,ν (r, P ′′ ) ≤ ϵ. 
+
+As a result, it holds that 
+
+sup 
+
+> μ∈ΠA
+
+inf 
+
+> ν∈ΠB
+
+V μ,ν (r, P ′) − sup 
+
+> μ∈ΠA
+
+inf 
+
+> ν∈ΠB
+
+V μ,ν (r, P ′′ ) ≤ ϵ. 
+
+Proof of Lemma H.8. The lemma directly results from the property of sup and inf .26

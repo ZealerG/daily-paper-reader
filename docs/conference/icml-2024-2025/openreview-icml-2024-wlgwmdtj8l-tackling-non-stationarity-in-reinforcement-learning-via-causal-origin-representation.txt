@@ -1,0 +1,1570 @@
+Title: Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation
+
+URL Source: https://openreview.net/pdf?id=WLGWMDtj8L
+
+Number of Pages: 25
+
+Markdown Content:
+# Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+Wanpeng Zhang 1 Yilin Li 2 Boyu Yang 3 Zongqing Lu 1 4 
+
+## Abstract 
+
+In real-world scenarios, the application of rein-forcement learning is significantly challenged by complex non-stationarity. Most existing meth-ods attempt to model changes in the environment explicitly, often requiring impractical prior knowl-edge of environments. In this paper, we propose a new perspective, positing that non-stationarity can propagate and accumulate through com-plex causal relationships during state transitions, thereby compounding its sophistication and af-fecting policy learning. We believe that this chal-lenge can be more effectively addressed by implic-itly tracing the causal origin of non-stationarity. To this end, we introduce the Causal-Origin 
+
+REP resentation ( COREP ) algorithm. COREP primarily employs a guided updating mechanism to learn a stable graph representation for the state, termed as causal-origin representation. By lever-aging this representation, the learned policy ex-hibits impressive resilience to non-stationarity. We supplement our approach with a theoretical analysis grounded in the causal interpretation for non-stationary reinforcement learning, advocat-ing for the validity of the causal-origin represen-tation. Experimental results further demonstrate the superior performance of COREP over exist-ing methods in tackling non-stationarity problems. The code is available at https://github.com/PKU-RL/COREP. 
+
+## 1. Introduction 
+
+Rapid advancements in reinforcement learning (RL) (Kael-bling et al., 1996; Sutton & Barto, 2018) have led to signif-       
+
+> 1School of Computer Science, Peking University 2Center for Statistical Science, Peking University 3School of Data Science, Fudan University 4Beijing Academy of Artificial Intelligence. Cor-respondence to: Zongqing Lu <zongqing.lu@pku.edu.cn >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+icant performance gains in various domains (Silver et al., 2018; Mirhoseini et al., 2020). However, a common as-sumption in many RL algorithms is the stationarity of the environment, which can limit the applicability in real-world scenarios characterized by varying dynamics (Padakandla et al., 2020; Padakandla, 2021). Recent efforts in the meta-RL approaches (Finn et al., 2017) have attempted to tackle this by enabling algorithms to adapt to changes (Poiani et al., 2021). However, these methods struggle in the face of more complex and unpredictable environmental dynam-ics (Sodhani et al., 2022; Feng et al., 2022). Approaches like FN-VAE (Feng et al., 2022) and LILAC (Xie et al., 2020) have made strides towards improving RL algorithms in non-stationary environments by explicitly modeling the change factors of the environment. Nevertheless, they may not comprehensively capture the complexity of real-world non-stationarity. This gap highlights the need for a more robust approach to handle the intricacies of non-stationary environments in RL. In this paper, we propose a novel setting for efficiently tack-ling non-stationarity in RL from a new perspective inspired by the causality literature (Zhang et al., 2020; Huang et al., 2020). We contend that minor changes in dynamics can cause significant shifts in observations due to their propaga-tion through intricate causal relationships in the dynamics. Thus, we need to trace the “causal origin” of these changes. However, directly constructing a causal graph that captures such information is a significant challenge due to the in-herent instability in non-stationary environments (Strobl, 2019). To address this, we introduce the Causal-Origin Representation (COREP) algorithm. COREP employs a guided update mechanism, which enables the learning of a stable graph representation of state, termed as causal-origin representation . This representation aims to capture the un-derlying causal structure in a way that is resilient to the unpredictable changes characteristic of non-stationary envi-ronments, aiding RL algorithms to adapt and learn policies in such settings. Specifically, we first propose a novel formulation of non-stationarity in RL as the mixture of decomposed sub-environments. In this formulation, we rewrite dynamics functions using masks to represent causal relationships, as-1Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+sumed invariant within each sub-environment. However, identifying these causal relationships without prior knowl-edge of the sub-environments poses a significant challenge. To overcome this, we propose the environment-shared union graph that captures causal relationship information among state elements. This is achieved by combining Maximal Ancestral Graphs (MAGs) from each sub-environment. We also provide theoretical support for the feasibility of recov-ering this environment-shared union graph. To effectively learn the proposed graph representation, we design a dual graph structure comprising a core-graph and a general-graph. The core graph focuses on learning a graph representation that is stable to dynamic changes, guided by a TD (Temporal Difference) error based updating mechanism. While it concentrates on learning the most essential parts of the graph representation, some edge information might be overlooked. To address this, we employ a continuously updating general-graph to compensate for potential infor-mation loss and enhance the algorithm’s adaptability. By integrating the core-graph and general-graph, we can finally construct the causal-origin representation, providing a com-prehensive understanding of the environment’s dynamics and significantly mitigating the impact of non-stationarity problems in RL. Our main contributions can be summarized as follows: • We provide a causal interpretation for non-stationary RL and propose a novel setting that focuses on the causal relationships within states; • Based on the proposed formulation and setting, we de-sign a modular algorithm that can be readily integrated into existing RL algorithms; • We provide a theoretical analysis that offers both inspi-ration and theoretical support for our algorithm. Exper-imental results further demonstrate the effectiveness of our algorithm. 
+
+## 2. Preliminaries 
+
+Problem Formulation. Reinforcement learning prob-lems are typically modeled as Markov Decision Processes (MDPs), defined as a tuple (S, A, P, R, γ ), where S is the state space, A is the action space, P : S × A × S → [0 , 1] 
+
+represents the transition probability, R : S × A → R is the reward function, and γ ∈ [0 , 1) is the discount fac-tor. We may also use the form of a dynamics function: 
+
+s′ = f (s, a, ε ) when the environment is deterministic. Here, ε represents random noise. The goal of an agent in RL is to find a policy π : S → A that maximizes the expected cumulative discounted reward, defined as the value function V π (s) = Eπ [P∞ 
+
+> t=0
+
+γtrt|s0 = s], where rt is the reward at time step t.In non-stationary environments, the dynamics of the envi-ronment can change over time. Our goal is to learn a policy 
+
+π that can adapt to the non-stationary environment and still achieve high performance. For simplicity of notations, we provide theoretical analysis in the form of the deterministic dynamics function f .
+
+Causal Structure Discovery. Causal structure discovery usually aims at inferring causation from data, modeled with a directed acyclic graph (DAG) D = ( V, E ), where the set of nodes V includes the variables of interest, and the set of directed edges E contains direct causal effects between these variables (Pearl et al., 2000). The causal graph is a practical tool that relates the conditional indepen-dence relations in the generating distribution to separation statements in the DAG ( d-separation) through the Markov property (Lauritzen, 1996). If there exist unobserved con-founders in the dynamics, maximal ancestral graphs (MAGs) 
+
+M = ( V, D, B ) are often used to represent observed vari-ables by generalizing DAGs with bidirected edges which depicts the presence of latent confounders (Richardson & Spirtes, 2002). The sets D, B stand for directed and bidi-rected edges, respectively. We also provide the definition of the partial order , a ba-sic concept necessary for the theoretical analysis in the manuscript. A partial order, π, on a DAG is defined to represent a relationship between nodes where their order is not strictly defined but still satisfies three properties as follows: (1) Reflexivity: each node is related to itself i.e ., 
+
+A < π A; (2) Antisymmetry: if A < π B and B < π A, then 
+
+A =π B; (3) Transitivity: if A < π B and B < π C, then 
+
+A < π C. When this relationship between A and B is not defined, i.e ., neither A < π B nor B < π A, we refer to this case as A̸ ≶ B with π, or A̸ ≶π B.
+
+Graph Neural Networks (GNNs). GNNs are a class of neu-ral networks designed for graph-structured data (Scarselli et al., 2008; Zhou et al., 2020). Given a graph G = ( V, E ),GNNs aim to learn a vector representation for each node 
+
+v ∈ V or the entire graph G, leveraging the informa-tion of both graph structure and node features. GNNs generally follow the message passing framework (Bal-cilar et al., 2021). Layers in GNN can be formulated as 
+
+H(l) = σ  P  
+
+> s
+
+LsH(l−1) W (l)
+
+> s
+
+, where H(l) is the node representation outputted by the l-th layer, Ls is the s-th con-volution support which defines how the node features are propagated, W (l) 
+
+> s
+
+is learnable parameters for the s-th con-volution support in the l-th layer, and σ(·) is the activation function. Graph Attention Network (GAT) (Veli ˇckovi ´c et al., 2017) is a special type of GNN following the message pass-ing framework. Instead of handcrafting, the self-attention mechanism is used to compute the support convolutions in each GAT layer, where the adjacency matrix plays the role of a mask matrix for computing the attention. 2Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## 3. Methodology 
+
+3.1. Motivation and Key Idea 
+
+In the COREP algorithm, the primary goal is to tackle non-stationarity problems in RL by learning the underlying graph structure of the environment, which we term causal-origin representation . This representation strives to be both causal, meaning it can reflect the cause-effect relationships among state elements, and stable, meaning it is robust to the en-vironment’s changes. To achieve this, we design a dual GAT structure consisting of a core-GAT and a general-GAT. The core-GAT focuses on learning the stable part of the environment’s causal graph, with its learning guided by a specific updating mechanism. The general-GAT, on the other hand, is continually updated to capture any additional information that the core-GAT might overlook. Together, these two GATs form a comprehensive understanding of the environment. Specifically, in constructing the causal-origin representation, we first transform the states of the environment into node features and create a weighted adjacency matrix to represent the connections between these features. We then apply a self-attention mechanism, which helps the algorithm focus on the most relevant parts of each node. The update of the core-GAT is guided by a TD error detection mechanism, which helps identify the most significant changes in the environment. To further enhance learning efficiency, we integrate the causal-origin representation into a Variational Autoencoder (VAE) framework (Kingma & Welling, 2013). Additionally, we introduce regularization terms to improve the identifiability of causal relationships and to ensure the structural integrity of the causal-origin representation. The overall framework is shown in Figure 2. 
+
+3.2. Causal Interpretation of Non-Stationary RL 
+
+In this part, we will propose a causal interpretation of non-stationarity in RL, which provides us with inspiration and theoretical support for the algorithm design. First, for the standard dynamics function s′ = f (s, a, ε ) in RL, in or-der to better discuss the relationship between elements, we rewrite it as 
+
+s′ 
+
+> i
+
+= f (cssi ⊙ s, casi ⊙ a, ε ) ,
+
+s′ =  s′
+
+> 1
+
+, . . . , s ′
+
+> ds
+
+ , (3.1) where s denotes the state with dimension ds, s′ 
+
+> i
+
+is the i-th element of next state s′, ε is random noise, and ⊙ denotes the Hadamard product (element-wise product). The masks 
+
+c·s represent the structural dependence among elements in the following way, e.g ., the j-th element of cssi ∈ { 0, 1}ds
+
+equals 1 if and only if sj causally affects si. Similarly, casi
+
+is also defined in the same way. In particular, if only the i-th element in ci·s equals 1 and all others are 0, it represents that each element only causally affects itself. In this case, Equation (3.1) simplifies to a standard dynamics function. As mentioned before, when the environment becomes non-stationary, the causal relationships between elements be-come more intricate. In addition to the relationships between states and actions, there may also be external factors causing environmental changes. These factors can have causal rela-tionships with both state and action, yet are not explicitly considered in Equation (3.1). Intuitively, we assume the presence of hidden states h in the dynamics. Similarly, we define the underlying dynamics function: 
+
+h′ 
+
+> i
+
+= g  chhi ⊙ h, cshi ⊙ s, cahi ⊙ a, ε  ,
+
+h′ =  h′
+
+> 1
+
+, . . . , h ′
+
+> dh
+
+ . (3.2) Considering the influence of the hidden state, the reward function can be similarly rewritten as: 
+
+r = R  csr ⊙ s, chr ⊙ h, car ⊙ a, ε  . (3.3) The masks can be combined into matrix form as C·s := [c·si ]ds
+
+> i=1
+
+, C·h := [ c·hi ]dh
+
+> i=1
+
+. Some previous work as-sumed that similar masks are invariant over time, and simply encoded them into some change factors (Huang et al., 2022). Instead, we allow such C·· to be time-varying, and pro-pose a novel causal interpretation based on an environment-shared union graph representation to capture the transition information in the non-stationary environment. With the defined underlying dynamics, we can represent the non-stationarity as being governed by specific causal rela-tionships. Specifically, we regard a non-stationary environ-ment as a mixture of various stationary sub-environments. The non-stationarity is thus interpreted as changes over time in the mixture distribution of these sub-environments. 
+
+It’s important to emphasize that the interpretation of non-stationarity serves primarily as theoretical insight. In prac-tical algorithm designs, we leverage this property in an approximate manner and do not require the environment to be explicitly decomposed into sub-environments. 
+
+When considering a sample from the k-th sub-environment, the defined masks C·· 
+
+> (k)
+
+are used to represent invariant rela-tionships within that sub-environment, meaning the current mask C·· 
+
+> current
+
+= C·· 
+
+> (k)
+
+. The relationships among variables such as states, actions, and hidden states, are character-ized by DAGs D(k) = ( V, E (k)) over the same node set 
+
+V = {s, h, a, s′, h′, a′, r, e }. Here, e represents the en-vironment label with an in-degree of 0, and E(k) is the set of directed edges in each DAG. Edges in E(k) are deter-mined by corresponding masks, i.e ., an edge from node vi to 
+
+vj (vi, v j ∈ V ) exists in E(k) if and only if cvivj 
+
+> (k)
+
+= 1 . Ad-ditionally, E(k) also includes edges from e to (s, h), which are subject to variation across different sub-environments. 3Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+In this setting, non-stationarity is reflected by the changes in the underlying graph structure of these DAGs. To better understand the causal interpretation, we provide an example case involving two sub-environments, as shown in Figure 1. This illustrates how the proposed union graph structure effectively captures the non-stationarity in the en-vironment. For more detailed explanations, please refer to Appendix A. Additionally, a toy example is provided in Appendix B to further explain this concept. 
+
+3.3. Union Graph of the Causal Structure 
+
+In the context of the above causal interpretation, a signifi-cant challenge arises when learning the structure of a causal graph without access to the environment label e, which can be considered a latent confounder that leads to spurious correlations. In the presence of unobservable nodes, max-imal ancestral graph (MAG) is a useful tool to generalize DAGs (Richardson & Spirtes, 2002). For each environment-specific DAG D(k), we can construct a corresponding MAG 
+
+M(k) (Sadeghi, 2013), as outlined in Algorithm A.1. In these MAGs, bidirected edges ( ↔) are used to characterize the change of marginal distribution of s, h over different sub-environments. To model structural relationships in non-stationary RL with a unified approach, we further encode the relations among all actions, states, hidden states, and rewards with an environment-shared union graph M∪, as defined by Definition 3.1 below. 
+
+Definition 3.1 (Environment-shared union graph) . The environment-shared union graph M∪ := ( V, D, B ) has the set of nodes V , the set of directed edges 
+
+D = {u → v : u, v ∈ V, ∃k such that u → v in M(k)},
+
+and the set of bidirected edges 
+
+B = {u ↔ v : u, v ∈ V, ∃k such that u ↔ v in M(k)}.
+
+The above defined union graph M∪ contains no cycle be-cause Equation (3.1-3.3) implies that there exists a common topological ordering for D(k) , see Appendix A for details. Without knowing the label of the k-th sub-environment, we cannot generally identify the structure of M(k) for each k
+
+from the observed data. However, we can show that M∪
+
+is still a MAG, hence any non-adjacent pair of nodes is 
+
+d-separated given some subset of nodes. 
+
+Proposition 3.2. Suppose that the dynamics follows Equa-tion (3.1-3.3), then there exists a partial order π on V such that (a) u is an ancestor of v ⇒ u < π v in M(k); and (b) u ↔ v ⇒ u̸ ≶π v in M(k). As a consequence, the environment-shared union graph M∪ is a MAG. 
+
+We provide the complete proofs and a detailed explana-tion of conditions in Appendix A. Proposition 3.2 pro-vides theoretical support for recovering the structure of the    
+
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (a) MAG M(1) .
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (b) MAG M(2) .
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (c) Union graph M∪
+
+Figure 1. MAG representations for two sub-environments and their union graph. In this example, the union graph is capable of repre-senting all possible kinds of causal relationships within the chang-ing dynamics. More explanations can be found in Appendix A. 
+
+environment-shared union graph M∪. In the following sec-tions, we will describe how the COREP algorithm learns a policy that is stable under non-stationarity by utilizing the environment-shared representation union graph M∪.
+
+3.4. Dual Graph Attention Network Structure 
+
+In this section, we will focus on the structure design. The detailed update mechanism will be discussed in Section 3.6. In line with Proposition 3.2, our objective is to efficiently learn the causal-origin representation, which encapsulates the environment-shared union graph M∪. To achieve this, we design a dual GAT structure comprising a core-GAT and a general-GAT. The core-GAT is specifically designed to learn a stable graph representation that aligns with the environment-shared union graph. For this purpose, we use TD error as a simple yet effective detector for significant changes in the environment’s underlying graph structure. This approach enables selective updates to the core-GAT, en-suring it responds only to significant environmental changes, thereby eliminating the need for explicit recognition of such changes as often required by existing work (Sutton et al., 2007). Additionally, it facilitates the approximate learning of the environment-shared union graph. While the core-GAT focuses on learning the stable part of the graph representation, some edges may be overlooked or lost in the process. To compensate for this potential loss of information and to enhance the algorithm’s adaptation capa-bilities, we introduce a continuously updating general-GAT. By integrating both the core-GAT and the general-GAT, we can construct the causal-origin representation to pro-vide a comprehensive understanding of the environment’s dynamics for the policy and mitigating the impact of non-stationarity in RL. 4Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation Graph Module 
+
+Latent: 
+
+Decoder 
+
+Feature Network 
+
+core 
+
+GAT 
+
+general 
+
+GAT 
+
+Environment 
+
+COREP 
+
+Framework 
+
+Policy Optimization 
+
+> generate
+> adjacency
+
+recent TD: 
+
+Encoder 
+
+> Sampling:
+> unfreeze
+> graph change
+> detection
+> freeze
+
+Figure 2. Overview of the COREP framework. (1) The left part illustrates that the COREP framework can be seamlessly incorporated into any RL algorithm. It takes the state as input and outputs the causal-origin representation for policy optimization. (2) The middle part shows the VAE structure employed by the COREP framework, which is utilized to enhance the learning efficiency. (3) The right part highlights the key components of COREP. The dual GAT structure is designed in line with the concept of causal-origin representation to retain the essential parts of the graph. The TD error detection can guide the core-GAT to learn the environment-shared union graph based on our theory. The general-GAT is continuously updated to compensate for the potential loss of information. 
+
+Specifically, we first transform states into node features us-ing an MLP network fMLP : Rds → RN ·df and reshape the output into node feature matrix X = {x1, x2, . . . , xN } ∈ 
+
+RN ×df , where N is the number of nodes, and df is the num-ber of features in each node. We then compute the weighted adjacency matrix which represents the probabilities of edges by using Softmax on the similarity matrix of nodes: 
+
+AX = Softmax  XX T ⊙ (1N − IN ) , (3.4) where 1N ∈ RN ×N represents the matrix with all elements equal to 1, IN ∈ RN ×N represents the identity matrix, and 
+
+⊙ denotes the Hadamard product. Multiplying (1N − IN )
+
+is for removing the self-loop similarity when computing the weighted adjacency matrix. Then a learnable weight matrix W ∈ Rdf ×dg is applied to the nodes for transforming X into graph features XW ∈
+
+RN ×dg where dg denotes the dimension of the graph feature. We then perform the self-attention mechanism on the nodes: 
+
+αij = attention( xiW , xj W |AX ). (3.5) The conditioned AX allows us to perform the masked at-tention, i.e ., we only compute αij for node j ∈ Ni(AX )
+
+where Ni(AX ) is the neighbor set of node i computed by the weighted adjacency matrix AX . This helps us con-sider deeper-depth neighbors of each node by combining multiple attention( ·) into a multi-layer network. For the 
+
+n-th graph attention layer, the coefficients computed by the self-attention mechanism can be specifically expressed as: 
+
+αij =
+
+δNi(AX )(j) · exp 
+
+
+
+σ
+
+
+
+ln [xiW ⊕ xj W ]T P  
+
+> k∈Ni(AX)
+
+exp 
+
+
+
+σ
+
+
+
+ln [xiW ⊕ xkW ]T ,
+
+(3.6) where ⊕ is the concatenation operator, σ is the activation function, ln ∈ R2dg is the learnable weight for the n-th graph attention layer, and δNi(AX )(j) is the indicator func-tion, i.e ., δNi(AX )(j) = 1 if j ∈ Ni(AX ) otherwise 0.Subsequently, the resulting features are concatenated to form the graph node: 
+
+gi = σ
+
+ X 
+
+> j∈Ni(AX)
+
+αij xj W
+
+
+
+. (3.7) The respective outputs of the core-GAT and the general-GAT, i.e ., Gcore 
+
+.
+
+= {g1, g2, . . . , gN }T
+
+> core
+
+, Ggeneral 
+
+.
+
+=
+
+{g1, g2, . . . , gN }T
+
+> general
+
+, are concatenated to form the final causal-origin representation. Specifically, we denote the entire process of obtaining the causal-origin representa-tion from s as a function G : Rds → RN ×2dg , such that 
+
+G(s) .
+
+= Gcore ⊕ Ggeneral .We finally feed G(s) into a VAE inference process to derive the latent representation h. More details about this process are discussed in Section 3.5. The latent h is then provided to the policy π(a|s, h) for policy optimization. COREP does not restrict the choice of policy optimization algorithms. In our implementation, we choose the standard PPO algorithm (Schulman et al., 2017) for policy optimization. 5Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+3.5. Incorporation with VAE 
+
+To improve the efficiency of learning the causal-origin rep-resentation, we incorporate the causal-origin representa-tion into the Variational AutoEncoder (VAE) framework (Kingma & Welling, 2013). Specifically, we feed the output 
+
+G(s) into the VAE inference process to derive the mean and variance (μh, σ h) of the latent representation h. Sub-sequently, we can sample h ∼ N (μh, σ h), h ∈ Rdh . The loss function for VAE is defined as 
+
+LVAE (s; θ, ϕ )= Eqϕ(h|G(s)) [log pθ (G(s)|h)] − KL [ qϕ(h|G(s)) || p(h)] 
+
+≈ MSE( s, ˆs) − KL [ qϕ (h|G(s)) ||N (0 , I)] ,
+
+(3.8) where pθ , q ϕ represent the parameterized decoder and encoder respectively, KL( ·) denotes the Kullback-Leibler divergence, and MSE( s, ˆs) is an estimation of 
+
+Eqϕ(h|G(s)) [log pθ (G(s)|h)] which measures the mean square error between the original state and the reconstructed state with the causal-origin representation. It is noteworthy that the VAE structure serves solely as a tool to enhance learning efficiency, therefore it is not a strictly necessary component of our method . The latent h is then provided to the policy π(a|s, h) for policy optimization. 
+
+3.6. Guided Updating for Core-GAT 
+
+As discussed in Section 3.4, to learn the causal-origin repre-sentation encapsulating the environment-shared union graph 
+
+M∪, we design a TD error-based detection mechanism to guide the update of core-GAT. Specifically, we store the TD errors of policy optimization into a buffer and com-pute the mean of recent TD errors, denoted as δα. Here, α
+
+controls the proportion of recent TD errors for detection. We then check whether δα lies within the confidence inter-val (μδ − ησ δ , μ δ + ησ δ ), where μδ , σ δ are the mean and standard deviation of the TD buffer, and η represents the confidence level. If the recent TD error δα lies within this interval, we freeze the weights of the core-GAT and halt its updates; otherwise, we unfreeze its weights and proceed with updating the core-GAT. We further introduce a regularization that penalizes the dif-ference between the output adjacency matrices of the two GATs to guide the learning of the core-GAT: 
+
+Lguide = ∥Acore − Ageneral ∥2. (3.9) To enhance the identifiability, we introduce the regulariza-tion for the MAG structure and sparsity: 
+
+LMAG = ∥Acore − AT
+
+> core
+
+∥2 + ∥Ageneral − AT
+
+> general
+
+∥2,
+
+Lsparsity = ∥Acore ∥1 + ∥Ageneral ∥1.
+
+(3.10) The LMAG can penalize asymmetry in the adjacency matri-ces of both the core and general graphs, ensuring alignment with the design of MAGs which utilize bidirected edges to characterize the change of marginal distribution of s, h
+
+across different sub-environments. The Lsparsity can encour-age a sparse representation, which is crucial for maintaining a manageable and interpretable graph structure. We finally compute the total loss function Ltotal as shown in Equation (3.11), combining the policy optimization objec-tive Lpolicy with the regularization loss functions: 
+
+Ltotal = Lpolicy + λ1Lguide + λ2(LMAG + Lsparsity + LVAE ),
+
+(3.11) where LVAE is calculated according to Equation (3.8). It is important to note that, despite the presence of multiple regularization terms, we simplify the objective by aggregat-ing these terms based on their magnitudes, setting only two hyperparameters. Empirical results also demonstrate that COREP does not rely on complex parameter tuning. By computing and backpropagating the gradient of Ltotal ,along with the policy optimization in an end-to-end manner, COREP prevents the distinct loss functions from leading to irregular causal structures and ensures that the policy learned can effectively tackle non-stationarity problems in RL. The detailed steps of COREP are outlined in Algorithm C.1. Implementation details are shown in Appendix C. 
+
+## 4. Experiments 
+
+In this section, our objective is to thoroughly evaluate the COREP algorithm by addressing three key questions: (1) How effective is COREP in tackling non-stationarity? (2) What specific contribution does each component of COREP make to its overall performance? (3) Can COREP maintain consistent performance across various degrees and settings of non-stationarity? To answer these questions, we conduct various experiments and provide corresponding analyses. Due to the page limitation, only parts of these experiments are presented in the main manuscript. For complete results, further analysis, and implementation details, please refer to Appendix C and D. To ensure reproducibility, we include our code in the supplementary material. 
+
+Baselines. We compare COREP with the following base-lines: FN-VAE (Feng et al., 2022), VariBAD (Zintgraf et al., 2019), and PPO (Schulman et al., 2017). FN-VAE is the SOTA method for tackling non-stationarity, VariBAD is one of the SOTA algorithms in meta-RL that also has certain capabilities in handling non-stationarity, and PPO is a clas-sical algorithm known for its strong stability. Furthermore, to examine the performance degradation caused by non-stationarity, we include an Oracle that has full access to non-stationarity information. 6Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 0 0.5 1 1.5 2                                        
+
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> Return
+> Cartpole Swingup
+> 01234
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Reacher Hard
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Cup Catch
+> 012345
+> Step (×10 6)
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> 600
+> 700
+> 800
+> Cheetah Run
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> Return
+> Swimmer Swimmer6
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Finger Spin
+> 0123456
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Fish Upright
+> 0246810
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Quadruped Walk
+> COREP VariBAD FN-VAE PPO PPO (convergence) Oracle
+
+Figure 3. Learning curves of our COREP algorithm and other baselines in different tasks. Solid curves indicate the mean of all trials with 5 different seeds. Shaded regions correspond to the standard deviation among trials. Dashed lines represent the asymptotic performance of PPO and Oracle. 
+
+Environment settings. The experiments are conducted on various environments from the DeepMind Control Suite (Tassa et al., 2018), which is a widely used benchmark for RL algorithms. We modify the environments to introduce non-stationarity, enabling a comprehensive evaluation of COREP. In our settings, similar to prior work FN-VAE, we introduce periodic noises to the environmental dynamics to represent non-stationarity. To support our claim that COREP can handle more complex non-stationarity, we design a more intricate setting, i.e ., we randomly sample the coefficients for both within-episode and across-episode non-stationarity at every time step. Specifically, our modification can be expressed as: 
+
+s′ = f (s, a ) + f (s, a ) · αd
+
+ct 
+
+> 1
+
+cos( ct 
+
+> 2
+
+· t) + ci 
+
+> 3
+
+sin( ci 
+
+> 4
+
+· i) .
+
+(4.1) Here, αd controls the overall degree of non-stationarity, and 
+
+ctk, c ik ∼ N (0 .5, 0.5) represent the changing coefficients of within-episode and across-episode non-stationarity, re-spectively. This design generates various combinations of non-stationarity for each time step and episode, posing more significant challenges to our COREP algorithm and the com-pared baselines. 
+
+Performance. As illustrated in Figure 3, COREP outper-forms all baselines across various environments, showcas-ing consistent performances in the face of non-stationarity. Notably, in complex environments such as Swimmer Swim-mer6, Fish Upright, and Quadruped Walk , COREP not only achieves higher performance but also exhibits smaller vari-ances. This indicates its strong resilience and adaptability to intricate non-stationary environments. Comparatively, VariBAD demonstrates certain resistance to non-stationarity due to its adaptive capabilities. How-ever, the large variances indicate a lack of stability in non-stationary settings. The FN-VAE method, which explicitly models the change factors, shows competitive performance in simpler environments but struggles to maintain consis-tency in more complex scenarios, underscoring its limita-tions in handling more challenging non-stationarity. Fur-thermore, the narrow performance gap between COREP and Oracle indicates the effectiveness of COREP in reducing the impact of non-stationarity on performance. 
+
+Ablation study. We conduct ablation studies to analyze the contribution of each component in COREP. To ensure con-sistency in our conclusion, the experiments are conducted under various non-stationarity settings: within-episode & across-episode (labeled as W+A-EP), within-episode (W-EP), and across-episode (A-EP) non-stationarities. As depicted in Figure 4(a), removing all COREP-specific de-signs and retaining only the VAE process (the ‘w/o COREP’ variant) results in substantial decreases in performance. This highlights the overall effectiveness of our designs. 7Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation (W+A)-EP W-EP A-EP      
+
+> 0.825
+> 0.850
+> 0.875
+> 0.900
+> 0.925
+> 0.950
+> 0.975
+> 1.000
+> normalized return
+> Cheetah Run
+> (W+A)-EP W-EP A-EP
+> 0.65
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> Swimmer Swimmer6
+> Full
+> w/o COREP
+> w/o VAE
+> w/o guide
+> w/o sparsity
+> w/o MAG
+> single GAT
+
+(a) Ablation study. 0.2 0.6 1.0 1.4 1.8        
+
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> Cheetah Run
+> 0.2 0.6 1.0 1.4 1.8
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+> Swimmer Swimmer6
+> COREP VariBAD FN-VAE PPO
+
+(b) Different degrees of non-stationarity. 
+
+Figure 4. Mean returns of 3 different trials with: (a) different com-ponents and non-stationarity settings. Returns are normalized to the full version of COREP in each environment; (b) different de-grees of non-stationarity. Returns are normalized to the COREP algorithm with standard degree 1.0.
+
+In the single GAT variant, which maintains the same net-work structure without introducing a secondary GAT and corresponding update mechanisms, we observe a significant performance gap compared to the full COREP. This result indicates that merely incorporating a graph representation is insufficient for capturing non-stationarity information effectively. The removal of the TD error detection mechanism (the ‘w/o Lguide ’ variant) lead to considerable performance drops, further substantiating the importance of the guided update mechanism in COREP. These results demonstrate the effectiveness and necessity of the two key designs in our method ( i.e ., the dual GAT structure and the guided update mechanism) in tackling non-stationarity. Additionally, the results also show that the regularization terms LMAG and Lsparse play important roles in enhancing COREP’s ability to handle non-stationarity. Furthermore, the inclusion of the VAE process in COREP is found to be effective in improving the performance as expected. 
+
+Different degrees of non-stationarity. 
+
+We further investigate the impact of varying degrees of non-stationarity in the environment, as depicted in Figure 4(b). The results suggest that the compared baselines are more affected by the degree of non-stationarity. Contrastively, COREP exhibits consistent performance when encountering different degrees of non-stationarity, further demonstrating our claim that COREP can effectively tackle more complex non-stationarity. 
+
+Visualization. To visualize the graph structure learned by COREP, we respectively show the weighted adjacency ma-trix of core-GAT and general-GAT in Cheetah Run and 
+
+Walker Walk . Please refer to Section D.6 for more details. It can be seen that core-GAT focuses more on a few core nodes in its learned graph structure, while general-GAT compensates for some overlooked detailed information by core-GAT. The results align well with our claim made in Section 3.1. 
+
+Hyperparameter study. We conduct additional experi-ments to study COREP’s sensitivity to the hyperparameters 
+
+λ1, λ 2 in the objective function (3.11). Results are shown in Appendix D.7, indicating that the performance of COREP is not sensitive to the hyperparameters. Even with extensive adjustments to λ1, λ 2, COREP consistently surpasses the SOTA baseline. Notably, we observe instances in certain environments with higher performance than default. This suggests that with more precise tuning, there is potential to further enhance COREP’s effectiveness. These findings suggest that COREP’s superior performance is largely at-tributed to its designs rather than relying on hyperparameter tuning. 
+
+## 5. Related Work 
+
+Non-stationary RL. Pioneering research in non-stationary RL primarily focused on directly detecting changes that had already occurred (Da Silva et al., 2006), rather than anticipating them. Various methods have been developed to anticipate changes in non-stationary RL settings. For example, Prognosticator (Chandak et al., 2020) tried to maximize future rewards without explicitly modeling non-stationary environments, while MBCD (Alegre et al., 2021) employed change-point detection to determine whether an agent should learn a new policy or reuse existing ones. How-ever, these methods with change-point detection may not work well in complex non-stationary environments and of-ten requires providing priors. In cases where the evolution of non-stationary environ-ments can be represented as a Semi-Markov chain, Hid-den Markov-MDPs or Hierarchical Semi-Markov Decision Processes can be employed to address non-stationarity prob-lems (Choi et al., 1999; Hadoux et al., 2014). Some later 8Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+work attempts to resist non-stationarity by leveraging the generalization of meta-learning (Finn et al., 2017). For example, Adaption via Meta-learning (Al-Shedivat et al., 2017) integrated continuous adaptation into the learning-to-learn framework to solve the non-stationarity problems. TRIO (Poiani et al., 2021) tracked non-stationarity by in-ferring the evolution of latent parameters, capturing the temporal change factors during the meta-testing phase. Gr-BAL (Nagabandi et al., 2018) meta-trained dynamic priors, enabling efficient adaptation to local contexts. However, these methods require the pre-definition of non-stationary tasks and subsequent meta-training on them. In real-world scenarios, though, we cannot access such infor-mation about the non-stationarity. An alternative line of research directly tries to learn latent representations to cap-ture non-stationary components, leveraging latent variable models to directly model change factors in environments or estimating latent vectors describing the non-stationary aspects of dynamics. Specifically, LILAC (Xie et al., 2020) regarded the change factor as a latent variable and explicitly modeled the latent MDP. FN-VAE (Feng et al., 2022) modeled multiple latent variables of non-stationarities to achieve better performance. However, in real-world scenarios, non-stationarity itself is often more complex. Simply modeling the latent dynamics may not solve such complex scenarios well. Interpreting nonstationarity from a causal perspective is another novel approach. In addition, some work learns controllers on a collection of pre-defined stationary environments (Provan et al., 2022; Deng et al., 2022; Zhang & Li, 2019), which can get a guar-anteed controller for any mixture of these stationary envi-ronments, thereby improving performance in more complex environments. Although our method theoretically treats non-stationary environments as mixtures of sub-environments in a similar way, we use a more elegant update mechanism in practical design to ensure that our method is applicable to continuously changing environments. Some other research (Saengkyongam et al., 2023) seeks to identify an invariant causal structure to mitigate the impact of non-stationarity, presenting similarities to our approach. However, their methodology relies on offline data and has been tested solely in simple contextual Bandits environ-ments. In contrast, our COREP algorithm is capable of online learning and addresses non-stationarity in more com-plex environments. 
+
+Causal structure learning. Various approaches for learning causal structure from observed data have been proposed, see (Vowels et al., 2022) for a review. These approaches mainly fall into two broad categories: constraint-based methods and score-based methods. The constraint-based methods check the existence of edges by performing conditional independence tests between each pair of variables, e.g . PC (Spirtes et al., 2000), IC (Pearl et al., 2000), and FCI (Spirtes et al., 1995; Zhang, 2008). In contrast, score-based methods generally view causal structure learning as a combinatorial optimization problem, and measure the goodness of fit of graphs over the data with a score, then optimize such score to find an optimal graph or equivalent classes (Chickering, 2002; Koivisto & Sood, 2004; Silander & Myllym ¨aki, 2006; Cussens et al., 2017; Huang et al., 2018). Recently, some gradient-based methods that transform the discrete search into a continuous optimization by relaxing the space over DAGs have been proposed. These meth-ods allow for applying continuous optimizations such as gradient descent to causal structure learning. For example, NOTEARS (Zheng et al., 2018) reformulated the structure learning problem as a continuous optimization problem, and ensured acyclicity with a weighted adjacency matrix. DAG-GNN (Yu et al., 2019) proposed a generative model pa-rameterized by a GNN and applied a variant of the structural constraint to learn the DAG. Some researchers (Saeed et al., 2020) considered the distribution arising from a mixture of causal DAGs, used MAGs to represent DAGs with unob-served nodes, and showed the identifiability of the union of component MAGs. 
+
+## 6. Conclusions, Limitations and Future Work 
+
+In this work, we first offer a novel interpretation of non-stationarity in RL, characterizing it through the union of MAGs. This new perspective has inspired us to design the COREP algorithm, which features a dual GAT structure and an update mechanism guided by TD-error detection. Focusing on the causal relationships whthin the dynamics, COREP learns a causal-origin representation that remains stable amidst changes in the environment, effectively ad-dressing non-stationarity problems in RL. Our theoretical analysis offers both inspiration and foundational support for COREP. Furthermore, experimental results from various non-stationary environments demonstrate the efficacy of our algorithm. However, the COREP algorithm does face certain limita-tions, particularly scalability issues in high-dimensional state spaces due to the computationally intensive nature of its graph-based representation. In our future work, we aim to overcome these challenges by integrating the causal-origin representation with other types of latent variable models, such as normalizing flows and probabilistic graphical mod-els. This is expected to enhance both the scalability and the performance, making COREP more applicable in real-world scenarios. 9Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## Acknowledgements 
+
+This work was supported in part by NSF China under grant 62250068. The authors would like to thank the anonymous reviewers for their valuable feedback and suggestions. 
+
+## Impact Statement 
+
+This research in machine learning, especially through the COREP algorithm, offers potential benefits for enhancing the decision-making abilities of agents in complex and un-predictable environments, such as robot control and au-tonomous driving. However, it is crucial to be aware of ethical implications, including data privacy, algorithmic bias, and the security of these systems. Future research should focus on developing transparent and safe algorithms for real-world scenarios. 
+
+## References 
+
+Al-Shedivat, M., Bansal, T., Burda, Y., Sutskever, I., Mor-datch, I., and Abbeel, P. Continuous adaptation via meta-learning in nonstationary and competitive environments. 
+
+arXiv preprint arXiv:1710.03641 , 2017. Alegre, L. N., Bazzan, A. L., and da Silva, B. C. Minimum-delay adaptation in non-stationary reinforcement learning via online high-confidence change-point detection. arXiv preprint arXiv:2105.09452 , 2021. Balcilar, M., Renton, G., H ´eroux, P., Ga ¨uz `ere, B., Adam, S., and Honeine, P. Analyzing the expressive power of graph neural networks in a spectral perspective. In 9th International Conference on Learning Representations, ICLR 2021, Virtual Event, Austria, May 3-7, 2021 . Open-Review.net, 2021. Chandak, Y., Theocharous, G., Shankar, S., White, M., Mahadevan, S., and Thomas, P. Optimizing for the future in non-stationary mdps. In International Conference on Machine Learning , pp. 1414–1425. PMLR, 2020. Chickering, D. M. Optimal structure identification with greedy search. Journal of machine learning research , 3 (Nov):507–554, 2002. Choi, S., Yeung, D.-Y., and Zhang, N. An environment model for nonstationary reinforcement learning. Ad-vances in neural information processing systems , 12, 1999. Cussens, J., Haws, D., and Studen `y, M. Polyhedral aspects of score equivalence in bayesian network structure learn-ing. Mathematical Programming , 164:285–324, 2017. Da Silva, B. C., Basso, E. W., Bazzan, A. L., and Engel, P. M. Dealing with non-stationary environments using context detection. In Proceedings of the 23rd interna-tional conference on Machine learning , pp. 217–224, 2006. Deng, X., Zhang, Y., and Qi, H. Towards optimal hvac con-trol in non-stationary building environments combining active change detection and deep reinforcement learning. 
+
+Building and environment , 211:108680, 2022. Feng, F., Huang, B., Zhang, K., and Magliacane, S. Fac-tored adaptation for non-stationary reinforcement learn-ing. In Oh, A. H., Agarwal, A., Belgrave, D., and Cho, K. (eds.), Advances in Neural Information Processing Systems , 2022. Finn, C., Abbeel, P., and Levine, S. Model-agnostic meta-learning for fast adaptation of deep networks. In Interna-tional conference on machine learning , pp. 1126–1135. PMLR, 2017. Hadoux, E., Beynier, A., and Weng, P. Solving hidden-semi-markov-mode markov decision problems. In Scalable Uncertainty Management: 8th International Conference, SUM 2014, Oxford, UK, September 15-17, 2014. Pro-ceedings 8 , pp. 176–189. Springer, 2014. Huang, B., Zhang, K., Lin, Y., Sch ¨olkopf, B., and Glymour, C. Generalized score functions for causal discovery. In 
+
+Proceedings of the 24th ACM SIGKDD international con-ference on knowledge discovery & data mining , pp. 1551– 1560, 2018. Huang, B., Zhang, K., Zhang, J., Ramsey, J., Sanchez-Romero, R., Glymour, C., and Sch ¨olkopf, B. Causal discovery from heterogeneous/nonstationary data. The Journal of Machine Learning Research , 21(1):3482–3534, 2020. Huang, B., Feng, F., Lu, C., Magliacane, S., and Zhang, K. AdaRL: What, where, and how to adapt in transfer reinforcement learning. In International Conference on Learning Representations , 2022. Kaelbling, L. P., Littman, M. L., and Moore, A. W. Re-inforcement learning: A survey. Journal of artificial intelligence research , 4:237–285, 1996. Kingma, D. P. and Welling, M. Auto-encoding variational bayes. arXiv preprint arXiv:1312.6114 , 2013. Koivisto, M. and Sood, K. Exact bayesian structure dis-covery in bayesian networks. The Journal of Machine Learning Research , 5:549–573, 2004. Lauritzen, S. L. Graphical models , volume 17. Clarendon Press, 1996. 10 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+Mirhoseini, A., Goldie, A., Yazgan, M., Jiang, J. W., Songhori, E., Wang, S., Lee, Y.-J., Johnson, E., Pathak, O., Nazi, A., et al. A graph placement methodology for fast chip design. Nature , 594(7862):207–212, 2020. Nagabandi, A., Clavera, I., Liu, S., Fearing, R. S., Abbeel, P., Levine, S., and Finn, C. Learning to adapt in dynamic, real-world environments through meta-reinforcement learning. arXiv preprint arXiv:1803.11347 , 2018. Padakandla, S. A survey of reinforcement learning algo-rithms for dynamically varying environments. ACM Com-puting Surveys (CSUR) , 54(6):1–25, 2021. Padakandla, S., KJ, P., and Bhatnagar, S. Reinforcement learning algorithm for non-stationary environments. Ap-plied Intelligence , 50:3590–3606, 2020. Pearl, J. et al. Models, reasoning and inference. Cambridge, UK: Cambridge University Press , 19(2), 2000. Poiani, R., Tirinzoni, A., and Restelli, M. Meta-reinforcement learning by tracking task non-stationarity. In Zhou, Z.-H. (ed.), Proceedings of the Thirtieth In-ternational Joint Conference on Artificial Intelligence, IJCAI-21 , pp. 2899–2905. International Joint Confer-ences on Artificial Intelligence Organization, 8 2021. doi: 10.24963/ijcai.2021/399. Main Track. Provan, G., Quinones-Grueiro, M., and Soh ´ege, Y. Towards real-time robust adaptive control for non-stationary envi-ronments. IFAC-PapersOnLine , 55(6):73–78, 2022. Richardson, T. and Spirtes, P. Ancestral graph markov models. The Annals of Statistics , 30(4):962–1030, 2002. Sadeghi, K. Stable mixed graphs. Bernoulli , 19(5B):2330– 2358, 2013. Saeed, B., Panigrahi, S., and Uhler, C. Causal structure discovery from distributions arising from mixtures of dags. In International Conference on Machine Learning ,pp. 8336–8345. PMLR, 2020. Saengkyongam, S., Thams, N., Peters, J., and Pfister, N. Invariant policy learning: A causal perspective. IEEE Transactions on Pattern Analysis and Machine Intelli-gence , 2023. Scarselli, F., Gori, M., Tsoi, A. C., Hagenbuchner, M., and Monfardini, G. The graph neural network model. IEEE transactions on neural networks , 20(1):61–80, 2008. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 , 2017. Silander, T. and Myllym ¨aki, P. A simple approach for find-ing the globally optimal bayesian network structure. In 
+
+Proceedings of the Twenty-Second Conference on Uncer-tainty in Artificial Intelligence , pp. 445–452, 2006. Silver, D., Hubert, T., Schrittwieser, J., Antonoglou, I., Lai, M., Guez, A., Lanctot, M., Sifre, L., Kumaran, D., Grae-pel, T., et al. A general reinforcement learning algorithm that masters chess, shogi, and go through self-play. Sci-ence , 362(6419):1140–1144, 2018. Sodhani, S., Meier, F., Pineau, J., and Zhang, A. Block contextual mdps for continual learning. In Learning for Dynamics and Control Conference , pp. 608–623. PMLR, 2022. Spirtes, P., Meek, C., and Richardson, T. Causal inference in the presence of latent variables and selection bias. In 
+
+Proceedings of the Eleventh conference on Uncertainty in artificial intelligence , pp. 499–506, 1995. Spirtes, P., Glymour, C. N., and Scheines, R. Causation, prediction, and search . MIT press, 2000. Strobl, E. V. Improved causal discovery from longitudinal data using a mixture of dags. In The 2019 ACM SIGKDD Workshop on Causal Discovery , pp. 100–133. PMLR, 2019. Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, 2018. Sutton, R. S., Koop, A., and Silver, D. On the role of tracking in stationary environments. In Proceedings of the 24th international conference on Machine learning ,pp. 871–878, 2007. Tassa, Y., Doron, Y., Muldal, A., Erez, T., Li, Y., Casas, D. d. L., Budden, D., Abdolmaleki, A., Merel, J., Lefrancq, A., et al. Deepmind control suite. arXiv preprint arXiv:1801.00690 , 2018. Veli ˇckovi ´c, P., Cucurull, G., Casanova, A., Romero, A., Lio, P., and Bengio, Y. Graph attention networks. arXiv preprint arXiv:1710.10903 , 2017. Vowels, M. J., Camgoz, N. C., and Bowden, R. D’ya like dags? a survey on structure learning and causal discovery. 
+
+ACM Computing Surveys , 55(4):1–36, 2022. Xie, A., Harrison, J., and Finn, C. Deep reinforcement learning amidst lifelong non-stationarity. arXiv preprint arXiv:2006.10701 , 2020. Yu, Y., Chen, J., Gao, T., and Yu, M. Dag-gnn: Dag struc-ture learning with graph neural networks. In Interna-tional Conference on Machine Learning , pp. 7154–7163. PMLR, 2019. 11 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+Zhang, J. On the completeness of orientation rules for causal discovery in the presence of latent confounders and selection bias. Artificial Intelligence , 172(16-17): 1873–1896, 2008. Zhang, K., Gong, M., Stojanov, P., Huang, B., Liu, Q., and Glymour, C. Domain adaptation as a problem of inference on graphical models. Advances in neural information processing systems , 33:4965–4976, 2020. Zhang, W. and Li, J. Stable weighted multiple model adap-tive control of continuous-time plant with large parameter uncertainties. IEEE Access , 7:144125–144133, 2019. Zheng, X., Aragam, B., Ravikumar, P. K., and Xing, E. P. Dags with no tears: Continuous optimization for structure learning. Advances in neural information processing systems , 31, 2018. Zhou, J., Cui, G., Hu, S., Zhang, Z., Yang, C., Liu, Z., Wang, L., Li, C., and Sun, M. Graph neural networks: A review of methods and applications. AI open , 1:57–81, 2020. Zintgraf, L., Shiarlis, K., Igl, M., Schulze, S., Gal, Y., Hof-mann, K., and Whiteson, S. Varibad: A very good method for bayes-adaptive deep rl via meta-learning. arXiv preprint arXiv:1910.08348 , 2019. 12 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## A. Causality Background and Proofs 
+
+We first review the definition of the Markov condition, the faithfulness assumption and some graphical concepts shown in the condition of Theorem 3.2. We use pa D (v), ch D (v), and an D (v) to denote the parents, children and ancestor of node v,respectively; for the detailed definitions, see e.g . (Lauritzen, 1996). 
+
+Definition A.1 (Global Markov Condition (Pearl et al., 2000)) . A distribution P over V satisfies the global Markov condition on graph D if for any partition (X, Y, Z ) such that X is d-separated from Y given Z, then X and Y are conditionally independent given Z.
+
+Definition A.2 (Faithfulness (Pearl et al., 2000)) . There are no independencies between variables that are not entailed by the Markov Condition. Under the above assumptions, we can tell the conditional independences using the d-separation criterion from a given DAG D (Pearl et al., 2000). Similarly, the MAGs are ancestral graphs where any non-adjacent pair of nodes is d-separated (Richardson & Spirtes, 2002). The following algorithm shows how to construct a MAG from DAG (Saeed et al., 2020): 
+
+Algorithm A.1 Construction of the maximal ancestral graph 
+
+1: Input: DAG D = ( V, E )
+
+2: Initialize D = ∅, B = ∅
+
+3: for u, v ∈ ch D (y) do 
+
+4: add u ↔ v to B.
+
+5: end for 
+
+6: for t, u, v such that (t → u) ∈ E and (u ↔ v) ∈ B do 
+
+7: if u ∈ an D (v) then 
+
+8: add t → v to D
+
+9: end if 
+
+10: end for 
+
+11: for u, v such that (u ↔ v) ∈ B do 
+
+12: if u ∈ an D (v) then 
+
+13: remove u ↔ v from B and add u → v to D
+
+14: end if 
+
+15: end for 
+
+To illustrate the above algorithm, we provide two figures. Figure 5 shows the underlying causal DAGs for the two environments, and Figure 6 depicts the output of Algorithm A.1 as well as the corresponding environment-shared union graph.   
+
+> e
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (a) DAG D(1) .
+> e
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (b) DAG D(2) .
+
+Figure 5. DAG representations for two sub-environments. 
+
+13 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation    
+
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (a) MAG M(1) .
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (b) MAG M(2) .
+> a
+> s
+> h1
+> h2
+> a′
+> s′
+> h′
+> 1
+> h′
+> 2
+> r′
+> (c) Union graph M∪
+
+Figure 6. MAG representations for two sub-environments and their union graph. 
+
+In this paper, we characterize the nonstationarity as a mixture of stationary distributions. Formally, we take the following definition. 
+
+Definition A.3 (Mixture of stationary distributions) . The marginal distribution of {s, h, a, s′, h′, a′} is a mixture of stationary distributions across environments, i.e., 
+
+P (s, h, a, s′, h′, a′) = X
+
+> k
+
+πkP (s, h, a, s′, h′, a′ | e = k),
+
+where πk denotes the probability that the sample is from the k-th environment varying over time, and P (s, h, a, s′, h′, a′ |
+
+e = k) is invariant over time. 
+
+Proof of Proposition 3.2. The outline of the proof are as follows. We first construct a strict partial order π on V . Then, we induce the MAGs M(1) , . . . , M(k) from the DAGs D(1) , . . . , D(k) by applying the rules defined in Algorithm A.1. We show the constructed partial order π is compatible , that ∀k, it holds that (a) u ∈ an( v) ⇒ u < π v in M(k); and (b) 
+
+u ↔ v ⇒ u̸ ≶π v in M(k). Finally we leverage the existing results in (Saeed et al., 2020) to conclude that M∪ is a MAG. We define a relation π on V as following: for any variable u ∈ { s, h, a} and any variable v ∈ { s′, h′, a′}, we have (i) 
+
+u < π v; (ii) v < π r′. To show the above defined π is a strict partial order, we first notice that π is irreflexive, because 
+
+u̸ <π u, v ̸ <π v and r′̸ <π r′. The transitivity and asymmetry also hold by definition of π. Therefore, π is a partial order on 
+
+V .The Algorithm A.1 constructs an MAG from DAG with three steps. The first step is to add bidirected edges among the nodes in ch( e). Different values of e leads different marginal distribution of s, h, hence ch( y) ⊆ { s, h}. Therefore, the bidirected edges are added with both nodes belonging to {s, h}. For the second step, there is no such node t, with (t → u) ∈ E and 
+
+(u ↔ v) ∈ B, because the nodes in {s, h} have no ancestor other than itself. So the second step adds the directed edges when u = v. The third step in our case is redundant. Equation (3.1) shows that there is no instantaneous causal effects in the system, so there is no u, v such that (u ↔ v) ∈ B while u ∈ an D (v). From all above, if the input of Algorithm A.1 is 
+
+D(k), then it outputs a MAG M(k) = ( V, D (k), B (k)) with the set of nodes V , the set directed edges D equals to the set of directed edges E(k) after removing the node e, and the set of bidirected edges B(k) consists edges among nodes in {s, h}.Then, we check the condition (a) and (b) to show M(1) , . . . , M(k) are compatible with the above defined π. For (a), if u is the ancestor node of v, then the structure of M(k) implies that either u ∈ { s, h} and v ∈ { s′, h′} are nodes in {s′, h′}, or 
+
+u is a node from {s′, h′} and v = r′. For (b), if u ↔ v, then u, v are nodes in {s, h}, hence u̸ ≶π v in M(k). These means that π is a common strict partial order on V for all MAGs. In this setup, we can leverage existing results from Lemma 4.3 (Saeed et al., 2020) to show that the environment-shared union graph M∪ is also a maximal ancestral graph. 14 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## B. Toy Example under the Causal Interpretation 
+
+To better understand the causal interpretation for non-stationary RL, let’s consider a simple toy example. Given a stationary environment with a state space represented as (s1, s 2). In this example, to maintain simplicity, we focus only on the state’s mask, omitting the action mask and noise term. We define the original dynamics function as f (cs ⊙ s, a ) = cs ⊙ s + a. For the toy environment, we consider a basic causal model wherein s′ 
+
+> i
+
+is only influenced by si.Consequently, the original mask is 
+
+cs =
+
+1 00 1
+
+
+
+(B.1) Given this, we can derive that 
+
+s′ 
+
+> 1
+
+= s1 + as′ 
+
+> 2
+
+= s2 + a. (B.2) We denote the non-stationarity in our experiments (Eq 4.1) simplistically as s′ = f (s, a )[1 + n(t)] , where n(t) represents the introduced non-stationarity, which makes the dynamics becoming time-varying. In this scenario, the non-stationary environment’s dynamics function becomes 
+
+s′ 
+
+> 1
+
+= s1 + a + ( s1 + a)n(t)
+
+s′ 
+
+> 2
+
+= s2 + a + ( s2 + a)n(t). (B.3) It is obvious that the dynamics introduces a time-varying term. In this context, we can define hi
+
+.
+
+= ( si + a)n(t), leading to 
+
+s′ 
+
+> i
+
+= si + hi + a. This allows us to deduce the dynamics of h as 
+
+h′ 
+
+> i
+
+= ( s′ 
+
+> i
+
++ a) · n(t + 1) = ( si + hi + 2 a) · n(t + 1) 
+
+.
+
+= gi(cts ⊙ s, cth ⊙ h, a ),
+
+(B.4) where cts, cth symbolize the time-varying masks caused by non-stationarity n(t).More specifically, we derive 
+
+cts = cth =
+
+n(t + 1) 00 n(t + 1) 
+
+
+
+(B.5) The masks represent the causal effects between variables after non-stationary changes occur in this example. The values represent the degree of causal effects, which can be treated as edge weights after normalization. Based on our theory, COREP’s goal is to learn the union graph shared by these graph structures and edge weights during the change process. That is, through a common graph with edge weights, it includes all possible non-stationary changes. Therefore, the information of non-stationarity in the final learned graph is reflected both in the topology of the union graph and in the edge weights representing probabilities. By introducing the time-varying masks and h, we can make the dynamics function remains stationary, transferring non-stationarity to the causal model. Thus, we have provided a walk-through under the simple toy example. In fact, as illustrated in Figures 5 and 6, there are more intricate causal relationships in complex environments. As depicted above, h can encapsulate not only the inherent environmental information but also the complex causal relationships with non-stationarity. Our proposed union MAG (Proposition 3.2) and the correspondingly designed dual-GAT architecture aim to learn such intricate causal models, enabling generic RL algorithms to handle non-stationarity under this causal representation. 15 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## C. Implementation and Training Details 
+
+C.1. Pseudo code for COREP 
+
+In Algorithm C.1, we summarize the steps of COREP. For more specific details, please refer to the code provided in our supplementary material. 
+
+Algorithm C.1 C ausal-Origin REP resentation ( COREP )
+
+1: Init: env; VAE parameters θ, ϕ ; policy parameters: ψ; replay buffer B; TD buffer Bδ .
+
+2: for i = 0 , 1, . . . do 
+
+3: Collect trajectory τi with πψ (a|s, h).
+
+4: Update replay buffer B[i] ← τi.
+
+5: for j = 0 , 1, . . . do 
+
+6: Sample a batch of episodes Ej from B and TD errors {δk} from Bδ .
+
+7: Transform states into X through MLPs. 
+
+8: Compute AX = Softmax  XX T ⊙ (1N − IN ).
+
+9: Compute δα =
+
+P    
+
+> |B δ|− α|B δ|<k< |B δ|
+
+δk
+
+
+
+/α |B δ |.
+
+10: if δα /∈ (μδ − ησ δ , μ δ + ησ δ ) then 
+
+11: unfreeze weights of core-GAT. 
+
+12: else 
+
+13: freeze weights of core-GAT. 
+
+14: end if 
+
+15: Get graph representation Gcore , Ggeneral from core-GAT and general-GAT. 
+
+16: Compute Lguide , LMAG , Lsparsity according to Equation (3.9, 3.10). 
+
+17: Input G(s) = Gcore ⊕ Ggeneral into VAE encoder qϕ and infer μh, σ h.
+
+18: Sample h ∼ N (μh, σ h)
+
+19: Decode ˆs from h using decoder pθ , then compute LVAE according to Equation (3.8). 
+
+20: Do policy optimization for πψ (a|s, h), then compute Lpolicy and TD error δ.
+
+21: Compute Ltotal according to Equation (3.11) and use it for gradient-updating θ, ϕ, ψ .
+
+22: Push δ into TD buffer Bδ .
+
+23: end for 
+
+24: end for 
+
+16 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+C.2. Hyperparameters 
+
+We list the hyperparameters for MLP, GAT, and VAE structures in Table C.1, and the hyperparameters for policy optimization and training in Table C.2.  
+
+> Table C.1. Hyperparameters for the structure of MLP, GAT, and VAE.
+
+Hyperparameter Value 
+
+MLP activation ReLU MLP hidden dim 512 MLP learning rate 1e-3 GAT activation ELU GAT hidden dim 32 (Cartpole Swingup, Reacher Easy/Hard, Cup Catch, Cheetah Run) 64 (Otherwise) GAT node numbers 4 (Cartpole Swingup, Reacher Easy/Hard, Cup Catch) 8 (Cheetah Run, Hopper Stand) 16 (Otherwise) node feature dim 16 (Cartpole Swingup, Reacher Easy/Hard, Cup Catch, Cheetah Run) 32 (Otherwise) GAT head numbers 2 (Quadruped Walk, Fish Upright, Walker Walk, Swimmer Swimmer6/15) 1 (Otherwise) VAE encoder hidden dim 128 VAE decoder hidden dim 64 latent representation dim 4 (Cartpole Swingup, Reacher Easy/Hard, Cup Catch) 8 (Cheetah Run, Hopper Stand) 16 (Otherwise)  
+
+> Table C.2. Hyperparameters for policy optimization and training.
+
+Hyperparameter Value 
+
+Policy hidden dim 256 (Swimmer Swimmer6/15, Walker Walk, Fish Upright, Quadruped Walk) 128 (Otherwise) Policy learning rate 7e-4 
+
+λ1 (for Lguide ) 0.1 
+
+λ2 (for LMAG /Lsparsity /LVAE ) 1e-3 PPO update epoch 16 PPO γ 0.97 PPO ε clip 0.1 TD buffer size 2000 Confidence level η 1.96 
+
+17 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## D. Full Experiment Details 
+
+D.1. Details about Environment Settings.  
+
+> Figure 7. The environment we use in our experiment. We add non-stationary noise to the observations of these environments according to Equation (4.1).
+
+Figure 7 shows the environments we use in the experiment. We add non-stationary noise to the observations of these environments according to Equation (4.1). These environments vary in terms of complexity, from low-dimensional problems like “Reacher Easy” to high-dimensional ones like “Quadruped Walk”. All these tasks require the agent to understand and control its physical embodiment in order to achieve the desired goals. The specific descriptions of these environments and goals are as follows. 
+
+Cartpole Swingup. The cart can move along a one-dimensional track. The pole is attached to the cart with a joint allowing it to rotate freely. The initial state has the pole hanging down, and the goal is to apply forces to the cart such that the pole swings up and is balanced upright. Actions typically involve applying a horizontal force to the cart. 
+
+Reacher Easy. The agent is a two-joint robotic arm. The arm must move in a two-dimensional plane to touch a target position. The arm’s state includes its joint angles and velocities. The action is the torque applied to each of the joints. The target’s position is fixed in this version. 
+
+Reacher Hard. The task is the same as ”Reacher Easy,” but the target position is randomly placed in each episode, making the task more difficult as the agent has to learn to reach various positions. 
+
+Cup Catch. The agent is a robotic arm holding a cup, and there’s a ball attached to the cup with a string. The arm needs to move in a way to swing the ball and catch it in the cup. The arm’s state includes the position and velocity of the arm joints and the position and velocity of the ball. The actions are the torques applied at the arm’s joints. 
+
+Cheetah Run. The agent is a model of a cheetah-like robot with 9 DoF(Degrees of Freedom): the agent can flex and extend its ”spine,” and each leg has two joints for flexing and extending. The agent’s state includes the joint angles and velocities, 18 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+and the actions are the torques applied to each of the joints. The goal is to move forward as fast as possible. 
+
+Hopper Stand. The agent is a one-legged robot, and its goal is to balance upright from a resting position. The agent’s state includes the angle and angular velocity of the torso, as well as the joint angles and velocities. The actions are the torques applied to the joints. 
+
+Swimmer Swimmer6. The agent is a snake-like robot swimming in a two-dimensional plane. The robot has 6 joints, and the goal is to swim forward as fast as possible. The agent’s state includes the joint angles and velocities, and the actions are the torques applied to the joints. 
+
+Swimmer Swimmer15. This is a more complex version of the Swimmer environment, with the agent being a 15-joint snake-like robot. Like the simpler version, the goal is to swim forward as fast as possible. 
+
+Finger Spin. The agent is a robot with two fingers, and there’s a freely spinning object. The goal is to keep the object spinning and balanced on the fingertips. The state includes the positions and velocities of the fingers and the object, and the actions are the forces applied by the fingers. 
+
+Walker Walk. The agent is a bipedal robot, and the goal is to walk forward as fast as possible. The agent’s state includes the angle and angular velocity of the torso, and the joint angles and velocities. The actions are the torques applied to the joints. 
+
+Fish Upright. The agent is a fish-like robot swimming in a three-dimensional fluid. The goal is to swim forward while maintaining an upright orientation. The agent’s state includes the orientation and velocity of the fish, and the actions are the torques and forces applied to move the fish. 
+
+Quadruped Walk. The agent is a quadrupedal (four-legged) robot. Like the bipedal walker, the goal is to walk forward as fast as possible. The agent’s state includes the angle and angular velocity of the torso, and the joint angles and velocities. The actions are the torques applied to the joints. To ensure consistency in our conclusion, the experiments are conducted under various non-stationarity settings, which include ‘within-episode & across-episode’, ‘within-episode’, and ‘across-episode’ non-stationarities. These settings are respectively denoted as (W+A)-EP, W-EP, and A-EP. Specifically, these non-stationarities can be expressed as 
+
+s′ = f (s, a ) + f (s, a ) · αd
+
+ct 
+
+> 1
+
+cos( ct 
+
+> 2
+
+· t) + ci 
+
+> 3
+
+sin( ci 
+
+> 4
+
+· i) (D.1) 
+
+s′ = f (s, a ) + f (s, a ) · αd
+
+ct 
+
+> 1
+
+cos( ct 
+
+> 2
+
+· t) (D.2) 
+
+s′ = f (s, a ) + f (s, a ) · αd
+
+ci 
+
+> 3
+
+sin( ci 
+
+> 4
+
+· i) (D.3) We experimented only under (W+A)-EP when looking at the performance of the algorithm, while in a more detailed ablation study we experimented with all three different setings. 
+
+D.2. Settings of Baselines 
+
+For VariBAD, we meta-train the models (5000 batch size, 2 epochs for all experiments) and show the learning curves of meta-testing. The tasks parameters for meta-training are uniformly sampled from a Gaussian distribution N (0 , 1) .For all approaches, we use the same backbone algorithm for policy optimization, i.e ., PPO with the same hyperparameters, as shown in Table C.2. 19 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+D.3. Full Results of Performance 0 0.5 1 1.5 2
+
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> Return
+
+Cartpole Swingup     
+
+> 01234
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Reacher Easy     
+
+> 01234
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Reacher Hard      
+
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Cup Catch      
+
+> 012345
+> Step (×10 6)
+> 0
+> 100
+> 200
+> 300
+> 400
+> 500
+> 600
+> 700
+> 800
+> Return
+
+Cheetah Run      
+
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Hopper Stand      
+
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+
+Swimmer Swimmer6      
+
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+
+Swimmer Swimmer15      
+
+> 012345
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+> Return
+
+Finger Spin        
+
+> 0123456
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Walker Walk       
+
+> 0123456
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Fish Upright      
+
+> 0246810
+> Step (×10 6)
+> 0
+> 200
+> 400
+> 600
+> 800
+> 1000
+
+Quadruped Walk 
+
+COREP VariBAD FN-VAE PPO PPO (convergence) Oracle 
+
+Figure 8. Learning curves of COREP and baselines in different environments. Solid curves indicate the mean of all trials with 5 different seeds. Shaded regions correspond to standard deviation among trials. The dashed lines represent the asymptotic performance of PPO and Oracle. 
+
+Figure 8 shows the full learning curves. We add non-stationary noise as Equation (D.1) to all environments. According to the results, COREP consistently performs well in environments of different complexities, proving the effectiveness of the algorithm. Especially in Hopper Stand, Swimmer Swimmer6, Swimmer Swimmer15, Finger Spin, Fish Upright, and Quadruped Walk , COREP demonstrates a larger performance gap, highlighting its superiority over baselines. FN-VAE has the ability to approach our COREP in some simple environments ( Cartpole Swingup, Reacher Easy, Reacher Hard, and Cup Catch ), but still exhibits significant variance, reflecting its instability, especially in more complex environ-ments where it performs even worse than VariBAD ( Finger Spin, Quadruped Walk ). VariBAD shows a large performance gap and variance in all environments, indicating poor stability to non-stationarity. PPO’s performance is consistently the worst across all environments due to the lack of any optimization for non-stationarity. 20 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+D.4. Full Results of Ablation Study (W+A)-EP W-EP A-EP 
+
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+> normalized return
+
+Cartpole Swingup   
+
+> (W+A)-EP W-EP A-EP
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+
+Reacher Easy   
+
+> (W+A)-EP W-EP A-EP
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+
+Reacher Hard   
+
+> (W+A)-EP W-EP A-EP
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+
+Cup Catch   
+
+> (W+A)-EP W-EP A-EP
+> 0.825
+> 0.850
+> 0.875
+> 0.900
+> 0.925
+> 0.950
+> 0.975
+> 1.000
+> normalized return
+
+Cheetah Run   
+
+> (W+A)-EP W-EP A-EP
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Hopper Stand   
+
+> (W+A)-EP W-EP A-EP
+> 0.65
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Swimmer Swimmer6   
+
+> (W+A)-EP W-EP A-EP
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Swimmer Swimmer15   
+
+> (W+A)-EP W-EP A-EP
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> normalized return
+
+Finger Spin   
+
+> (W+A)-EP W-EP A-EP
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+
+Walker Walk   
+
+> (W+A)-EP W-EP A-EP
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Fish Upright   
+
+> (W+A)-EP W-EP A-EP
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Quadruped Walk 
+
+Full w/o COREP w/o VAE w/o guide w/o sparsity w/o MAG single GAT 
+
+Figure 9. Final mean returns of 3 different trials on all environments with different components and non-stationarity settings. Returns are normalized to the full version of COREP in each environment. 
+
+Figure 9 shows the performance after removing different components in COREP. All (W+A)-EP, W-EP, and A-EP non-stationary noises, i.e . Equation (D.1, D.2, D.3), are separately added to the environments. Each point of Figure 9 represents the normalized return, which is used to observe the contribution of removed components to the overall algorithm. Specifically, • ‘w/o COREP’ remove all COREP-specific designs and retaining only the VAE process; • ‘w/o VAE’ is a version without the VAE process; • ‘w/o Lguide ’ removes the guided update mechanism containing TD detection; • ‘w/o Lsparsity ’ removes the corresponding loss Lsparsity in Equation (3.11); • ‘w/o LMAG ’ removes the corresponding loss LMAG in Equation (3.11); • ‘single GAT’ maintains the same network structure without introducing a secondary GAT and corresponding update mechanism. 21 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+D.5. Full Results on Non-stationarity Degrees 0.2 0.6 1.0 1.4 1.8 
+
+> 0.86
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+> 1.02
+> normalized return
+
+Cartpole Swingup 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.88
+> 0.90
+> 0.92
+> 0.94
+> 0.96
+> 0.98
+> 1.00
+> 1.02
+
+Reacher Easy 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Reacher Hard 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.850
+> 0.875
+> 0.900
+> 0.925
+> 0.950
+> 0.975
+> 1.000
+> 1.025
+
+Cup Catch 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> normalized return
+
+Cheetah Run 
+
+0.2 0.6 1.0 1.4 1.8  
+
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> 1.05
+
+Hopper Stand 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> 1.0
+
+Swimmer Swimmer6 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Swimmer Swimmer15 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+> normalized return
+
+Finger Spin 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.825
+> 0.850
+> 0.875
+> 0.900
+> 0.925
+> 0.950
+> 0.975
+> 1.000
+> 1.025
+
+Walker Walk 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Fish Upright 
+
+0.2 0.6 1.0 1.4 1.8 
+
+> 0.70
+> 0.75
+> 0.80
+> 0.85
+> 0.90
+> 0.95
+> 1.00
+
+Quadruped Walk 
+
+COREP VariBAD FN-VAE PPO 
+
+Figure 10. Final mean returns of 3 different trials on Cheetah Run and Swimmer Swimmer6 environments with different degrees of non-stationarity. Returns are normalized to the COREP algorithm with standard degree 1.0.
+
+To analyze the impact of varying degrees of non-stationarity in the environment, we change the values of αd in Equation (D.1). As depicted in Figure 10, the results suggest that the performance of the compared baselines is more affected by the degree of non-stationarity. Conversely, COREP exhibits consistent performance when encountering different degrees of non-stationarity, further affirming our claim that COREP can effectively tackle more complex non-stationarity. 22 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+D.6. Visualization of Learned Graph 
+
+To visualize the graph learned by the COREP algorithm, we respectively show the weighted adjacency matrices of core-GAT and general-GAT after 5M steps in the Cartpole Swingup , Reacher Hard , and Cup Catch environment in Figure 11, 12, 13. It is noteworthy that the number of graph nodes is set to be the same as the observation dimension of each environment to bring better empirical insights into how the dual graph actually functions. For further information about the actual meaning of each dimension in different environments, please refer to the DeepMind Control Suite technical report (Tassa et al., 2018). In these heatmaps, each value on a grid represents the weight of an edge from a node on the y-axis to a node on the x-axis. A higher value indicates a greater causal influence. Based on the results, it can be seen that core-GAT indeed focuses more on a few core nodes in its learned graph structure, while general-GAT compensates for some overlooked detailed information by core-GAT. The results align well with our claim made in the manuscript. 1 2 3 4 5                                            
+
+> 1
+> 2
+> 3
+> 4
+> 5
+> 0.00 0.59 0.36 0.00 0.05
+> 0.00 0.00 0.95 0.05 0.00
+> 0.98 0.00 0.00 0.02 0.00
+> 0.00 0.05 0.09 0.00 0.86
+> 0.00 0.97 0.03 0.00 0.00
+> 12345
+> 1
+> 2
+> 3
+> 4
+> 5
+> 0.00 0.54 0.25 0.03 0.18
+> 0.00 0.00 0.83 0.11 0.05
+> 0.79 0.01 0.01 0.16 0.03
+> 0.03 0.13 0.23 0.00 0.61
+> 0.01 0.68 0.28 0.03 0.01
+
+Figure 11. Weighted adjacency matrix of core-GAT ( left ) and general-GAT ( right ) in Cartpole Swingup after 5M steps. 1 2 3 4 5 6 7                                                                                          
+
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 0.00 0.01 0.00 0.01 0.97 0.00 0.00
+> 0.22 0.00 0.00 0.00 0.03 0.75 0.00
+> 0.00 0.00 0.00 0.00 0.00 1.00 0.00
+> 0.00 0.45 0.00 0.00 0.55 0.00 0.00
+> 0.00 0.00 0.06 0.93 0.00 0.00 0.00
+> 0.00 0.00 0.00 1.00 0.00 0.00 0.00
+> 0.99 0.00 0.00 0.01 0.00 0.00 0.00
+> 1234567
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 0.01 0.23 0.03 0.21 0.46 0.02 0.05
+> 0.31 0.00 0.02 0.01 0.13 0.52 0.00
+> 0.01 0.01 0.01 0.12 0.02 0.77 0.06
+> 0.02 0.24 0.03 0.00 0.64 0.06 0.01
+> 0.01 0.02 0.27 0.53 0.00 0.05 0.12
+> 0.02 0.05 0.02 0.82 0.06 0.01 0.02
+> 0.42 0.03 0.06 0.25 0.01 0.22 0.01
+
+Figure 12. Weighted adjacency matrix of core-GAT ( left ) and general-GAT ( right ) in Reacher Hard after 5M steps. 
+
+23 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 1 2 3 4 5 6 7 8                                                                                                                       
+
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 0.00 0.00 0.01 0.98 0.01 0.00 0.00 0.00
+> 0.00 0.00 0.97 0.01 0.00 0.01 0.01 0.00
+> 0.00 0.00 0.00 0.17 0.00 0.00 0.00 0.83
+> 0.00 0.00 0.34 0.00 0.00 0.54 0.12 0.00
+> 0.00 0.00 0.66 0.00 0.00 0.00 0.33 0.00
+> 0.24 0.00 0.63 0.00 0.00 0.00 0.00 0.12
+> 0.04 0.00 0.00 0.00 0.00 0.96 0.00 0.00
+> 0.84 0.00 0.00 0.08 0.00 0.08 0.00 0.00
+> 12345678
+> 1
+> 2
+> 3
+> 4
+> 5
+> 6
+> 7
+> 8
+> 0.01 0.01 0.28 0.39 0.22 0.02 0.03 0.04
+> 0.05 0.00 0.47 0.24 0.01 0.05 0.16 0.02
+> 0.01 0.00 0.01 0.36 0.00 0.01 0.05 0.56
+> 0.01 0.01 0.55 0.00 0.01 0.13 0.24 0.05
+> 0.05 0.01 0.61 0.01 0.00 0.08 0.24 0.00
+> 0.42 0.02 0.37 0.01 0.01 0.00 0.00 0.16
+> 0.30 0.10 0.06 0.15 0.03 0.35 0.01 0.01
+> 0.29 0.02 0.00 0.38 0.09 0.21 0.00 0.00
+
+Figure 13. Weighted adjacency matrix of core-GAT ( left ) and general-GAT ( right ) in Cup Catch after 5M steps. 
+
+D.7. Study on Tunning Parameters of Loss Terms 
+
+We conduct additional experiments to study COREP’s sensitivity to the hyperparameters λ1, λ 2 in the objective function (3.11). Results are shown in Table D.1 and Table D.2. The results indicate that the performance is not sensitive to the values of these hyperparameters. Even with extensive adjustments to these parameters, COREP consistently surpasses the performance of SOTA baseline. Notably, we observe instances in certain environments where adjustments lead to even higher performance. This suggests that with more precise tuning, there is potential to further enhance COREP’s effectiveness. These findings are significant as they demonstrate that COREP’s superior performance is largely attributed to its designs in structure and process, rather than relying on hyperparameter tuning. The low sensitivity to hyperparameter values also implies ease of use and adaptability in diverse settings. 
+
+Table D.1. Sensitivity results of parameter λ1. The results indicate that the performance is not sensitive to λ1, even with significant adjustments to its value, COREP still outperforms FN-VAE. 
+
+λ1 Cartpole Swingup Reacher Easy Reacher Hard Cup Catch Cheetah Run Hopper Stand 
+
+0.5 732 .3 ± 30 .6 947 .6 ± 24 .6 938 .4 ± 29 .2 868 .5 ± 24 .7 634 .8 ± 41 .6 651 .4 ± 29 .30.1 (original) 743 .4 ± 21 .2 964 .6 ± 17 .3 947 .2 ± 23 .1 877 .5 ± 19 .2 651 .1 ± 44 .3 645 .5 ± 25 .80.05 732 .8 ± 26 .6 939 .3 ± 16 .4 949 .4 ± 25 .7 870 .1 ± 19 .8 642 .7 ± 52 .8 656 .7 ± 32 .3
+
+0.01 722 .3 ± 28 .4 945 .2 ± 23 .3 934 .3 ± 19 .5 864 .6 ± 25 .5 629 .4 ± 57 .2 641 .3 ± 33 .80.001 717 .5 ± 31 .9 928 .8 ± 25 .8 936 .9 ± 25 .7 858 .3 ± 18 .6 622 .8 ± 49 .2 627 .5 ± 27 .5
+
+FN-VAE 710 .3 ± 64 .5 913 .3 ± 38 .7 928 .1 ± 21 .9 851 .3 ± 31 .6 606 .5 ± 75 .3 580 .9 ± 47 .3
+
+Table D.2. Sensitivity analysis of parameters λ2. The results indicate that the performance is not sensitive to λ2, even with significant adjustments to its value, COREP still outperforms FN-VAE. 
+
+λ2 Cartpole Swingup Reacher Easy Reacher Hard Cup Catch Cheetah Run Hopper Stand 
+
+0.01 728 .7 ± 36 .1 936 .3 ± 23 .7 931 .5 ± 24 .4 864 .9 ± 25 .8 632 .2 ± 37 .5 623 .5 ± 32 .10.005 745 .6 ± 34 .8 955 .3 ± 25 .3 953 .6 ± 22 .1 872 .5 ± 21 .5 644 .5 ± 36 .1 638 .1 ± 24 .60.001 (original) 743 .4 ± 21 .2 964 .6 ± 17 .3 947 .2 ± 23 .1 877 .5 ± 19 .2 651 .1 ± 44 .3 645 .5 ± 25 .8
+
+0.0005 718 .6 ± 31 .5 946 .6 ± 19 .6 945 .5 ± 19 .4 856 .3 ± 18 .7 621 .6 ± 48 .4 641 .1 ± 29 .60.0001 721 .1 ± 35 .9 949 .5 ± 27 .8 940 .6 ± 19 .7 859 .2 ± 26 .4 618 .1 ± 55 .7 619 .5 ± 31 .7
+
+FN-VAE 710 .3 ± 64 .5 913 .3 ± 38 .7 928 .1 ± 21 .9 851 .3 ± 31 .6 606 .5 ± 75 .3 580 .9 ± 47 .3
+
+24 Tackling Non-Stationarity in Reinforcement Learning via Causal-Origin Representation 
+
+## E. Compute Resource Details 
+
+We list the hardware resources used in Table E.1, and list the training time required for a single trial in each environment in Table E.2.  
+
+> Table E.1. Computational resources for our experiments.
+
+CPU GPU RAM 
+
+Intel I9-12900K@3.2GHz (24 Cores) Nvidia RTX 3090 (24GB) × 2 256GB  
+
+> Table E.2. Computing time of each single trial in different environments.
+
+Environment Training Time 
+
+Cartpole Swingup 12 hours Reacher Easy 16 hours Reacher Hard 20 hours Cup Catch 16 hours Cheetah Run 24 hours Hopper Stand 28 hours Swimmer Swimmer6 28 hours Swimmer Swimmer15 36 hours Finger Spin 28 hours Walker Walk 28 hours Fish Upright 30 hours Quadruped Walk 42 hours 
+
+## F. Licenses 
+
+In our code, we have used the following libraries which are covered by the corresponding licenses: • Numpy (BSD-3-Clause license) • PyTorch (BSD-3-Clause license) • PyTorch Geometric (MIT license) • DeepMind Control (Apache-2.0 license) • OpenAI Gym (MIT License) 25

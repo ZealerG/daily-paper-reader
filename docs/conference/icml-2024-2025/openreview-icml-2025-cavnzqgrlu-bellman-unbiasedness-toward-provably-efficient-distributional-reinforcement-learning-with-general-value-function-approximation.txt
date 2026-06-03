@@ -1,0 +1,3203 @@
+Title: Bellman Unbiasedness: Toward Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation
+
+URL Source: https://openreview.net/pdf?id=CAvnZQgrLu
+
+Number of Pages: 25
+
+Markdown Content:
+# Bellman Unbiasedness: Toward Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Taehyun Cho 1 Seungyub Han 1 Seokhun Ju 1 Dohyeong Kim 1 Kyungjae Lee 2 Jungwoo Lee 1
+
+## Abstract 
+
+Distributional reinforcement learning improves performance by capturing environmental stochas-ticity, but a comprehensive theoretical understand-ing of its effectiveness remains elusive. In ad-dition, the intractable element of the infinite di-mensionality of distributions has been overlooked. In this paper, we present a regret analysis of dis-tributional reinforcement learning with general value function approximation in a finite episodic Markov decision process setting. We first intro-duce a key notion of Bellman unbiasedness which is essential for exactly learnable and provably ef-ficient distributional updates in an online manner. Among all types of statistical functionals for rep-resenting infinite-dimensional return distributions, our theoretical results demonstrate that only mo-ment functionals can exactly capture the statistical information. Secondly, we propose a provably ef-ficient algorithm, SF-LSVI , that achieves a tight regret bound of ˜O(dE H 32
+
+√K) where H is the horizon, K is the number of episodes, and dE is the eluder dimension of a function class. Distributional reinforcement learning (DistRL) (Bellemare et al., 2017; Rowland et al., 2019; Choi et al., 2019; Kim et al., 2024) is an advanced approach to reinforcement learn-ing (RL) that focuses on the entire probability distribution of returns rather than solely on the expected return. By considering the full distribution of returns, distRL provides deeper insight into the uncertainty of each action, such as the mode or median. This framework enables us to make safer and more effective decisions that account for vari-ous risks (Chow et al., 2015; Son et al., 2021; Greenberg et al., 2022; Kim et al., 2023), particularly in complex real-world situations, such as robotic manipulation (Bodnar et al.,     
+
+> 1Seoul National University, Seoul, South Korea 2Korea Uni-versity, Seoul, South Korea. Correspondence to: Kyungjae Lee <kyungjae_lee@korea.ac.kr>, Jungwoo Lee <junglee@snu.ac.kr>.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+2019), neural response (Muller et al., 2024), stratospheric balloon navigation (Bellemare et al., 2020), algorithm dis-covery (Fawzi et al., 2022), and several game benchmarks (Bellemare et al., 2013; Machado et al., 2018). While the distributional approach offers richer information, two key theoretical challenges are introduced that distinguish it from expectation-based RL. 
+
+Infinite-dimensionality of distribution. In practice, dis-tributions contain an infinite amount of information, and we must resort to approximations using a finite number of parameters or statistical functionals, such as categori-cal (Bellemare et al., 2017) and quantile representations (Dabney et al., 2018b). However, previous works often con-ducted analyses while overlooking these intractable nature of distributions. Additionally, not all statistical functionals can be exactly learned through the Bellman operator, as the meaning of statistical functionals is not preserved after updates. For example, the median is not preserved under the Bellman updates, as the median of a mixture of two distributions does not equal the mixture of their medians. Thus, a fundamental question arises: 
+
+"For a given statistical functional, does there exist a corresponding Bellman operator that ensures exactness?" 
+
+To formalize this issue, Rowland et al. (2019) introduced 
+
+Bellman closedness , which characterizes statistical function-als that can be exactly learned in the presence of a corre-sponding Bellman operator. 
+
+Online distributional update. In this paper, we focus on developing an algorithm that efficiently explores from a regret minimization perspective while simultaneously per-forming distributional Bellman updates in an online man-ner. One possible approach to addressing this problem is to first update the policy using an existing provably effi-cient non-distributional RL algorithm and then estimate the distribution via additional rollouts. However, decou-pling these two processes introduces several drawbacks. First, adding extra rollouts solely for distribution estimation is sample-inefficient, and the limited number of rollouts inevitably introduce accumulated approximation errors in the estimated distribution throughout the learning process. 1Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation                 
+
+> Figure 1. Venn-Diagram of Statistical Functional Classes. The diagram illustrates categories of statistical functional. (Yellow ∩Blue)
+> Within the linear statistical functional class, Rowland et al. (2019) showed that the only functionals satisfying Bellman closedness are moment functionals. (Red ∩Blue) We extend this concept by introducing the notion of Bellman unbiasedness , which not only covers moment functionals but also includes central moment functionals from the broader class including nonlinear statistical functionals. (Yellow
+> ∩Blue c)According to Lemmas 3.2 and 4.4 of Rowland et al. (2019), categorical functionals are linear but not Bellman closed. (A)
+> Maximum and minimum functionals are Bellman closed, while they are not unbiasedly estimatable. (B) Median and quantile functionals are neither Bellman closed nor unbiased, highlighting that they are not proper to encode the distribution in terms of exactness. The proofs corresponding to each region are provided in Appendix C.
+
+Moreover, the estimation is confined to the return distri-bution of the executed policy, making it difficult to reuse for estimating distributions under different policies, thereby moving further away from off-policyness. To overcome those two fundamental challenges inherent to DistRL, we take a closer look at the distributional Bellman update and revisit what additional properties of statistical functionals, beyond Bellman closedness, are required to construct online DistRL algorithms that are not only exactly learnable but also provably efficient in terms of regret. In this context, we identify the following additional issues that arise when using statistical functionals for updates instead of the full distribution: • Representing a mixture distribution with a finite, fixed number of parameters leads to approximation errors during the update. For example, when expressing the mixture of two distributions, each represented by N
+
+parameters, compressing 2N into N parameters in the mixture results in inevitable information loss. • Due to the unknown nature of the transition P(·| s, a ),the target distribution is estimated by sampling the next state s′. Hence, the statistical functionals of the target distribution should be unbiasedly estimated using the statistical functionals from the sampled distribution. In this paper, we introduce a key concept, Bellman unbiased-ness , for precise information learnability of a distribution from a finite number of samples in an online setting. As shown in Figure 1, we prove that the moment functional remains the only solution in a class that includes nonlinear 
+
+statistical functionals that satisfies both properties. We then discuss the inherent intractability of distributional Bellman completeness (distBC) – a structural assumption previously defined in the literature (Wang et al., 2023; Chen et al., 2024) – and investigate the benefits of redesigning this con-cept using a collection of statistical functionals. Finally, we propose a provably efficient statistical functional RL algorithm with general value function approximation, called 
+
+SF-LSVI .In summary, our main contributions are as follows: • Introduce a key property of Bellman unbiasedness for exactly learnable and provably efficient online distRL algorithm. We show that the moment functional is the unique structure in a class including nonlinear statisti-cal functionals. • Describe the inherent intractability of infinite-dimensional distributions and analyze how hidden ap-proximation error prevents the design of provably ef-ficient algorithms. To address this, we revisit the ex-isting structural assumption of distributional Bellman Completeness through a statistical functional lens. • Propose exactly learnable and provably efficient distRL algorithm called SF-LSVI , achieving a tight regret up-per bound ˜O(dE H 32
+
+√K). 1 Our framework yields a tighter regret bound with a weaker structural assump-tion compared to prior results in distRL. 
+
+## 1. Related Work                      
+
+> 1We ignore poly-log terms in H, S, A, K in the ˜O(·)notation.
+> 2In Chen et al. (2024), the regret bound is written as
+> ˜O(dEL∞(ρ)H√K), where L∞(ρ)represents the lipschitz con-stant of the risk measure ρ, i.e., |ρ(Z)−ρ(Z′)| ≤ L∞(ρ)∥FZ−
+> FZ′∥∞. Since L∞(ρ)≥Hin risk-neutral setting, we translate the regret bound into ˜O(dEH2√K).
+
+2Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Table 1. Comparison for different methods under distributional RL framework. H represents a subspace of infinite-dimensional space 
+
+F∞. To bound the eluder dimesion dE , Wang et al. (2023) and Chen et al. (2024) assumed the discretized reward MDP.                                  
+
+> Algorithm Regret Eluder dimension dEBellman Completeness MDP assumption Finite Representation Exactly Learnable
+> O-DISCO
+> (Wang et al., 2023) ˜O(poly (dEH)√K)dim E(H, ϵ )distributional BC discretized reward, small-loss bound ✗✗
+> V-EST-LSR
+> (Chen et al., 2024) ˜O(dEH2√K)2dim E(H, ϵ )distributional BC discretized reward, lipschitz continuity ✗✗
+> SF-LSVI
+> [Ours] ˜O(dEH32
+> √K)dim E(FN, ϵ )statistical functional BC none ✓✓
+
+Distributional RL. In classical RL, the Bellman equation, which is based on expected returns, has a closed-form ex-pression. However, it remains unclear whether any statistical functionals of return distribution always have their corre-sponding closed-form expressions. Rowland et al. (2019) introduced the notion of Bellman closedness for collections of statistical functionals that can be updated in a closed form via Bellman update. They showed that the only Bellman-closed statistical functionals in the discounted setting are the moments EZ∼η [Zk]. More recently, Marthe et al. (2023) proposed a general framework for distRL, where the agent plans to maximize its own utility functionals instead of expected return, formalizing this property as Bellman Op-timizability . They further demonstrated that in the undis-counted setting, the only W1-continuous and linear Bellman optimizable statistical functionals are exponential utilities  
+
+> 1
+> λ
+
+log EZ∼η [exp( λZ )] .In practice, C51 (Bellemare et al., 2017) and QR-DQN (Dabney et al., 2018b) are notable distributional RL algo-rithms where the convergence guarantees of sampled-based algorithms are proved (Rowland et al., 2018; 2023). Dabney et al. (2018a) expanded the class of policies on arbitrary distortion risk measures by taking the based distribution non-uniformly and improve the sample efficiency from their implicit representation of the return distribution. Cho et al. (2023) highlighted the drawbacks of optimistic exploration in distRL, introducing a randomized exploration that per-turbs the distribution when the agent selects next action. 
+
+RL with General Value Function Approximation. Re-gret bounds have been studied for a long time in online RL, across various domains such as bandit (Lattimore & Szepesvári, 2020; Abbasi-Yadkori et al., 2011; Russo & Van Roy, 2013), tabular RL (Kakade, 2003; Auer et al., 2008; Osband & Van Roy, 2016; Osband et al., 2019; Jin et al., 2018), and linear function approximation (Jin et al., 2020; Wang et al., 2019; Zanette et al., 2020). In recent years, deep RL has shown significant performance using deep neural networks as function approximators, and at-tempts have been made to analyze whether it is efficient in terms of general function approximation (Jin et al., 2021; Agarwal et al., 2023). Wang et al. (2020) established a provably efficient RL algorithm with general value function approximation based on the eluder dimension dE (Russo & Van Roy, 2013) and achieves a regret upper bound of 
+
+˜O(poly (dE H)√K). To circumvent the intractability from computing the upper confidence bound, Ishfaq et al. (2021) injected the stochasticity on the training data and get the optimistic value function instead of upper confidence bound, enhancing computationally efficiency. Beyond risk-neutral setting, several prior works have shown regret bounds under risk-sensitive objectives (e.g., entropic risk (Fei et al., 2021; Liang & Luo, 2022), CVaR (Bastani et al., 2022)), which align with our approach in that they are built on a distribu-tion framework. Liang & Luo (2022) achieved the regret upper bound of ˜O(exp( H)p|S| 2|A| H2K) and the lower bound of Ω(exp( H)p|S||A| HK ) in tabular setting. 
+
+DistRL with General Value Function Approximation. 
+
+Recently, only few efforts have aimed to bridge the gap between two fields. Wang et al. (2023) proposed a distri-butional RL algorithm, O-DISCO , which enjoys small-loss bound by using a log-likelihood objective. Similarly, Chen et al. (2024) provided a risk-sensitive RL framework with static lipschitz risk measure. While these studies analyze within a distributional framework, they do not address the in-tractability of implementation in infinite-dimensional space of distributions. In contrast, our approach focuses on a statis-tical functional framework, providing a detailed comparison with other distRL methods as shown in Table 1. 
+
+## 2. Preliminaries 
+
+Episodic MDP. We consider a episodic Markov deci-sion process which is defined as a M = ( S, A, H, P, r )
+
+characterized by state space S, action space A, horizon length H, transition kernels P = {Ph}h∈[H], and reward 
+
+r = {rh}h∈[H] at step h ∈ [H]. The agent interacts with the environment across K episodes. For each k ∈ [K]
+
+and h ∈ [H], Hkh = ( s11, a 11, . . . , s 1 
+
+> H
+
+, a 1 
+
+> H
+
+, . . . , s kh, a kh) repre-sents the history up to step h at episode k. We assume the reward is bounded by [0 , 1] and the agent always transit to terminal state send at step H + 1 with rH+1 = 0 .3Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 𝑞𝑞 1 𝑞𝑞 2 𝑞𝑞 3 𝑞𝑞 4      
+
+> 𝑞𝑞 1∗𝑞𝑞 2∗𝑞𝑞 3∗𝑞𝑞 4∗
+> 𝑞𝑞 1′𝑞𝑞 2′𝑞𝑞 3′𝑞𝑞 4′
+
+Figure 2. Illustrative representation of sketch-based Bellman updates for a mixture distribution. Instead of updating the distributions directly, each sampled distribution is embedded through a sketch ψ (e.g., mean μ, quantile qi). The transformation ϕψ aims to compress the mixture distribution into the same number of parameters, ensuring unbiasedness to prevent information loss. 
+
+Policy and Value Functions. A (deterministic) policy π is a collection of H functions {πh : S → A} Hh=1 . Given a pol-icy π, a step h ∈ [H], and a state-action pair (s, a ) ∈ S × A ,the Q and V -function are defined as Qπh (s, a )(: S × A → 
+
+R) := Eπ
+
+hPHh′=h rh′ (sh′ , a h′ ) | sh = s, a h = a
+
+i
+
+and 
+
+V πh (s)(: S → R) := Eπ
+
+hPHh′=h rh′ (sh′ , a h′ ) | sh = s
+
+i
+
+.
+
+Random Variables and Distributions. For a sample space Ω, we extend the definition of the Q-function into a random variable and its distribution, 
+
+Zπh (s, a )(: S × A × Ω → R):= 
+
+> H
+
+X
+
+> h′=h
+
+rh′ (sh′ , a h′ ) | sh = s, a h = a, a h′ = πh′ (sh′ ),ηπh (s, a )(: S × A → P(R)) := law (Zπh (s, a )) .
+
+Analogously, we extend the definition of V -function by introducing a bar notation. 
+
+¯Zπh (s)(: S × Ω → R):= 
+
+> H
+
+X
+
+> h′=h
+
+rh′ (sh′ , a h′ ) | sh = s, a h′ = πh′ (sh′ ),
+
+¯ηπh (s)(: S → P(R)) := law ( ¯Zπh (s)) .
+
+Note that ¯Zπh (s) = Zπh (s, π (s)) and ¯ηπh (s) =
+
+ηπh (s, π (s)) . We use π⋆ to denote an optimal pol-icy ( i.e., π⋆h(·| s) = arg max π V πh (s) ) and de-note V ⋆h (s) = V π⋆ 
+
+> h
+
+(s), Q ⋆h(s, a ) = Qπ⋆ 
+
+> h
+
+(s, a ),
+
+η⋆h(s, a ) = ηπ⋆ 
+
+> h
+
+(s, a ), and ¯η⋆h(s) = ¯ηπ⋆ 
+
+> h
+
+(s). For no-tational simplicity, we denote the expectation over transition, [PhV πh+1 ]( s, a ) = Es′∼Ph(·| s,a )V πh+1 (s′),
+
+[Ph ¯Zπh+1 ]( s, a ) = Es′∼Ph(·| s,a ) ¯Zπh+1 (s′), and 
+
+[Ph ¯ηπh+1 ]( s, a ) = Es′∼Ph(·| s,a ) ¯ηπh+1 (s′). 3 For brevity, we refer to ¯ηπ simply as ¯η.In the episodic MDP, the agent aims to learn the optimal policy through a fixed number of interactions with the en-vironment across a number of episodes. At the beginning of each episode k(∈ [K]) , the agent starts at the initial state 
+
+> 3
+
+Note that Es′∼Ph(·| s,a ) ¯ηπh+1 (s′) is a mixture distribution. 
+
+sk 
+
+> 1
+
+and choose a policy πk. In step h(∈ [H]) , the agent observes skh(∈ S ), takes an action akh(∈ A ) ∼ πkh(·| skh),receives a reward rh(skh, a kh), and the environment transits to the next state skh+1 ∼ Ph(·| skh, a kh). Finally, we measure the suboptimality of an agent by its regret, which is the ac-cumulated difference between the ground truth optimal and the return received from the interaction. The regret after K
+
+episodes is defined as Reg (K) = PKk=1 V ⋆ 
+
+> 1
+
+(sk 
+
+> 1
+
+)−V πk 
+
+> 1
+
+(sk 
+
+> 1
+
+).
+
+Distributional Bellman Optimality Equation. Recall that η⋆h satisfies the following optimality equation: 
+
+η⋆h(s, a ) = ( Thη⋆h+1 )( s, a ):= Es′∼Ph(·| s,a ),a ′∼π⋆h(·| s′)[( Brh )#η⋆h+1 (s′, a ′)] = ( Brh )#[Phη⋆h+1 ]( s, a )
+
+where Br : R → R is defined by Br (x) = r + x, and g#η ∈
+
+P(R) is the pushforward of the distribution η through g
+
+(i.e., g#η(A) = η(g−1(A)) for any Borel set A ⊆ R). 
+
+Additional Notations. For a given N , we denote an 
+
+N −dimensional function class FN := F(1) ×· · ·×F (N ) ⊆n
+
+f = [ f (1) , · · · , f (N )] : S × A → RN
+
+o
+
+. Given a dataset 
+
+D = {(st, a t, [z(1)  
+
+> t
+
+, . . . , z (N ) 
+
+> t
+
+]) }|D|  
+
+> t=1
+
+⊆ S × A × RN , a set of state-action pairs Z = {(st, a t)}|Z|  
+
+> t=1
+
+⊆ S × A and for a function f : S × A → RN , we define the norm 
+
+∥f (n)∥∞, ∥f ∥∞,1, ∥f ∥D , ∥f ∥Z as written in Appendix A. For a set of (vector-valued) functions FN ⊆ { f : S × A → RN }, the width function of (s, a ) is defined as 
+
+w(n)(FN , s, a ) := max f,g ∈F N |f (n)(s, a ) − g(n)(s, a )|.
+
+## 3. Statistical Functionals in Distributional RL 
+
+In this section, we define two key concepts in the distRL framework: the statistical functional and the sketch . We also illustrate Bellman closedness , a crucial property from Bellemare et al. (2023). Next, we introduce Bellman unbi-asedness , a novel concept that complements the previous property and is essential for provable efficiency. As shown in Figure 2, quantile functionals cannot be updated in an 4Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+unbiased manner (as proved in Theorem 3.3), demonstrat-ing that only certain sketches can be updated exactly. We then show that the only sketch satisfying both properties is the moment functional, which is unique among statis-tical functionals. Finally, we discuss the intractability of the previous structural assumption, distributional Bellman Completeness, and its tendency to cause linear regret. To address this, we introduce statistical functional Bellman Completeness , a relaxed assumption, and explain why it satisfies both properties. 
+
+3.1. Bellman Closedness Definition 3.1 (Statistical functionals, Sketch; (Bellemare et al., 2023)) . A statistical functional is a mapping from a probability distribution to a real value ψ : P(R) → R.A sketch is a vector-valued function ψ1: N : P(R) →
+
+RN specified by an N -tuple where each component is a statistical functional, 
+
+ψ1: N (·) = ( ψ1(·), · · · , ψ N (·)) .
+
+We denote the domain of sketch as Pψ1: N (R) and its im-age as Iψ1: N = {ψ1: N (¯ η) : ¯ η ∈ Pψ1: N (R)}. We further extend to state return distribution functions ψ1: N (¯ η) = 
+
+ψ1: N (¯ η(s)) : s ∈ S 
+
+
+
+.
+
+Definition 3.2 (Bellman closedness; (Rowland et al., 2019)) .
+
+A sketch ψ1: N is Bellman closed if there exists an operator 
+
+Tψ1: N : IS 
+
+> ψ1: N
+
+→ IS 
+
+> ψ1: N
+
+such that 
+
+ψ1: N (T ¯η) = Tψ1: N ψ1: N (¯ η) for all ¯η ∈ P(R)S
+
+which is closed under a distributional Bellman operator 
+
+T : P(R)S → P(R)S .Bellman closedness is the property that a sketch are exactly learnable when updates are performed from the infinite-dimensional distribution space to the finite-dimensional em-bedding space. While classical Bellman equation implies the existence of Bellman operator for expected values, not all statistical functional has such corresponding Bellman op-erator. Precisely, Rowland et al. (2019) showed that the only finite linear statistical functionals that are Bellman closed are given by the collections of statistical functionals where its linear span is equal to the set of exponential-polynomial functionals. 4
+
+Theorem 3.3. Quantile functional cannot be Bellman closed under any additional sketch. 
+
+While Rowland et al. (2019) focused on "linear" statistical functionals in defining a sketch (i.e., ψ(¯ η) = EZ∼¯η [h(Z)] 
+
+for some h), leaving questions about nonlinear functionals, 
+
+> 4In discounted setting, a unique solution becomes moments. We’ve overwritten it for convinience.
+
+we extend this by showing that "nonlinear" statistical func-tionals, such as maximum or minimum, can also be Bellman closed. Additionally, while their proof implicitly treated quantiles as linear functionals, we provide a technical clar-ification in Appendix C.1 where we formally demonstrate that no sketch Bellman operator exists for quantiles. 
+
+3.2. Bellman Unbiasedness 
+
+While the intractability caused by infinite-dimensionality was addressed in Bellman closedness, another intractable element which has not yet fully tackled is the sampling of the next state. During the implementation, note that the agent does not have access to the transition kernel P. In-stead, the agent can only access the empirical transition kernel ˆP(·| s, a ) = 1
+
+> K
+
+PKk=1 1{s′ 
+
+> k
+
+= · | s, a } which is de-rived from K sampled next states. This limitation implies that the operator should be treated as an empirical operator 
+
+ˆTψ , rather than Tψ (i.e., ˆTψ ψ(¯ η) := ψ(( Br )#[ˆP¯η]) ). There-fore, we naturally introduce a new notion of Bellman unbi-asedness to unbiasedly estimate the expected distribution 
+
+(Br )#Es′∼P(·| s,a )[¯ η(s′)] , which is a mixture by transitions, from the sample distribution (Br )# ¯η(s′).
+
+Definition 3.4 (Bellman unbiasedness) . A sketch ψ(= 
+
+ψ1: N ) is Bellman unbiased if a vector-valued estimator 
+
+ϕψ = ϕψ (ψ(·), · · · , ψ (·)) : ( IS 
+
+> ψ
+
+)k → IS 
+
+> ψ
+
+exists where the sketch of expected distribution (Br )#Es′∼P(·| s,a )[¯ η(s′)] can be unbiasedly estimated by ϕψ using the k sampled sketches from the sample distribution (Br )# ¯η(s′), i.e., 
+
+Es′
+
+> i∼P
+
+"
+
+ϕψ ψ
+
+
+
+(Br )# ¯η(s′
+
+> 1
+
+)
+
+
+
+, · · · , ψ 
+
+
+
+(Br )# ¯η(s′
+
+> k
+
+)
+
+| {z }   
+
+> ksampled sketches from sample distribution ˆTψψ(¯ η(s))
+
+!# 
+
+= ψ
+
+
+
+(Br )#Es′∼P(·| s,a )[¯ η(s′)] 
+
+
+
+.
+
+Bellman unbiasedness is another natural definition, simi-lar to Bellman closedness, which takes into account a fi-nite number of samples for the transition. For example, mean-variance sketch is Bellman unbiased as the following unbiased estimator ϕ(μ,σ 2) exists for k sample estimates: 
+
+(μ, σ 2) = ϕ(μ,σ 2)
+
+
+
+(ˆ μ1, ˆσ21 ), · · · , (ˆ μk, ˆσ2
+
+> k
+
+)
+
+
+
+=
+
+ 1
+
+k
+
+> k
+
+X
+
+> i=1
+
+ˆμi, 1
+
+k
+
+> k
+
+X
+
+> i=1
+
+(ˆ μi − 1
+
+k
+
+> k
+
+X
+
+> i=1
+
+ˆμi)2 + ˆ σ2
+
+> i
+
+
+
+On the other hand, median functional is not Bellman unbi-ased since there is no unbiased estimator for median. Then, the following question naturally arises; 
+
+"Which sketches are unbiasedly estimatable under the sketch-based Bellman update?" 
+
+The following lemma answers this question. 5Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+η T η ψ(T η)
+
+ψ(η) Tψ ψ(η) 
+
+> Figure 3. Bellman Closedness
+
+η T η ψ(T η)
+
+ψ(η) ˆTψ ψ(η) EP[ϕψ ◦ ˆTψ ψ(η)] Sample next state                           
+
+> Unbiasedly estimate
+> Figure 4. Bellman Unbiasedness
+> Figure 5. Illustration of Bellman Closedness and Bellman Unbiasedness. The above path represents an ideal distributional Bellman update. Due to the infinite-dimensionality, the update process should be represented by using a finite-dimensional embedding (sketch) ψ.Since the transition kernel Pis unknown, the below path describes that the implementation should sample the next state and update by using ˆTψwith the empirical transition kernel ˆP. A sketch ψis Bellman unbiased if ˆTψ◦ψcan unbiasedly estimate ψ◦ T through some transformation ϕψ,i.e., ψ(Tη) = EP[ϕψ◦ˆTψ(η)] .
+
+Lemma 3.5. Let F¯η be a CDF of the probability distri-bution ¯η ∈ Pψ (R)S . Then a sketch is Bellman unbiased if and only if the sketch is homogeneous over Pψ (R)S
+
+of degree k, i.e., there exists some vector-valued function 
+
+h = h(x1, · · · , x k) : X k → RN such that 
+
+ψ(¯ η) = 
+
+Z
+
+· · · 
+
+Z
+
+h(x1, · · · , x k)dF ¯η (x1) · · · dF ¯η (xk).
+
+Lemma 3.5 states that in statistical functional dynamic pro-gramming, the unbiasedly estimatable embedding of a dis-tribution can only be structured in the form of functions that are homogeneous of finite degree (Halmos, 1946). To illustrate that homogenity defines a broader class than linear functionals, consider the variance as a simple example. Vari-ance is clearly not a linear functional, as it is non-additive. However, it can be written as Var (¯ η) = EZ1∼¯η [( Z1 − EZ2∼¯η [Z2]) 2]= EZ1,Z 2∼¯η [Z21 − 2Z1Z2 + Z22 ] = EZ1,Z 2∼¯η [h(Z1, Z 2)] 
+
+which implies the homogenity of degree 2. Taking this concept further and combining it with the results on Bellman closedness, we prove that even when including a nonlinear statistical functional, the only sketch that can be exactly learned and unbiasedly estimated in a finite-dimensional embedding space is the moment sketch. 
+
+Theorem 3.6. The only finite sketches that are both Bellman unbiased and closed are given by collections of ψ1, . . . , ψ N
+
+where its linear span {PNn=0 αnψn| αn ∈ R , ∀N } is equal to the linear span of the set of exponential polynomial func-tionals {η → EZ∼η [Zl exp ( λZ )] | l = 0 , 1, . . . , L, λ ∈ R},where ψ0 is the constant functional equal to 1.
+
+Compared to Rowland et al. (2019), we extend beyond linear statistical functionals to include nonlinear statistical func-tionals, showing the uniqueness of the moment functional. As shown in Figure 1, our theoretical results not only show that high-order central moments such as variance or skew-ness are exactly learnable and unbiasedly estimatable, but also reveal that other nonlinear statistical functionals like median or quantiles inevitably involve approximation errors due to biased estimations. 
+
+Necessity of Bellman unbiasedness. Bellman unbiased-ness ensures that updates can be unbiasedly performed when only a finite number of sampled sketches are available. In other words, it guarantees that the sequence of sampled sketches forms a martingale, enabling the construction of confidence regions through concentration inequalities. This property is crucial for establishing provable efficiency in terms of regret minimization. 
+
+Complementary roles of unbiasedness and closedness. 
+
+At first glance, Bellman Unbiasedness (BU) may appear to be a stricter subset of Bellman Closedness (BC). How-ever, as illustrated in Figure 1, the relationship is more subtle: for example, the categorical sketch is BU but not BC, whereas functionals like the maximum or minimum are BC but not BU. More precisely, BU guarantees the existence of an unbiased estimator of the ground-truth sketch given a finite number of sampled sketches. In contrast, BC plays a complementary role by ensuring that the update process consistently provide such sketches. If a sketch is BU but not BC–as in the case of the categorical sketch–then the update process cannot continue providing new sampled sketches, making dynamic programming infeasible. 
+
+3.3. Statistical Functional Bellman Completeness 
+
+We consider distributional reinforcement learning with gen-eral value function approximation (GVFA). For successful TD learning, GVFA framework for classical RL commonly requires the assumption, Bellman Completeness , that after applying Bellman operator, the output lies in the function class F (Wang et al., 2020; Ayoub et al., 2020; Ishfaq et al., 2021). As a natural extension, our approach receives a tuple of function class FN ⊆ { f : S × A → RN } as input to represent N moments of distribution. Building on this, we assume that for any ¯η : S → P([0 , H ]) , the sketch of target function lies in the function class FN .
+
+Assumption 3.7 (Statistical Functional Bellman Complete-ness) . For any distribution ¯η : S → P([0 , H ]) and 6Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+h ∈ [H], there exists f¯η ∈ F N which satisfies 
+
+f¯η (s, a ) = ψ1: N
+
+ (Brh )#[Ph ¯η]( s, a ) ∀(s, a ) ∈ S × A 
+
+DistBC inevitably leads to linear regret. In the seminal works, Wang et al. (2023) and Chen et al. (2024) assumed that the function class H ⊆ { η : S × A → P([0 , H ]) }
+
+follows the distributional Bellman Completeness (distBC) assumption ( i.e., if η ∈ H for all π, h ∈ [H], T πh η ∈ H ). This seems natural, but constructing a finite-dimensional subspace H that satisfies distBC is quite challenging. Since the distributional Bellman operator is a composition of trans-lation and mixing distributions for the next state, it implies that a function class H must be closed under translation and mixture. However, when considering the representation of infinite-dimensional distributions using a finite number of representations, it is not trivial that the mixture of distri-butions can also be represented with the same number of representations. For example, while a Gaussian distribution can be represented using two parameters (μ, σ 2), a mixture of K Gaussians generally requires 2K representations. To avoid the issue of closedness under mixture, both previ-ous studies assumed a discretized reward MDP where all outcomes of the return distribution are able to discretized into an uniform grid of finite points. Unfortunately, the approximation error introduced by the discretization is not negligible when it comes to regret. This is because model misspecification , which is the error when the model fails to represent the target, typically leads to linear regret. 
+
+Definition 3.8 (Model Misspecification in distBC) . For a given distribution class H which is the finite-dimensional subspace of the space of all distribution F∞, we call ζ the 
+
+misspecification error 
+
+ζ := inf   
+
+> f¯η∈H
+
+sup 
+
+> (s,a )∈S×A
+
+∥f¯η (s, a ) − (Brh )#[Ph ¯η]( s, a )∥
+
+for any ¯η : S → P([0 , H ]) and h ∈ [H].Note that ζ is strictly positive unless the function ap-proximator f¯η can represent any distribution in the finite-dimensional subspace H generated by translation and mix-ture. In a classical linear bandit setting (Zanette et al., 2020), a lower bound with misspecification error ζ is known to yield linear regret Ω( ζK ). Therefore, redefining Bellman Completeness within the infinite-dimensional distribution space is not appropriate, as it either imposes strong con-straints on the MDP structure or leads to linear regret. To circumvent model misspecification, we revisit the distribu-tional BC through the statistical functional lens. We propose a novel framework that matches a finite number of statistical functionals to the target, rather than the entire distribution itself. 
+
+## 4. SF-LSVI : Statistical Functional Least Square Value Iteration 
+
+In this section, we propose SF-LSVI for distRL frame-work with general value function approximation. Leverag-ing the result from Theorem 3.6, we introduce a moment least square regression . This allows us to capture a finite set of moment information from the distribution, which can be unbiasedly estimated, thereby leading to the truncated moment problem (Shohat & Tamarkin, 1943; Schmüdgen et al., 2017). Unlike previous work (Wang et al., 2023; Chen et al., 2024) that estimates in infinite-dimensional dis-tribution spaces, our method enables to estimate distribution unbiasedly in finite-dimensional embedding spaces with-out misspecification error. The pseudocode of SF-LSVI is described in Appendix B. 
+
+Overview. At the beginning of episode k ∈ [K], we main-tain all previous samples {(sτh′ , a τh′ , r τh′ )}(τ,h ′)∈[k−1] ×[H]
+
+and initialize a sketch ψ1: N (¯ ηkH+1 (·)) = 0N . For each step 
+
+h = H, . . . , 1, we compute the normalized sample moments of target distribution {(Brτh′ )# ¯ηkh+1 (sτh′+1 )}h′∈[H] with the help of binomial theorem, 
+
+ψn
+
+
+
+(Brτh′ )# ¯ηh(sτh′+1 )
+
+
+
+:= E[( ¯Zkh+1 (sτh′+1 ) + rτh′ )n]
+
+Hn−1
+
+=
+
+Pnn′=0 Hn′
+
+ψn′
+
+
+
+¯ηh(sτh′+1 )
+
+
+
+(rτh′ )n−n′
+
+Hn−1
+
+and iteratively solve the N -moment least square regression 
+
+˜f kh, ¯η ← arg min  
+
+> f∈F
+> k−1
+
+X 
+
+> τ=1
+> H
+
+X
+
+> h′=1
+
+ NX
+
+> n=1
+
+f (n)(sτh′ , a τh′ )
+
+− ψn
+
+
+
+(Brτh′ )# ¯ηkh+1 (sτh′+1 )
+
+ 2
+
+based on the dataset Dkh which contains the sketch of tem-poral target ψ1: N
+
+
+
+(Brτh′ )# ¯ηkh+1 (sτh′+1 )
+
+
+
+. Then we define 
+
+Qkh(·, ·) = min {( ˜f kh, ¯η )(1) (·, ·) + bkh(·, ·), H } and choose the greedy policy πkh(·) with respect to Qkh. Next, we update all 
+
+N normalized moments of Q-distribution ψ1: N
+
+
+
+ηhk (·, ·)
+
+
+
+and V -distribution ψ1: N
+
+
+
+¯ηhk (·)
+
+
+
+. We repeat the procedure until all the K episodes are completed. 
+
+## 5. Theoretical Analysis 
+
+In this section, we provide the theoretical guarantees for 
+
+SF-LSVI under Assumption 3.7. Applying proof tech-niques from Wang et al. (2020) and extending the result to a statistical functional lens, we generalize eluder dimension 
+
+(Russo & Van Roy, 2013) to the vector-valued function, which has been widely used in RL literatures (Ayoub et al., 7Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+2020; Wang et al., 2020; Jin et al., 2020) to measure the complexity of learning with the function approximators. 
+
+Definition 5.1 (ϵ-dependent, ϵ-independent, Eluder dimen-sion for vector-valued function) . Let ϵ ≥ 0 and Z =
+
+{(si, a i)}ni=1 ⊆ S × A be a sequence of state-action pairs. • A state-action pair (s, a ) ∈ S × A is ϵ-dependent 
+
+on Z with respect to FN if ∥f − g∥Z ≤ ϵ for any vector-valued function f, g ∈ F N , then |f (1) (s, a ) −
+
+g(1) (s, a )| ≤ ϵ.• An (s, a ) is ϵ-independent on Z with respect to FN
+
+if (s, a ) is not ϵ-dependent on Z.• The ϵ-eluder dimension dim E (FN , ϵ ) of a vector-valued function class FN is the length of the longest sequence of elements in S × A such that, for some 
+
+ϵ′ ≥ ϵ, every element is ϵ′-independent on its predeces-sors. We assume that the function class FN and state-action space 
+
+S × A have bounded covering numbers. 
+
+Assumption 5.2 (Covering number) . For any ϵ > 0, the following holds: • there exists an ϵ-cover C(FN , ϵ ) ⊆ F N with size 
+
+|C (FN , ϵ )| ≤ N (FN , ϵ ), such that for any g ∈ F N ,there exists g′ ∈ C (FN , ϵ ) with ∥g − g′∥∞,1 ≤ ϵ.• there exists an ϵ-cover C(S × A , ϵ ) with size |C (S × A, ϵ )| ≤ N (S × A , ϵ ), such that for any (s, a ) ∈S × A , there exists (s′, a ′) ∈ C(S × A , ϵ ) with 
+
+max f ∈F |f (s, a ) − f (s′, a ′)| ≤ ϵ
+
+The following two lemmas give confidence bounds on the sum of the l2 norms of all normalized moments. 
+
+Lemma 5.3 (Single Step Optimization Error) . Con-sider a fixed k ∈ [K] and a fixed h ∈ [H].Let Zkh = {(sτh, a τh)}τ ∈[k−1] and Dkh, ¯η =
+
+n 
+
+sτh, a τh, ψ 1: N
+
+
+
+(Bτrh′ )# ¯η(sτh′+1 )
+
+o  
+
+> τ∈[k−1]
+
+for any 
+
+¯η : S → P([0 , H ]) . Define ˜f kh, ¯η = arg min f ∈F N ∥f ∥2 
+
+> Dkh, ¯η
+
+.For any ¯η and δ ∈ (0 , 1) , there is an event E(¯ η, δ )
+
+such that conditioned on E(¯ η, δ ), with probability at least 1 − δ, for any ¯η′ : S → P([0 , H ]) with 
+
+∥ψ1: N (¯ η′) − ψ1: N (¯ η)∥∞,1 ≤ 1/T ,we have 
+
+˜fh, ¯η′ (·, ·) − ψ1: N
+
+
+
+(Br(·,·))#[P¯η′]( ·, ·)
+
+
+
+> Zkh
+
+≤ c′
+
+
+
+N 12 H
+
+q
+
+log(1 /δ ) + log N (FN , 1/T )
+
+
+
+for some constant c′ > 0.
+
+Due to the definition of Bellman unbiasedness, we re-mark that moment sketch has a corresponding vector-valued estimator ϕψ1: N as an identity and leads to a concentra-tion results as the sampled sketches forms a martingale with respect to the filtration Fτh induced by the history of {(sτh, a τh)}τ ∈[k−1] (i.e., E
+
+h
+
+ψ1: N
+
+
+
+(Brh )# ¯η(sτh)
+
+
+
+Fτh
+
+i
+
+=
+
+ψ1: N
+
+
+
+(Brh )#[Ph ¯η]( sτh, a τh)
+
+
+
+). Another notable aspect in Lemma 5.3 is using normalized moments E[Zn]/H n−1 instead of moments E[Zn], as it reduces the size of the confidence region from O(HN ) to 
+
+O(√N ). This adjustment is akin to scaling the optimization function in multi-objective optimization to treat each ob-jective equally, which effectively prevents the model from favoring objectives with larger scales. 
+
+Lemma 5.4 (Confidence Region) . Let (FN )kh = {f ∈FN |∥ f − ˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ )}, where 
+
+β(FN , δ ) ≥ c′ · N H 2(log( T /δ ) + log N (FN , 1/T )) 
+
+for some constant c′ > 0. Then with probability at least 
+
+1 − δ/ 2, for all k, h ∈ [K] × [H], we have 
+
+ψn
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+
+
+∈ (FN )kh
+
+Lemma 5.4 guarantees that the sequence of moments from the target distribution ψ1: N
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+
+
+lies in the confidence region (FN )kh with high probability. Sup-ported by the aforementioned lemma, we can further guar-antee that all Q-functions are optimistically estimated with high probability and derive our final result. 
+
+Theorem 5.5. Under Assumption 3.7, with probability at least 1 − δ, SF-LSVI achieves a regret bound of Reg (K) ≤ 2Hdim E (FN , 1/T ) + 4 HpKH log(1 /δ )
+
+Under weaker structural assumptions, we show that 
+
+SF-LSVI enjoys near-optimal regret bound of order 
+
+˜O(dE H 32
+
+√K), which is √H better than the state-of-the-art distRL algorithm V-EST-LSR (Chen et al., 2024). For the linear MDP setting, we have dE = ˜O(d) and thus 
+
+SF-LSVI achieves a tight regret bound as ˜O(√d2H3K)
+
+which matches a lower bound Ω( √d2H3K) (Zhou et al., 2021). In our analysis, we highlight two main technical novelties which significantly reduces the degree of regret in distRL framework; 1. We refine previous lemma of Osband et al. (2019) and Wang et al. (2020) to remove the dependency of 
+
+β(FN , 1/δ ) (See Appendix D.4), ensuring that regret bound depends only on the pre-defined function class, not on the number of moment extracted. 8Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+2. As shown in Table 1, we define the eluder dimension 
+
+dE in a finite-dimensional embedding space FN , while other methods rely on an infinite-dimensional distribu-tion space H ⊆ F ∞.
+
+## 6. Conclusions 
+
+We describe the sources of approximation error inherent in distribution-based updates and introduce a pivotal con-cept of Bellman unbiasedness, which enables to exactly learn the information of distribution. We also present a provably efficient online distRL algorithm, SF-LSVI ,with general value function approximation. Notably, our algorithm achieves a near-optimal regret bound of 
+
+˜O(dE H 32
+
+√K), matching the tightest upper bound achieved by non-distributional framework (Zhou et al., 2021; He et al., 2023). One interesting future direction would be to refor-mulate the definition of regret as discrepencies in moments rather than the expected return, and to show the sample-efficiency of distRL. We hope that our work sheds some light on future research in analyzing the provable efficiency of distRL. 
+
+## Acknowledgements 
+
+This work is in part supported by the National Research Foundation of Korea (NRF, RS-2024-00451435(40%), RS-2024-00413957(40%)), Institute of Information & commu-nications Technology Planning & Evaluation (IITP, RS-2021-II212068(10%), 2021-0-00180(10%)) grant funded by the Ministry of Science and ICT (MSIT), grant-in-aid of HANHWA SYSTEMS, Samsung Electronics Co., Ltd(IO210202-08370-01), Institute of New Media and Com-munications(INMAC), and the BK21 FOUR program of the Education and Research Program for Future ICT Samsung Electronics Co., Ltd(IO210202-08370-01), Pioneers, Seoul National University in 2025. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Abbasi-Yadkori, Y., Pál, D., and Szepesvári, C. Improved algorithms for linear stochastic bandits. Advances in neural information processing systems , 24, 2011. Agarwal, A., Jin, Y., and Zhang, T. Vo q l: Towards optimal regret in model-free rl with nonlinear function approxima-tion. In The Thirty Sixth Annual Conference on Learning Theory , pp. 987–1063. PMLR, 2023. Auer, P., Jaksch, T., and Ortner, R. Near-optimal regret bounds for reinforcement learning. Advances in neural information processing systems , 21, 2008. Ayoub, A., Jia, Z., Szepesvari, C., Wang, M., and Yang, L. Model-based reinforcement learning with value-targeted regression. In International Conference on Machine Learning , pp. 463–474. PMLR, 2020. Bastani, O., Ma, J. Y., Shen, E., and Xu, W. Regret bounds for risk-sensitive reinforcement learning. Ad-vances in Neural Information Processing Systems , 35: 36259–36269, 2022. Bellemare, M. G., Naddaf, Y., Veness, J., and Bowling, M. The arcade learning environment: An evaluation plat-form for general agents. Journal of Artificial Intelligence Research , 47:253–279, 2013. Bellemare, M. G., Dabney, W., and Munos, R. A distribu-tional perspective on reinforcement learning. In Interna-tional Conference on Machine Learning , pp. 449–458. PMLR, 2017. Bellemare, M. G., Candido, S., Castro, P. S., Gong, J., Machado, M. C., Moitra, S., Ponda, S. S., and Wang, Z. Autonomous navigation of stratospheric balloons using reinforcement learning. Nature , 588(7836):77–82, 2020. Bellemare, M. G., Dabney, W., and Rowland, M. Distribu-tional reinforcement learning . MIT Press, 2023. Bodnar, C., Li, A., Hausman, K., Pastor, P., and Kalakr-ishnan, M. Quantile qt-opt for risk-aware vision-based robotic grasping. arXiv preprint arXiv:1910.02787 , 2019. Chen, Y., Zhang, X., Wang, S., and Huang, L. Prov-able risk-sensitive distributional reinforcement learning with general function approximation. arXiv preprint arXiv:2402.18159 , 2024. Cho, T., Han, S., Lee, H., Lee, K., and Lee, J. Pitfall of optimism: Distributional reinforcement learning by ran-domizing risk criterion. arXiv preprint arXiv:2310.16546 ,2023. 9Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Choi, Y., Lee, K., and Oh, S. Distributional deep reinforce-ment learning with a mixture of gaussians. In 2019 Inter-national conference on robotics and automation (ICRA) ,pp. 9791–9797. IEEE, 2019. Chow, Y., Tamar, A., Mannor, S., and Pavone, M. Risk-sensitive and robust decision-making: a cvar optimization approach. Advances in neural information processing systems , 28, 2015. Dabney, W., Ostrovski, G., Silver, D., and Munos, R. Im-plicit quantile networks for distributional reinforcement learning. In International conference on machine learn-ing , pp. 1096–1105. PMLR, 2018a. Dabney, W., Rowland, M., Bellemare, M., and Munos, R. Distributional reinforcement learning with quantile re-gression. In Proceedings of the AAAI Conference on Artificial Intelligence , 2018b. Dann, C., Jiang, N., Krishnamurthy, A., Agarwal, A., Lang-ford, J., and Schapire, R. E. On oracle-efficient pac rl with rich observations. Advances in neural information processing systems , 31, 2018. Engert, M. Finite dimensional translation invariant sub-spaces. Pacific Journal of Mathematics , 32(2):333–343, 1970. Fawzi, A., Balog, M., Huang, A., Hubert, T., Romera-Paredes, B., Barekatain, M., Novikov, A., R Ruiz, F. J., Schrittwieser, J., Swirszcz, G., et al. Discovering faster matrix multiplication algorithms with reinforce-ment learning. Nature , 610(7930):47–53, 2022. Fei, Y., Yang, Z., and Wang, Z. Risk-sensitive reinforce-ment learning with function approximation: A debiasing approach. In International Conference on Machine Learn-ing , pp. 3198–3207. PMLR, 2021. Greenberg, I., Chow, Y., Ghavamzadeh, M., and Mannor, S. Efficient risk-averse reinforcement learning. Advances in Neural Information Processing Systems , 35:32639– 32652, 2022. Halmos, P. R. The theory of unbiased estimation. The Annals of Mathematical Statistics , 17(1):34–43, 1946. He, J., Zhao, H., Zhou, D., and Gu, Q. Nearly minimax optimal reinforcement learning for linear markov deci-sion processes. In International Conference on Machine Learning , pp. 12790–12822. PMLR, 2023. Ishfaq, H., Cui, Q., Nguyen, V., Ayoub, A., Yang, Z., Wang, Z., Precup, D., and Yang, L. Randomized exploration in reinforcement learning with general value function approximation. In International Conference on Machine Learning , pp. 4607–4616. PMLR, 2021. Jin, C., Allen-Zhu, Z., Bubeck, S., and Jordan, M. I. Is q-learning provably efficient? Advances in neural infor-mation processing systems , 31, 2018. Jin, C., Yang, Z., Wang, Z., and Jordan, M. I. Provably efficient reinforcement learning with linear function ap-proximation. In Conference on Learning Theory , pp. 2137–2143. PMLR, 2020. Jin, C., Liu, Q., and Miryoosefi, S. Bellman eluder di-mension: New rich classes of rl problems, and sample-efficient algorithms. Advances in neural information processing systems , 34:13406–13418, 2021. Kakade, S. M. On the sample complexity of reinforcement learning . University of London, University College Lon-don (United Kingdom), 2003. Kim, D., Lee, K., and Oh, S. Trust region-based safe distri-butional reinforcement learning for multiple constraints. In Thirty-seventh Conference on Neural Information Pro-cessing Systems , 2023. Kim, D., Lee, K., and Oh, S. Trust region-based safe distri-butional reinforcement learning for multiple constraints. 
+
+Advances in neural information processing systems , 36, 2024. Lattimore, T. and Szepesvári, C. Bandit algorithms . Cam-bridge University Press, 2020. Liang, H. and Luo, Z.-Q. Bridging distributional and risk-sensitive reinforcement learning with provable regret bounds. arXiv preprint arXiv:2210.14051 , 2022. Machado, M. C., Bellemare, M. G., Talvitie, E., Veness, J., Hausknecht, M., and Bowling, M. Revisiting the arcade learning environment: Evaluation protocols and open problems for general agents. Journal of Artificial Intelligence Research , 61:523–562, 2018. Marthe, A., Garivier, A., and Vernade, C. Beyond aver-age return in markov decision processes. arXiv preprint arXiv:2310.20266 , 2023. Muller, T. H., Butler, J. L., Veselic, S., Miranda, B., Wallis, J. D., Dayan, P., Behrens, T. E., Kurth-Nelson, Z., and Kennerley, S. W. Distributional reinforcement learning in prefrontal cortex. Nature Neuroscience , pp. 1–6, 2024. Osband, I. and Van Roy, B. On lower bounds for regret in reinforcement learning. arXiv preprint arXiv:1608.02732 ,2016. Osband, I., Van Roy, B., Russo, D. J., Wen, Z., et al. Deep exploration via randomized value functions. J. Mach. Learn. Res. , 20(124):1–62, 2019. 10 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Rowland, M., Bellemare, M., Dabney, W., Munos, R., and Teh, Y. W. An analysis of categorical distributional re-inforcement learning. In International Conference on Artificial Intelligence and Statistics , pp. 29–37. PMLR, 2018. Rowland, M., Dadashi, R., Kumar, S., Munos, R., Belle-mare, M. G., and Dabney, W. Statistics and samples in dis-tributional reinforcement learning. In International Con-ference on Machine Learning , pp. 5528–5536. PMLR, 2019. Rowland, M., Munos, R., Azar, M. G., Tang, Y., Ostrovski, G., Harutyunyan, A., Tuyls, K., Bellemare, M. G., and Dabney, W. An analysis of quantile temporal-difference learning. arXiv preprint arXiv:2301.04462 , 2023. Russo, D. and Van Roy, B. Eluder dimension and the sample complexity of optimistic exploration. Advances in Neural Information Processing Systems , 26, 2013. Schmüdgen, K. et al. The moment problem , volume 9. Springer, 2017. Shohat, J. A. and Tamarkin, J. D. The problem of moments .Number 1. American Mathematical Soc., 1943. Son, K., Kim, J., Yi, Y., and Shin, J. Disentangling sources of risk for distributional multi-agent reinforcement learn-ing. 2021. Wang, K., Zhou, K., Wu, R., Kallus, N., and Sun, W. The benefits of being distributional: Small-loss bounds for reinforcement learning. arXiv preprint arXiv:2305.15703 ,2023. Wang, R., Salakhutdinov, R. R., and Yang, L. Reinforce-ment learning with general value function approximation: Provably efficient approach via bounded eluder dimen-sion. Advances in Neural Information Processing Sys-tems , 33:6123–6135, 2020. Wang, Y., Wang, R., Du, S. S., and Krishnamurthy, A. Optimism in reinforcement learning with gener-alized linear function approximation. arXiv preprint arXiv:1912.04136 , 2019. Zanette, A., Lazaric, A., Kochenderfer, M., and Brunskill, E. Learning near optimal policies with low inherent bellman error. In International Conference on Machine Learning ,pp. 10978–10989. PMLR, 2020. Zhou, D., Gu, Q., and Szepesvari, C. Nearly minimax optimal reinforcement learning for linear mixture markov decision processes. In Conference on Learning Theory ,pp. 4532–4576. PMLR, 2021. 11 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+# Appendix 
+
+## A. Notation 
+
+Table 2. Table of notation 
+
+Notation Description 
+
+S state space of size S
+
+A action space of size AH horizon length of one episode 
+
+T number of episodes 
+
+rh(s, a ) reward of (s, a ) at step h
+
+Ph(s′|s, a ) probability transition of (s, a ) to s′ at step h
+
+Hkh history up to step h, episode kN number of statistical functionals 
+
+Qπh (s, a ) Q-function of a given policy π at step hV πh (s) V-function of a given policy π at step hZπh (s, a ) random variable of Q-function 
+
+¯Zπh (s) random variable of V -function 
+
+ηπh (s, a ) probability distribution of Q-function 
+
+¯ηπh (s) probability distribution of V -function 
+
+[Ph(·)] expectation over transition [Ph(·)] = Es′∼Ph (·)(Br )# pushforward of the distribution through Br (x) := r + xf (n) n-th element of N -dimensional vector f
+
+∥f ∥∞ max norm of f : X → R defined as ∥f ∥∞ := max x∈X |f (n)(x)|∥f ∥∞,1 l1-norm of max norm of f : X → R defined as ∥f ∥∞,1 := PNn=1 max x∈X |f (n)(x)|FN a function class of N -dimensional embedding space 
+
+Z a set of state-action pairs Z := {(st, a t)}|Z| 
+
+> t=1
+
+D a dataset D := {(st, a t, [d(1)  
+
+> t
+
+, · · · , d (N ) 
+
+> t
+
+]) }|D| 
+
+> t=1
+
+∥f ∥2 
+
+> Z
+
+for f : S × A → R, define ∥f ∥2 
+
+> Z
+
+:= PNn=1 
+
+P 
+
+> (s,a )∈Z
+
+(f (n)(st, a t)) 2
+
+∥f ∥2 
+
+> D
+
+for f : S × A → R, define ∥f ∥2 
+
+> D
+
+:= PNn=1 
+
+PD
+
+> t=1
+
+(f (n)(st, a t) − d(n) 
+
+> t
+
+)2
+
+w(n)(FN , s, a ) width function of (s, a ) defined as w(n)(FN , s, a ) := max f,g ∈F N |f (n)(s, a ) − g(n)(s, a )|
+
+˜f kh, ¯η a solution of moment least squre regression, defined as ˜f kh, ¯η := arg min f ∈F N ∥f ∥Dkh
+
+f¯η a target sketch of distribution ¯η, defined as f¯η := ψ1: N (( Br )#[Ph ¯η]) (FN )kh a confidence region at step h, episode k, defined as (FN )kh := {f ∈ F N | ∥ f − ˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ )}
+
+ψ(¯ η) a statistical functional Pψ (R)S → RS
+
+ψ1: N (¯ η) a N −collection of statistical functional Pψ1: N (R)S → RN ×S
+
+Pψ1: N (R) a domain of sketch ψ1: N
+
+Iψ1: N an image of sketch ψ1: N
+
+T distributional Bellman operator, defined as T ¯η := ( Br )#[P¯η]
+
+Tψ sketch Bellman operator w.r.t ψ, defined as Tψ ψ(¯ η) := ψ
+
+
+
+(Br )#[P¯η]
+
+
+
+ˆTψ empirical sketch Bellman operator w.r.t ψ, defined as ˆTψ ψ(¯ η) := ψ
+
+
+
+(Br )#[ˆP¯η]
+
+
+
+N (FN , ϵ ) covering number of FN w.r.t the ϵ−ball dim E (FN , ϵ ) eluder dimension of FN w.r.t ϵ
+
+12 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+## B. Pseudocode of SF-LSVI and Technical Remarks 
+
+Algorithm 1 Statistical Functional Least Square Value Iteration ( SF-LSVI (δ))
+
+Input: failure probability δ ∈ (0 , 1) and the number of episodes K
+
+1: for episode k = 1 , 2, . . . , K do 
+
+2: Receive initial state sk
+
+> 1
+
+3: Initialize ψ1: N (¯ ηkH+1 (·)) ← 0N
+
+4: for step h = H, H − 1, . . . , 1 do 
+
+5: Dkh ←
+
+n
+
+sτh′ , a τh′ , ψ 1: N
+
+
+
+(Brτh′ )# ¯ηkh+1 (sτh′+1 )
+
+o 
+
+> (τ,h ′)∈[k−1] ×[H]
+
+// Data collection 
+
+6: ˜f kh, ¯η ← arg min f ∈F N ∥f ∥Dkh // Distribution Estimation 
+
+7: bkh(·, ·) ← w(1) (( FN )kh, ·, ·)
+
+8: Qkh(·, ·) ← min {( ˜f kh, ¯η )(1) (·, ·) + bkh(·, ·), H }
+
+9: πkh(·) = arg max a∈A Qkh(·, a ) , V kh (·) = Qkh(·, π kh(·)) // Optimistic planning 
+
+10: ψ1
+
+
+
+ηkh(·, ·)
+
+
+
+← Qkh(·, ·), ψ2: N
+
+
+
+ηkh(·, ·)
+
+
+
+←
+
+
+
+min {( ˜f kh, ¯η )(n)(·, ·), H }
+
+ 
+
+> n∈[2: N]
+
+11: ψ1
+
+
+
+¯ηkh(·)
+
+
+
+← V kh (·), ψ2: N
+
+
+
+¯ηkh(·)
+
+
+
+← ψ1: N
+
+
+
+ηkh(·, π kh(·)) 
+
+ 
+
+> n∈[2: N]
+
+12: for h = 1 , 2, . . . , H do 
+
+13: Take action akh ← πkh(skh)
+
+14: Observe reward rkh(skh, a kh) and get next state skh+1 .
+
+Remark B.1 . For an optimistic planning, we define the bonus function as the width function bkh(s, a ) := wkh(( FN )kh, s, a )
+
+where (FN )kh denotes a confidence region at step h, episode k. When F is a linear function class, the width function can be evaluated by simply computing the maximal distance of weight vector. For a general function class F, computing the width function requires to solve a set-constrained optimization problem, which is known as NP-hard (Dann et al., 2018). However, a width function is computed simply for optimistic exploration, and approximation errors are known to have a small effect on regret (Abbasi-Yadkori et al., 2011). 13 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+## C. Related Work and Discussion 
+
+C.1. Technical Clarifications on Linearity Assumption in Existing Results Bellman Closedness and Linearity. Rowland et al. (2019) proved that quantile functional is not Bellman closed by providing a specific counterexample. However, their discussion based on counterexamples can be generalized as it assumes that the sketch Bellman operator for the quantile functional needs to be linear. They consider an discounted MDP with initial state s0 with single action a, which transits to one of two terminal states 
+
+s1, s 2 with equal probability. Letting no reward at state s0, Unif ([0 , 1]) at state s1, and Unif ([1 /K, 1 + 1 /K ]) at state s2, the return distribution at state s0 is computed as mixture 12 Unif ([0 , γ ]) + 12 Unif ([ γ/K, γ + γ/K ]) . Then the  
+
+> 12K
+
+−quantile at state s0 is γK . They proposed a counterexample where each quantile distribution of state s1, s 2 is represented as 1
+
+> K
+
+PKk=1 δ 2k−1
+
+> K
+
+and 1
+
+> K
+
+PKk=1 δ 2k+1 
+
+> K
+
+respectively, the 12K −quantile of state s0 is ψq2K
+
+ 12K
+
+PKk=1 δ γ(2 k−1) 
+
+> K
+
++ δ γ(2 k+1) 
+
+> K
+
+
+
+= 
+
+> 3γ
+> 2K
+
+. However, this example does not consider that the mixture of quantiles is not a quantile of the mixture distribution (i.e., 
+
+ψq (λη 1 + (1 − λ)η2)̸ = λψ q (η1) + (1 − λ)ψq (η2)), due to the nonlinearity of the quantile functional. Therefore, this does not present a valid counterexample to prove that quantile functionals are not Bellman closed. 
+
+Bellman Optimizability and Linearity. Marthe et al. (2023) proposed the notion of Bellman optimizable statistical functional which redefine the Bellman update by planning with respect to statistical functionals rather than expected returns. They proved that W1-continuous Bellman Optimizable statistical functionals are characterized by exponential utilities 1 
+
+> λ
+
+log EZ∼η [exp( λZ )] . However, their proof requires some technical clarification regarding the assumption that such statistical functionals are linear. To illustrate, they define a statistical functional ψf and consider two probability distributions η1 = 12 (δ0 + δh) and 
+
+η2 = δϕ(h) where ϕ(h) = f −1
+
+ 12 (f (0) + f (h)) 
+
+
+
+. Using the translation property, they lead ψf (η1) = ψf (η2) to  
+
+> 12
+
+(f (x) + f (x + h)) = f (x + ϕ(h)) for all x ∈ R. However, this equality ψf
+
+ 12 (δx + δx+h)
+
+
+
+= 12 (f (x) + f (x + h)) 
+
+holds only if ψf is linear, which is not necessarily a valid assumption for all statistical functionals. 
+
+C.2. Existence of Nonlinear Bellman Closed Sketch. 
+
+The previous two examples may not have considered the possibility that the sketch Bellman operator might not necessarily be linear. However, some statistical functionals are Bellman-closed even if they are nonlinear, so it is open question whether there is a nonlinear sketch Bellman operator that makes the quantile functional Bellman-closed. In this section, we present examples of maximum and minimum functionals that are Bellman-closed, despite being nonlinear. In a nutshell, consider the maximum of return distribution at state s1, s 2 is γ, γ + γ/K respectively. Beyond linearity, the maximum of return distribution at state s0 can be computed by taking the maximum of these values; 
+
+max(max(¯ η(s1)) , max(¯ η(s2))) = max( γ, γ + γ/K ) = γ + γ/K 
+
+which produces the desired result. This implies the existence of a nonlinear sketch that is Bellman closed. More precisely, by defining max s′∼P(·| s,a ) and min s′∼P(·| s,a ) as the maximum and minimum of the sampled sketch ψ (Br )# ¯η(s′) with the distribution P(·| s, a ), we can derive the sketch Bellman operator for maximum and minimum functionals as follows; • Tψmax 
+
+
+
+ψmax (¯ η(s)) 
+
+
+
+= max s′∼P(·| s,a )
+
+
+
+ψmax 
+
+ (Br )# ¯η(s′)
+
+= max s′∼P(·| s,a )
+
+
+
+r + ψmax 
+
+ ¯η(s′)
+
+• Tψmin 
+
+
+
+ψmin (¯ η(s)) 
+
+
+
+= min s′∼P(·| s,a )
+
+
+
+ψmin 
+
+ (Br )# ¯η(s′)
+
+= min s′∼P(·| s,a )
+
+
+
+r + ψmin 
+
+ ¯η(s′)
+
+.14 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+C.3. Non-existence of sketch Bellman operator for quantile functional 
+
+In this section, we prove that quantile functional cannot be Bellman closed under any additional sketch. First we introduce the definition of mixture-consistent , which is the property that the sketch of a mixture can be computed using only the sketch of the distribution of each component. 
+
+Definition C.1 (mixture-consistent) . A sketch ψ is mixture-consistent if for any ν ∈ [0 , 1] and any distributions η1, η 2 ∈
+
+Pψ (R), there exists a corresponding function hψ such that 
+
+ψ(νη 1 + (1 − ν)η2) = hψ
+
+
+
+ψ(η1), ψ (η2), ν 
+
+
+
+.
+
+Next, we will provide some examples of determining whether a sketch is mixture-consistent or not. 
+
+Example 1. Every moment or exponential polynomial functional is mixture-consistent. 
+
+Proof. For any n ∈ [N ] and λ ∈ C,
+
+EZ∼νη 1+(1 −ν)η2 [Zn exp( λZ )] = νEZ∼η1 [Zn exp( λZ )] + (1 − ν)EZ∼η2 [Zn exp( λZ )] .
+
+■
+
+Example 2. Variance functional is not mixture-consistent. 
+
+Proof. Let ν = 12 and Z, Y be the random variables where Z ∼ 12 δ0 + 12 δ2 and Y ∼ 12 δk + 12 δk+2 . Then, Var (Z) = 
+
+Var (Y ) = 1 . While RHS is constant for any k, LHS is not a constant for any k, i.e., Var X∼ 12 ( 12 δ0+ 12 δ2)+ 12 ( 12 δk + 12 δk+2 )(X) = 14 (k2 + 5) .
+
+■
+
+While variance functional is not mixture consistent by itself, it can be mixture consistent with another statistical functional, the mean. 
+
+Example 3. Variance functional is mixture-consistent under mean functional. 
+
+Proof. Notice that mean functional is mixture-consistent. We need to show that variance functional is mixture-consistent under mean functional. Var Z∼νη 1+(1 −ν)η2 [Z]= EZ∼νη 1+(1 −ν)η2 [Z2] − (EZ∼νη 1+(1 −ν)η2 [Z]) 2
+
+= νEZ∼η1 [Z2] + (1 − ν)EZ∼η2 [Z2] − (νEZ∼η1 [Z] + (1 − ν)EZ∼η2 [Z]) 2
+
+= ν(Var Z∼η1 [Z] + ( EZ∼η1 [Z]) 2) + (1 − ν)( Var Z∼η2 [Z] + ( EZ∼η2 [Z]) 2)
+
+− (νEZ∼η1 [Z] + (1 − ν)EZ∼η2 [Z]) 2.
+
+■
+
+This means that to determine whether it is mixture-consistent or not, we should check it on a per-sketch basis, rather than on a per-statistical functional basis. 15 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Example 4. Maximum and minimum functional are both mixture-consistent. 
+
+Proof. 
+
+max 
+
+> Z∼νη 1+(1 −ν)η2
+
+[Z] = max(max 
+
+> Z∼η1
+
+[Z], max 
+
+> Z∼η2
+
+[Z]) 
+
+and 
+
+min 
+
+> Z∼νη 1+(1 −ν)η2
+
+[Z] = min( min 
+
+> Z∼η1
+
+[Z], min 
+
+> Z∼η2
+
+[Z]) 
+
+■
+
+Since maximum and minimum functionals are mixture consistent, we can construct a nonlinear sketch bellman operator like the one in section C.2. This is possible because there is a nonlinear function hψ that ensures the sketch is closed under mixture. Before demonstrating that a quantile sketch cannot be mixture consistent under any additional sketch, we will first illustrate with the example of a median functional that is not mixture consistent. 
+
+Example 5. Median sketch is not mixture-consistent. 
+
+Proof. Let ν = 12 and Z, Y be the random variables where Z ∼ 0.2δ0 + 0 .8δ1 and Y ∼ 0.6δ0 + 0 .4δk for some 0 < k < 1.Then ψmed (Z) = 1 and ψmed (Y ) = 0 . However, med X= Z+Y
+
+> 2
+
+[X] = ψmed (0 .4δ0 + 0 .2δk + 0 .4δ1) = k
+
+which is dependent in k. ■
+
+Lemma C.2. Quantile sketch cannot be mixture-consistent, under any additional sketch. Proof. For a given integer N > 0 and a quantile level α ∈ (0 , 1) , let ν = 12 and a random variable Y ∼ py0 δ0 + py1 δy1 +
+
+· · · + pyN δyN (0 < y 1 < · · · < y N < 1) where py0 > α so that ψα−quantile [Y ] = 0 . Consider another random variable 
+
+Z ∼ pz0 δ0 + pz1 δ1 where pz0 < α so that ψα−quantile [Z] = 1 . Then the α−quantile of the mixture X = Y +Z 
+
+> 2
+
+is 
+
+ψα−quantile [X] = yn where n = min 
+
+(
+
+n ≤ N 12
+
+> n
+
+X
+
+> n′=0
+
+pyn′ + 12 pz0 > α 
+
+)
+
+.
+
+Letting pz0 = 2 α − Pnn′=0 pyn′ , we can manipulate ψα−quantile [X] to be any value of yn. Hence, ψα−quantile [X] is a function of all possible outcomes of Y .If there exists a finite number of statistical functionals which make quantile sketch mixture-consistent, then such sketch would uniquely determine the distribution for any N . This results in a contradiction that infinite-dimensional distribution space can be represented by a finite number of statistical functional. ■
+
+Lemma C.3. If a sketch ψ is Bellman closed, then it is mixture-consistent. Proof. Consider an MDP where initial state s0 has no reward and transits to two state s1, s 2 with probability ν, 1 − ν and reward distribution ¯η1, ¯η2. Since ψ is Bellman closed, ψ(¯ η(s0)) is a function of ψ(¯ η(s1)) and ψ(¯ η(s2)) , (i.e., ψ(¯ η(s0)) 
+
+= gψ (ψ(¯ η(s1)) , ψ(¯ η(s2))) for some gψ ). Since ψ(¯ η(s0)) = ψ(ν ¯η(s1) + (1 − ν)¯ η(s2)) , it implies that ψ is mixture-consistent. ■
+
+Combining the results of Lemma C.2 and Lemma C.3, we prove that a quantile sketch cannot be Bellman closed, no matter what additional sketches are provided. 16 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+## D. Proof 
+
+Theorem (3.3) . Quantile functional cannot be Bellman closed under any additional sketch. 
+
+Proof. See Lemma C.2 and Lemma C.3. ■
+
+Lemma (3.5) . Let F¯η be a CDF of the probability distribution ¯η ∈ P(R)S . Then a sketch is Bellman unbiased if and only if the sketch is a homogeneous of degree k, i.e., there exists some vector-valued function h = h(x1, · · · , x k) : X k → RN
+
+such that 
+
+ψ(¯ η) = 
+
+Z
+
+· · · 
+
+Z
+
+h(x1, · · · , x k)dF ¯η (x1) · · · dF ¯η (xk).
+
+Proof. (⇒) Consider an two-stage MDP with a single action a, and an initial state s0 which transits to one of terminal state 
+
+{s1, · · · , s K } with transition kernel P(·| s0, a ). Assume that the reward r(s0) = 0 . Then ¯η(s0) = PKk=1 P(sk)δr(sk ). Note that s′
+
+> 1
+
+, · · · , s ′ 
+
+> k
+
+are independent and identically distributed random variable in distribution P(·| s, a ).
+
+Es′∼P(·| s0,a )
+
+h
+
+ϕψ
+
+
+
+ψ
+
+
+
+(Br )# ¯η(s′
+
+> 1
+
+)
+
+
+
+, · · · , ψ 
+
+
+
+(Br )# ¯η(s′
+
+> k
+
+)
+
+i 
+
+= ψ1: N
+
+
+
+(Br )#Es′∼P(·| s0,a )[¯ η(s′)] 
+
+
+
+=⇒ Es′∼P(·| s0,a )
+
+h
+
+ϕψ
+
+
+
+ψ
+
+
+
+δr(s′
+
+> 1)
+
+
+
+, · · · , ψ 
+
+
+
+δr(s′ 
+
+> k)
+
+i 
+
+= ψ
+
+
+
+Es′∼P(·| s0,a )[δr(s′)]
+
+
+
+=⇒ Es′∼P(·| s0,a )
+
+h
+
+ϕψ
+
+
+
+g(s′
+
+> 1
+
+), · · · , g (s′
+
+> k
+
+)
+
+i 
+
+= ψ
+
+
+
+¯η(s0)
+
+
+
+=⇒
+
+Z
+
+· · · 
+
+Z
+
+h(s′
+
+> 1
+
+, · · · , s ′
+
+> k
+
+)dF ¯η (s′
+
+> 1
+
+) · · · dF ¯η (s′
+
+> k
+
+) = ψ
+
+
+
+¯η(s0)
+
+
+
+.
+
+(⇐)
+
+ψ
+
+
+
+(Br )#Es′∼P(·| s,a )[¯ η(s′)] 
+
+
+
+=
+
+Z
+
+· · · 
+
+Z
+
+h(x1, · · · , x k)dF (Br )#Es′∼P(·| s,a )[¯ η(s′)] (x1), · · · , dF (Br )#Es′∼P(·| s,a )[¯ η(s′)]( xk )
+
+=
+
+Z
+
+· · · 
+
+Z
+
+h(x1 + r, · · · , x k + r)d
+
+
+
+Es′∼P(·| s,a )F¯η(s′)(x1)
+
+
+
+, · · · , d 
+
+
+
+Es′∼P(·| s,a )F¯η(s′)(xk)
+
+
+
+= Es′∼P(·| s,a )
+
+Z 
+
+· · · 
+
+Z
+
+h(x1 + r, · · · , x k + r)dF ¯η(s′)(x1) · · · dF ¯η(s′)(xk)
+
+
+
+= Es′∼P(·| s,a )
+
+h
+
+ψ
+
+
+
+(Br )#[¯ η(s′)] 
+
+i 
+
+■
+
+Theorem (3.6) . The only finite statistical functionals that are Bellman unbiased and closed are given by the collections of 
+
+ψ1, . . . , ψ N where its linear span {PNn=0 αnψn| αn ∈ R , ∀N } is equal to the set of exponential polynomial functionals 
+
+{η → EZ∼η [Zl exp ( λZ )] | l = 0 , 1, . . . , L, λ ∈ R}, where ψ0 is the constant functional equal to 1. In discount setting, it is equal to the linear span of the set of moment functionals {η → EZ∼η [Zl]| l = 0 , 1, . . . , L } for some L ≤ N .
+
+Proof. Our proof is mainly based on the proof techniques of Rowland et al. (2019) and we describe in an extended form. Since their proof also considers the discounted setting, we will define Br,γ (x) = r + γx for discount factor γ ∈ [0 , 1) . By assumption of Bellman closedness, ψn
+
+
+
+(Br,γ )# ¯η(s′)
+
+
+
+will be written as g(r, γ, ψ 1: N (¯ η(s′)) for some g. By assumption of Bellman unbiasedness and Lemma 3.5, both ψ1: N (¯ η(s′)) and ψn
+
+
+
+(Br,γ )# ¯η(s′)
+
+
+
+are affine as functions of the distribution 17 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+¯η(s′),
+
+ψ1: N (α¯η1(s′) + (1 − α)¯ η2(s′)) = EZi∼α¯η1(s′)+(1 −α)¯ η2(s′)[h1: N ( ¯Z1, · · · , ¯Zk)] = αE ¯Zi∼¯η1(s′)[h1: N ( ¯Z1, · · · , ¯Zk)] + (1 − α)E ¯Zi∼¯η2(s′)[h1: N ( ¯Z1, · · · , ¯Zk)] = αψ 1: N (¯ η1(s′)) + (1 − α)ψ1: N (¯ η2(s′)) 
+
+and 
+
+ψn
+
+
+
+(Br,γ )#(α¯η1(s′) + (1 − α)¯ η2(s′)) 
+
+
+
+= EZi∼α¯η1(s′)+(1 −α)¯ η2(s′)[hn(r + γ ¯Z1, · · · , r + γ ¯Zk)] = αE ¯Zi∼¯η1(s′)[hn(r + γ ¯Z1, · · · , r + γ ¯Zk)] + (1 − α)E ¯Zi∼¯η2(s′)[hn(r + γ ¯Z1, · · · , r + γ ¯Zk)] = αψ n
+
+
+
+(Br,γ )# ¯η1(s′)
+
+
+
++ (1 − α)ψn
+
+
+
+(Br,γ )# ¯η2(s′)
+
+
+
+Therefore, g(r, γ, ·) is also affine on the convex codomain of ψ1: N . Thus, we have 
+
+E ¯Zi∼¯η [ϕψn (r + γ ¯Z1, · · · , r + γ ¯Zk)] = a0(r, γ ) + 
+
+> N
+
+X
+
+> n′=1
+
+an′ (r, γ )E ¯Zi∼¯η [ϕψn′ ( ¯Z1, · · · , ¯Zk)] 
+
+for some function a0: N : R × [0 , 1] → R. By taking ¯η(s′) = δx, we obtain 
+
+ϕψn (r + γx, · · · , r + γx ) = a0(r, γ ) + 
+
+> N
+
+X
+
+> n′=1
+
+an′ (r, γ )ϕψn′ (x, · · · , x ).
+
+According to Engert (1970), for any translation invariant finite-dimensional space is spanned by a set of function of the form 
+
+{x 7 → xl exp( λj x)| j ∈ [J], 0 ≤ l ≤ L}
+
+for some finite subset {λ1, · · · , λ J } of C. Hence, each function x 7 → ϕψn (x, · · · , x ) is expressed as linear combination of exponential polynomial functions. In addition, the linear combination of ϕψn should be closed under composition with for any discount factor γ ∈ [0 , 1] , all λj should be zero. Hence, the linear combination of ϕψ1 , · · · , ϕ ψN must be equal to the span of {x 7 → xl| 0 ≤ l ≤ L} for some L ∈ N.
+
+■
+
+Lemma (5.3) . Consider a fixed k ∈ [K] and a fixed h ∈ [H]. Let Zkh = {(sτh, a τh)}τ ∈[k−1] and Dkh, ¯η =
+
+n 
+
+sτh, a τh, ψ 1: N
+
+
+
+(Bτrh′ )# ¯η(sτh′+1 )
+
+o  
+
+> τ∈[k−1]
+
+for any ¯η : S → P([0 , H ]) . Define ˜f kh, ¯η = arg min f ∈F N ∥f ∥2 
+
+> Dkh, ¯η
+
+. For any ¯η and δ ∈ (0 , 1) , there is an event E(¯ η, δ ) such that conditioned on E(¯ η, δ ), with probability at least 1 − δ, for any 
+
+¯η′ : S → P([0 , H ]) with ∥ψ1: N (¯ η′) − ψ1: N (¯ η)∥∞,1 ≤ 1/T or PNn=1 ∥ψn(¯ η′) − ψn(¯ η)∥∞ ≤ 1/T , we have 
+
+˜fh, ¯η′ (·, ·) − ψ1: N
+
+
+
+(Br(·,·))#[P¯η′]( ·, ·)
+
+
+
+> Zkh
+
+≤ c′
+
+
+
+N 12 H
+
+q
+
+log(1 /δ ) + log N (FN , 1/T )
+
+
+
+for some constant c′ > 0.
+
+Proof. Define the sketch of target f¯η : S × A → RN ,
+
+f¯η (·, ·) := ψ1: N
+
+
+
+(Br(·,·))#[P¯η]( ·, ·)
+
+
+
+for all i ∈ [N ].
+
+18 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+For any f ∈ F ,
+
+∥f ∥2 
+
+> Dkh, ¯η′
+
+− ∥ f¯η′ ∥2 
+
+> Dkh, ¯η′
+
+=
+
+> N
+
+X
+
+> n=1
+
+X 
+
+> sτh,a τh∈Z kh, ¯η′
+
+
+
+f (n)(sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η′(sτh+1 )
+
+ 2
+
+−
+
+
+
+f (n)¯η′ (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η′(sτh+1 )
+
+ 2
+
+=
+
+> N
+
+X
+
+> n=1
+
+X 
+
+> sτh,a τh∈Z kh, ¯η′
+
+(f (n)(sτh, a τh) − f (n)¯η′ (sτh, a τh)) 2
+
++ 2( f (n)(sτh, a τh) − f (n)¯η′ (sτh, a τh)) 
+
+
+
+f (n)¯η′ (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η′(sτh+1 )
+
+ 
+
+≥ ∥ f − f¯η′ ∥2
+
+> Zkh
+
+−4
+
+> N
+
+X
+
+> n=1
+
+∥f (n)¯η − f (n)¯η′ ∥∞(H + 1) |Z kh |
+
++
+
+> N
+
+X
+
+> n=1
+
+X 
+
+> sτh,a τh∈Z kh, ¯η′
+
+h
+
+2( f (n)(sτh, a τh) − f (n)¯η (sτh, a τh)) 
+
+
+
+f (n)¯η (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+ | {z } 
+
+> χτh(f(n))
+
+i
+
+≥ ∥ f − f¯η′ ∥2
+
+> Zkh
+
+−4N (H + 1) −
+
+> N
+
+X
+
+> n=1
+
+X 
+
+> sτh,a τh∈Z kh, ¯η′
+
+χτh(f (n)) .
+
+For the first inequality, we change the second term from ¯η′ to ¯η which are the ϵ-covers. Notice that AC − BC ′ ≥−| AC − BC ′| ≥ −| (A − B)C| − | (A − B)C′| ≥ − 2|A − B|| max( C, C ′)|.
+
+(f (n)(sτh, a τh) − f (n)¯η′ (sτh, a τh)) 
+
+
+
+f (n)¯η′ (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η′(sτh+1 )
+
+ 
+
+− (f (n)(sτh, a τh) − f (n)¯η (sτh, a τh)) 
+
+
+
+f (n)¯η (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+ 
+
+≥ − 2∥f (n)¯η′ (sτh, a τh) − f (n)¯η (sτh, a τh)∥× max 
+
+
+
+f (n)¯η′ (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η′(sτh+1 )
+
+
+
+, f (n)¯η (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+  
+
+≥ − 2∥f (n)¯η′ (sτh, a τh) − f (n)¯η (sτh, a τh)∥(H + 1) 
+
+For the second inequality, consider ¯η′ : S → P([0 , H ]) with PNn=1 ∥ψn(¯ η′) − ψn(¯ η)∥∞ ≤ 1/T . We have 
+
+∥f (n)¯η − f (n)¯η′ ∥∞ = max 
+
+> s,a
+> n
+
+X
+
+> n′=1
+
+Hn′
+
+[ψn′ ([ P¯η]( s, a )) − ψn′ ([ P¯η′]( s, a ))] rn−n′
+
+/H n−1
+
+≤
+
+> n
+
+X
+
+> n′=1
+
+max  
+
+> s′
+
+ψn′ (¯ η(s′)) − ψn′ (¯ η′(s′)) 
+
+≤ 1/T. 
+
+Defining Fkh as the filtration induced by the sequence {(sτh′ , a τh′ )}τ,h ′∈[k−1] ×[H] ∪ { (sk 
+
+> 1
+
+, a k 
+
+> 1
+
+), (sk 
+
+> 2
+
+, a k 
+
+> 2
+
+), . . . , (skh, a kh)}, notice 19 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+that 
+
+E
+
+h NX
+
+> n=1
+
+χτh(f (n)) Fτh
+
+i
+
+=
+
+> N
+
+X
+
+> n=1
+
+2( f (n)(sτh, a τh) − f (n)¯η (sτh, a τh))( f (n)¯η (sτh, a τh) − E
+
+h
+
+ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+
+
+Fτh
+
+i
+
+)=
+
+> N
+
+X
+
+> n=1
+
+2( f (n)(sτh, a τh) − f (n)¯η (sτh, a τh))( f (n)¯η (sτh, a τh) − Esτh+1 ∼Ph(·| sτh,a τh)
+
+h
+
+ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+i 
+
+)=
+
+> N
+
+X
+
+> n=1
+
+2( f (n)(sτh, a τh) − f (n)¯η (sτh, a τh))( f (n)¯η (sτh, a τh) − ψn
+
+
+
+(Brτh )#Esτh+1 ∼Ph(·| sτh,a τh)[¯ η(sτh+1 )] 
+
+
+
+)= 0 
+
+and 
+
+> N
+
+X
+
+> n=1
+
+χτh(f (n)) =
+
+> N
+
+X
+
+> n=1
+
+2( f (n)(sτh, a τh) − f (n)¯η (sτh, a τh))( f (n)¯η (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+
+
+)
+
+≤ max  
+
+> n∈[N]
+
+n
+
+2( f (n)¯η (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η(sτh+1 )
+
+
+
+)
+
+o NX
+
+> n=1
+
+f (n)(sτh, a τh) − f (n)¯η (sτh, a τh)
+
+≤ 2( H + 1) 
+
+> N
+
+X
+
+> n=1
+
+f (n)(sτh, a τh) − f (n)¯η (sτh, a τh)
+
+In third equality, we emphasize that only Bellman unbiased sketch can derive the martingale difference sequence which induce the concentration result. Since every moment functional is commutable with mixing operation, the transformation 
+
+ϕψn in Definition 3.4 is identity for all n ∈ [N ]. Hence, we choose the sketch as moment which already knows ϕψ .By Azuma-Hoeffding inequality, 
+
+P
+
+h X
+
+> (τ,h )∈[k−1] ×[H]
+> N
+
+X
+
+> n=1
+
+χτh(f (n)) ≥ ϵ
+
+i
+
+≤ 2 exp 
+
+
+
+− ϵ2
+
+2(2( H + 1)) 2 P
+
+> (τ,h )∈[k−1] ×[H]
+
+ PNn=1 |f (n) − f (n)¯η |
+
+2
+
+
+
+≤ 2 exp 
+
+
+
+− ϵ2
+
+2(2( H + 1)) 2 P
+
+> (τ,h )∈[k−1] ×[H]
+
+
+
+N PNn=1 |f (n) − f (n)¯η |2
+
+
+
+= 2 exp 
+
+
+
+− ϵ2
+
+2N (2( H + 1)) 2∥f − f¯η ∥2
+
+> Zkh
+
+
+
+where the second inequality follows from the Cauchy-Schwartz inequality. We set 
+
+ϵ =
+
+r
+
+8N (H + 1) 2∥f − f¯η ∥2
+
+> Zkh
+
+log 
+
+ N (FN , 1/T )
+
+δ
+
+
+
+With union bound for all f ∈ C (FN , 1/T ), with probability at least 1 − δ,
+
+X
+
+> (τ,h )∈[k−1] ×[H]
+> N
+
+X
+
+> n=1
+
+χτh(f (n)) ≤ c′N 12 (H + 1) ∥f − f¯η ∥Zkh
+
+r
+
+log 
+
+ N (FN , 1/T )
+
+δ
+
+
+
+for some constant c′ > 0.20 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+For all f ∈ F N , there exists g ∈ C (FN , 1/T ), such that ∥f − g∥∞,1 ≤ 1/T or PNn=1 ∥f (n) − g(n)∥∞ ≤ 1/T for all 
+
+n ∈ [N ],
+
+X
+
+> (τ,h )∈[k−1] ×[H]
+> N
+
+X
+
+> n=1
+
+χτh(f (n)) ≤ X
+
+> (τ,h )∈[k−1] ×[H]
+> N
+
+X
+
+> n=1
+
+χτh(g(n)) + 2( H + 1) |Z kh |
+
+> N
+
+X
+
+> n=1
+
+1
+
+T
+
+≤ c′N 12 (H + 1) ∥g − f¯η ∥Zkh
+
+r
+
+log 
+
+ N (FN , 1/T )
+
+δ
+
+
+
++ 2 N (H + 1) 
+
+≤ c′N 12 (H + 1)( ∥f − f¯η ∥Zkh + 1) 
+
+r
+
+log 
+
+ N (FN , 1/T )
+
+δ
+
+
+
++ 2 N (H + 1) 
+
+≤ c′N 12 (H + 1)( ∥f − f¯η′ ∥Zkh + 2) 
+
+r
+
+log 
+
+ N (FN , 1/T )
+
+δ
+
+
+
++ 2 N (H + 1) 
+
+where the third inequality follows from, 
+
+∥f − g∥2
+
+> Zkh
+
+≤
+
+> N
+
+X
+
+> n=1
+
+X
+
+> (τ,h )∈[k−1] ×[H]
+
+|f (n)(sτh, a τh) − g(n)(sτh, a τh)|2
+
+≤ N T 
+
+ 1
+
+T
+
+2
+
+≤ 1.
+
+Recall that ˜f kh,η ′ = arg min f ∈F ∥f ∥2
+
+> Dkh,η ′
+
+. We have ∥ ˜f kh,η ′ ∥2
+
+> Dkh,η ′
+
+− ∥ f¯η′ ∥2
+
+> Dkh,η ′
+
+≤ 0, which implies, 
+
+0 ≥ ∥ ˜f kh, ¯η′ ∥2 
+
+> Dkh, ¯η′
+
+− ∥ f¯η′ ∥2 
+
+> Dkh, ¯η′
+
+= ∥ ˜f kh, ¯η′ − f¯η′ ∥2
+
+> Zkh
+
++ 2 
+
+> N
+
+X
+
+> n=1
+
+X
+
+> (τ,h )∈[k−1] ×[H]
+
+h
+
+(( ˜f kh, ¯η′ )(n)(sτh, a τh) − f (n)¯η′ (sτh, a τh))(( f (n)¯η′ (sτh, a τh) − ψn
+
+
+
+(Brτh )# ¯η′(sτh+1 )
+
+
+
+)
+
+i
+
+≥ ∥ ˜f kh, ¯η′ − f¯η′ ∥2
+
+> Zkh
+
+− c′N 12 (H + 1)( ∥ ˆf kh, ¯η′ − f¯η′ ∥Zkh + 2) 
+
+q
+
+log(2 /δ ) + log N (FN , 1/T ) − 6N (H + 1) .
+
+Recall that if x2 − 2ax − b ≤ 0 holds for constant a, b > 0, then x ≤ a + √a2 + b ≤ c′ · a for some constant c′ > 0.Hence, 
+
+∥ ˜f kh,η ′ − f¯η′ ∥Zkh ≤ c′(N 12 H
+
+q
+
+log(1 /δ ) + log N (FN , 1/T )) 
+
+for some constant c′ > 0. ■
+
+Lemma (5.4) . Let (FN )kh = {f ∈ F N |∥ f − ˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ )}, where 
+
+β(FN , δ ) ≥ c′ · N H 2(log( T /δ ) + log N (FN , 1/T )) 
+
+for some constant c′ > 0. Then with probability at least 1 − δ/ 2, for all k, h ∈ [K] × [H], we have 
+
+ψn
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+
+
+∈ (FN )kh
+
+Proof. For all (k, h ) ∈ [K] × [H],
+
+S := 
+
+n 
+
+min {f (1) (·, ·) + bkh+1 (·, ·), H }
+
+
+
+f ∈ C (FN , 1/T )
+
+o
+
+∪
+
+n
+
+0
+
+o
+
+n = 1 
+
+n 
+
+min {f (n)(·, ·), H }
+
+
+
+f ∈ C (FN , 1/T )
+
+o
+
+∪
+
+n
+
+0
+
+o
+
+2 ≤ n ≤ N
+
+21 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+is a (1 /T )-cover of ψ1: N (ηkh+1 (·, ·)) where 
+
+ψ1: N (ηkh+1 (·, ·)) = 
+
+
+
+min {(f kh+1 )(1) (·, ·) + bkh+1 (·, ·), H } n = 1 and h < H 
+
+min {(f kh+1 )(n)(·, ·), H } 2 ≤ n ≤ N and h < H 
+
+0N h = H,
+
+i.e., there exists ψ1: N (η) ∈ S such that ∥ψ1: N (η) − ψ1: N (ηkh+1 )∥∞,1 ≤ 1/T . This implies 
+
+¯S := 
+
+n
+
+ψ1: N
+
+
+
+η(·, arg max  
+
+> a∈A
+
+ψ1(η(·, a ))) 
+
+
+
+| ψ1: N (η) ∈ S
+
+o
+
+is a (1 /T )-cover of ψ1: N (¯ ηkh+1 ) with log( |¯S|) ≤ log N (FN , 1/T ).For each ψ1: N (¯ η) ∈ ¯S, let E(¯ η, δ/ 2|¯S|T ) be the event defined in Lemma 5.3. By union bound for all ψ1: N (¯ η) ∈ ¯S, we have Pr [T  
+
+> ψ1: N(¯ η)∈¯S
+
+E(¯ η, δ/ 2|¯S|T )] ≥ 1 − δ/ 2T .Let ψ1: N (¯ η) ∈ ¯S such that ∥ψ1: N (¯ η) − ψ1: N (¯ ηkh+1 )∥∞,1 ≤ 1/T . Conditioned on T  
+
+> sN(¯ η)∈¯S
+
+E(¯ η, δ/ 2|¯S|T ) and by Lemma 5.3, we have 
+
+˜f kh, ¯η (·, ·) − ψ1: N
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+ 2
+
+> Zkh
+
+≤ c′
+
+N H 2(log( T /δ ) + log N (FN , 1/T )) 
+
+
+
+for some constant c′ > 0.By union bound for all (k, h ) ∈ [K]×[H], we have ψ1: N
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+
+
+∈ (FN )kh with probability 1−δ/ 2. ■
+
+Lemma D.1. Let Qkh(s, a ) := min {H, ˜f kh (s, a ) + bkh(s, a )} for some bonus function bkh(s, a ) for all (s, a ) ∈ S × A . If 
+
+bkh(s, a ) ≥ w(1) (( FN )kh, s, a ) , then with probability at least 1 − δ/ 2,
+
+Q∗
+
+> h
+
+(s, a ) ≤ Qkh(s, a ) and V ∗ 
+
+> h
+
+(s) ≤ V kh (s)
+
+for all (k, h ) ∈ [K] × [H], for all (s, a ) ∈ S × A .
+
+Proof. We use induction on h from h = H to 1 to prove the statement. Let E be the event that for (k, h ) ∈ [K] × [H],
+
+ψ1: N
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+
+
+∈ (FN )kh. By Lemma 5.4, Pr |E| ≥ 1 − δ/ 2. In the rest of the proof, we condition on E.When h = H + 1 , the desired inequality holds as Q∗
+
+> H+1
+
+(s, a ) = V ∗
+
+> H+1
+
+(s) = QkH+1 (s, a ) = V kH+1 (s) = 0 . Now, assume that Q∗
+
+> h+1
+
+(s, a ) ≤ Qkh+1 (s, a ) and V ∗
+
+> h+1
+
+(s) ≤ V kh+1 (s) for some h ∈ [H]. Then, for all (s, a ) ∈ S × A ,
+
+Q∗
+
+> h
+
+(s, a ) = min {H, r h(s, a ) + [ PhV ∗
+
+> h+1
+
+]( s, a )}≤ min {H, r h(s, a ) + [ PhV kh+1 ]( s, a )}≤ min {H, ˜f kh (s, a ) + w(1) (Fkh , s, a )}
+
+= min {H, Q kh(s, a ) − bkh(s, a ) + w(1) (Fkh , s, a )}≤ Qkh(s, a )
+
+■
+
+Lemma D.2 (Regret decomposition) . With probability at least 1 − δ/ 4, we have Reg (K) ≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(2 bkh(skh, a kh) + ξkh),
+
+where ξkh = [ Ph(V kh+1 − V πk
+
+> h+1
+
+)]( skh, a kh) − (V kh+1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )) is a martingale difference sequence with respect to the filtration Fkh induced by the history Hkh.
+
+22 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Proof. We condition on the above event E in the rest of the proof. For all (k, h ) ∈ [K] × [H], we have 
+
+˜f kh, ¯η (·, ·) − ψ1: N
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+ 2
+
+> Zkh
+
+≤ β(FN , δ ).
+
+Recall that (FN )kh = {f ∈ FN | ∥f − ˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ )} is the confidence region. Since 
+
+ψ1: N
+
+
+
+(Brh(·,·))#[Ph ¯ηkh+1 ]( ·, ·)
+
+
+
+∈ (FN )kh, then by the definition of width function w(1) (Fkh , s, a ), for (k, h ) ∈ [K] × [H],we have 
+
+w(1) (Fkh , s, a ) ≥ ψ1
+
+
+
+(Brh(s,a ))#[Ph ¯ηkh+1 ]( s, a )
+
+
+
+− ( ˜f kh, ¯η )(1) (s, a )
+
+= rh(s, a ) + [ PhV kh+1 ]( s, a ) − ( ˜f kh, ¯η )(1) (s, a ) .
+
+Recall that Q∗
+
+> h
+
+(·, ·) ≤ Qkh(·, ·).Reg (K) = 
+
+> K
+
+X
+
+> k=1
+
+V ⋆ 
+
+> 1
+
+(sk 
+
+> 1
+
+) − V πk 
+
+> 1
+
+(sk 
+
+> 1
+
+)
+
+≤
+
+> K
+
+X
+
+> k=1
+
+V k 
+
+> 1
+
+(sk 
+
+> 1
+
+) − V πk 
+
+> 1
+
+(sk 
+
+> 1
+
+)=
+
+> K
+
+X
+
+> k=1
+
+Qk 
+
+> 1
+
+(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+) − Qπk 
+
+> 1
+
+(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+)=
+
+> K
+
+X
+
+> k=1
+
+Qk 
+
+> 1
+
+(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+) − (r1(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+) + [ P1V k 
+
+> 2
+
+]( sk 
+
+> 1
+
+, a k 
+
+> 1
+
+)) + ( r1(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+) + [ P1V k 
+
+> 2
+
+]( sk 
+
+> 1
+
+, a k 
+
+> 1
+
+)) 
+
+− Qπk 
+
+> 1
+
+(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+)
+
+≤
+
+> K
+
+X
+
+> k=1
+
+w(1) (( FN )k 
+
+> 1
+
+, s k 
+
+> 1
+
+, a k 
+
+> 1
+
+)+ bk 
+
+> 1
+
+(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+) + [ P1(V k 
+
+> 2
+
+− V πk 
+
+> 2
+
+)]( sk 
+
+> 1
+
+, a k 
+
+> 1
+
+)
+
+≤
+
+> K
+
+X
+
+> k=1
+
+w(1) (( FN )k 
+
+> 1
+
+, s k 
+
+> 1
+
+, a k 
+
+> 1
+
+)+ bk 
+
+> 1
+
+(sk 
+
+> 1
+
+, a k 
+
+> 1
+
+) + ( V k 
+
+> 2
+
+(sk 
+
+> 2
+
+) − V πk 
+
+> 2
+
+(sk 
+
+> 2
+
+)) + ξk
+
+> 1
+
+...
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(w(1) (( FN )kh, s kh, a kh)+ bkh(skh, a kh) + ξkh)
+
+≤
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+(2 bkh(skh, a kh) + ξkh)
+
+■
+
+It remains to bound PKk=1 
+
+PHh=1 bkh(skh, a kh), for which we will exploit fact that FN has bounded eluder dimension. 
+
+Lemma D.3. If bkh(s, a ) ≥ w(1) (( FN )kh, s, a ) for all (s, a ) ∈ S × A and k ∈ [K] where 
+
+(FN )kh = {f ∈ F N | ∥ f − ˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ )},
+
+then KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+1{bkh(skh, a kh) > ϵ } ≤ 
+
+ 4β(FN , δ )
+
+ϵ2 + 1 
+
+
+
+dim E (FN , ϵ )
+
+for some constant c > 0.
+
+23 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Proof. We first want to show that for any sequence {(s1, a 1), . . . , (sκ, a κ)} ⊆ S × A , there exists j ∈ [κ] such that 
+
+(sj , a j ) is ϵ-dependent on at least L = ⌈(κ − 1) /dim E (FN , ϵ )⌉ disjoint subsequences in {(s1, a 1), . . . , (sj−1, a j−1)}
+
+with respect to FN . We demonstrate this by using the following procedure. Start with L disjoint subsequences of 
+
+{(s1, a 1), . . . , (sj−1, a j−1)}, B1, B2, . . . , BL, which are initially empty. For each j, if (sj , a j ) is ϵ-dependent on every 
+
+B1, . . . , BL, we achieve our goal so we stop the process. Else, we choose i ∈ [L] such that (sj , a j ) is ϵ-independent on Bi
+
+and update Bi ← B i ∪ { (sj , a j )}, j ← j + 1 . Since every element of Bi is ϵ-independent on its predecessors, |B i| cannot get bigger than dim E (FN , ϵ ) at any point in this process. Therefore, the process stops at most step j = Ldim E (FN , ϵ ) + 1 ≤ κ.Now we want to show that if for some j ∈ [κ] such that bkh(sj , a j ) > ϵ , then (sj , a j ) is ϵ-dependent on at most 4β(FN , δ )/ϵ 2
+
+disjoint subsequences in {(s1, a 1), . . . , (sj−1, a j−1)} with respect to FN . If bkh(sj , a j ) > ϵ and (sj , a j ) is ϵ-dependent on a subsequence of {(s′
+
+> 1
+
+, a ′
+
+> 1
+
+), . . . , (s′
+
+> l
+
+, a ′
+
+> l
+
+)} ⊆ { (s1, a 1), . . . , (sκ, a κ)}, it implies that there exists f, g ∈ F N with ∥f −
+
+˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ ) and ∥g − ˜f kh, ¯η ∥2
+
+> Zkh
+
+≤ β(FN , δ ) such that f (1) (s′
+
+> t
+
+, a ′
+
+> t
+
+) − g(1) (s′
+
+> t
+
+, a ′
+
+> t
+
+) ≥ ϵ. By triangle inequality, ∥f −
+
+g∥2
+
+> Zkh
+
+≤ 4β(FN , δ ). On the other hand, if (sj , a j ) is ϵ-dependent on L disjoint subsequences in {(s1, a 1), . . . , (sκ, a κ)},then 
+
+4β(FN , δ ) ≥ ∥ f − g∥2 
+
+> Zk
+
+≥ ∥ f (1) − g(1) ∥2 
+
+> Zk
+
+≥ Lϵ 2
+
+resulting in L ≤ 4β(FN , δ )/ϵ 2. Therefore, we have (κ/ dim E (FN , ϵ )) − 1 ≤ 4β(FN , δ )/ϵ 2 which results in 
+
+κ ≤
+
+ 4β(F, δ )
+
+ϵ2 + 1 
+
+
+
+dim E (FN , ϵ )
+
+■
+
+Lemma D.4 (Refined version of Lemma 10 in Wang et al. (2020)) . If bkh(s, a ) ≥ w(1) (( FN )kh, s, a ) for all (s, a ) ∈ S × A 
+
+and k ∈ [K], then KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+bkh(skh, a kh) ≤ Hdim E (FN , 1/T ).
+
+Proof. We first sort the sequence {bkh(skh, a kh)}(k,h )∈[K]×[H] in a decreasing order and denote it by {e1, . . . , e T }(e1 ≥ e2 ≥· · · ≥ eT ). By Lemma D.3, for any constant M > 0 and et ≥ 1/√M T , we have 
+
+t ≤
+
+ 4β(FN , δ )
+
+M e 2
+
+> t
+
++ 1 
+
+
+
+dim E (FN , √M e t) ≤
+
+ 4β(FN , δ )
+
+M e 2
+
+> t
+
++ 1 
+
+
+
+dim E (FN , 1/T )
+
+which implies 
+
+et ≤
+
+ t
+
+dim E (FN , 1/T ) − 1
+
+−1/2
+
+r 4β(FN , δ )
+
+M ,
+
+for t ≥ dim E (FN , 1/T ). Since we have et ≤ H,
+
+> T
+
+X
+
+> t=1
+
+et =
+
+> T
+
+X
+
+> t=1
+
+et1{et < 1/√M T } +
+
+> T
+
+X
+
+> t=1
+
+et1{et ≥ 1/√M T, t < dim E (FN , 1/T )}
+
++
+
+> T
+
+X
+
+> t=1
+
+et1{et ≥ 1/√M T, t ≥ dim E (FN , 1/T )}≤ 1
+
+√M + Hdim E (FN , 1/T ) + X   
+
+> dim E(FN,1/T )≤t≤T
+
+ t
+
+dim E (FN , 1/T ) − 1
+
+−1/2
+
+r 4β(FN , δ )
+
+M
+
+≤ 1
+
+√M + Hdim E (FN , 1/T ) + 2 
+
+ T
+
+dim E (FN , 1/T ) − 1
+
+1/2
+
+dim E (FN , 1/T )
+
+r 4β(FN , δ )
+
+M
+
+= 1
+
+√M + Hdim E (FN , 1/T ) + 
+
+q
+
+16 · dim E (FN , 1/T ) · T · β(FN , δ )/M . 
+
+24 Provably Efficient Distributional Reinforcement Learning with General Value Function Approximation 
+
+Taking M → ∞ , KX
+
+> k=1
+> H
+
+X
+
+> h=1
+
+bkh(skh, a kh) ≤ Hdim E (FN , 1/T ).
+
+■
+
+Theorem (5.5) . Under Assumption 3.7, with probability at least 1 − δ, SF-LSVI achieves a regret bound of Reg (K) ≤ 2Hdim E (FN , 1/T ) + 4 HpKH log(2 /δ ).
+
+Proof. Recall that ξkh = [ Ph(V kh+1 − V πk
+
+> h+1
+
+)]( skh, a kh) − (V kh+1 (skh+1 ) − V πk
+
+> h+1
+
+(skh+1 )) is a martingale difference sequence where E[ξkh|Fkh] = 0 and |ξkh| ≤ 2H. By Azuma-Hoeffding’s inequality, with probability at least 1 − δ/ 2,
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ξkh ≤ 4HpKH log(2 /δ ).
+
+Conditioning on the above event and Lemma D.4, we have Reg (K) ≤ 2
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+bkh(skh, a kh) + 
+
+> K
+
+X
+
+> k=1
+> H
+
+X
+
+> h=1
+
+ξkh
+
+≤ 2Hdim E (FN , 1/T ) + 4 HpKH log(2 /δ )
+
+■
+
+25

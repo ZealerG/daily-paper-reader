@@ -1,0 +1,3763 @@
+Title: Multi-View Stochastic Block Models
+
+URL Source: https://openreview.net/pdf?id=BJx1K4lAAX
+
+Number of Pages: 28
+
+Markdown Content:
+# Multi-View Stochastic Block Models 
+
+Vincent Cohen-Addad * 1 Tommaso d’Orsi * 1 2 Silvio Lattanzi * 1 Rajai Nasser * 1 
+
+## Abstract 
+
+Graph clustering is a central topic in unsuper-vised learning with a multitude of practical appli-cations. In recent years, multi-view graph clus-tering has gained a lot of attention for its appli-cability to real-world instances where one has access to multiple data sources. In this paper we formalize a new family of models, called multi-view stochastic block models that captures this setting. For this model, we first study efficient algorithms that naively work on the union of mul-tiple graphs. Then, we introduce a new efficient algorithm that provably outperforms previous ap-proaches by analyzing the structure of each graph separately. Furthermore, we complement our re-sults with an information-theoretic lower bound studying the limits of what can be done in this model. Finally, we corroborate our results with experimental evaluations. 
+
+## 1. Introduction 
+
+Clustering graphs is a fundamental topic in unsupervised learning. It is used in a variety of fields, including data mining, social sciences, statistics, and more. The goal of graph clustering is to partition the vertices of the graph into disjoint sets so that similar vertices are grouped together and dissimilar vertices lie in different clusters. In this con-text, several notions of similarity between vertices have been studied throughout the years resulting in different clus-tering objectives and clustering algorithms (Von Luxburg, 2007; Ng et al., 2001; Bansal et al., 2004; Goldberg, 1984; Dasgupta, 2016). Despite the rich literature, most of the algorithmic results in graph clustering only focus on the setting where a single graph is presented in input. This is in contrast with the increasing practical importance of multimodality and with              
+
+> *Equal contribution 1Google Research 2BIDSA, Boc-coni. Correspondence to: Tommaso d’Orsi <tom-maso.dorsi@unibocconi.it >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+the growing attention in applied fields to multi-view or multi-layer clustering (Paul & Chen, 2016; Corneli et al., 2016; Han et al., 2015; De Bacco et al., 2017; Khan & Maji, 2019; Zhong & Pun, 2021; Hu et al., 2019; Abavisani & Patel, 2018; Kim et al., 2016; Gujral et al., 2020; Ni et al., 2016; De Santiago et al., 2023; Papalexakis et al., 2013; Gujral & Papalexakis, 2018; Gorovits et al., 2018). In practice it is in fact observed that while a single data source only offers a specific characterization of the underlying objects, leading to a coarse partition of the data, a careful combination of multiple views often allows a semantically richer network structure to emerge (Fu et al., 2020; Fang et al., 2023). For a practical example, consider the task of clustering users of a social network platform like Facebook, Instagram or X. To solve such task one could simply cluster the friendship graph, or one could cluster such graph by looking together at the friendship graph, the co-like graph (a graph where two users are connected if they like the same picture/video), the co-comment graph (a graph where two users are connected if they comment on the same post), the co-repost graph (a graph where two users are connected if they repost the same post) and so on and so forth. In practice, one would expect the second approach to work better in many settings because it provides a more fine-grained description of the behaviors of the users. Despite the large number of basic applications, very little is known on the theoretical aspect of the problem. Sev-eral works (Paul & Chen, 2016; Corneli et al., 2016; Han et al., 2015; De Bacco et al., 2017) consider the multi-layer stochastic block models where the goal is to identify k
+
+communities given several instances (i.e., layer or view) of the stochastic block model, each with k communities. In this paper, we would like to work in a more general and more realistic setup, where there are k communities but each instance only provides partial information about these k communities. Very recently and concurrently to us, (De Santiago et al., 2023) introduced the multi-view stochastic block model . In this model, one is given in in-put multiple graphs, each coming from a stochastic block model, and the goal is to leverage the information contained in the graphs to recover the underlying clustering structure. More precisely, given a vector of labels 1 z where the la-bels capture the clustering assignment and are in [k], and 
+
+> 1We write random variables in boldface.
+
+1Multi-View Stochastic Block Models 
+
+t graphs G1, . . . , Gt, where each graph G` is drawn inde-pendently from a stochastic block model with 2 labels and possibly distinct parameters, we are interested in design-ing an algorithm to weakly recover the underlying vector 
+
+z. One important aspect of the model is that none of the input graphs G1, . . . , Gt may contain enough information to recover the full clustering structure (for example because 
+
+2 < k ), nevertheless one can show that if enough graphs are observed it is possible to recover the clustering structure of the underlying instance. Armed with this new model we study different approaches to cluster the input graphs G1, . . . , Gt. First, we note that the natural approach (sometimes used in practice) of merg-ing the graphs and then clustering the union of the graphs, called early fusion , leads to suboptimal results. Then we design a more careful late fusion clustering algorithm that first clusters all the graphs separately and then carefully merges their results. This shows the superiority of late over early fusion. Finally, we complement our results with an information-theoretic lower bound studying the limits of what can be done in this model. The bounds obtained are a drastic improvement over the ones obtained by (De Santiago et al., 2023). 
+
+Model Before formally introducing our model, we recall the classic definition of the stochastic block model. The k community symmetric stochastic block model (see (Abbe, 2017) for a survey) denotes the following joint dis-tribution (x, G) ∼ SBM n,k,d,ε over a vector of n labels in 
+
+[k] and a graph on n vertices: 
+
+• draw x from [k]n uniformly at random; 
+
+• for each distinct i, j ∈ [n], independently create an edge ij in G with probability (1 + (1 − 1 
+
+> k
+
+)ε) dn if xi =
+
+xj and probability (1 − εk ) dn otherwise. We denote the conditional distribution of G given x = x
+
+as SBM k,d,ε (x) . Given a graph G sampled according to this model, the goal is to recover the (unknown) underlying vector of labels as well as possible. Most of the statistical and computational phenomena at play can already be observed in the simplest settings with two communities, so we will often focus on those. For k = 2 ,we denote the distribution by SBM n, 2,d,ε , i.e., we explicitly replace the subscript k. It will also be convenient to use 
+
+{+1 , −1} for the community labels instead of [2] , so we will sometimes do this. The labeling convention should be clear from the context. One of the most widely studied natural objective in the con-text of stochastic block models is that of weak recovery 
+
+–asking to approximately recover the communities. Specif-ically, we say that an algorithm achieves weak recovery for {SBM n,k,d,ε }n∈N if the correlation of the algorithm’s output ˆx(G) ∈ [k]n and the underlying vector x of labels is better than random as n grows, 2
+
+P
+
+(
+
+R(ˆ x(G`), x`) > 1
+
+k + Ω d,ε/k (1) 
+
+)
+
+> 1 − o(1) , (1) where R(ˆ x, x ) is the agreement between ˆx and x, defined as 3
+
+R(ˆ x, x ) = max 
+
+> π∈Pk
+
+1
+
+n
+
+∑
+
+> i∈[n]
+
+Jˆxi = π(xi)K , (2) and Pk is the permutation group of [k] .
+
+A sequence of works (Decelle et al., 2011; Massouli ´e, 2014; Mossel et al., 2014; 2015b; Abbe & Sandon, 2016a; Mos-sel et al., 2018; Montanari & Sen, 2016), have studied the statistical and computational landscapes of this objective, with great success. The emerging picture (Bordenave et al., 2015; Abbe & Sandon, 2016a; Montanari & Sen, 2016) shows that it is possible to achieve weak recovery in poly-nomial time whenever dε 2/k 2 > 1, this value is called the Kesten-Stigum threshold. Further evidence (Hopkins & Steurer, 2017) suggests that this threshold is optimal for polynomial time algorithms. In particular, for the special case of weak recovery with 2 communities (Mossel et al., 2015b) showed that the problem is solvable (also compu-tationally efficiently) if and only if dε 2/4 > 1. For larger values of k a gap between information-theoretic results and efficient algorithms exists (Abbe & Sandon, 2016b; Banks et al., 2016). In the context of multimodality, we define the following multi-view model. 
+
+Model 1.1 (Multi-View stochastic block model) . Let k > 1
+
+and let T be a sequence of t tuples (d`, ε `) where d` > 0
+
+and ε` ∈ (0 , 1) . We refer to the following joint distribu-tion (z, (f1, G1), . . . (ft, Gt)) ∼ (T ,k,t)-MV -SBM n as the 
+
+(T , k, t )-multi-view stochastic block model: 1. for each ` ∈ [t], independently draw a mapping f` :[k] → {± 1} uniformly at random; 2. independently draw a vector z from [k]n uniformly at random; 3. for each ` ∈ [t], independently draw a graph G` ∼
+
+SBM n, 2,d `,ε ` (f`(z)) , where f`(z) is the n-dimensional vector with entries f`(z1), . . . , f`(zn) .
+
+Given G1, . . . , Gt, the goal is to approximately recover the unknown vector z of labels.             
+
+> 2We use o(1) to denote afunction fsuch that
+> lim n→∞ f(n)/1 = 0 .
+> 3We use Iverson’s brackets to denote the indicator function.
+
+2Multi-View Stochastic Block Models 
+
+When T = {(d`, ε `)}`∈[t] is such that (d`, ε `) =(d, ε ) for some d, ε, we denote the model simply by (d, ε,k,t)-MV -SBM n.Although Model 1.1 captures the algorithmic phenomena of multi-view models used in practice, more general versions of Model 1.1 could be defined, we discuss them in Section 6. Similarly to the vanilla stochastic block model, weak re-covery can also be defined for Model 1.1. We say that an algorithm achieves weak recovery for (T ,k,t)-MV -SBM n
+
+with t observations, if it outputs a vector ˆz(G1, . . . Gt) sat-isfying: 
+
+P
+
+(
+
+R(ˆ z(G1, . . . Gt), z) > 1
+
+k + Ω(1) 
+
+)
+
+> 1 − ot(1) .
+
+(3) Differently from the vanilla stochastic block model, the complexity of Model 1.1 is governed both by the SBM pa-rameters in T and by the number of observations t. A good algorithm should then achieve weak recovery with the best possible multiway tradeoff between the edge-densities of the graphs, the biases and the number of observations at hand. That is, extract as much information as possible so to require as few observations as possible. This novel inter-play of parameters immediately raises two natural questions, which are the main focus of this work. 
+
+How many observations are needed? The problem gets easier the larger the number of observations one has access to (see Appendix A for a formal proof). It is also easy to see that for t = o(log k), it is information theoretically 
+
+impossible to approximately recover the communities (since 
+
+log 2 k bits are needed to encode k labels). Furthermore, as we will see, stronger lower bounds can also be obtained. 
+
+How many observations suffice? To understand how many observations suffice to recover the communities, it is in-structive to consider the union graph G∗ = ⋃ 
+
+> `∈[t]
+
+G` of an instance from (d, ε,k,t)-MV -SBM n, which turns out to follow a k-communities stochastic block model with pa-rameters d∗ = Θ( dt ) , ε ∗ = Θ( ε) (see Appendix A). Build-ing on the aforementioned results, this implies that at least 
+
+t > Ω( k2/dε 2) observations are needed for efficient weak recovery of the communities from G∗! However, as we show later, exponentially better algorithms can bridge this gap. 
+
+1.1. Results Weak recovery Our main algorithmic result shows that weak recovery for (T ,k,t)-MV -SBM n can be achieved in polynomial time with only O(log k) many observations. 
+
+Theorem 1.2 (Weak recovery for multi-view mod-els) . Let n, k > 0 . Let (z, (f1, G1), . . . (ft, Gt)) ∼
+
+(T ,k,t)-MV -SBM n for a sequence of tuples T =
+
+{(d`, ε `)}t`=1 , each satisfying d` · ε2 
+
+> `
+
+/4 > 1. Then there exists a constant CT > 0 depending only on T , such that if t > Ω
+
+( log kC2
+
+> T
+
+)
+
+, weak recovery of z in the sense of (3) 
+
+is possible. Moreover, the underlying algorithm runs in polynomial time. 
+
+Theorem 1.2 implies that whenever the algorithm has access to Θ(log k) observations, each above the relative Kesten-Stigum threshold, the guarantees of the underlying algo-rithm match the aforementioned trivial lower bound, up to constant factors. Moreover, as we will see in Section 4, the underlying algorithm turns out to be surprisingly simple and efficient. The algorithm in Theorem 1.2 applies a specialized weak-recovery algorithm on each view G` to obtain a matrix ˆX`
+
+estimating f`(z)f`(z)T and achieving the correlation             
+
+> C`6E
+> [ˆX(G)ij
+> ∣∣∣f`(z)i=f`(z)j
+> ]
+> −E
+> [ˆX(G)ij
+> ∣∣∣f`(z)6=f`(z)j
+> ]
+> ,
+
+(4) where C` depends only on d`, ε `. The algorithm then pro-ceeds into processing the outputs ˆX` in a blackbox fashion 
+
+to produce an estimate ˆz of z.The constant CT in Theorem 1.2 is the average of the cor-relations (C`)`∈[t]. It is natural to wonder whether the de-pendency of the number of observations on CT is needed. Moreover, as for canonical stochastic block models, it is natural to ask what the exact phase transition of Model 1.1 is. While we leave this latter fascinating question open, our next result shows that if we want an algorithm that processes estimates in a blackbox fashion, then some dependency on 
+
+CT is indeed needed. 
+
+Theorem 1.3 (Lower bound for multi-view models - In-formal) . Let n, k > 0 . Let (z, (f1, G1), . . . (ft, Gt)) ∼
+
+(T ,k,t)-MV -SBM n for a sequence of tuples T =
+
+{(d`, ε `)}t`=1 , each satisfying d` · ε2 
+
+> `
+
+/4 > 1. Assume that for every ` ∈ [t] we have an estimate 4 ˆX` of f`(z)f`(z)T sat-isfying a pair-wise correlation (as in (4) ) of at least C` > 0 ,
+
+and let CT be the average correlation. If t = o
+
+( log kCT
+
+)
+
+, then by only using the estimates 
+
+ˆX1, . . . , ˆXt, it is information-theoretically impossible to return a vector ˆz satisfying 
+
+P
+
+(
+
+R(ˆ z, z) > 1
+
+k + Ω(1) 
+
+)
+
+> 0.99 . (5) 
+
+Exact recovery Another widely studied objective for stochastic block models is that of exact recovery , where the goal is to correctly classify all vertices in the graph     
+
+> 4Such estimates might be obtained by applying a blackbox weak-recovery algorithm for SBM n, 2,d,ε on each of G1, . . . , Gt,and which has the mentioned correlation guarantee.
+
+3Multi-View Stochastic Block Models 
+
+(see (Abbe et al., 2015; Mossel et al., 2015a; Abbe, 2017) and references therein). In the context of Model 1.1 this objective becomes 
+
+P (R(ˆ z, z) = 1) > 1 − o(1) . (6) As a corollary we show that, when given access to more views, the algorithm behind Theorem 1.2 can achieve exact recovery. 
+
+Corollary 1.4 (Exact recovery for multi-view models) .
+
+Consider the settings of Theorem 1.2, if t > Ω
+
+( log nC2
+
+> T
+
+)
+
+then exact recovery of z in the sense of Equation (6) is possi-ble. Moreover, the underlying algorithm runs in polynomial time. 
+
+Experiments Theorem 1.2 show hows, for Model 1.1, 
+
+late fusion algorithms can provide better guarantees –by requiring an exponentially smaller number of observations to achieve the same error in a large parameters regime– than early fusion algorithms. We further corroborated these findings with experiments on synthetic data in Section 5. 
+
+## Organization 
+
+The rest of the paper is organized as follows. We introduce the main ideas in Section 2. In Section 3 we introduce our specialized weak recovery algorithm for the standard stochastic block model. This is then used in the design of the algorithm behind Theorem 1.2 in Section 4. Experiments are presented in Section 5. Future directions and conclusions are discussed in Section 6. In Appendix A we show the limits of algorithms using the union graph. Appendix B contains a proof of (the formal version of) Theorem 1.3. Deferred proofs are presented in Appendix C. 
+
+## Notation 
+
+We denote random variables in boldface . We hide con-stant factors using the notation O(·), Ω( ·), Θ( ·) . We write 
+
+Oδ (·) , Ωδ (·) to specify that the hidden constant may de-pend on the parameter δ. Similarly, we sometimes write 
+
+Cδ to denote a constant depending only on δ. We further denote the indicator function with Iverson’s brackets J·K .
+
+Given functions f, g : R → R, we say f ∈ on(g) if 
+
+lim n→∞ f (n)/g (n) = 0 . Similarly we write f ∈ ωn(g)
+
+if g ∈ on(f ) . With a slight abuse of notation we often write 
+
+on(g) to denote a function in on(g). When the context is clear we drop the subscript. In particular, we often write 
+
+o(1) to denote functions that tends to zero as n grows. We say that an event happens with high probability if this prob-ability is at least 1 − o(1) . For a set S ⊆ [n], we write 
+
+i u.a.r. 
+
+∼ S to denote an element drawn uniformly at random. For a given probability distribution and a measurable event 
+
+E , we denote the probability that the event occurs by P(E) .
+
+We denote the complement event by Ec .
+
+For a vector v ∈ Rn, we write ‖v‖ for its Euclidean norm. For a matrix M ∈ Rn×n, we denote by ‖M ‖ its spec-tral norm and by ‖M ‖F its Frobenius norm. We also let 
+
+‖M ‖1 := ∑ 
+
+> ij
+
+|Mij | . We denote the i-th row of M by Mi.For a graph G with n vertices, we denote by A(G) its adja-cency matrix. When the context is clear we simply write A.If the graph is directed, row Ai contains the outgoing edges of vertex i . 
+
+For a given vector of labels z ∈ [k]n, we denote by 
+
+c1(z) . . . , c k(z) the n-dimensional indicator vectors of the 
+
+k communities defined by z. In the interest of simplic-ity, we often denote instances (z, (f1, G1), . . . (ft, Gt)) 
+
+drawn from (T ,k,t)-MV -SBM n simply by I . For z ∈ [k]n,we also denote by (T ,k,t)-MV -SBM n(z) the distribution of (z, (f1, G1), . . . (ft, Gt)) ∼ (T ,k,t)-MV -SBM n condi-tioned on the event z = z . We often call z ∈ [k]n a “com-munity vector”. We say that an algorithm runs in time T , if in the worst case it performs at most T elementary operations. 
+
+## 2. Techniques 
+
+We outline here the main ideas behind Theorem 1.2 and The-orem 1.3. In the interest of clarity, we limit our discussion to (d, ε,k,t)-MV -SBM n.
+
+Behavior of the union graph The algorithm behind The-orem 1.2 is remarkably simple and leverages known algo-rithms for weak recovery of stochastic block models (par-ticularly related to the robust algorithms of (Ding et al., 2022; 2023)). As a first step, to gain intuition, it is instruc-tive to understand why the union graph instead requires 
+
+t > Ω( k2) observations (see Theorem A.1). An instance 
+
+I of (d, ε,k,t)-MV -SBM n is given by a vector z ∈ [k]n and a collection of t independent pairs (f1, G1) , . . . , (ft, Gt),where each G` is sampled from SBM 2,d,ε (f`(z)) . Since, by definition, each edge {i, j } appears in G` with probability (
+
+1 + ε
+
+2 · f`(z)i · f`(z)j
+
+)
+
+· dn , in the union graph ⋃ 
+
+> `∈[t]
+
+G`
+
+the same edge appears roughly with probability 
+
+dn · ∑
+
+> `∈[t]
+
+(
+
+1 + ε
+
+2 · f`(z)i · f`(z)j
+
+)
+
+.
+
+The intuition here is that if zi 6 = zj the second term in the sum would be close to 0, while for zi = zj it would be εt  
+
+> 2
+
+.
+
+Hence, we will see this edge in the union graph roughly with probability 
+
+dt n · (1 + O(ε) · Jzi = zj K) .
+
+That is, the union graph behaves similarly to a vanilla stochastic block model with k communities, bias O(ε) and 4Multi-View Stochastic Block Models 
+
+expected degree dt . As stated in the introduction, existing efficient algorithms can achieve weak recovery for that dis-tribution whenever (dt )ε2/k 2 > Ω(1) , implying t > Ω( k2)
+
+in the regime 4 < dε 2 6 O(1) where weak recovery for each observation is possible. 
+
+Amplifying the signal-to-noise ratio via black-box esti-mators The above approach of taking the union graph and then running community detection on it yields sub-optimal guarantees because the graph does not keep all information regarding the instance I . Our strategy to overcome this issue is to proceed in the reverse order: first extract as much information as possible from each graph, and then combine the data. Concretely, in the context of (d, ε,k,t)-MV -SBM n,our plan is to accurately estimate the matrix f`(z)f`(z)T for each graph G` . Indeed, the polynomial ∑ 
+
+> `∈[t]
+
+f`(z)if`(z)j
+
+strongly correlates with Jzi = zj K in the sense that 
+
+t = E
+
+∑
+
+> `∈[t]
+
+f`(z)if`(z)j
+
+∣∣∣∣∣∣ zi = zj
+
+
+
+> E
+
+∑
+
+> `∈[t]
+
+f`(z)if`(z)j
+
+∣∣∣∣∣∣ zi 6 = zj
+
+ = 0 .
+
+In other words, we can accurately estimate whether 
+
+zi = zj or not by accurately estimating the products ∑ 
+
+> `∈[t]
+
+f`(z)if`(z)j . Now, we do not have access to the functions f`(z) but we can hope (see the subsequent para-graphs) that existing weak recovery algorithms can provide a close enough estimate in the sense 
+
+t · Cd,ε = E
+
+∑
+
+> `∈[t]
+
+ˆx(G`)i ˆx(G`)j
+
+∣∣∣∣∣∣ zi = zj
+
+ (7) 
+
+> E
+
+∑
+
+> `∈[t]
+
+ˆx(G`)i ˆx(G`)j
+
+∣∣∣∣∣∣ zi 6 = zj
+
+ = 0 .
+
+If so, we may simply decide whether i, j should be clustered together based on how large ∑ 
+
+> `∈[t]
+
+ˆx(G`)i ˆx(G`)j is. By independence of the observations, standard concentration of measure results tell us that Ω(log( n)/C 2
+
+> d,ε
+
+) observations 5
+
+would suffice to exactly predict all the n2 pairs (and hence achieve exact recovery with this number of observations). 
+
+Improvements via neighborhoods intersection Contin-uing with the above line of thinking, one can further improve the dependency on t to t = Θ(log k) as promised in The-orem 1.2. For a label p ∈ [k] , let cp(z) ∈ { 0, 1}n be the indicator vector of the corresponding community. The im-provement comes from observing that for ` 6 = `′ and for any typical labelling z (i.e. a labelling that is approximately       
+
+> 5This is better than Ω( k2)as long as k>Ω( √log n).
+
+balanced), we have large separation between the commu-nity indicator vectors ‖cp(z) − cp′ (z)‖2 > Ω( n/k ) . The crucial consequence is that for a fixed index i ∈ [n], we do not need to guess correctly Jzi = zj K for all j and we may misclassify some pairs. Indeed if Ai ∈ { 0, 1}n is a vector with entries (Ai)j that accurately predicts Jzi = zj K
+
+up to a ρ < n/k misclassification error, then we can deduce whether i, j come from the same community by verifying if 
+
+Ai and Aj agree on the majority of their entries. Concretely, by the reverse triangle inequality it holds that 
+
+|‖ Ai − Aj ‖ − ‖ cp(z) − cp′ (z)‖| 
+
+6 ‖cp(z) − Ai‖ + ‖cp′ (z) − Aj ‖ 6 O(n/k ) .
+
+That is, we are still able to exactly deduce whether i, j sit in the same community! The improvement over t then comes as O(log( k)/C 2 
+
+> δ
+
+) observations suffice to bound the misclas-sification error by n/k times a tiny constant. Finally, we remark that we are bound to misclassify some vertices as for some vertices i the estimator vector Ai will not accurately represent its community when t 6 O(log( k)/C 2 
+
+> δ
+
+) (this is due to the well-known gap between weak recovery and ex-act recovery in the vanilla stochastic block model (Abbe, 2017)). 
+
+The pair-wise weak recovery estimator So far, we glossed over the fact that we do not have an algorithm return-ing an accurate estimate ˆx(G`)ˆ x(G`)T of f`(z)f`(z)T given the graph G` . Notice that for a pair (x, G) ∼ SBM n, 2,d,ε ,an algorithm achieving weak recovery returns a vector 
+
+ˆx(G) ∈ {± 1}n such that 
+
+Ω( n2) 6 E [〈ˆx(G), x〉2]
+
+6 E [〈ˆx(G)ˆ x(G)T, xx T〉]
+
+which is enough to obtain the separation required in Equa-tion (7). Indeed, the above implies that on average 
+
+E [ˆ x(G)i ˆx(G)j | xi = xj] − E [ˆ x(G)i ˆx(G)j | xi 6 = xj]
+
+> Ωd,ε (1) ,
+
+which is enough to carry out the strategy outlined in the pre-vious paragraphs. Notice that, a priori, it is not clear whether these estimators should work for (d, ε,k,t)-MV -SBM n as the model introduces some subtle difficulties compared to SBM n, 2,d,ε . Most importantly, the labels in f`(z) –and hence the edges in G`– are not pair-wise independent. We bypass this obstacle carrying out the analysis after con-ditioning on the choice of f`, so that, even though the com-munities may be unbalanced, the edges are again indepen-dent. Now, for highly unbalanced communities the expected degree of each vertex is an accurate predictor for its commu-nity, hence weak recovery is easy to achieve. On the other hand, one can treat slightly unbalanced communities as per-turbed balanced communities and apply the node-robust algorithm of (Ding et al., 2023). 5Multi-View Stochastic Block Models 
+
+Remark 2.1 (Connection with (Liu et al., 2022)) . Liu, Moitra and Raghavendra studied a joint distribution model over hypergraphs with independence edges. In the special case of graphs, their model can be seen as a simpler version of Model 1.1 in which every f`(·) is known , and each d` is a constant. For this model, (Liu et al., 2022) beats random guessing: They produce a unit vector that correlates with the community vector better than a random vector guess would. However, they provide no rounding strategy. The algorith-mic techniques in (Liu et al., 2022) are very different from ours and do not imply a result of the form of Theorem 1.2 for Model 1.1. 
+
+Information theoretic lower bounds for black-box algo-rithms The proof of Theorem 1.3 consists of two main steps. In the first step, we bound how much information an estimate ˆX` with pair-wise correlation C` can reveal about z. We show that this can be bounded (in terms of mutual information) as I(z; ˆX`) 6 O(C` · n). In the sec-ond step we use an adapted version of Fano’s inequality to show that if ˆz is an estimate of z achieving (5) , then ˆz must have at least Ω( n · log k) bits of information about z, i.e., 
+
+I(z; ˆ z) > Ω( n · log k).Now if ˆz is obtained by only processing ( ˆX`)`∈[t] , then by using the data processing inequality, we can show that 
+
+Ω( n · log k) 6 ∑
+
+> t∈[t]
+
+I(z; ˆX`)
+
+6 ∑
+
+> t∈[t]
+
+O(C` · n) 6 O(CT · t · n) ,
+
+where CT is the average of the correlations (C`)`∈[t] . From this we deduce that we must have t > Ω
+
+( log kCT
+
+)
+
+.
+
+## 3. Specialized weak recovery for vanilla SBMs 
+
+General weak recovery results (Abbe, 2017) for stochastic block models turn out to be too weak for our objective. We rely instead on the following stronger statement, which we obtain by exploiting the robust algorithms of (Ding et al., 2022), (Ding et al., 2023), and which also works down to the Kesten-Stigum threshold. This specialized estimator will be used in the main algorithm behind Theorem 1.2. 
+
+Theorem 3.1 (Pair-wise weak recovery for unbalanced 2
+
+communities stochastic block model) . Let n, d, ε > 0 be satisfying dε 2/4 − 1 > 0 . Let x = ( xi)i∈[n] ∈ {± 1}n be a sequence of i.i.d. binary random variables with P(xi =+1) = p . There exists a polynomial time algorithm such that, on input G ∼ SBM n, 2,d,ε (x), returns with probability 
+
+1 − o(1) a matrix ˆX(G) ∈ [−1 , +1] n×n satisfying ∀i, j ∈
+
+[n]
+
+Cd,ε 6 E
+
+[ ˆX(G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+− E
+
+[ ˆX(G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+for some constant Cd,ε > 0 .
+
+Notice that the algorithm only receives G, d, ε and hence it does not know p . Note also that in the above, if one of the events xi = xj or xi 6 = xj has probability 0 (i.e., if 
+
+p = 0 or p = 1 ), then we adopt the convention that the corresponding conditional expectation is 0. We defer the proof of Theorem 3.1 to Appendix C. 
+
+## 4. The algorithm 
+
+In this section we prove Theorem 1.2. We start by describing the underlying algorithm. Throughout the section, for a given t , we assume T = {(d`, ε `)}t`=1 to be a sequence of t tuples (d`, ε `) each satisfying d` · ε2 
+
+> `
+
+/4 − 1 > 0 . For each ` ∈ [t], let C` be the weak-recovery constant that is achievable for SBM n,d `,ε ` in the sense of Theorem 3.1 (recall this constant depends only on d`, ε `) and let 
+
+C = 1
+
+t
+
+∑
+
+> `∈[t]
+
+C` > 0 .
+
+We also assume k 6 n1−Ω(1) .
+
+Algorithm 1 Community detection for multi-view stochas-tic block models 
+
+Input: k, G 1, . . . , G t .
+
+Output: Community vector ˆz in [k]n .
+
+For each G` with ` ∈ [t], run the community detection algorithm of Theorem 3.1. Construct the directed graph F on the vertex set [n] as follows. 
+
+for i = 1 to n do 
+
+Add an outgoing edge to the n/k vertices j ∈ [n] with largest ∑ 
+
+> `∈[t]
+
+ˆX(G`)ij .
+
+end for 
+
+Run Algorithm 2 on the adjacency matrix A of F and return the resulting vector. 
+
+Remark 4.1 (Running time) . By Theorem 3.1, the first step of the algorithm takes time O (t · nO(1) ) . Computing the values of ∑ 
+
+> `∈[t]
+
+ˆX(G`)ij for all pairs takes time O(t · n2) .
+
+Drawing the edges takes time O(n2 log n). Hence the algo-rithm runs in time O ((tn )O(1) + T ) where T is the running time of Algorithm 2. 
+
+Graph structure on balanced instances Algorithm 1 will work on typical instances from (T ,k,t)-MV -SBM n. In particular, it will work on instances that are approximately balanced, as described below. 
+
+Definition 4.2 (Balanced vector) . Let z ∈ [k]n . We say that z is balanced if for all p ∈ [k] , it holds 
+
+(
+
+1 − n−Ω(1) ) nk 6 ‖cp(z)‖2 6
+
+(
+
+1 + n−Ω(1) ) nk .
+
+6Multi-View Stochastic Block Models 
+
+If z is balanced we also say that I ∼ (T ,k,t)-MV -SBM n(z)
+
+is balanced. It is immediate to see that a random instance 
+
+(z, (f1, G1), . . . (ft, Gt)) ∼ (T ,k,t)-MV -SBM n is balanced with high probability. 
+
+Fact 4.3 (Probability of balanced instance) . Let I := (z, (f1, G1), . . . (ft, Gt)) ∼ (T ,k,t)-MV -SBM n, . Then, with probability 1 − n−10 , I is balanced. The proof of Fact 4.3 is straightforward and we defer it to Appendix C. On balanced instances with sufficiently many observations, the adjacency matrix A of F becomes a good approximation of the true community matrix ∑ 
+
+> i∈[k]
+
+ci(z)ci(z)T.
+
+Lemma 4.4 (Graphs structure from good instances) . Let 
+
+n, k, t > 0. Let I := ( z, (f1, G1), . . . (ft, Gt)) . Then Algorithm 1 constructs an adjacency matrix A such that 
+
+∀p ∈ [k] , ∀i ∈ [n]
+
+E
+
+[
+
+‖Ai − cp(z)‖2 ∣∣∣ zi = p
+
+]
+
+6 O(n) ·
+
+(
+
+n−Ω(1) + e−Ω( ¯C2·t))
+
+.
+
+To prove Lemma 4.4 we require an intermediate step. 
+
+Fact 4.5 . Consider the setting of Lemma 4.4. There exists a constant C∗ ∈ [−t, t ] such that, for i, j ∈ [n],
+
+P
+
+∑
+
+> `∈[t]
+
+ˆX(G`)ij < C ∗ − C · t
+
+3
+
+∣∣∣∣∣∣ zi = zj
+
+ 6 e−Ω(C2·t) ,
+
+P
+
+∑
+
+> `∈[t]
+
+ˆX(G`)ij > C∗ − C · t
+
+3
+
+∣∣∣∣∣∣ zi 6 = zj
+
+ 6 e−Ω(C2·t) .
+
+We defer the proof of Fact 4.5 to Appendix C. We are now ready to prove Lemma 4.4. 
+
+Proof of Lemma 4.4. Fix i ∈ [n] . We can limit our analy-sis after conditioning on the event E(z) that z is balanced. Indeed, we have 
+
+E
+
+[
+
+‖Ai − cp(z)‖2 ∣∣∣ E(z)c , zi = p
+
+]
+
+· P (E(z)) 
+
+6 O(n) · P (E(z)) 6 n−Ω(1) .
+
+Let C∗ be the constant of Fact 4.5. Define 
+
+Bij = ∑
+
+> `∈[t]
+
+ˆX(G`)ij ,
+
+and let A′ 
+
+> i
+
+= ( A′ 
+
+> ij
+
+)j∈[n] be the binary vector defined as 
+
+A′ 
+
+> ij
+
+=
+
+s
+
+Bij > C∗ − ¯C · t
+
+3
+
+{
+
+.
+
+Notice that ‖A′
+
+> i
+
+‖1 is the number of indices j with Bij >
+
+C∗ − ¯C·t 
+
+> 3
+
+. Now from the definition of the binary vector Ai ,
+
+we know that Aij = 1 if and only if Bij is among the top 
+
+n/k values in {Bij ′ : j′ ∈ [n]} . From this it is not hard to see that that ‖Ai − A′
+
+> i
+
+‖1 can be bounded from above by how much ‖A′
+
+> i
+
+‖1 deviates from n/k , that is 
+
+‖Ai − A′
+
+> i
+
+‖1 6
+
+∣∣∣‖A′
+
+> i
+
+‖1 − nk
+
+∣∣∣ .
+
+Now assuming that E(z) holds, we have 
+
+‖cp(z)‖1 = ‖cp(z)‖2 = nk ± n1−Ω(1) ,
+
+hence 
+
+‖Ai − A′
+
+> i
+
+‖1 6 ∣∣‖A′
+
+> i
+
+‖1 − ‖ cp(z)‖1
+
+∣∣ + n1−Ω(1) 
+
+6 ‖A′ 
+
+> i
+
+− cp(z)‖1 + n1−Ω(1) .
+
+Since cp(z) and Ai are binary vectors, we have 
+
+‖Ai − cp(z)‖2 = ‖Ai − cp(z)‖1
+
+6 ‖Ai − A′
+
+> i
+
+‖1 + ‖A′ 
+
+> i
+
+− cp(z)‖1 ,
+
+and hence, given E(z) , we have 
+
+‖Ai − cp(z)‖2 6 2 ‖A′ 
+
+> i
+
+− cp(z)‖1 + n1−Ω(1) . (8) Now notice that 
+
+|(A′
+
+> i
+
+)j − cp(z)j |
+
+= J(A′
+
+> i
+
+)j = 1 KJ cp(z)j = 0 K + J(A′
+
+> i
+
+)j = 0 KJ cp(z)j = 1 K
+
+= J(A′
+
+> i
+
+)j = 1 KJ zj 6 = pK + J(A′
+
+> i
+
+)j = 0 KJ zj = pK .
+
+Now using Fact 4.5 and leveraging the fact that 
+
+P (E(z)c | zi = p) 6 O (n−10 ) we get 
+
+E [|(A′
+
+> i
+
+)j − cp(z)j | | E (z), zi = p]
+
+6 e−Ω(C2·t) + O (n−10 ) .
+
+Combining this with (8) we conclude that 
+
+E
+
+[
+
+‖Ai − cp(z)‖2 ∣∣∣ E(z), zi = p
+
+]
+
+6 O(n) ·
+
+(
+
+n−Ω(1) + e−Ω( ¯C2·t))
+
+.
+
+Rounding Thanks to Lemma 4.4, an application of the following rounding scheme –sometimes called second mo-ment rounding , as one may see A as an estimate of ∑ 
+
+> p
+
+cp(z)cp(z)T– suffices to compute the true communities. 
+
+Remark 4.6 (Running time) . Each step in the outer loop takes time O(n2). Overall Algorithm 2 runs in O(k · n2) .
+
+7Multi-View Stochastic Block Models 
+
+Algorithm 2 Second moment rounding 
+
+Input: A matrix A ∈ { 0, 1}n×n .
+
+Output: Community vector ˆz in [n]k .
+
+Let S = ∅ .
+
+for p = 1 to k (stop earlier if S = [ n]) do 
+
+Pick uniformly at random i ∈ [n] \ S . Set Sp = {i} .
+
+for j ∈ [n] \ S , j 6 = i do 
+
+Set j ∈ Sp if ‖Ai − Aj ‖2 6 nk .
+
+end for 
+
+Add Sp to S .
+
+end for 
+
+Assign each i ∈ [n] \ S to a set Sp, where p is chosen uniformly at random. 
+
+Return: the vector ˆz with ˆzi = p if and only if i ∈ Sp .
+
+As first step of the proof, we introduce a new definition. 
+
+Definition 4.7 (Representative row) . Let z ∈ [k]n, let 
+
+c1(z), . . . , c k(z) be the indicator vectors of the labels in 
+
+z and let A∗(z) = ∑ 
+
+> p
+
+cp(z)cp(z)T . For a matrix A ∈{0, 1}n×n , we say Ai is q-representative if 
+
+‖Ai − A∗(z)i‖2 6 n · e−q·C2·t . (9) We denote by Rq the set of q representatives of A . 
+
+The use of representative rows is convenient because, for sufficiently many observations, it is easy to see that rows which are representative of the same community must be close together, while rows that are representative of different communities must be far from each other. 
+
+Lemma 4.8. Let n, k, t > 0 , and let q > 0 be the hid-den constant in Lemma 4.4. Let t > C log kC2 for a large enough universal constant C > 0. Let z ∈ [k]n be bal-anced. Suppose that at each iteration of the outer loop, Algorithm 2 picks some Ai that is a q-representative. Then 
+
+max π∈Pk
+
+∑ 
+
+> i∈R q(z)
+
+J ˆzi = π(zi)K = |R q | , where Pk is the permutation group over [k] .
+
+We defer the proof of Lemma 4.8 to Appendix C. Now, to prove Theorem 1.2, it remains to argue that, with high probability, first there are few non-representatives in A , and 
+
+second Algorithm 2 picks q-representatives at each iteration of the outer loop. 
+
+Lemma 4.9. Let n, k, t > 0 , and let q > 0 be the hidden constant in Lemma 4.4. Let t = C log k 
+
+> ¯C2
+
+for a large enough universal constant C > 0. Let I := (z, (f1, G1), . . . (ft, Gt)) ∼ (T ,k,t)-MV -SBM n . Let A be the matrix constructed by Algorithm 1. On input A, with probability at least 1 − k−Ω(1) , the following holds: 
+
+• there are at least n · (1 − k−Ω(1) ) rows in A which are 
+
+Ω( q)-representatives, 
+
+• step 1.(a) of Algorithm 2 only picks Ω( q)-representative vectors. Proof. By Fact 4.3 we may assume z is balanced. By Lemma 4.4 and Markov’s inequality, with probability 
+
+1 − e−Ω( q·C2·t) there are at most O(n) · e−Ω(q·C2·t) in-dices i ∈ [n] such that Ai is not a Ω( q)-representative. Note that if C is large enough, then e−Ω(q·C2·t) = k−Ω(1) . At every iteration of the loop, if we pick a representative vector we remove at most (1 + o(1)) nk indices, since z is bal-anced. Hence at each iteration there are at least nk (1 − o(1)) 
+
+indices that are Ω( q)-representative and which have not yet been picked. It follows that the probability we never pick an index that is not Ω( q)-representative is at least 
+
+(
+
+1 − n·k−Ω(1) 
+
+> n/k
+
+)k
+
+> 1 − k−Ω(1) as desired (by choosing 
+
+C to be large enough). Theorem 1.2 now immediately follows combining Fact 4.3, Lemma 4.4, Lemma 4.8 and Lemma 4.9. 
+
+Exact recovery Lemma 4.9 also implicitly yield exact recovery for sufficiently many observations. 
+
+Corollary 4.10. Let n, k, t > 0 , and let q > 0 be the hidden constant in Lemma 4.4. Let t > C log n 
+
+> ¯C2
+
+for a large enough universal constant C > 0. Let I := (z, (f1, G1), . . . (ft, Gt)) ∼ (T ,k,t)-MV -SBM n . Let A be the matrix constructed by Algorithm 1. On input A, with probability at least 1 − n−Ω(1) , all rows in A are Ω( q)-representatives. Proof. By Lemma 4.4 and Markov’s inequality, with proba-bility 1 − e−Ω( q·C2·t) there are at most O(n) · e−Ω(q·C2·t)
+
+indices i ∈ [n] such that Ai is not a Ω( q)-representative. Therefore, for t > C 
+
+> ¯C2
+
+log n no such index exists. Since by Lemma 4.8 only indices corresponding to rows that are not Ω( q)-representative can be misclassified, by Fact 4.3, Lemma 4.4, Lemma 4.9 and Corollary 4.10 we obtain Corollary 1.4. 
+
+## 5. Experiments 
+
+We show here experiments on synthetic data sampled from (d, ε,k,t)-MV -SBM n . The estimator in Theorem 3.1 is com-plex and relies on a high order sum-of-squares program, making it hard to implement in practice. Nevertheless, it is reasonable to believe that: (i) the guarantees of Theorem 3.1 are only sufficient, but not necessary, to obtain Theorem 1.2; 
+
+(ii) other estimators provide the guarantees of Theorem 3.1. For this reason, it makes sense to test Algorithm 1 with other community detection algorithms. 8Multi-View Stochastic Block Models 
+
+The next figures compares the results on 
+
+(z, (f1, G1), . . . , (ft, Gt)) ∼ (d, ε,k,t)-MV -SBM n (for a wide range of parameters) of the following algorithms: A.1 Louvain’s algorithm (Blondel et al., 2008) on the union graph ⋃ 
+
+> i∈[t]
+
+Gt .
+
+A.2 Algorithm 1 with Louvain’s algorithm applied in place of the estimator of Theorem 3.1 . The y-axis measures agreement as defined in Equation (2). Results are averaged over 20 simulations.                           
+
+> Figure 1. Fixing t= 10 ,n= 1000 ,k= 10 ,d= 50 and varying
+> εin [0 .5,1.5] .
+> Figure 2. Fixing t= 10 ,n= 1000 ,k= 10 ,ε= 0 .5and varying
+> din [50 ,150] .
+
+## 6. Conclusions and future directions 
+
+The introduction of Model 1.1 raises several natural ques-tions, for which we only provide initial answers. 
+
+On the phase transition threshold One of the most inter-esting question concerns the phase transition of the model. Concretely, one may expect a rich interplay between the signal-to-noise ratio of each of the observed graphs (pos-sibly below the relative KS threshold) and the number of observations required to weakly recover the hidden vector z.We leave the characterization of this trade-off beyond Theo-rem 1.2 and Theorem 1.3 as a fascinating open question. 
+
+From 2 communities to k communities in the multi-view model Another natural question concern the generaliza-tion to a model in which each view may have 2 6 k` 6 k
+
+communities. The ideas outlined above translate in princi-ple to these settings but the correctness appears difficult to prove. Concretely, any estimator achieving guarantees com-parable to Theorem 3.1 but for more than 2 communities can immediately be plugged-in Algorithm 1 to achieve weak recovery in these more general settings. 6 However, to the best of our knowledge existing weak-recovery algorithms for SBM n,k,d,ε do not lead to estimators of this form. A first obstacle appears to be the fact that for each dis-tribution the labels f`(z)1 . . . , f`(z)n are not independent. Existing estimators for stochastic block models instead cru-cially relies on the independence of the labels. Notice that independence holds when conditioning on f` but due to the high variance of random [k] → [k′] mappings, an argument along these lines would require an analysis for communities whose distribution is not known a priori. This makes each observation G` more akin to a stochastic block model with 
+
+unknown parameters. These models have been studied in (Abbe & Sandon, 2015) in the context of partial recovery 
+
+and exact recovery but are not known to achieve the notion of weak recovery we require. A second obstacle arising from the current proof structure is that existing robust algorithm for weak recovery –which are used in Theorem 3.1– are only known to work for k = 2 .
+
+But a generalization of these algorithms to k > 2 appears to be difficult to analyze (the current proofs is already more than 200 pages long! (Ding et al., 2022)). Hence, it remains open how to provide guarantees for more general models. 
+
+## Acknowledgments 
+
+We thank David Steurer for insightful discussions in the early stages of this work. Tommaso d’Orsi is partially sup-ported by the project MUR FARE2020 PAReCoDi. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to provide a theoret-ical foundation to machine learning heuristics often used in practice. We do not feel that any particular societal conse-quences of our work should be highlighted here. 
+
+> 6Without changing the proof of correctness of the algorithm!
+
+9Multi-View Stochastic Block Models 
+
+## References 
+
+Abavisani, M. and Patel, V. M. Deep multimodal subspace clustering networks. IEEE Journal of Selected Topics in Signal Processing , 12(6):1601–1614, 2018. Abbe, E. Community detection and stochastic block models: recent developments. The Journal of Machine Learning Research , 18(1):6446–6531, 2017. Abbe, E. and Sandon, C. Recovering communities in the general stochastic block model without knowing the pa-rameters. Advances in neural information processing systems , 28, 2015. Abbe, E. and Sandon, C. Achieving the ks threshold in the general stochastic block model with linearized acyclic belief propagation. Advances in Neural Information Pro-cessing Systems , 29, 2016a. Abbe, E. and Sandon, C. Crossing the ks threshold in the stochastic block model with information theory. In 2016 IEEE International Symposium on Information Theory (ISIT) , pp. 840–844. IEEE, 2016b. Abbe, E., Bandeira, A. S., and Hall, G. Exact recovery in the stochastic block model. IEEE Transactions on information theory , 62(1):471–487, 2015. Banks, J., Moore, C., Neeman, J., and Netrapalli, P. Information-theoretic thresholds for community detection in sparse networks. In Conference on Learning Theory ,pp. 383–416. PMLR, 2016. Bansal, N., Blum, A., and Chawla, S. Correlation clustering. 
+
+Machine learning , 56:89–113, 2004. Blondel, V. D., Guillaume, J.-L., Lambiotte, R., and Lefeb-vre, E. Fast unfolding of communities in large networks. 
+
+Journal of statistical mechanics: theory and experiment ,2008(10):P10008, 2008. Bordenave, C., Lelarge, M., and Massouli ´e, L. Non-backtracking spectrum of random graphs: community detection and non-regular ramanujan graphs. In 2015 IEEE 56th Annual Symposium on Foundations of Com-puter Science , pp. 1347–1357. IEEE, 2015. Corneli, M., Latouche, P., and Rossi, F. Exact icl maxi-mization in a non-stationary temporal extension of the stochastic block model for dynamic networks. Neurocom-puting , 192:81–91, 2016. Dasgupta, S. A cost function for similarity-based hierarchi-cal clustering. In Proceedings of the forty-eighth annual ACM symposium on Theory of Computing , pp. 118–127, 2016. De Bacco, C., Power, E. A., Larremore, D. B., and Moore, C. Community detection, link prediction, and layer interdependence in multilayer networks. Phys. Rev. E, 95:042317, Apr 2017. doi: 10.1103/PhysRevE.95. 042317. URL https://link.aps.org/doi/10. 1103/PhysRevE.95.042317 .De Santiago, K., Szafranski, M., and Ambroise, C. Mix-ture of stochastic block models for multiview clustering. In ESANN 2023-European Symposium on Artificial Neu-ral Networks, Computational Intelligence and Machine Learning , pp. 151–156, 2023. Decelle, A., Krzakala, F., Moore, C., and Zdeborov ´a, L. Asymptotic analysis of the stochastic block model for modular networks and its algorithmic applications. Phys-ical Review E , 84(6):066106, 2011. Ding, J., d’Orsi, T., Nasser, R., and Steurer, D. Robust recovery for stochastic block models. In 2021 IEEE 62nd Annual Symposium on Foundations of Computer Science (FOCS) , pp. 387–394. IEEE, 2022. Ding, J., d’Orsi, T., Hua, Y., and Steurer, D. Reaching kesten-stigum threshold in the stochastic block model un-der node corruptions. In The Thirty Sixth Annual Confer-ence on Learning Theory , pp. 4044–4071. PMLR, 2023. Fang, U., Li, M., Li, J., Gao, L., Jia, T., and Zhang, Y. A comprehensive survey on multi-view clustering. IEEE Transactions on Knowledge and Data Engineering , 2023. Fu, L., Lin, P., Vasilakos, A. V., and Wang, S. An overview of recent multi-view clustering. Neurocomputing , 402: 148–161, 2020. Goldberg, A. V. Finding a maximum density subgraph. 1984. Gorovits, A., Gujral, E., Papalexakis, E. E., and Bogdanov, P. Larc: Learning activity-regularized overlapping com-munities across time. In Proceedings of the 24th ACM SIGKDD international conference on knowledge discov-ery & data mining , pp. 1465–1474, 2018. Gujral, E. and Papalexakis, E. E. Smacd: Semi-supervised multi-aspect community detection. In Proceedings of the 2018 SIAM International Conference on Data Mining , pp. 702–710. SIAM, 2018. Gujral, E., Pasricha, R., and Papalexakis, E. Beyond rank-1: Discovering rich community structure in multi-aspect graphs. In Proceedings of The Web Conference 2020 , pp. 452–462, 2020. Han, Q., Xu, K., and Airoldi, E. Consistent estimation of dynamic and multi-layer block models. In Bach, F. and Blei, D. (eds.), Proceedings of the 32nd International 
+
+10 Multi-View Stochastic Block Models 
+
+Conference on Machine Learning , volume 37 of Pro-ceedings of Machine Learning Research , pp. 1511–1520, Lille, France, 07–09 Jul 2015. PMLR. URL https:// proceedings.mlr.press/v37/hanb15.html .Hopkins, S. B. and Steurer, D. Efficient bayesian estima-tion from few samples: community detection and related problems. In 2017 IEEE 58th Annual Symposium on Foundations of Computer Science (FOCS) , pp. 379–390. IEEE, 2017. Hu, D., Nie, F., and Li, X. Deep multimodal clustering for unsupervised audiovisual learning. In Proceedings of the IEEE/CVF Conference on Computer Vision and Pattern Recognition , pp. 9248–9257, 2019. Khan, A. and Maji, P. Approximate graph laplacians for multimodal data clustering. IEEE transactions on pattern analysis and machine intelligence , 43(3):798–813, 2019. Kim, M., Han, D. K., and Ko, H. Joint patch clustering-based dictionary learning for multimodal image fusion. 
+
+Information Fusion , 27:198–214, 2016. Liu, S., Mohanty, S., and Raghavendra, P. On statistical inference when fixed points of belief propagation are unstable. In 2021 IEEE 62nd Annual Symposium on Foundations of Computer Science (FOCS) , pp. 395–405. IEEE, 2022. Massouli ´e, L. Community detection thresholds and the weak ramanujan property. In Proceedings of the forty-sixth annual ACM symposium on Theory of computing ,pp. 694–703, 2014. Montanari, A. and Sen, S. Semidefinite programs on sparse random graphs and their application to community de-tection. In Proceedings of the forty-eighth annual ACM symposium on Theory of Computing , pp. 814–827, 2016. Mossel, E., Neeman, J., and Sly, A. Belief propagation, ro-bust reconstruction and optimal recovery of block models. In Conference on Learning Theory , pp. 356–370. PMLR, 2014. Mossel, E., Neeman, J., and Sly, A. Consistency thresh-olds for the planted bisection model. In Proceedings of the forty-seventh annual ACM symposium on Theory of computing , pp. 69–75, 2015a. Mossel, E., Neeman, J., and Sly, A. Reconstruction and estimation in the planted partition model. Probability Theory and Related Fields , 162:431–461, 2015b. Mossel, E., Neeman, J., and Sly, A. A proof of the block model threshold conjecture. Combinatorica , 38(3):665– 708, 2018. Ng, A., Jordan, M., and Weiss, Y. On spectral clustering: Analysis and an algorithm. Advances in neural informa-tion processing systems , 14, 2001. Ni, J., Cheng, W., Fan, W., and Zhang, X. Self-grouping multi-network clustering. In 2016 IEEE 16th Interna-tional Conference on Data Mining (ICDM) , pp. 1119– 1124. IEEE, 2016. Papalexakis, E. E., Akoglu, L., and Ience, D. Do more views of a graph help? community detection and clustering in multi-graphs. In Proceedings of the 16th International Conference on Information Fusion , pp. 899–905. IEEE, 2013. Paul, S. and Chen, Y. Consistent community detection in multi-relational data through restricted multi-layer stochastic blockmodel. 2016. Von Luxburg, U. A tutorial on spectral clustering. Statistics and computing , 17:395–416, 2007. Zhong, G. and Pun, C.-M. Latent low-rank graph learn-ing for multimodal clustering. In 2021 IEEE 37th Inter-national Conference on Data Engineering (ICDE) , pp. 492–503. IEEE, 2021. 11 Multi-View Stochastic Block Models 
+
+## A. Failure of community detection on the union graph 
+
+In this section we provide rigorous evidence that efficient algorithm cannot achieve comparable guarantees to Theorem 1.2 by only considering the union graph ⋃ 
+
+> i∈[t]
+
+Gi for (z, (f1, G1), . . . (ft, Gt)) ∼ (d, ε,k,t)-MV -SBM n. Concretely, we prove the following theorem. 
+
+Theorem A.1 (Limits of weak recovery from the union graph) . Let n, k, d, ε > 0, assume that t > 100 · (log k)2, and let 
+
+I := ( z, (f1, G1), . . . (ft, Gt)) ∼ (d, ε,k,t)-MV -SBM n. With probability at least 1 − k−Ω(1) over the draws of f1, . . . , ft,the conditional distribution over (z , G1, . . . , Gt) satisfies: 
+
+• z is drawn uniformly at random from [k]n;
+
+• each edge ij appears (independently) in ⋃ 
+
+> i∈[t]
+
+Gi with probability at most d∗ 
+
+> n
+
+(1+(1 − 1 
+
+> k
+
+)ε∗) if zi = zj and probability at least d∗ 
+
+> n
+
+(1 − εk ) otherwise, for some d∗, ε ∗ such that 
+
+dt · 1 + ε
+
+> 2
+
+1 + (1 − 1
+
+> k
+
+) ε∗ 6 d∗ 6 dt · 1 + ε∗
+
+> 1−ε∗/k
+
+1 + (1 − 1
+
+> k
+
+) ε∗ − o(1) .
+
+In words, Theorem A.1 shows that the union graph ⋃ 
+
+> i∈[t]
+
+Gi is essentially a k-community stochastic block model with parameters d∗ = Θ( dt ) , ε ∗ = Θ( ε) . As discussed in Section 1, it is conjecturally hard to achieve weak recovery in polynomial time for d∗(ε∗/k )2 6 1 . In the context of Theorem A.1, this implies that the parameters of the distribution of ⋃ 
+
+> i∈[t]
+
+Gi are above the Kesten-Stigum threshold only for d∗(ε∗/k )2 > Ω(1) . That is, at least t > Ω( k2) observations are required! Next we prove the theorem. 
+
+Proof of Theorem A.1. Let q, q ′ ∈ [k] be distinct. By Chernoff’s bound and choice of t we have 7
+
+P
+
+ t
+
+2 (1 − o(1)) 6 ∑
+
+> `∈[t]
+
+Jf`(q) = f`(q′)K 6 t
+
+2 (1 + o(1)) 
+
+ > 1 − k−5 . (10) Hence we may take a union over all such pairs q, q ′ ∈ [k] as the corresponding event E will hold with probability at least 1 − k−O(1) . So let f1 . . . , f t : [ k] → ± 1 be fixed functions verifying the event E of (10) . We condition the rest of the analysis on f1 = f1, . . . , ft = ft . In these settings each edge appears in G∗ := ⋃ 
+
+> i∈[t]
+
+Gi independently of others. Moreover, by union bound 
+
+P (ij ∈ G∗ | zi = zj , f1 = f1, . . . , ft = ft) 6
+
+(
+
+1 + ε
+
+2
+
+) dt n ,
+
+and 
+
+P (ij ∈ G∗ | zi 6 = zj , f1 = f1, . . . , ft = ft)
+
+> 1 −
+
+(
+
+1 −
+
+(
+
+1 + ε
+
+2
+
+) dn
+
+) t  
+
+> 2(1 −o(1))
+
+(
+
+1 −
+
+(
+
+1 − ε
+
+2
+
+) dn
+
+) t 
+
+> 2(1+ o(1))
+
+> 1 −
+
+(
+
+1 −
+
+(
+
+1 + ε
+
+2
+
+) dt 
+
+2n (1 − o(1)) 
+
+) ( 
+
+1 −
+
+(
+
+1 − ε
+
+2
+
+) dt 
+
+2n (1 + o(1)) 
+
+)
+
+> (1 − o(1)) dt n ,
+
+where we used the inequality (1 + s)r > 1 + rs , for r > 1 , s > −1 . It remains to compute d∗ and ε∗ so that 
+
+(
+
+1 + ε
+
+2
+
+) dt n 6 d∗
+
+n
+
+(
+
+1 + 
+
+(
+
+1 − 1
+
+k
+
+)
+
+ε∗
+
+)
+
+,
+
+> 7
+
+We can take o(1) to be t−1/4 and by Hoeffding’s inequality we can bound the probability of the event E in (10) not happening by 
+
+2 exp( −√t) 6 2 exp( −10 log k) 6 k−5.
+
+12 Multi-View Stochastic Block Models 
+
+(1 − o(1)) dt n > d∗
+
+n
+
+(
+
+1 − ε∗
+
+k
+
+)
+
+.
+
+Rearranging the inequalities, 
+
+d∗ > dt · 1 + ε
+
+> 2
+
+1 + (1 − 1
+
+> k
+
+) ε∗ ,d∗ 6 dt · 11 − ε∗
+
+> k
+
+− o(1) = dt · 1 + ε∗kk−ε∗
+
+1 + (1 − 1
+
+> k
+
+) ε∗ − o(1) 
+
+as desired. 
+
+Remark A.2 (On the weighted union graph) . A natural question to ask is whether the weighted union graph – the graph over [n], in which edge ij has weight ∑
+
+> `∈[t]
+
+Jij ∈ G`K– could provide better guarantees. In the sparse settings 
+
+d 6 no(1) , t 6 no(1) only a no(1) −1 fraction of the edges have weight larger than 1 and thus one may expect that this additional information does not simplify the problem. 
+
+## B. Information theoretic lower bound for blackbox algorithms 
+
+In this section we would like to study, in the context of (T ,k,t)-MV -SBM n, the information-theoretic limitations for having an algorithm that (i) runs the procedure in Theorem 3.1 on each observation and (ii) uses the resulting matrices ( ˆX`)`∈[t] to reconstruct the original k communities. Essentially, we would like to prove a formal version of Theorem 1.3. In order to do this, we first need to introduce some useful notation and terminology. Throughout the section let z ∈ [k]n be the vector of communities, and let (f`)`∈[t] be t independent and uniformly distributed random mappings [k] → { +1 , −1}. For every ` ∈ [t] let x` = f`(z) and let G` ∼ SBM n, 2,d `,ε ` (f`(z)) . We introduce a quantitative version of weak-recovery. 
+
+Definition B.1 (α`-weak-recovery algorithm) . We say that an algorithm 8 ˆX` taking G` as input and producing an estimate 
+
+ˆX`(G`) ∈ [+1 , −1] n×n of x`x`T is an α`-weak-recovery algorithm if we have 
+
+E
+
+[ ˆX`(G)ij 
+
+∣∣∣ (x`)i = ( x`)j
+
+]
+
+− E
+
+[ ˆX(G)ij 
+
+∣∣∣ (x`)i 6 = ( x`)j
+
+]
+
+> α` , ∀i, j ∈ [n] . (11) Clearly, the algorithm mentioned in Theorem 3.1 is a Cd,ε -weak-recovery algorithm. We are interested in determining the information-theoretic limits for estimating z based only on the outputs of an α`-weak-recovery algorithm when applied on the observations (G`)`∈[t]. To this end, let us introduce blackbox estimators: 
+
+Definition B.2 (Blackbox estimator) . A blackbox estimator for z is a mapping 
+
+ˆz : ([+1 , −1] n×n)t → [k]n .
+
+The blackbox estimator is applied as follows: For every ` ∈ [t] , we first compute ˆX` = ˆX`(G`) , for some α-weak-recovery algorithm ˆX` for x` for which we do not know anything about except that it is an α-weak-recovery algorithm, and then compute ˆz = ˆ z( ˆX1, . . . , ˆXt).We would like to guarantee that the blackbox estimator yields a successful weak-recovery of z using only the fact that 
+
+ˆX` = ˆX`(G`) satisfies (11) for every ` ∈ [t]. In order to formalize this, we will use the notion of α-estimates: 
+
+Definition B.3 (α-estimates) . Let α = ( α`)`∈[t] ∈ (0 , 2] t be a sequence of t positive numbers. Let ˆX1, . . . , ˆXt ∈
+
+[+1 , −1] n×n be t random matrices. We say that ( ˆX`)`∈[t] are α-estimates of (x`x`T)`∈[t] if they satisfy the following three conditions: (a) Given (x`)`∈[t], the random matrices ( ˆX`)`∈[t] are conditionally independent from z.(b) For every ` ∈ [t], given x`, the random matrix ˆX` is conditionally independent from 
+
+(x1, . . . , x`−1, x`+1 , . . . , xt, ˆX1, . . . , ˆX`−1, ˆX`+1 , . . . , ˆXt).  
+
+> 8Note that ˆX`may be a randomized algorithm.
+
+13 Multi-View Stochastic Block Models 
+
+(c) For every ` ∈ [t] and every i, j ∈ [n] with i 6 = j we have 
+
+E
+
+[
+
+( ˆX`)ij 
+
+∣∣∣ (x`)i = ( x`)j
+
+]
+
+− E
+
+[
+
+( ˆX`)ij 
+
+∣∣∣ (x`)i 6 = ( x`)j
+
+]
+
+> α` , ∀i, j ∈ [n] . (12) It is not hard to see that if ˆX` is an α`-weak-recovery algorithms for every ` ∈ [t], then ( ˆX(G`)) `∈[t] are α-estimates of 
+
+(x`x`T)`∈[t].Now we are ready to formally define what we mean by “guaranteeing that the blackbox estimator yields a successful weak-recovery of z using only the fact that ˆX` = ˆX(G`) satisfies (11) for every ` ∈ [t]”: 
+
+Definition B.4 ((ρ, τ, α, t )-weak-recovery blackbox estimator) . Let α = ( α`)`∈[t] ∈ (0 , 2] t be a sequence of t positive numbers, and let ρ > 0 and τ > 0 .
+
+A mapping 9
+
+ˆz : ([ −1, +1] n×n)t → [k]n
+
+is said to be a (ρ, τ, α, t )-weak-recovery blackbox estimator for z from α-estimates of (x`x`T)`∈[t] if for every t random matrices ( ˆX`)`∈[t] which are α-estimates of (x`x`T)`∈[t], if 
+
+z = ˆ z( ˆX1, . . . , ˆXt) ,
+
+then with probability at least τ we have 
+
+max 
+
+> π∈Pk
+
+∑
+
+> i
+
+1
+
+n Jzi = π(ˆ zi)K > 1
+
+k + ρ , (13) where Pk is the set of permutations [k] → [k] .
+
+We are now ready to state the main theorem of the section, which implies Theorem 1.3. 
+
+Theorem B.5 (Formal statement of Theorem 1.3) . Let α = ( α`)`∈[t] ∈ (0 , 2] t be a sequence of t positive numbers and denote 
+
+α = 1
+
+t
+
+∑
+
+> `∈[t]
+
+α` .
+
+Let ρ > 0 and τ > 0 . Let z ∈ [k]n be the uniformly random vector of communities, and let (f`)`∈[t] be t independent and uniformly distributed random mappings [k] → { +1 , −1}. For every ` ∈ [t] let x` = f`(z). If there exists a 
+
+(ρ, τ, α, t )-weak-recovery blackbox estimator for z from α-estimates of (x`x`T)`∈[t] , and if n is large enoug, then we must have 
+
+t > Ωρ
+
+( τ · log kα
+
+)
+
+.
+
+We prove Theorem B.5 in Appendix B.1, Appendix B.2, and Appendix B.3. We conclude this section showing how Algorithm 1 is indeed a blackbox estimator. 
+
+Proof that Algorithm 1 is a blackbox estimator. We can split Algorithm 1 into two steps: (1) Computing ˆX1 = ˆX1(G1), . . . , ˆXt = ˆXt(Gt) by applying the algorithm in Theorem 3.1 to G1, . . . , Gt , respectively. (2) Computing an estimate ˆz of z based only on ( ˆX`)`∈[t] .
+
+In step (1), since each of ˆX` is applied to G` independently of all other graphs and since G` depends on z only through 
+
+x` , it is not hard to see that ( ˆX`)`∈[t] satisfy conditions (a) and (b) of Definition B.3. Now if α` = C` is the correlation guaranteed by Theorem 3.1 for ˆX` , it follows that ( ˆX`)`∈[t] are α-estimates of (x`x`T)`∈[t] , where α = ( α`)`∈[t] .
+
+Now since step (2) of Algorithm 1 only processes ( ˆX`)`∈[t] , and since the guarantee on the agreement of ˆz with z is proved based only on the fact that ( ˆX`)`∈[t] are α-estimates, we can see that, assuming that t is a large enough multiple of 
+
+(log k)/α 2 , step (2) is a (1 − k−Ω(1) , 1 − k−Ω(1) , α, t )-weak-recovery blackbox estimator. 
+
+> 9
+
+Note that ˆz may be a randomized function. 
+
+14 Multi-View Stochastic Block Models 
+
+B.1. Upper bound on the information revealed by α-estimates 
+
+The first step in our proof is to determine how much information about z the α-estimates can reveal. Let ( ˆX`)`∈[t] be 
+
+α-estimates of (x`x`T)`∈[t]. The mutual information (measured in bits) between z and ˆX1, . . . , ˆXt can be upper bounded as follows: 
+
+I(z; ˆX1, . . . , ˆXt) (∗)
+
+6 I(x1, . . . , xt; ˆX1, . . . , ˆXt)= H( ˆX1, . . . , ˆXt) − H( ˆX1, . . . , ˆXt|x1, . . . , xt) ,
+
+(14) where (∗) follows from the data-processing inequality 10 .The entropy H( ˆX1, . . . , ˆXt) can be upper bounded as follows: 
+
+H( ˆX1, . . . , ˆXt) 6 ∑
+
+> `∈[t]
+
+H( ˆX`) . (15) Now using the chain rule, the conditional entropy H( ˆX1, . . . , ˆXt|x1, . . . , xt) can be rewritten as follows: 
+
+H( ˆX1, . . . , ˆXt|x1, . . . , xt) = ∑
+
+> `∈[t]
+
+H( ˆX`|x1, . . . , xt, ˆX1, . . . , ˆX`−1)= ∑
+
+> `∈[t]
+
+H( ˆX`|x`) ,
+
+(16) where the last equality follows from Property (b) of α-estimates. Combining (14), (15) and (16) we get 
+
+I(z; ˆX1, . . . , ˆXt) 6 ∑
+
+> l∈[t]
+
+(
+
+H( ˆX`) − H( ˆX`|x`)
+
+)
+
+= ∑
+
+> l∈[t]
+
+I(x`; ˆX`)
+
+(17) Now for each ` ∈ [t], we will derive an upper bound on I(x`; ˆX`) (which would then induce an upper bound on 
+
+I(z; ˆX1, . . . , ˆXt)). Note that we cannot obtain a non-trivial upper bound on I(x`; ˆX`) for arbitrary α-estimates because setting ˆX` = x`x`T would satisfy the definition of α-estimates, and for ˆX` = x`x`T we have I(x`; ˆX`) = n , which is too large for our purposes. What we will do instead is to show that there exist α-estimates for which we can get the desired upper bound on I(x`; ˆX`).The α-estimates that we will consider are of the form ˆX` = ˆ x` ˆx`T where ˆx` ∈ { +1 , 1}n is defined as follows: 
+
+P (ˆ x` = ˆ x`|x` = x`) = ∏
+
+> i∈[n]
+
+P ((ˆ x`)i = (ˆ x`)i|(x`)i = ( x`)i) ,
+
+where 
+
+P ((ˆ x`)i = (ˆ x`)i | (x`)i = ( x`)i) = 
+
+{ 12 + √ α` 
+
+> 8
+
+if (ˆ x`)i = ( x`)i , 
+
+> 12
+
+− √ α` 
+
+> 8
+
+if (ˆ x`)i = −(x`)i .
+
+In other words, we obtain ˆx` by sending the entries of x` through a binary symmetric channel with flipping probability  
+
+> 12
+
+− √ α` 
+
+> 8
+
+.
+
+> 10
+
+Notice that due to Property (a) of α-estimates, z − (x`)`∈[t] − (ˆ x`)`∈[t] is a Markov chain. 
+
+15 Multi-View Stochastic Block Models 
+
+Now notice that 
+
+E [(ˆ x`)i | (x`)i] = ( x`)i · P ((ˆ x`)i = ( x`)i | (x`)i) − (x`)i · P ((ˆ x`)i = −(x`)i | (x`)i)= 2 
+
+√ α`
+
+8 (x`)i =
+
+√ α`
+
+2 (x`)i .
+
+Hence, for i 6 = j
+
+E
+
+[
+
+( ˆX`)i,j 
+
+∣∣∣ (x`)i, (x`)j
+
+]
+
+= E [(ˆ x`)i · (ˆ x`)j | (x`)i, (x`)j ]= E [(ˆ x`)i | (x`)i] E [(ˆ x`)j | (x`)j ]=
+
+√ α`
+
+2 (x`)i ·
+
+√ α`
+
+2 (x`)j = α`
+
+2 (x`)i · (x`)j ,
+
+from which it is not hard to see that 
+
+E
+
+[
+
+( ˆX`)i,j 
+
+∣∣∣ (x`)i = ( x`)j
+
+]
+
+− E
+
+[
+
+( ˆX`)i,j 
+
+∣∣∣ (x`)i = −(x`)j
+
+]
+
+= α`
+
+2 −
+
+(
+
+− α`
+
+2
+
+)
+
+= α` .
+
+This proves that our choice of ( ˆX`)`∈[t] indeed yields α-estimates. In the remainder of this subsection we will show that this particular choice of α-estimates is noisy enough to yield a useful upper bound on the mutual information I(x`; ˆX`) .
+
+For every ` ∈ [t] we have 
+
+I(x`; ˆX`) = I(x`; ˆ x`) = H(ˆ x`) − H(ˆ x`|x`) 6 n − H(ˆ x`|x`) , (18) where the first equality follows from the fact that there is a one-to-one mapping between ˆx` and ˆX` = ˆ x` ˆx`T , and the last inequality follows from the fact that ˆx` ∈ { +1 , −1}n is a binary vector of length n . 
+
+Now notice that the conditional distribution of ˆx` given x` can be seen as a sequence of n independent Bernoulli random variables with parameter 12 ± √ α` 
+
+> 8
+
+. Therefore 11 ,
+
+H(ˆ x`|x`) = n · h2
+
+( 12 +
+
+√ α`
+
+8
+
+)
+
+, (19) where 
+
+h2(p) = −p log 2 p − (1 − p) log 2(1 − p)
+
+is the binary entropy function. Combining (18) and (19), we get 
+
+I(x`; ˆX`) 6 n ·
+
+(
+
+1 − h2
+
+( 12 +
+
+√ α`
+
+8
+
+)) 
+
+.
+
+Now note that the function p 7 → h2(p) is a strictly concave function achieving its maximum at p = 12 for which we have 
+
+h2(p) = 1 . Therefore, for small α` , we have 
+
+1 − h2
+
+( 12 +
+
+√ α`
+
+8
+
+)
+
+= h′′  
+
+> 2
+
+(1 /2) 2
+
+(√ α`
+
+8
+
+)2
+
+± O
+
+(√ α`
+
+8
+
+)3
+
+6 O(α`) .
+
+We conclude that there exists an absolute constant C > 0 such that 
+
+I(x`; ˆX`) 6 C · α` · n . 
+
+Combining this with (17), we conclude that for some α-estimates ( ˆX`)`∈[t] of (xx T 
+
+> `
+
+)`∈[t], we have 
+
+I(z; ˆX1, . . . , ˆXt) 6 ∑
+
+> `∈[t]
+
+C · α` · n = C · α · t · n . (20) 
+
+> 11
+
+Notice that h2(p) = h2(1 − p) and hence h2
+
+( 12 + √ α`
+
+> 8
+
+) = h2
+
+( 12 − √ α`
+
+> 8
+
+).
+
+16 Multi-View Stochastic Block Models 
+
+B.2. Weakly recovering z reduces its entropy 
+
+Now let ˆz ∈ [k]n be an estimate of z which satisfies (13) with probability at least τ . We will apply a modified version of the standard Fano inequality in order to upper bound H(z|ˆz). Define the random variable 
+
+A =
+
+{
+
+1 if z and ˆz satisfy (13) ,
+
+0 otherwise . We have 
+
+H(z|ˆz) 6 H(A, z|ˆz)= H(A|ˆz) + H(z|ˆz, A)
+
+6 H(A) + H(z|ˆz, A = 0) P[A = 0] + H(z|ˆz, A = 1) P[A = 1] 
+
+6 1 + ( n log 2 k) · P[A = 0] + H(z|ˆz, A = 1) · P[A = 1] ,
+
+where the last inequality follows from the fact that A is a binary random variable (and hence its entropy is at most one bit), and the fact that z ∈ [k]n, which implies that H(z|ˆz, A = 0) 6 log 2 (kn) = n log 2 k. We conclude that 
+
+H(z|ˆz) 6 1 + n log 2 k − (n log 2 k − H(z|ˆz, A = 1)) · P[A = 1] 
+
+6 1 + n log 2 k − τ · (n log 2 k − H(z|ˆz, A = 1)) ,
+
+where the last inequality follows from the fact that P[A = 1] > τ and the fact that n log 2 k − H(z|ˆz, A = 1) > 0 (because 
+
+z ∈ [k]n). Now since z is a uniform random variable in [k]n, we have H(z) = log 2 (kn) = n log 2 k , and hence 
+
+I(z; ˆ z) = H(z) − H(z|ˆz)
+
+> τ · (n log 2 k − H(z|ˆz, A = 1)) − 1 . (21) Now we will focus on upper bounding H(z|ˆz, A = 1) . For every ˆz ∈ [k]n, we have 
+
+H(z|ˆz = ˆ z, A = 1) 6 log 2 |Z(ˆ z, ρ )| , (22) where 
+
+Z(ˆ z, ρ ) = 
+
+{
+
+z ∈ [k]n : max 
+
+> π∈Pk
+
+∑
+
+> i
+
+1
+
+n Jzi = π(ˆ zi)K > 1
+
+k + ρ
+
+}
+
+= ⋃
+
+> π∈Pk
+
+Z(ˆ z, ρ, π ) ,
+
+and 
+
+Z(ˆ z, ρ, π ) = 
+
+{
+
+z ∈ [k]n : ∑
+
+> i
+
+1
+
+n Jzi = π(ˆ zi)K > 1
+
+k + ρ
+
+}
+
+.
+
+Hence, 
+
+|Z(ˆ z, ρ )| 6 ∑
+
+> π∈Pk
+
+|Z(ˆ z, ρ, π )| .
+
+We will further divide Z(ˆ z, ρ, π ) as follows: 
+
+Z(ˆ z, ρ, π ) = ⋃
+
+> βn 6m6n
+
+Z(ˆ z, ρ, π, m ) ,
+
+where 
+
+β = 1
+
+k + ρ , 
+
+and 
+
+Z(ˆ z, ρ, π, m ) = 
+
+{
+
+z ∈ [k]n : ∑
+
+> i
+
+Jzi = π(ˆ zi)K = m
+
+}
+
+.
+
+17 Multi-View Stochastic Block Models 
+
+It is not hard to see that 
+
+|Z(ˆ z, ρ, π, m )| =
+
+( nm
+
+)
+
+· (k − 1) n−m .
+
+By defining βm = mn and using Stirling’s formula 12 , we get: 
+
+log 2 |Z(ˆ z, ρ, π, m )| = n log 2 n − n log 2 e
+
+− m log 2 m + m log 2 e − (n − m) log 2(n − m) + ( n − m) log 2 e
+
+± O(log n) + ( n − m) log 2(k − 1) = n log 2 n − βmn log 2(βmn) − (1 − βm)n log 2((1 − βm)n)+ (1 − βm)n log 2(k − 1) ± O(log n)= ( h2(βm) + (1 − βm) · log 2(k − 1)) · n ± O(log n) .
+
+By taking derivatives and analyzing the function g(βm) = h2(βm) + (1 − βm) · log 2(k − 1) , we can show that g is decreasing after βm > 1 
+
+> k
+
+, and hence for βm > β = 1 
+
+> k
+
++ ρ > 1 
+
+> k
+
+, we have g(βm) 6 g(β). In particular, for every m satisfying 
+
+βn 6 m 6 n, we have 
+
+log 2 |Z(ˆ z, ρ, π, m )| 6 (h2(β) + (1 − β) · log 2(k − 1)) · n + O(log n) .
+
+Therefore, 
+
+|Z(ˆ z, ρ )| 6 ∑
+
+> π∈Pk
+
+∑
+
+> βn 6m6n
+
+|Z(ˆ z, ρ, π, m )|
+
+6 ∑
+
+> π∈Pk
+
+∑
+
+> βn 6m6n
+
+2(h2(β)+(1 −β)·log 2(k−1)) ·n+O(log n)
+
+= k! · n · 2(h2(β)+(1 −β)·log 2(k−1)) ·n+O(log n) ,
+
+and hence 
+
+log 2 |Z(ˆ z, ρ )| 6 (h2(β) + (1 − β) · log 2(k − 1)) · n + O(k log k + log n) .
+
+Since this is true for every ˆz ∈ [k]n, we get from (22) that 
+
+H(z|ˆz, A = 1) 6 (h2(β) + (1 − β) · log 2(k − 1)) · n + O(k log k + log n) .
+
+Combining this with (21), we get 
+
+I(z; ˆ z) > τ (n log 2 k − (h2(β) + (1 − β) · log 2(k − 1)) n − O(log n + k log k)) − 1
+
+> τ · n
+
+2 (log 2 k − h2(β) − (1 − β) · log 2(k − 1)) , (23) where the last inequality assumes 13 that n is large enough (and in particular n  k log k). 
+
+B.3. Putting everything together 
+
+Proof of Theorem B.5. Assume that there is a (ρ, τ, α, t )-weak-recovery blackbox estimator ˆz for z and assume that n is large enough. Let ( ˆX`)`∈[t] be α-estimates of (x`)`∈[t] satisfying (20), i.e., 
+
+I(z; ˆX1, . . . , ˆXt) 6 C · α · t · n . 
+
+Let ˆz = ˆ z( ˆX1, . . . , ˆX`). From the data-processing inequality, we have 
+
+I(z; ˆ z) 6 I(z; ˆX1, . . . , ˆXt) 6 C · α · t · n . 
+
+> 12
+
+For large n, we have log 2(n!) = n log 2 n − n log 2 e ± O(log 2 n).
+
+> 13
+
+It is worth noting that if β > 1/k , then log 2 k − h2(β) − (1 − β) · log 2(k − 1) > 0 , as we will show in the next subsection. 
+
+18 Multi-View Stochastic Block Models 
+
+On the other hand, since ˆz is a (ρ, τ, α, t )-weak-recovery blackbox estimator and since (ˆ x`)`∈[t] are α-estimates of (x`)`∈[t],it follows that ˆz satisfies (13) with probability 1 − τ . It follows from (23) that for n large enough, we have 
+
+I(z; ˆ z) > τ · n
+
+2 · (log 2 k − h2(β) − (1 − β) · log 2(k − 1)) .
+
+We conclude that τ · n
+
+2 · (log 2 k − h2(β) − (1 − β) · log 2(k − 1)) · n 6 C · α · t · n . 
+
+Therefore, we must have 
+
+t > τ · log 2 k − h2(β) − (1 − β) · log 2(k − 1) 2C · α .
+
+Now define 
+
+l(β) = log 2 k − h2(β) − (1 − β) · log 2(k − 1) = log 2 k + β log 2 β + (1 − β) log 2(1 − β) − (1 − β) · log 2(k − 1) ,
+
+so that 
+
+t > τ · l(β)2C · α = τ · l(1 /k + ρ)2C · α .
+
+Let us analyze the function l(β):
+
+• A quick calculation shows that 
+
+l(1 /k ) = 0 .
+
+• The derivative of l is 
+
+l′(β) = log 2 β + 1ln 2 − log 2(1 − β) − 1ln 2 + log 2(k − 1) = log 2 β − log 2(1 − β) + log 2(k − 1) ,
+
+and hence 
+
+l′(1 /k ) = 0 .
+
+• The second derivative of l is 
+
+l′′ (β) = 1
+
+β ln 2 + 1(1 − β) ln 2 > 0 , ∀β ∈ (0 , 1) .
+
+Hence, l′(β) > 0 for β ∈ (1 /k, 1) , and since l(1 /k ) = 0 we can see that l(1 /k + ρ) > 0 whenever ρ > 0 . Furthermore, a quick calculation reveals that for fixed ρ we have 14 
+
+lim 
+
+> k→∞
+
+l(1 /k + ρ)log 2(k) = ρ > 0 ,
+
+which means that 
+
+min 
+
+> k>2
+
+l(1 /k + ρ)log 2(k) > 0 ,
+
+and hence l(1 /k + ρ) = Ω ρ(log 2(k)) . We conclude that 
+
+t > Ωρ
+
+( τ · log kα
+
+)
+
+.
+
+> 14
+
+Note that β log 2 β + (1 − β) log 2(1 − β) = −h2(β) and since 0 6 h2(β) 6 1 , we can see that lim k→∞ h2(β)log 2(k) = 0 . Hence 
+
+lim k→∞ l(1 /k +ρ)log 2(k) can be simplified as lim k→∞ 1 − (1 − ρ − 1 
+
+> k
+
+) log 2(k−1) log 2(k) = ρ . 
+
+19 Multi-View Stochastic Block Models 
+
+## C. Deferred proofs 
+
+We present here proofs deferred in the main body of the paper. 
+
+Deferred proofs of Section 3 .To obtain Theorem 3.1 we need to introduce results about robust weak recovery. 
+
+Definition C.1 (μ-node corrupted, balanced 2 communities SBM) . Let μ ∈ [0 , 1] . Let x ∈ {± 1}n be a vector satisfying ∑ 
+
+> i
+
+xi = 0 and let G0 ∼ SBM 2,d,ε (x) . An adversary may choose up to μ · n vertices in G0 and arbitrarily modify edges (and non-edges) incident to at least one of them to produce the corrupted graph G. We write G μ
+
+≈ G0 to denote that G is a 
+
+μ-node corrupted version of G0.In the context of node corrupted graphs, the definition of weak recovery is still with respect to the original vector x as defined in Equation (1). It is known that node robust weak recovery is achievable. 
+
+Theorem C.2 (Implicit in (Ding et al., 2023)) . Let n, d, ε > 0 be satisfying d · ε2 − 1 =: δ > 0 . There exist: 
+
+• constants 0 < μ δ < 1 and 0 < C δ < 1 , and 
+
+• a (randomized) polynomial time algorithm 15 ˆXr taking a graph G of n vertices as input and producing a matrix 
+
+ˆXr(G) ∈ [−1, +1] n×n as output, such that ˆXr is a successful weak-recovery recovery algorithm robust against any μ-node corruption for all μ 6 μδ . More formally, for every x ∈ {± 1}n satisfying ∑ 
+
+> i
+
+xi = 0 , and every μ 6 μδ , we have 
+
+E
+
+> G0∼SBM 2,d,ε (x)
+
+[
+
+min  
+
+> G:Gμ
+> ≈G0
+
+〈 ˆXr(G), xx T〉
+
+]
+
+> Cδ · n2 .
+
+We can use Theorem C.2 to obtain Theorem 3.1. Let γ = ∣∣p − 12
+
+∣∣ be the unbalancedness in the vector of labels of x, where p = P(xi = +1) .The main idea behind the algorithm in Theorem 3.1 is to first distinguish whether the unbalancedness γ is sufficiently small or not. If it is sufficiently small, then we apply the robust algorithm of Theorem C.2. Otherwise, we can achieve weak-recovery by relying on the degree of a vertex to estimate its community label. In the following two lemmas, we treat the case where the unbalancedness γ is sufficiently small: 
+
+Lemma C.3. Let n, d, ε, p, x = ( xi)i∈[n] and G ∼ SBM n, 2,d,ε (x) be as in Theorem 3.1 and let δ = ε2d 
+
+> 4
+
+− 1 > 0. Let 
+
+μδ , C δ and ˆXr be 16 as in Theorem C.2 and define 
+
+μ′ 
+
+> δ
+
+= 1100 min {μδ , C δ } .
+
+If the unbalancedness γ = ∣∣ 12 − p∣∣ of x satisfies γ 6 μ′ 
+
+> δ
+
+, then for n large enough, we have 
+
+E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+]
+
+> 34 Cδ · n2 .
+
+Proof. For the sake of simplicity, we will only treat the case where n is even. Since ˆXr is robust against node corruptions, it is not hard to see that the proofs can be adapted to the case where n is odd. 
+
+> 15
+
+The subscript r in ˆXr stands for “robust”. 
+
+> 16
+
+It is worth noting that since Theorem C.2 assumes that ∑ 
+
+> i
+
+xi = 0 , then n must be even in Theorem C.2. However, in Lemma C.3 we would like n to be general. Hence, if n is odd, we apply the following procedure: (1) we add a fictitious vertex n + 1 which is not incident to any vertex in [n] and we call the resulting graph (having [n + 1] as its set of vertices) as ˜G , (2) we apply ˆXr on ˜G , and (3) we take the submatrix of ˆXr( ˜G) induced by the vertices in [n]. We still denote the overall algorithm as ˆXr.
+
+20 Multi-View Stochastic Block Models 
+
+For every x ∈ {±} n, let n+(x) = |{ i ∈ [n] : xi = +1 }| and n−(x) = |{ i ∈ [n] : xi = −1}| . Since P(xi = +1) = p, then by the law of large numbers we know that n+(x) and n−(x) concentrate around pn and (1 − p)n, respectively. Furthermore, since γ = ∣∣ 12 − p∣∣ 6 μ′ 
+
+> δ
+
+, we can use standard concentration inequalities to show that with probability at least 1 − O(n−10 ),the random vector x satisfies the event 
+
+E =
+
+{
+
+x ∈ {±} n :
+
+∣∣∣∣
+
+n+(x)
+
+n − 12
+
+∣∣∣∣ 6 2μ′ 
+
+> δ
+
+and 
+
+∣∣∣∣
+
+n−(x)
+
+n − 12
+
+∣∣∣∣ 6 2μ′
+
+> δ
+
+}
+
+.
+
+Now since P(x ∈ E ) = 1 − O(n−10 ) and since 
+
+∣∣∣〈 ˆXr(G), xx T〉
+
+∣∣∣ 6 n2, it is not hard to see that 
+
+E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+]
+
+= E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+∣∣∣ x ∈ E 
+
+]
+
+± o(1) , (24) so we can focus on studying E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+∣∣∣ x ∈ E 
+
+]
+
+.Now fix x ∈ E and condition on the event that x = x. From the definition of E it is not hard to see that there is x′ ∈ {±} n
+
+satisfying ∑ 
+
+> i∈[n]
+
+x′ 
+
+> i
+
+= 0 and 
+
+|Dx,x ′ | 6 4μ′ 
+
+> δ
+
+n , 
+
+where 
+
+Dx,x ′ = |i ∈ [n] : xi 6 = x′
+
+> i
+
+| .
+
+Now construct a random graph G′ as follows: 
+
+• If i, j ∈ [n] \ Dx,x ′ , i.e., if xi = x′ 
+
+> i
+
+and xj = x′ 
+
+> j
+
+, then we let {i, j } ∈ G′ if and only if {i, j } ∈ G.
+
+• If either i ∈ Dx,x ′ or j ∈ Dx,x ′ then we put the edge {i, j } in G′ with probability dn
+
+(1 + ε 
+
+> 2
+
+x′ 
+
+> i
+
+· x′
+
+> j
+
+) .
+
+• The events ({i, j } ∈ G′)i,j ∈[n] are mutually independent. It is not hard to see that: 
+
+• G′ ∼ SBM n, 2,d,ε (x′) , and 
+
+• G 4μ′
+
+> δ
+
+≈ G′ , i.e., G can be obtained from G′ by adding or removing edges incident to at most 4μ′ 
+
+> δ
+
+n vertices. Since 4μ′ 
+
+> δ
+
+6 4100 μδ 6 μδ , it follows from Theorem C.2 that 
+
+E
+
+[
+
+〈 ˆXr(G), x ′x′T〉
+
+∣∣∣ x = x
+
+]
+
+> Cδ · n2 . (25) Now notice that 
+
+〈 ˆXr(G), xx T〉 = 〈 ˆXr(G), x ′x′T〉 + 〈 ˆXr(G), xx T − x′x′T〉 ,
+
+and 
+
+∣∣∣〈 ˆXr(G), xx T − x′x′T〉
+
+∣∣∣ 6
+
+∥∥∥ ˆXr(G)
+
+∥∥∥∞
+
+· ∥∥xx T − x′x′T∥∥1 6 1 · ∥∥xx T − x′x′T∥∥1
+
+6 2 ‖x − x′‖1 · n = 4 |Dx,x ′ | · n 6 16 μ′ 
+
+> δ
+
+· n2 .
+
+Combining this with (25), we get 
+
+E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+∣∣∣ x = x
+
+]
+
+> (Cδ − 16 μ′ 
+
+> δ
+
+) · n2 > 84 100 Cδ · n2 .
+
+21 Multi-View Stochastic Block Models 
+
+Now since this is true for all x ∈ E , we conclude that 
+
+E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+∣∣∣ x ∈ E 
+
+]
+
+> (Cδ − 16 μ′ 
+
+> δ
+
+) · n2 > 84 100 Cδ · n2 ,
+
+where the last inequality is true because μ′ 
+
+> δ
+
+= 1100 min {μδ , C δ }. Combining the above with (24) , we can deduce that for n
+
+large enough, we have 
+
+E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+]
+
+> 34 Cδ · n2 .
+
+The following lemma takes the algorithm of Lemma C.3 and applies a symmetrization argument in order to get “a positive correlation at the edge level”. 
+
+Lemma C.4 (Pair-wise weak recovery for sufficiently balanced 2 communities stochastic block mode) . Let n, d, ε, p, x =(xi)i∈[n] and G ∼ SBM n, 2,d,ε (x) be as in Theorem 3.1. Let δ = ε2d 
+
+> 4
+
+− 1 > 0 and let γ = ∣∣ 12 − p∣∣ be the unbalancedness of x. There exist constants μ′ 
+
+> δ
+
+> 0 and C′ 
+
+> δ
+
+> 0 and a randomized polynomial-time algorithm 17 ˆXsb taking G as input and producing a matrix ˆXsb (G) ∈ [−1, +1] n×n such that if 
+
+γ 6 μ′ 
+
+> δ
+
+,
+
+then for every i, j ∈ [n] with i 6 = j, we have 
+
+C′ 
+
+> δ
+
+6 E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+− E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+.
+
+Proof. Let μδ , C δ and ˆXr be as in Theorem C.2, and let μ′ 
+
+> δ
+
+= C′ 
+
+> δ
+
+= 1100 min {μδ , C δ }. Lemma C.3 shows that 
+
+E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+]
+
+> 34 Cδ · n2 .
+
+The algorithm ˆXsb (G) can be obtained by “symmetrizing” the algorithm ˆXr as follows: Let σ be a (uniformly) random permutation [n] → [n] and let Gσ be the graph obtained from G by σ-permuting its vertices, i.e., we let the edge 18 {σi, σj }
+
+belong to Gσ if and only if {i, j } ∈ G. We define the matrix ˆXsb (G) ∈ [−1, +1] n as follows: 
+
+ˆXsb (G)ij = ˆXr (Gσ )σiσj .
+
+In other words, we apply the random permutation σ to graph G , we apply the algorithm ˆXr , and then we apply the inverse of the permutation on the resulting matrix. Due to the symmetry of the SBM distribution, it is not hard to see that for every i, j ∈ [n] with i 6 = j, we have 
+
+E
+
+[ ˆXsb (G)ij · xixj
+
+]
+
+= ∑ 
+
+> i′,j ′∈[n]:
+> i′6=j′
+
+E
+
+[ ˆXsb (G)ij · xixj
+
+∣∣∣ σi = i′, σj = j′]
+
+· P (σi = i′, σj = j′)= ∑ 
+
+> i′,j ′∈[n]:
+> i′6=j′
+
+E
+
+[ ˆXr (Gσ )σiσj · xixj
+
+∣∣∣ σi = i′, σj = j′]
+
+· 1
+
+n(n − 1) 
+
+> (∗)
+
+= 1
+
+n(n − 1) 
+
+∑ 
+
+> i′,j ′∈[n]:
+> i′6=j′
+
+E
+
+[ ˆXr (G)σiσj · xσi xσj
+
+∣∣∣ σi = i′, σj = j′]
+
+> 17
+
+The subscript sb in ˆXsb stands for “sufficiently balanced”. 
+
+> 18
+
+For simplicity, We denote σ(i) as σi.
+
+22 Multi-View Stochastic Block Models 
+
+= 1
+
+n(n − 1) 
+
+∑ 
+
+> i′,j ′∈[n]:
+> i′6=j′
+
+E
+
+[ ˆXr(G)i′j′ · xi′ xj′
+
+]
+
+= 1
+
+n(n − 1) E
+
+[
+
+〈 ˆXr(G), xx T〉
+
+]
+
+− 1
+
+n(n − 1) 
+
+∑
+
+> i∈[n]
+
+E
+
+[ ˆXr(G)ii · x2
+
+> i
+
+]
+
+> 1
+
+n(n − 1) · 34 Cδ · n2 − 1
+
+n − 1
+
+> 34 Cδ − o(1) ,
+
+where (∗) follows from the symmetry of the SBM distribution under the simultaneous permutation of vertices and labels. Now notice that 
+
+E
+
+[ ˆXsb (G)ij · xixj
+
+]
+
+= E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+· P (xi = xj ) − E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+· P (xi 6 = xj )= E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+· (p2 + (1 − p)2) − E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+· (2 p(1 − p)) = E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+·
+
+( 12 + 2 γ2
+
+)
+
+− E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+] ( 12 − 2γ2
+
+)
+
+6 12 · E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
++ 2 γ2 − 12 · E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
++ 2 γ2 ,
+
+where in the last inequality we used the fact that 
+
+∣∣∣ ˆXsb (G)ij 
+
+∣∣∣ 6 1. We can deduce that for n large enough, we have 
+
+E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+− E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+> 2 E
+
+[ ˆXsb (G)ij · xixj
+
+]
+
+− 8γ2 > 32 Cδ − o(1) − 8γ2 > Cδ ,
+
+where the last inequality follows from the fact that 
+
+8γ2 6 8μ′2 
+
+> δ
+
+6 8
+
+( 1100 Cδ
+
+)2
+
+6 Cδ
+
+100 .
+
+By picking C′ 
+
+> δ
+
+= Cδ , the lemma follows. Now we turn to show that if x is sufficiently unbalanced, then there exists an efficient algorithm that achieves pair-wise weak recovery. 
+
+Lemma C.5 (Pair-wise weak recovery for sufficiently unbalanced 2 communities stochastic block mode) . Let n, d, ε, p, x =(xi)i∈[n] and G ∼ SBM n, 2,d,ε (x) be as in Theorem 3.1. Further assume that p ∈ [0 , 1] . Let δ = ε2d 
+
+> 4
+
+− 1 > 0 and let 
+
+γ = ∣∣ 12 − p∣∣ be the unbalancedness of x, and let μ′ 
+
+> δ
+
+be as in Lemma C.4. There exists a constant C′′  
+
+> δ
+
+> 0 and a randomized polynomial-time algorithm 19 ˆXsu taking G as input and producing a matrix ˆXsu (G) ∈ [−1, +1] n×n such that if 
+
+γ > 12 μ′ 
+
+> δ
+
+,
+
+then for every i, j ∈ [n] with i 6 = j, we have 
+
+C′′  
+
+> δ
+
+6 E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+− E
+
+[ ˆXsb (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+.
+
+Proof. For the sake of simplicity we may assume without loss of generality that p > 12 , i.e., p = 12 + γ and hence “ +1 ” is the larger community in expectation. 
+
+> 19
+
+The subscript su in ˆXsu stands for “sufficiently unbalanced”. 
+
+23 Multi-View Stochastic Block Models 
+
+For every i, j ∈ [n], let 
+
+deg 6 =j (i) = |{ v ∈ [n] \ { i, j } : {i, v } ∈ G}| 
+
+be the number of vertices in [n] \ { i, j } which are adjacent to i in G.Let C > 0 be a large enough constant (to be chosen later) and let 
+
+ˆx(j) 
+
+> i
+
+(G) = 1
+
+C
+
+(deg 6 =j (i) − d(1 − 2/n )) · q∣∣deg 6 =j (i) − d(1 − 2/n )∣∣ 6 Cy ∈ [−1, 1] ,
+
+and define the matrix ˆXsu (G) ∈ [−1, +1] n×n as: 
+
+ˆXsu (G)ij = ˆ x(j) 
+
+> i
+
+(G) · ˆx(i) 
+
+> j
+
+(G) .
+
+It is not hard to see that given (xi, xj ) , the random variables deg 6=j (i) and deg 6 =i(j) are conditionally independent. Therefore, ˆx(j) 
+
+> i
+
+(G) and ˆx(i) 
+
+> j
+
+(G) are conditionally independent given (xi, xj ) , hence 
+
+E
+
+[ ˆXsu (G)ij 
+
+∣∣∣ xi, xj
+
+]
+
+= E
+
+[
+
+ˆx(j) 
+
+> i
+
+(G)
+
+∣∣∣ xi, xj
+
+]
+
+· E
+
+[
+
+ˆx(i) 
+
+> j
+
+(G)
+
+∣∣∣ xi, xj
+
+]
+
+= E
+
+[
+
+ˆx(j) 
+
+> i
+
+(G)
+
+∣∣∣ xi
+
+]
+
+· E
+
+[
+
+ˆx(i) 
+
+> j
+
+(G)
+
+∣∣∣ xj
+
+]
+
+.
+
+Now, for every v ∈ [v] \ { i, j } , we have 
+
+P ({i, v } ∈ G | xi) = E [P ({i, v } ∈ G | xi, xv ) | xi] = E
+
+[ dn
+
+(
+
+1 + 12 ε · xixv
+
+) ∣ ∣∣∣ xi
+
+]
+
+= dn
+
+(
+
+1 + 12 ε · xi E[xv ]
+
+)
+
+= dn
+
+(
+
+1 + 12 ε · (p − (1 − p)) 
+
+)
+
+= dn (1 + εγ xi) .
+
+Therefore, the conditional distribution of deg 6 =j (i) given xi is Binomial (n − 2, dn (1 + εγ xi)), hence 
+
+E [deg 6=j (i) ∣∣ xi
+
+] = ( n − 2) · dn (1 + εγ xi) ,
+
+and so 
+
+E
+
+[ 1
+
+C
+
+(deg 6 =j (i) − d(1 − 2/n )) ∣∣∣∣ xi
+
+]
+
+= d(1 − 2/n ) · εγ xi
+
+C . (26) On the other hand, by the Cauchy-Schwarz inequality, we have 
+
+E
+
+[∣ ∣∣∣ˆx(j) 
+
+> i
+
+(G) − 1
+
+C
+
+(deg 6 =j (i) − d(1 − 2/n ))∣∣∣∣∣∣∣∣ xi
+
+]
+
+6 E
+
+[ 1
+
+C
+
+∣∣deg 6 =j (i) − d(1 − 2/n )∣∣ · q∣∣deg 6 =j (i) − d(1 − 2/n )∣∣ > C y ∣∣∣∣ xi
+
+]
+
+6 1
+
+C E
+
+[(deg 6 =j (i) − d(1 − 2/n ))2 ∣∣∣ xi
+
+]1/2
+
+· E
+
+[q∣∣deg 6 =j (i) − d(1 − 2/n )∣∣ > C y2 ∣∣∣ xi
+
+]1/2
+
+6 1
+
+C E
+
+[(deg 6 =j (i) − d(1 − 2/n ))2 ∣∣∣ xi
+
+]1/2
+
+· P (∣ ∣deg 6 =j (i) − d(1 − 2/n )∣∣ > C ∣∣ xi
+
+)1/2 ,
+
+and by Chebychev’s inequality, we have 
+
+P (∣ ∣deg 6 =j (i) − d(1 − 2/n )∣∣ > C ∣∣ xi
+
+) 6
+
+E
+
+[(deg 6 =j (i) − d(1 − 2/n ))2 ∣∣∣ xi
+
+]
+
+C2 ,
+
+24 Multi-View Stochastic Block Models 
+
+hence 
+
+E
+
+[∣ ∣∣∣ˆx(j) 
+
+> i
+
+(G) − 1
+
+C
+
+(deg 6 =j (i) − d(1 − 2/n ))∣∣∣∣∣∣∣∣ xi
+
+]
+
+6
+
+E
+
+[(deg 6 =j (i) − d(1 − 2/n ))2 ∣∣∣ xi
+
+]
+
+C2 . (27) Now notice that 
+
+E
+
+[(deg 6=j (i) − d(1 − 2/n ))2 ∣∣∣ xi
+
+]
+
+= E
+
+[(( deg 6 =j (i) − d(1 − 2/n ) (1 + εγ xi) + ( εγ xi) d(1 − 2/n ))) 2 ∣∣∣ xi
+
+]
+
+> (∗)
+
+6 E
+
+[
+
+2 (deg 6=j (i) − d(1 − 2/n ) (1 + εγ xi))2 + 2 (( εγ xi) d(1 − 2/n )) 2 ∣∣∣ xi
+
+]
+
+6 2 E
+
+[(deg 6 =j (i) − d(1 − 2/n ) (1 + εγ xi))2 ∣∣∣ xi
+
+]
+
++ 2 d2ε2γ2 ,
+
+where (∗) is true because (a + b)2 6 2a2 + 2 b2 for all a, b ∈ R.Now since the conditional distribution of deg 6=j (i) given xi is Binomial (n − 2, dn (1 + εγ xi)), its conditional expectation is equal to d(1 − 2/n ) (1 + εγ xi) and its conditional variance is equal to 
+
+E
+
+[(deg 6 =j (i) − d(1 − 2/n ) (1 + εγ xi))2 ∣∣∣ xi
+
+]
+
+= ( n − 2) 
+
+( dn (1 + εγ xi)
+
+)
+
+·
+
+(
+
+1 − dn (1 + εγ xi)
+
+)
+
+6 d(1 + εγ ) 6 2d . 
+
+Therefore, 
+
+E
+
+[(deg 6 =j (i) − d(1 − 2/n ))2 ∣∣∣ xi
+
+]
+
+6 4d + 2 d2ε2γ2 ,
+
+and hence from (27) we get 
+
+E
+
+[∣ ∣∣∣ˆx(j) 
+
+> i
+
+(G) − 1
+
+C
+
+(deg 6 =j (i) − d(1 − 2/n ))∣∣∣∣∣∣∣∣ xi
+
+]
+
+6 4d + 2 d2ε2γ2
+
+C2 .
+
+Combining this with (26) we get 
+
+E
+
+[
+
+ˆx(j) 
+
+> i
+
+(G)
+
+∣∣∣ xi
+
+]
+
+= d(1 − 2/n ) · εγ xi
+
+C ± O
+
+( d + d2ε2γ2
+
+C2
+
+)
+
+= d(1 − 2/n )
+
+C
+
+(
+
+εγ xi ± O
+
+( 1 + dε 2γ2
+
+C
+
+)) 
+
+.
+
+Let 
+
+C = ˜C(1 − 2/n )
+
+(
+
+dε + 1
+
+εμ ′
+
+> δ
+
+)
+
+,
+
+for some large enough constant ˜C > 1 to be chosen later. We have 
+
+O
+
+( 1
+
+C
+
+)
+
+6 O
+
+(
+
+1˜C(1 − 2/n )/(εμ ′ 
+
+> δ
+
+)
+
+)
+
+= O
+
+( εμ ′
+
+> δ
+
+˜C
+
+)
+
+6 O
+
+( εγ 
+
+˜C
+
+)
+
+,
+
+where the last inequality follows from γ > μ′ 
+
+> δ
+> 2
+
+. Furthermore, 
+
+O
+
+( dε 2γ2
+
+C
+
+)
+
+6 O
+
+( dε 2γ2
+
+˜C(1 − 2/n ) · dε 
+
+)
+
+6 O
+
+( εγ 2
+
+˜C
+
+)
+
+6 O
+
+( εγ 
+
+˜C
+
+)
+
+.
+
+We conclude that 
+
+E
+
+[
+
+ˆx(j) 
+
+> i
+
+(G)
+
+∣∣∣ xi
+
+]
+
+= d(1 − 2/n )
+
+C
+
+(
+
+εγ xi ± O
+
+( εγ 
+
+˜C
+
+)) 
+
+= d(1 − 2/n )εγ C
+
+(
+
+xi ± O
+
+( 1˜C
+
+)) 
+
+25 Multi-View Stochastic Block Models 
+
+= dεγ 
+
+˜C
+
+(
+
+dε + 1
+
+> εμ ′
+> δ
+
+)(
+
+xi ± O
+
+( 1˜C
+
+)) 
+
+= C′′  
+
+> δ
+
+γ
+
+(
+
+xi ± O
+
+( 1˜C
+
+)) 
+
+,
+
+where 
+
+C′′  
+
+> δ
+
+= dε 2
+
+˜C
+
+(
+
+dε 2 + 1
+
+> μ′
+> δ
+
+) = 4(1 + δ)˜C
+
+(
+
+4(1 + δ) + 1
+
+> μ′
+> δ
+
+) = 4(1 + δ)μ′
+
+> δ
+
+˜C (4(1 + δ)μ′ 
+
+> δ
+
++ 1) .
+
+Notice how C′′  
+
+> δ
+
+depends only on δ . 
+
+Finally, 
+
+E
+
+[ ˆXsu (G)ij 
+
+∣∣∣ xi, xj
+
+]
+
+= E
+
+[
+
+ˆx(j) 
+
+> i
+
+(G)
+
+∣∣∣ xi
+
+]
+
+· E
+
+[
+
+ˆx(i) 
+
+> j
+
+(G)
+
+∣∣∣ xj
+
+]
+
+= C′′  
+
+> δ
+
+γ
+
+(
+
+xi ± O
+
+( 1˜C
+
+)) 
+
+· C′′  
+
+> δ
+
+γ
+
+(
+
+xj ± O
+
+( 1˜C
+
+)) 
+
+= ( C′′  
+
+> δ
+
+γ)2
+
+(
+
+xixj ± O
+
+( 1˜C
+
+)) 
+
+,
+
+and so 
+
+E
+
+[ ˆXsu (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+− E
+
+[ ˆXsu (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+= ( C′′  
+
+> δ
+
+γ)2
+
+(
+
+2 ± O
+
+( 1˜C
+
+)) 
+
+.
+
+By choosing ˜C to be an absolute constant which is large enough, we get 
+
+E
+
+[ ˆXsu (G)ij 
+
+∣∣∣ xi = xj
+
+]
+
+− E
+
+[ ˆXsu (G)ij 
+
+∣∣∣ xi 6 = xj
+
+]
+
+> (C′′  
+
+> δ
+
+γ)2 > (C′′  
+
+> δ
+
+μ′ 
+
+> δ
+
+)2
+
+4 ,
+
+where the last inequality is true because we assume that γ > μ′ 
+
+> δ
+> 2
+
+.Now we can leverage Lemma C.4 and Lemma C.5 in order to prove Theorem 3.1. 
+
+Proof of Theorem 3.1. Let γ, μ ′ 
+
+> δ
+
+, C ′ 
+
+> δ
+
+, C ′′  
+
+> δ
+
+be as in Lemma C.4 and Lemma C.5. We will first distinguish between the sufficiently balanced and sufficiently unbalanced cases by counting the number of edges which are incident to a random sublinear (but sufficiently high) set of vertices. Let m = dn3/4e and let I be a random subset of [n] of size m.Let deg( I) be the number of edges in G from I to [n] \ I. We have 
+
+E [deg( I) | I] = ∑
+
+> i∈I,j ∈[n]\I
+
+E [J{i, j } ∈ GK] = ∑
+
+> i∈I,j ∈[n]\I
+
+E [P ({i, j } ∈ G | xi, xj )] = ∑
+
+> i∈I,j ∈[n]\I
+
+E
+
+[ dn
+
+(
+
+1 + 12 εxixj
+
+)] 
+
+= dn
+
+∑
+
+> i∈I,j ∈[n]\I
+
+(
+
+1 + 12 ε E [xixj ]
+
+)
+
+= dn
+
+∑
+
+> i∈I,j ∈[n]\I
+
+(
+
+1 + 12 ε (P (xi = xj ) − P (xi 6 = xj )) 
+
+)
+
+= dn
+
+∑
+
+> i∈I,j ∈[n]\I
+
+(
+
+1 + 12 ε (p2 + (1 − p)2 − 2p(1 − p)))
+
+= dm (n − m)
+
+n
+
+(
+
+1 + 12 ε (2 p − 1) 2
+
+)
+
+= dm (n − m)
+
+n
+
+(1 + 2 εγ 2) = (1 ± o(1)) dn 3/4 (1 + 2 εγ 2) .
+
+So the algorithm ˆX is defined as follows: 26 Multi-View Stochastic Block Models 
+
+• If deg( I) > dn 3/4
+
+(
+
+1 + 2 ε
+
+( 3μ′
+
+> δ
+> 4
+
+)2)
+
+we apply the algorithm ˆXsu on the subgraph G([ n] \ I) of G induced on n \ I
+
+and define 
+
+ˆX(G)ij =
+
+{ ˆXsu (G([ n] \ I)) ij if i, j ∈ [n] \ I ,
+
+0 otherwise .
+
+• If deg( I) < dn 3/4
+
+(
+
+1 + 2 ε
+
+( 3μ′
+
+> δ
+> 4
+
+)2)
+
+we apply the algorithm ˆXsb on the subgraph G([ n] \ I) of G induced on n \ I
+
+and define 
+
+ˆX(G)ij =
+
+{ ˆXsb (G([ n] \ I)) ij if i, j ∈ [n] \ I ,
+
+0 otherwise .
+
+By standard concentration inequalities, we can show that: 
+
+• If γ < μ′ 
+
+> δ
+> 2
+
+, then with probability 1 − o(1) we have deg( I) < dn 3/4
+
+(
+
+1 + 2 ε
+
+( 3μ′
+
+> δ
+> 4
+
+)2)
+
+and so we apply the algorithm 
+
+ˆXsb which will succeed in achieving pair-wise weak recovery according to Lemma C.4, assuming i, j ∈ [I].
+
+• If γ > μ′ 
+
+> δ
+> 2
+
+, then with probability 1 − o(1) we have deg( I) > dn 3/4
+
+(
+
+1 + 2 ε
+
+( 3μ′
+
+> δ
+> 4
+
+)2)
+
+and so we apply the algorithm 
+
+ˆXub which will succeed in achieving pair-wise weak recovery according to Lemma C.5, assuming i, j ∈ [I].
+
+• If μ′ 
+
+> δ
+> 2
+
+< γ < μ ′ 
+
+> δ
+
+, then it follows from Lemma C.4 and Lemma C.5 that it does not matter which algorithm we apply because both of them achieve pair-wise weak recovery, assuming i, j ∈ [I].Now for any i, j ∈ [n] , the probability of picking any of them in I is vanishingly small. We conclude that the algorithm ˆX
+
+satisfies the guarantees sought in Theorem 3.1. 
+
+Deferred proof of Section 4 First we prove Fact 4.3. 
+
+Proof of Fact 4.3. Let p ∈ [k] be fixed. By Chernoff’s bound, with probability at least 1 − n20 ,
+
+(
+
+1 −
+
+√ 400 k log nn
+
+) 
+
+> nk
+
+6
+
+‖cp(z)‖2 6
+
+(
+
+1 + 
+
+√ 400 k log nn
+
+) 
+
+> nk
+
+, hence the property follows by a union bound. Next we prove Fact 4.5. 
+
+Proof. For each ` ∈ [t] , define 
+
+E
+
+[ ˆX(G`)ij 
+
+∣∣∣ f`(z)i = f`(z)j
+
+]
+
+=: C∗
+
+> `
+
+and let 
+
+C∗ = ∑
+
+> `∈[t]
+
+C` .
+
+By independence of the observations, the inequality of Fact 4.5 for the case case zi = zj follows with an application of Hoeffding’s inequality. The case zi 6 = zj needs a bit more work. By Theorem 3.1, for each ` ∈ [t], we have 
+
+E
+
+[ ˆX(G`)ij 
+
+∣∣∣ f`(z)i = f`(z)j
+
+]
+
+= C∗ 
+
+> `
+
+,
+
+27 Multi-View Stochastic Block Models 
+
+and 
+
+E
+
+[ ˆX(G`)ij 
+
+∣∣∣ f`(z)i 6 = f`(z)j
+
+]
+
+6 C∗ 
+
+> `
+
+− C` .
+
+Therefore, 
+
+E
+
+[ ˆX(G`)ij 
+
+∣∣∣ zi 6 = zj
+
+]
+
+= E
+
+[ ˆX(G`)ij 
+
+∣∣∣ f`(z)i = f`(z)j
+
+]
+
+· P (f`(z)i = f`(z)j | zi 6 = zj )+ E
+
+[ ˆX(G`)ij 
+
+∣∣∣ f`(z)i 6 = f`(z)j
+
+]
+
+· P (f`(z)i 6 = f`(z)j | zi 6 = zj )
+
+6C∗ 
+
+> `
+
+− C` · 12 ,
+
+and so 
+
+E
+
+∑
+
+> `∈[t]
+
+ˆX(G`)ij 
+
+∣∣∣∣∣∣ zi 6 = zj
+
+ 6 ∑
+
+> `∈[t]
+
+(
+
+C∗ 
+
+> `
+
+− C` · 12
+
+)
+
+= C∗ − C · t
+
+2 .
+
+The inequality of Fact 4.5 for case zi 6 = zj follows with another application of Hoeffding’s inequality. Now we prove Lemma 4.8. 
+
+Proof of Lemma 4.8. Let Ai be a (p, q )-representative and Aj be a (p′, q )-representative, for p , p ′ ∈ [k] . It suffices to show that if p = p′ then ‖Ai − Aj ‖2 6 n/k and otherwise ‖Ai − Aj ‖2 > n/k . Then no q-representative index remains unassigned at the end of step 1. By the reverse triangle inequality 
+
+|‖ Ai − Aj ‖ − ‖ cp(z) − cp′ (z)‖| 
+
+6 ‖Ai − Aj − cp(z) + cp′ (z)‖
+
+6 ‖Ai − cp(z)‖ + ‖Aj − cp′ (z)‖
+
+6 2n · e−q·C2·t .
+
+For p = p′ we have ‖cp(z) − cp′ (z)‖ = 0 and by choice of t , the first inequality follows. For p 6 = p′ we have 
+
+‖cp(z) − cp′ (z)‖ > nk (2 − o(1)) since z is balanced and the second inequality follows again by choice of t.28

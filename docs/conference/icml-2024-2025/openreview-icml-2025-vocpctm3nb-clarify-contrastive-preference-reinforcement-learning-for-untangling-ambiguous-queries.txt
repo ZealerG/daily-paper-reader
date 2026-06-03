@@ -1,0 +1,991 @@
+Title: CLARIFY: Contrastive Preference Reinforcement Learning for  Untangling Ambiguous Queries
+
+URL Source: https://openreview.net/pdf?id=vOCPctm3nb
+
+Number of Pages: 19
+
+Markdown Content:
+# CLARIFY: Contrastive Preference Reinforcement Learning for Untangling Ambiguous Queries 
+
+Ni Mu * 1 Hao Hu * 2 Xiao Hu 1 Yiqin Yang 3 Bo Xu 3 Qing-Shan Jia 1
+
+## Abstract 
+
+Preference-based reinforcement learning (PbRL) bypasses explicit reward engineering by infer-ring reward functions from human preference comparisons, enabling better alignment with hu-man intentions. However, humans often strug-gle to label a clear preference between similar segments, reducing label efficiency and limiting PbRL’s real-world applicability. To address this, we propose an offline PbRL method: Contrastive 
+
+LeArning for Resolv Ing Ambiguous Feedback (CLARIFY), which learns a trajectory embed-ding space that incorporates preference informa-tion, ensuring clearly distinguished segments are spaced apart, thus facilitating the selection of more unambiguous queries. Extensive experi-ments demonstrate that CLARIFY outperforms baselines in both non-ideal teachers and real hu-man feedback settings. Our approach not only selects more distinguished queries but also learns meaningful trajectory embeddings. 
+
+## 1. Introduction 
+
+Reinforcement Learning (RL) has achieved remarkable suc-cess in various domains, including robotics (Kalashnikov et al., 2018; Ju et al., 2022), gaming (Mnih et al., 2015; Ibarz et al., 2018), and autonomous systems (Schulman, 2015; Bellemare et al., 2020). However, a fundamental chal-lenge in RL is the need for well-defined reward functions, which can be time-consuming and complex to design, espe-cially when aligning them with human intent. To address this challenge, several approaches have emerged to learn         
+
+> *Equal contribution 1Beijing Key Laboratory of Embodied Intel-ligence Systems, Department of Automation, Tsinghua University, Beijing, China 2Moonshot AI, Beijing, China 3The Key Labora-tory of Cognition and Decision Intelligence for Complex Systems, Institute of Automation, Chinese Academy of Sciences, Beijing, China. Correspondence to: Yiqin Yang <yiqin.yang@ia.ac.cn >,Qing-Shan Jia <jiaqs@tsinghua.edu.cn >.
+> Proceedings of the 42 st International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+directly from human feedback or demonstrations, avoiding the need for explicit reward engineering. Preference-based Reinforcement Learning (PbRL) stands out by using hu-man preferences between pairs of trajectory segments as the reward signal (Lee et al., 2021a; Christiano et al., 2017). This framework, based on pairwise comparisons, is easy to implement and captures human intent effectively. However, when trajectory segments are highly similar, it becomes difficult for humans to differentiate between them and identify subtle differences (Inman, 2006; Bencze et al., 2021). Therefore, existing PbRL methods (Lee et al., 2021a; Liang et al., 2022; Park et al., 2022) face this significant challenge of ambiguous queries : humans struggle to give a clear signal for highly similar segments, leading to ambigu-ous preferences. As highlighted in previous work (Mu et al., 2024), this problem of ambiguous queries not only hinders labeling efficiency but also restricts the practical application of PbRL in real-world settings. In this paper, we focus on solving this problem in offline PbRL by selecting a larger proportion of unambiguous queries. We propose a novel method, CLARIFY, which uses contrastive learning to learn trajectory embeddings and incorporate preference information, as outlined in Fig-ure 1. CLARIFY features two contrastive losses to learn a meaningful embedding space. The ambiguity loss lever-ages the ambiguity information of queries, increasing the distance between embeddings of clearly distinguished seg-ments while reducing the distance between ambiguous ones. The quadrilateral loss utilizes the preference information of queries, modeling the relationship between better and worse-performing segments as quadrilaterals. With theoret-ical guarantees, the two losses allow us to select more un-ambiguous queries based on the embedding space, thereby improving label efficiency. Extensive experiments show the effectiveness CLARIFY. First, CLARIFY outperforms the state-of-the-art offline PbRL methods under non-ideal feedback from both scripted teachers and real human labelers. Second, CLARIFY sig-nificantly increases the proportion of unambiguous queries. We conduct human experiments to demonstrate that the queries selected by CLARIFY are more clearly distin-guished, thereby improving human labeling efficiency. Fi-1CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 𝑑 𝑒𝑚𝑏 = 𝑓 𝜙 𝜎 0 − 𝑓 𝜙 𝜎 1 2                     
+
+> 0
+> Probability
+> Sample query 𝜎 0,𝜎 1with higher 𝑑 𝑒𝑚𝑏
+> Non -ideal
+> teacher
+> Train Trajectory Encoder 𝒇 𝝓 𝝈 through Contrastive Learning ①Select Clearly Distinguished Queries through Reject Sampling ②
+> Good
+> segment
+> Poor
+> segment (,)
+> Clearly
+> Distinguished
+> Ambiguous
+> (,)
+> Segment embedding vector
+> (,)Ambiguous query
+> Clearly -distinguished query (,)
+
+Figure 1: The framework of CLARIFY. 1) Train the trajectory embeddings via contrastive learning, incorporating preference information. 2) Using the embedding space, select clearly distinguished queries for non-ideal teachers via reject sampling. nally, the visualization analysis of the learned embedding space reveals that segments with clearer distinctions are widely separated while similar segments are closely clus-tered together. This clustering behavior confirms the mean-ingfulness and coherence of the embedding space. 
+
+## 2. Related Work 
+
+Preference-based RL (PbRL). PbRL allows agents to learn from human preferences between pairs of trajectory segments, eliminating the need for reward engineering (Christiano et al., 2017). Previous PbRL works focus on improving feedback efficiency via query selection (Ibarz et al., 2018; Biyik et al., 2020), unsupervised pretraining (Lee et al., 2021a; Mu et al., 2024), and feedback augmenta-tion (Park et al., 2022; Choi et al., 2024). Also, PbRL has been successfully applied to fine-tuning large language mod-els (LLMs) (Ouyang et al., 2022), where human feedback serves as a more accessible alternative to reward functions. In offline PbRL, an agent learns a policy from an offline trajectory dataset without reward signals, alongside pref-erence feedback on segment pairs provided by a teacher. Traditional methods (Shin et al., 2023) follow a two-phase process: training a reward model from preference feedback, and then performing offline RL. Some works (Kim et al., 2022; Gao et al., 2024) focus on preference modeling, while others (Hejna & Sadigh, 2024; Kang et al., 2023) optimize policies directly from preference feedback. 
+
+Learning from non-ideal feedback. Despite PbRL’s po-tential, real-world human feedback is often non-ideal, a growing area of concern. To address this, Lee et al. (2021b) proposes a model of non-ideal feedback. Cheng et al. (2024) assumes random label errors, identifying outliers via loss function values. Xue et al. (2023) improves reward ro-bustness through regularization constraints. However, these approaches still rely on idealized models of feedback, which diverge from real human decision-making. Mu et al. (2024) is perhaps the closest work to ours, addressing the challenge of labeling similar segments in online PbRL, which aligns with the ambiguous query issue. However, the method of Mu et al. (2024) cannot be applied to offline settings. This paper focuses on addressing this issue in the offline PbRL. 
+
+Contrastive learning for RL. Contrastive learning is widely used in self-supervised learning to differentiate be-tween positive and negative samples and extract meaningful features (Oord et al., 2018; Chen & He, 2021). In RL, it has been applied to representation learning in image-based RL (Laskin et al., 2020; Yuan & Lu, 2022) to improve learning efficiency, and to temporal distance learning (Myers et al., 2024; Jiang et al., 2024) to encourage exploration. In this pa-per, we apply contrastive learning to incorporate preference into trajectory representations for offline PbRL. 
+
+## 3. Preliminaries 
+
+Preference-based RL. In RL, an agent aims to maximize the cumulative discounted rewards in a Markov Decision Process (MDP), defined by a tuple (S, A, P, r, γ ). S and A
+
+are the state and action space, P = P (·| s, a ) is the environ-ment transition dynamics, r = r(s, a ) is the reward function, and γ is the discount factor. In offline PbRL, the true reward function r is unknown, and we have an offline dataset D
+
+without reward signals. We request preference feedback p
+
+for two trajectory segments σ0 and σ1 of length H sampled from D. p = 0 denotes σ1 is preferred ( σ1 ≻ σ0), p = 1 
+
+denotes the opposite ( σ1 ≺ σ0). In cases where segments are too similar to distinguish, we set p = no cop , and this label is skipped during learning. The preference data 
+
+(σ0, σ 1, p ) forms the preference dataset Dp.Conventional offline PbRL methods estimate a reward func-tion ˆr = ˆ rψ (s, a ) from Dp and use it to train a policy πθ via offline RL. The Preference model, typically based on the Bradley-Terry model (Bradley & Terry, 1952), estimates the probability Pψ [σ1 ≻ σ0] as: 
+
+Pψ [σ1 ≻ σ0] = exp P 
+
+> t
+
+ˆrψ (s1 
+
+> t
+
+, a 1 
+
+> t
+
+)
+
+P 
+
+> i∈{ 0,1}
+
+exp P 
+
+> t
+
+ˆrψ (sit, a it) . (1) The following cross-entropy loss is minimized: 2CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 𝜎 +′
+
+𝜎 +
+
+≥ ++
+
+𝜎 −
+
+𝜎 −′   
+
+> 𝜎 +,𝜎 −
+> 𝜎 +
+> ′,𝜎 −′
+
+(a) −1 0 1 
+
+> −1.0
+> −0.5
+> 0.0
+> 0.5
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+
+(b) 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0        
+
+> 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 Normalized Return
+
+(c) 
+
+Figure 2: Illustration of quadrilateral loss Lquad . (a) A demonstration of the main idea of Lquad . (b) An embedding visualization of the intuitive example in Section 4.1. (c) True embedding visualization results of the benchmark experiments on the “drawer-open” task, under skip rate ϵ = 0 .5 and ϵ = 0 .7.
+
+min  
+
+> ψ
+
+Lreward = − E
+
+> (σ0,σ 1,p )∼Dp
+
+h
+
+(1 − p) log Pψ [σ0 ≻ σ1]+ p log Pψ [σ1 ≻ σ0]
+
+i
+
+.
+
+(2) 
+
+Contrastive learning. Contrastive learning is a self-supervised learning approach, which learns meaningful rep-resentations by comparing pairs of samples. The basic idea is to bring similar (positive) samples closer in the embedding space while pushing dissimilar (negative) samples apart. Early works (Chopra et al., 2005) directly optimize this objective, using the following loss function: 
+
+Lcontrastive = 12N
+
+> N
+
+X
+
+> i=1
+
+h
+
+I(yi=yj )∥zi − zj ∥22
+
++ I(yi̸ =yj ) max(0 , m − ∥ zi − zj ∥2)2i
+
+,
+
+(3) where zi is the representation of sample i, Iyi=yj and 
+
+I(yi̸ =yj ) are indicator functions, and m is a pre-defined mar-gin. InfoNCE loss (Oord et al., 2018) is widely used in recent works, which is formulated as: 
+
+LInfoNCE = − log exp( sim (zi, z ′
+
+> i
+
+)/t )
+
+PKk=1 exp( sim (zi, z k)/t ) , (4) where sim (·, ·) is the similarity function, z′ 
+
+> i
+
+denotes the pos-itive sample of zi, and t is a temperature scaling parameter. In our work, we apply contrastive learning to model trajec-tory representations, incorporating preference information. The encoder z = fϕ(τ ) models arbitrary-length trajectory 
+
+τ , and its corresponding preference-based loss functions are detailed in Section 4.1. 
+
+## 4. Method 
+
+In this section, we start by introducing the issue of ambigu-ous queries : humans struggle to clearly distinguish between similar trajectory segments, making the query ambiguous. This issue, validated in human experiments (Mu et al., 2024), hinders the practical application of PbRL. While previous work (Mu et al., 2024) tackles this issue in online PbRL settings, it remains unsolved in offline settings. To tackle ambiguous queries in offline PbRL, we propose a novel method, Contrastive LeArning for Resolv Ing Am-biguous Feedback (CLARIFY), which maximizes the se-lection of clearly-distinguished queries to improve human labeling efficiency. Our approach is based on contrastive learning, integrating preference information into trajectory embeddings. In the learned embedding space, clearly dis-tinguished segments are well-separated, while ambiguous segments remain close, as detailed in Section 4.1. Based on this embedding, we introduce a query selection method in Section 4.2 to select more unambiguous queries. The overall framework of CLARIFY is illustrated in Figure 1 and Algorithm 1, with implementation details provided in Section 4.3. 
+
+4.1. Representation Learning 
+
+In this subsection, we first formalize the problem of preference-based representation learning. Our goal is to train an encoder z = fϕ(τ ), where z is a fixed-dimensional embedding of trajectory τ . We leverage a preference dataset 
+
+Dp containing tuples (σ0, σ 1, p ), where σ0 and σ1 are tra-jectory segments, and p ∈ { 0, 1, no cop } indicates the preference: p = 0 if σ0 is preferred, p = 1 if σ1 is preferred, and p = no cop if the segments are too similar to compare. A well-structured embedding space should maximize the distance between clearly distinguished segments while min-imizing the distance between ambiguous ones. In such a space, trajectories with similar performance are close, while those with large performance gaps are far apart. This results in a meaningful and coherent embedding space, where high-performance trajectories form one cluster, low-3CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+performance trajectories form another, and intermediate trajectories smoothly transition between them. To achieve this, we propose two contrastive learning losses. 
+
+Ambiguity loss Lamb . The first loss, called the ambiguity loss, directly optimizes this goal. It maximizes the distance between the embeddings of clearly distinguished segment pairs and minimizes the distance between ambiguous ones: 
+
+min  
+
+> ϕ
+
+Lamb =
+
+h
+
+− E
+
+> (σ0,σ 1,p )∼Dp,p∈{ 0,1}
+
+ℓ(z0, z 1)+ E
+
+> (σ0,σ 1,p )∼Dp,p=no cop
+
+ℓ(z0, z 1)
+
+i
+
+,
+
+(5) where z0 = fϕ(σ0), z1 = fϕ(σ1), and ℓ(·, ·) is the distance metric. However, relying solely on the ambiguity loss Lamb can cause several issues. First, when the preference dataset is small, continuous optimization of Lamb may lead to over-fitting. Additionally, Lamb alone can cause representation collapse, where ambiguous segments are mapped to the same point in the embedding space. This is because Lamb 
+
+only leverages ambiguity information (whether segments are distinguishable) but ignores preference relations (which segment is better). The quadrilateral loss Lquad , introduced below, mitigates this issue by acting as a regularizer, ensur-ing the embedding space better captures the full preference structure and improving representation quality. 
+
+Quadrilateral loss Lquad . To address these issues, we introduce the quadrilateral loss Lquad , which directly models preference relations between segment pairs, better capturing the underlying structure in the embedding space. Specif-ically, for two clearly distinguished queries (σ+, σ −) and 
+
+(σ′
+
+> +
+
+, σ ′−), where σ+ and σ′ 
+
+> +
+
+are preferred over σ− and σ′−,we create a quadrilateral-shaped relationship between their embeddings. By utilizing pairs of queries, the training data size grows from O(n) to O(n2), mitigating the overfitting issue caused by limited preference data. The core idea Lquad is illustrated in Figure 2(a). For each pair of clearly distinguished queries, we treat σ+ and σ′ 
+
+> +
+
+as “positive” samples, as they are preferred over σ− and σ′−,the “negative” samples. The quadrilateral loss encourages the sum of distances between positive samples σ+, σ ′ 
+
+> +
+
+and between negative samples σ−, σ ′− to be smaller than the sum of distances within positive or negative pairs (i.e., between 
+
+σ+ and σ−, or σ′ 
+
+> +
+
+and σ−). Formally, this is expressed as: 
+
+min  
+
+> ϕ
+
+Lquad = − E
+
+> (( σ+,σ −),(σ′
+> +,σ ′−)) ∼Dp
+
+h
+
+ℓ(z+, z −′)+ ℓ(z+′, z −) − ℓ(z+, z +′) − ℓ(z−, z −′)
+
+i
+
+,
+
+(6) where z+ = fϕ(σ+), z +′ = fϕ(σ′
+
+> +
+
+), z − = fϕ(σ−), z −′ =
+
+fϕ(σ′−).
+
+An intuitive example. To demonstrate the effectiveness of the quadrilateral loss, we conducted a simple experiment. We generated 1000 data points with values uniformly dis-tributed between 0 and 1, initializing each data point’s em-bedding as a 2-dim vector sampled from a standard normal distribution. We then optimized these embeddings using the quadrilateral loss. As shown in Figure 2(b), the learned embedding space exhibits a smooth and meaningful distribu-tion, with higher-valued data points transitioning gradually to lower-valued ones. Please refer to Appendix C.3 for experimental details. 
+
+4.2. Query Selection 
+
+This section presents a query selection method based on rejection sampling to select more unambiguous queries. For a given query (σ0, σ 1, p ), we calculate the embedding dis-tance demb = ℓ(fϕ(σ0), f ϕ(σ1)) between its two segments. For a batch of queries, we can obtain a distribution p(demb )
+
+of the embedding distances. We aim to manipulate this dis-tribution using rejection sampling to increase the proportion of clearly distinguished queries. We define the rejection sampling distribution q(demb ) as follows. First, we estimate the density functions ρclr (demb )
+
+and ρamb (demb ) = 1 − ρclr (demb ) for clearly-distinguished and ambiguous pairs, using the existing preference dataset 
+
+Dp. These densities reflect the likelihood of observing a distance demb for each type of segment pair. Next, we compute a new density function: 
+
+ρ1(demb ) = max (0 , ρ clr (demb ) − ρamb (demb )) 
+
+R max (0 , ρ clr (d′) − ρamb (d′)) dd ′ ,ρ2(demb ) = ρclr (demb )/ρ amb (demb )
+
+R (ρclr (d′)/ρ amb (d′)) dd ′ ,ρ(demb ) = 0 .5( ρ1(demb ) + ρ2(demb )) .
+
+(7) This density function emphasizes the distances where clearly distinguished segments are more frequent than ambiguous ones. Finally, we multiply this new density function by the original distribution p(demb ) to obtain the rejection sampling distribution q(demb ):
+
+q(demb ) = p(demb ) · ρ(demb ), (8) which increases the likelihood of selecting queries with clearly distinguished segment pairs, improving labeling effi-ciency. For the remaining queries after rejection sampling, we follow prior work (Lee et al., 2021a; Shin et al., 2023) by selecting those with maximum disagreement. 
+
+4.3. Implementation Details Embedding training. For embedding training in Section 4.1, we adopt a Bi-directional Decision Transformer (BDT) architecture (Furuta et al., 2021a), where the encoder z =
+
+4CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+Table 1: Success rates on Metaworld tasks (the first 7 tasks) and episodic returns on DMControl tasks (the last 2 tasks), over 6 random seeds. We use skip rate ϵ = 0 .5, 0.7 and report the average performance and standard deviation of the last 5
+
+trained policies. The yellow and gray shading represent the best and second-best performances, respectively. 
+
+Skip Rate Algorithm box-close dial-turn drawer-open handle -pull-side hammer peg-insert -side sweep-into cheetah-run walker-walk 
+
+- IQL 94.90 ± 1.42 76.50 ± 1.73 98.60 ± 0.45 99.30 ± 0.59 72.00 ± 2.35 88.40 ± 1.30 79.40 ± 1.91 607.46 ± 8.13 830.15 ± 20.08 
+
+0.5
+
+MR 0.26 ± 0.02 14.46 ± 5.27 50.47 ± 6.24 79.73 ± 12.19 0.14 ± 0.08 9.23 ± 2.03 23.25 ± 9.67 205.04 ± 50.53 322.93 ± 161.07 
+
+OPRL 8.25 ± 3.16 57.33 ± 25.02 72.67 ± 2.87 83.92 ± 7.98 14.80 ± 5.27 22.00 ± 4.64 61.00 ± 7.52 531.96 ± 48.75 646.40 ± 51.35 
+
+PT 0.15 ± 0.20 30.54 ± 7.24 61.64 ± 10.07 89.75 ± 6.07 0.11 ± 0.10 10.20 ± 2.94 46.35 ± 3.35 384.59 ± 99.26 599.43 ± 39.42 
+
+OPPO 0.56 ± 0.79 13.06 ± 12.74 11.67 ± 6.24 0.56 ± 0.79 2.78 ± 4.78 0.00 ± 0.00 15.56 ± 11.57 346.01 ± 127.78 311.27 ± 42.73 
+
+LiRE 3.60 ± 0.69 46.20 ± 6.75 63.47 ± 10.38 52.07 ± 33.58 16.20 ± 13.37 21.60 ± 4.00 57.47 ± 2.74 553.61 ± 43.16 789.18 ± 28.77 
+
+CLARIFY 29.40 ± 16.27 77.50 ± 7.37 83.50 ± 7.40 95.00 ± 1.22 26.75 ± 11.26 24.25 ± 6.65 68.00 ± 7.13 617.31 ± 14.43 796.34 ± 12.87 
+
+0.7
+
+MR 0.20 ± 0.11 16.57 ± 8.22 45.51 ± 10.25 74.82 ± 17.10 0.06 ± 0.09 5.21 ± 2.63 17.22 ± 6.05 234.77 ± 81.40 306.39 ± 134.72 
+
+OPRL 7.40 ± 6.97 63.40 ± 9.46 46.50 ± 18.83 84.00 ± 7.11 5.00 ± 2.28 23.75 ± 5.36 52.00 ± 9.33 513.94 ± 55.45 664.16 ± 89.47 
+
+PT 0.18 ± 0.18 25.64 ± 7.40 64.72 ± 18.44 74.94 ± 12.56 0.09 ± 0.05 8.21 ± 4.07 28.52 ± 6.67 429.19 ± 44.92 647.68 ± 38.53 
+
+OPPO 0.56 ± 0.79 2.78 ± 2.83 11.67 ± 6.24 0.56 ± 0.79 4.44 ± 6.29 0.00 ± 0.00 15.56 ± 11.57 355.69 ± 59.35 304.19 ± 16.25 
+
+LiRE 7.67 ± 16.79 38.40 ± 8.52 39.10 ± 6.78 50.60 ± 31.59 14.25 ± 7.30 23.40 ± 3.40 56.00 ± 6.40 514.75 ± 10.02 795.02 ± 22.80 
+
+CLARIFY 17.50 ± 6.87 79.40 ± 3.83 78.60 ± 10.52 95.00 ± 1.10 28.75 ± 15.58 23.00 ± 1.22 59.67 ± 10.09 593.24 ± 22.75 816.54 ± 11.08 
+
+fϕ(τ ) and the decoder ˆa = πϕ′ (s, z ) are Transformer-based. The model is trained with a reconstruction loss: 
+
+min 
+
+ϕ,ϕ ′ Lrecon = E τ ∼D
+
+(s,a )∼τ
+
+πϕ′ (s, f ϕ(τ )) , a 2. (9) Appendix E provides more details on BDT. Also, to stabilize training, we constrain the L2 norm of the embeddings to be close to 1. Without this constraint, embeddings may either grow unbounded or collapse to the origin, both of which can cause training to fail: 
+
+min 
+
+ϕ Lnorm = Eτ ∼D max ( ∥fϕ(τ )∥2, 1) . (10) The final loss function combines these terms: 
+
+L = Lrecon + λamb Lamb + λquad Lquad + λnorm Lnorm , (11) where λamb , λ quad , λ norm are hyperparameters. We use the L2 distance as the distance metric ℓ(·, ·).
+
+Rejection sampling. For rejection sampling in Section 4.2, following the successful discretization of low-dimensional features in prior RL works (Bellemare et al., 2017; Furuta et al., 2021b), we discretize the embedding distance demb it into nbin intervals to handle continuous distributions. Based on the above discussion, the overall process of CLAR-IFY is summarized in Algorithm 1. First, we randomly sample a query batch to pretrain the encoder and reward model. Next, we select queries based on the pretrained em-bedding space, update the preference dataset Dp and reward model, and retrain the embedding using the updated Dp.Finally, we train the policy πθ using a standard offline RL algorithm, such as IQL (Kostrikov et al., 2021). Additional implementation details are provided in Appendix C.2. 
+
+## 5. Theoretical Analysis 
+
+This section establishes the theoretical foundation of CLAR-IFY’s embedding framework and provides insights into the proposed objective. We present two key propositions show-ing that the losses Lquad and Lamb ensure: 1) margin separa-tion for distinguishable samples, and 2) convex separability of preference signals in the embedding space. The first property guarantees a meaningful geometric embedding for selecting distinguishable samples, while the second ensures that the embedding space does not collapse and maintains a clear separation between positive and negative samples. 
+
+Margin guarantees for disentangled representations. 
+
+Proposition 5.1 formalizes how Lamb enforces geometric separation between trajectories with distinguishable value differences. 
+
+Proposition 5.1 (Positive Separation Margin under Optimal Ambiguity Loss) . Let Dp be a distribution over labeled tra-jectory pairs (σ0, σ 1, p ) with p ∈ { 0, 1, no cop }. Define 
+
+P = {(σ0, σ 1) | p ∈ { 0, 1}} and N = {(σ0, σ 1) | p =
+
+no cop }. Let 
+
+ϕ∗ = arg min 
+
+ϕ Lamb (ϕ), zi = fϕ∗ (σi),
+
+and set d+min = inf 
+
+(σ0,σ 1)∈P ℓ(z0, z 1),d−
+
+max = sup 
+
+(σ0,σ 1)∈N
+
+ℓ(z0, z 1),
+
+where ℓ(z0, z 1) = ∥z0 −z1∥. If the class {fϕ} is continuous and sufficiently expressive, and supp( Dp) is compact in 
+
+(σ0, σ 1)-space, then there exists δ > 0 such that 
+
+d+min ≥ d−
+
+max + δ > 0.
+
+Proof. Please refer to Appendix A.1 for detailed proof. This proposition guarantees that the ambiguity-loss min-imizer ϕ∗ yields not only a correct ordering of pairwise distances but also enforces a strict margin δ > 0:
+
+inf 
+
+(σ0,σ 1)∈P ∥z0 − z1∥ ≥ sup 
+
+(σ0,σ 1)∈N
+
+∥z0 − z1∥ + δ. 
+
+5CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 
+
+(a) dial-turn 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 (b) drawer-open 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 (c) hammer 0.0 0.2 0.4 0.6 0.8 1.0  
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Normalized Return
+
+(d) walker-walk 
+
+Figure 3: Visualizations of the learned embedding spaces under ϵ = 0 .5, where segments with high returns (bright color) and low returns (dark color) are clearly separated into distinct clusters, with a smooth transition between their centers. In effect, CLARIFY’s objective Lamb provably carves out a uniform buffer δ around all distinguishable trajectory pairs, endowing the learned embedding space with a nontrivial geometric margin that enhances robustness and separability. 
+
+Convex geometry of preference signals. The second propo-sition characterizes how Lquad induces convex separability in the embedding space. We show that minimizing this loss directly translates to constructing a robust decision boundary between preferred and non-preferred trajectories: 
+
+Proposition 5.2 (Convex Separability) . Assume the positive and negative samples are distributed in two convex sets C+
+
+and C− in the embedding space. Let μ+ = E[z+] and μ− =
+
+E[z−] denote the class centroids. If Lquad is minimized with a margin η > 0, then there exists a hyperplane H defined by: 
+
+H = {z ∈ Rd | wT z + b = 0 }
+
+such that for all z+ ∈ C + and z− ∈ C −,
+
+˜d(z+, H) ≥ η and ˜d(z−, H) ≤ − η
+
+where ˜d(z, H) = ( w⊤b + z)/|| w|| denotes the signed dis-tance from z to H.Proof. Please refer to Appendix A.2 for detailed proof. The second proposition characterizes the separability achieved in the embedding space. The centroid separation 
+
+μ+ − μ− acts as a global discriminator, while the margin 
+
+η ensures local robustness against ambiguous samples near decision boundaries. This result has two key implications: 1) The existence of a separating hyperplane H guarantees linear separability of preferences, enabling simple query selection policies (e.g., margin-based sampling) to achieve high labeling efficiency. 2) The margin η directly quan-tifies the “safety gap” against ambiguous queries, where any query pair within 2η distance would be automatically filtered out as unreliable. This mathematically substantiates our method’s ability to actively avoid ambiguous queries during human feedback collection. To better illustrate the dynamics of the embedding space of the proposed losses, we provide a gradient-based analy-sis to explain, available in Appendix A.3. Overall, CLAR-IFY’s framework combines three principles: 1) Margin max-imization for query disambiguation, 2) Convex geometric separation for reliable hyperplane decisions, 3) Dynami-cally balanced contrastive gradients for stable embedding learning. Together, these properties ensure that the learned representation is both geometrically meaningful (aligned with trajectory values) and algorithmically useful (enabling efficient query selection). 
+
+## 6. Experiments 
+
+We designed our experiments to answer the following ques-tions: Q1: How does CLARIFY compare to other state-of-the-art methods under non-ideal teachers? Q2: Can CLAR-IFY improve label efficiency by query selection? Q3: Can CLARIFY learn a meaningful embedding space for trajec-tory representation? Q4: What is the contribution of each of the proposed techniques in CLARIFY? 
+
+6.1. Setups Dataset and tasks. Previous offline PbRL studies often use D4RL (Fu et al., 2020) for evaluation, but D4RL is shown to be insensitive to reward learning due to the “survival in-stinct” (Li et al., 2023), where performance can remain high even with wrong rewards (Shin et al., 2023). To address this, we use the offline dataset presented by Choi et al. (2024) with Metaworld (Yu et al., 2020) and DMControl (Tassa et al., 2018), which has been proven to be suitable for re-ward learning (Choi et al., 2024). Specifically, we choose 
+
+7 complex Metaworld tasks: box-close, dial-turn, drawer-open, handle-pull-side, hammer, peg-insert-side, sweep-into, and 2 complex DMControl tasks: cheetah-run, walker-walk. Task details are provided in Appendix C.1. 
+
+Baselines. We compare CLARIFY with several state-of-the-art methods, including Markovian Reward (MR), Pref-erence Transformer (PT) (Kim et al., 2022), OPRL (Shin et al., 2023), OPPO (Kang et al., 2023), and LiRE (Choi et al., 2024). MR is based on a Markovian reward model using MLP layers, serving as the baseline in PT, which uses a Transformer for reward modeling. OPRL leverages reward 6CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries dial-turn hammer walker-walk 20 50 75 100     
+
+> Query clarity ratio (%)  CLARITY OPRL
+> dial-turn hammer walker-walk 20 50 75 100
+> Accuracy (%) CLARITY OPRL
+
+Figure 4: Query clarity ratio and accuracy of human labels for CLARIFY and OPRL, with CLARIFY-selected queries are more clearly distinguished for humans. ensembles and selects queries with maximum disagreement. OPPO also learns trajectory embeddings but optimizes the policy directly in the embedding space. LiRE uses the listwise comparison to augment the feedback. Following prior work, we use IQL (Kostrikov et al., 2021) to optimize the policy after reward learning. Also, we train IQL with ground truth rewards as a performance upper bound. More implementation details are provided in Appendix C.2. 
+
+Non-ideal teacher design. Following prior works (Lee et al., 2021a; Shin et al., 2023), we use a scripted teacher for systematic evaluation, which provides preferences be-tween segments based on the sum of ground truth rewards 
+
+rgt . To better mimic human decision-making uncertainty, we introduce a “skip” mechanism. When the performance difference between two segments σ0, σ 1 is marginal, that is, 
+
+X
+
+> (s,a )∈σ0
+
+rgt (s, a ) − Σ(s,a )∈σ1 rgt (s, a ) < ϵH · ravg , (12) the teacher skips the query by assigning p = no cop . Here, 
+
+H is the segment length, and ravg is the average ground truth reward for transitions in offline dataset D. We refer to ϵ ∈ (0 , 1) as the skip rate. This model is similar to the “threshold” mechanism in Choi et al. (2024), but differs from the “skip” teacher in B-Pref (Lee et al., 2021b), which skips segments with too small returns. 
+
+6.2. Evaluation on the Offline PbRL Benchmark Benchmark results. We compare CLARIFY with baselines on Metaworld and DMControl. Table 1 shows that skipping degrades MR’s performance, even with PT. LiRE improves MR via listwise comparison, while OPRL enhances perfor-mance by selecting maximally disagreed queries. OPPO is similarly affected by skipping, performing on par with MR. In contrast, CLARIFY selects clearer queries, improving reward learning and achieving the best results in most tasks. 
+
+Enhanced query clarity. To assess CLARIFY’s ability to select unambiguous queries, we compare the distinguish-able query ratio under a non-ideal teacher. Table 3 shows CLARIFY achieves higher query clarity across tasks. We further validate this via human experiments on dial-Table 2: Performance of CLARIFY and MR using different numbers of queries, under skip rate ϵ = 0 .5.
+
+> # of Queries
+
+dial-turn sweep-into                                                    
+
+> CLARIFY MR CLARIFY MR
+> 100 59.50 ±4.67 49.50 ±10.16 54.00 ±2.16 49.67 ±4.03
+> 500 77.25 ±6.87 50.50 ±5.98 68.67 ±1.70 56.67 ±4.03
+> 1000 77.50 ±3.01 57.33 ±5.02 68.00 ±3.19 61.00 ±7.52
+> 2000 77.80 ±6.10 59.00 ±5.72 68.75 ±1.48 63.25 ±6.02
+
+Table 3: Ratios of clearly-distinguished queries under the non-ideal teacher with ϵ = 0 .5, for CLARIFY and baselines.                    
+
+> dial-turn hammer sweep-into walker-walk CLARIFY 76.33% 62.67% 68.67% 46.86%
+> MR 46.95% 50.33% 36.67% 36.28% OPRL 31.67% 12.67% 25.60% 15.64% PT 43.90% 49.33% 31.67% 37.90%
+
+turn, hammer, and walker-walk. Labelers provide 20 prefer-ence labels per run over 3 seeds, selecting the segment best achieving the task (e.g., upright posture in walker-walk). Unclear queries are skipped. Appendix D details task objec-tives and prompts. We evaluate with: 1) Query clarity: the ratio of queries with human-provided preferences. 2) Accuracy: agreement between human labels and ground truth. Figure 4 confirms CLARIFY’s superior query clarity and accuracy, validating its effectiveness. 
+
+Embedding space visualizations. We visualize the learned embedding space using t-SNE in Figure 3. Each point repre-sents a segment embedding, colored by its normalized return value. For most tasks, high-performance segments (bright colors) and low-performance segments (dark colors) form distinct clusters with smooth transitions, indicating that the embedding space effectively captures performance differ-ences. The balanced distribution of points further demon-strates the stability and quality of the learned representation, highlighting CLARIFY’s ability to create a meaningful and coherent embedding space. 
+
+6.3. Human Experiments Validation of the non-ideal teacher. To validate the ap-propriateness of our non-ideal teacher (Section 6.1), we conduct a human labeling experiment, where labelers pro-vide preferences between segment pairs with varying return differences. The results in Figure 5 show that as the return difference increases, both the query clarity ratio and accu-racy improve. This suggests that when the return difference is small, humans struggle to distinguish between segments, 7CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries dial-turn hammer walker-walk     
+
+> 20 50 75 100 Query clarity ratio (%)  Large Return Difference (RD) Medium RD Small RD
+> dial-turn hammer walker-walk
+> 60 80 100
+> Accuracy (%)
+> Large Return Difference (RD) Medium RD Small RD
+
+Figure 5: Query clarity ratio and accuracy of human labels for queries with varying return differences (RD). For dial-turn and hammer, RD values are 300 , 100 , and 10 ; for walker-walk, RD are 30 , 10 , and 1.Table 4: Performance of CLARIFY and ρclr -based query selection method, under skip rate ϵ = 0 .5.
+
+Query Selection dial-turn sweep-into CLARIFY 77.50 ± 3.01 68.00 ± 3.19 
+
+ρclr -based 61.33 ± 5.31 48.60 ± 10.74 
+
+aligning with our assumption that small return differences lead to ambiguous queries. 
+
+Human evaluation. To evaluate CLARIFY’s perfor-mance with real human preferences, we conduct experi-ments comparing CLARIFY with OPRL on the walker-walk task across 3 random seeds. Human labelers provide 
+
+100 feedback samples per run, with preference batch size 
+
+M = 20 . As shown in Table 5, CLARIFY outperforms OPRL in policy performance, suggesting that our reward models have higher quality. Additionally, queries selected by CLARIFY have higher clarity ratios and accuracy in human labeling, indicating that our approach improves the preference labeling process by selecting more clearly distin-guished queries. For more details on the human experiments, please refer to Appendix D. We believe these results indicate CLARIFY’s potential in real-world applications, especially those involving human feedback, such as LLM alignment. 
+
+6.4. Ablation Study Component analysis. To assess the impact of each con-trastive loss in CLARIFY, we incrementally apply the ambi-guity loss Lamb and the quadrilateral loss Lquad . As shown in Table 6, without either loss, performance is similar to OPRL. Using only Lamb yields unstable results due to overfitting early in training. When only Lquad is applied, performance improves but with slower convergence. When both losses are used, the best results are achieved, showing that their Table 5: Performance of CLARIFY and OPRL on walker-walk task, under real human labelers. 
+
+CLARIFY OPRL Episodic Returns 420.75 ± 52.02 265.91 ± 33.57 
+
+Query Clarity Ratio (%) 63.33 ± 8.50 53.33 ± 6.24 
+
+Accuracy (%) 87.08 ± 9.15 66.67 ± 4.71 
+
+Table 6: Performance of CLARIFY with and without opti-mizing Lamb and Lquad , under skip rate ϵ = 0 .5.
+
+Lamb Lquad dial-turn sweep-into 
+
+✗ ✗ 63.20 ± 4.79 40.00 ± 11.29 
+
+✓ ✗ 69.00 ± 11.20 52.80 ± 17.01 
+
+✗ ✓ 71.25 ± 8.81 62.20 ± 4.92 
+
+✓ ✓ 77.50 ± 3.01 68.00 ± 3.19 
+
+combination is crucial to the method’s success. 
+
+Ablation on the query selection. We compare two query selection methods: CLARIFY ‘s rejection sampling and a density-based approach that selects the highest-density queries ρclr (d), aiming for the most clearly distinguished queries. As shown in Table 4, the density-based method per-forms poorly, likely due to selecting overly similar queries, reducing diversity in the queries. In contrast, CLARIFY selects a more diverse set of unambiguous queries, yielding better performance. 
+
+Enhanced query efficiency. We compare the performance of CLARIFY and MR using different numbers of queries. As shown in Table 2, CLARIFY outperforms MR consis-tently, even if only 100 queries are provided. The result demonstrates CLARIFY’s ability to make better use of the limited feedback budget. 
+
+Ablation on hyperparameters. As Figure 6 visualizes, when varying the values of λdist , λquad , and λnorm , the qual-ity of embedding space remains largely unaffected. This demonstrates the robustness of CLARIFY to hyperparame-ter changes, as small adjustments do not significantly alter the quality of learned embeddings. 
+
+## 7. Conclusion 
+
+This paper presents CLARIFY, a novel approach that en-hances PbRL by addressing the ambiguous query issue. Leveraging contrastive learning, CLARIFY learns trajec-tory embeddings with preference information and employs reject sampling to select more clearly distinguished queries, improving label efficiency. Experiments show CLARIFY outperforms existing methods in policy performance and labeling efficiency, generating high-quality embeddings that boost human feedback accuracy in real-world applications, making PbRL more practical. 8CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+## Acknowledgments 
+
+This work is supported by the Strategic Priority Re-search Program of the Chinese Academy of Sciences (No.XDA27040200), the NSFC (No. 62125304, 62192751, and 62073182), the Beijing Natural Science Foundation (L233005), the BNRist project (BNR2024TD03003) and the 111 International Collaboration Project (B25027). The author would like to express gratitude to Yao Luan for the constructive suggestions for this paper. 
+
+## Impact Statement 
+
+We believe that CLARIFY has the potential to significantly improve the alignment of reinforcement learning agents with human preferences, enabling more precise and adaptable AI systems. Such advancements could have broad soci-etal implications, particularly in domains like healthcare, education, and autonomous systems, where understanding and responding to human intent is crucial. By enhancing the ability of AI to align with diverse human values and preferences, CLARIFY could promote greater trust in AI technologies, facilitate their adoption in high-stakes envi-ronments, and ensure that AI systems operate ethically and responsibly. These developments could contribute to the re-sponsible advancement of AI technologies, improving their safety, fairness, and applicability in real-world scenarios. 
+
+## References 
+
+Bellemare, M. G., Dabney, W., and Munos, R. A distribu-tional perspective on reinforcement learning. In Inter-national conference on machine learning , pp. 449–458. PMLR, 2017. Bellemare, M. G., Candido, S., Castro, P. S., Gong, J., Machado, M. C., Moitra, S., Ponda, S. S., and Wang, Z. Autonomous navigation of stratospheric balloons using reinforcement learning. Nature , 588(7836):77–82, 2020. Bencze, D., Sz ˝oll ˝osi, ´A., and Racsm ´any, M. Learning to distinguish: shared perceptual features and discrimination practice tune behavioural pattern separation. Memory , 29 (5):605–621, 2021. Biyik, E., Huynh, N., Kochenderfer, M., and Sadigh, D. Active preference-based gaussian process regression for reward learning. In Robotics: Science and Systems , 2020. Bradley, R. A. and Terry, M. E. Rank analysis of incom-plete block designs: I. the method of paired comparisons. 
+
+Biometrika , 39(3/4):324–345, 1952. Chen, X. and He, K. Exploring simple siamese represen-tation learning. In Proceedings of the IEEE/CVF con-ference on computer vision and pattern recognition , pp. 15750–15758, 2021. Cheng, J., Xiong, G., Dai, X., Miao, Q., Lv, Y., and Wang, F.-Y. Rime: Robust preference-based reinforcement learning with noisy preferences. arXiv preprint arXiv:2402.17257 ,2024. Choi, H., Jung, S., Ahn, H., and Moon, T. Listwise re-ward estimation for offline preference-based reinforce-ment learning. arXiv preprint arXiv:2408.04190 , 2024. Chopra, S., Hadsell, R., and LeCun, Y. Learning a sim-ilarity metric discriminatively, with application to face verification. In 2005 IEEE computer society conference on computer vision and pattern recognition (CVPR’05) ,volume 1, pp. 539–546. IEEE, 2005. Christiano, P. F., Leike, J., Brown, T., Martic, M., Legg, S., and Amodei, D. Deep reinforcement learning from human preferences. Advances in neural information pro-cessing systems , 30, 2017. Fu, J., Kumar, A., Nachum, O., Tucker, G., and Levine, S. D4rl: Datasets for deep data-driven reinforcement learning. arXiv preprint arXiv:2004.07219 , 2020. Furuta, H., Matsuo, Y., and Gu, S. S. Generalized decision transformer for offline hindsight information matching. 
+
+arXiv preprint arXiv:2111.10364 , 2021a. Furuta, H., Matsushima, T., Kozuno, T., Matsuo, Y., Levine, S., Nachum, O., and Gu, S. S. Policy information capac-ity: Information-theoretic measure for task complexity in deep reinforcement learning. In International Conference on Machine Learning , pp. 3541–3552. PMLR, 2021b. Gao, C.-X., Fang, S., Xiao, C., Yu, Y., and Zhang, Z. Hind-sight preference learning for offline preference-based re-inforcement learning. arXiv preprint arXiv:2407.04451 ,2024. Hejna, J. and Sadigh, D. Inverse preference learning: Preference-based rl without a reward function. Advances in Neural Information Processing Systems , 36, 2024. Ibarz, B., Leike, J., Pohlen, T., Irving, G., Legg, S., and Amodei, D. Reward learning from human preferences and demonstrations in atari. Advances in neural information processing systems , 31, 2018. Inman, M. Tuning in to how neurons distinguish between stimuli. PLoS Biology , 4(4):e118, 2006. Jiang, Y., Liu, Q., Yang, Y., Ma, X., Zhong, D., Bo, X., Yang, J., Liang, B., Zhang, C., and Zhao, Q. Episodic novelty through temporal distance. In Intrinsically-Motivated and Open-Ended Learning Workshop@ NeurIPS2024 , 2024. Ju, H., Juan, R., Gomez, R., Nakamura, K., and Li, G. Transferring policy of deep reinforcement learning from 9CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+simulation to reality for robotics. Nature Machine Intelli-gence , 4(12):1077–1087, 2022. Kalashnikov, D., Irpan, A., Pastor, P., Ibarz, J., Herzog, A., Jang, E., Quillen, D., Holly, E., Kalakrishnan, M., Van-houcke, V., et al. Scalable deep reinforcement learning for vision-based robotic manipulation. In Conference on robot learning , pp. 651–673. PMLR, 2018. Kang, Y., Shi, D., Liu, J., He, L., and Wang, D. Beyond reward: Offline preference-guided policy optimization. 
+
+arXiv preprint arXiv:2305.16217 , 2023. Kim, C., Park, J., Shin, J., Lee, H., Abbeel, P., and Lee, K. Preference transformer: Modeling human preferences using transformers for rl. In The Eleventh International Conference on Learning Representations , 2022. Kostrikov, I., Nair, A., and Levine, S. Offline reinforce-ment learning with implicit q-learning. arXiv preprint arXiv:2110.06169 , 2021. Laskin, M., Srinivas, A., and Abbeel, P. Curl: Contrastive unsupervised representations for reinforcement learning. In International conference on machine learning , pp. 5639–5650. PMLR, 2020. Lee, K., Smith, L., and Abbeel, P. Pebble: Feedback-efficient interactive reinforcement learning via relabeling experience and unsupervised pre-training. arXiv preprint arXiv:2106.05091 , 2021a. Lee, K., Smith, L., Dragan, A., and Abbeel, P. B-pref: Benchmarking preference-based reinforcement learning. 
+
+arXiv preprint arXiv:2111.03026 , 2021b. Li, A., Misra, D., Kolobov, A., and Cheng, C.-A. Survival instinct in offline reinforcement learning. In Advances in Neural Information Processing Systems (NeurIPS) , 2023. Liang, X., Shu, K., Lee, K., and Abbeel, P. Reward uncer-tainty for exploration in preference-based reinforcement learning. arXiv preprint arXiv:2205.12401 , 2022. Mnih, V., Kavukcuoglu, K., Silver, D., Rusu, A. A., Veness, J., Bellemare, M. G., Graves, A., Riedmiller, M., Fidje-land, A. K., Ostrovski, G., et al. Human-level control through deep reinforcement learning. nature , 518(7540): 529–533, 2015. Mu, N., Luan, Y., Yang, Y., and Jia, Q.-s. S-epoa: Overcom-ing the indistinguishability of segments with skill-driven preference-based reinforcement learning. arXiv preprint arXiv:2408.12130 , 2024. Myers, V., Zheng, C., Dragan, A., Levine, S., and Eysen-bach, B. Learning temporal distances: Contrastive succes-sor features can provide a metric structure for decision-making. arXiv preprint arXiv:2406.17098 , 2024. Oord, A. v. d., Li, Y., and Vinyals, O. Representation learn-ing with contrastive predictive coding. arXiv preprint arXiv:1807.03748 , 2018. Ouyang, L., Wu, J., Jiang, X., Almeida, D., Wainwright, C., Mishkin, P., Zhang, C., Agarwal, S., Slama, K., Ray, A., et al. Training language models to follow instructions with human feedback. Advances in neural information processing systems , 35:27730–27744, 2022. Park, J., Seo, Y., Shin, J., Lee, H., Abbeel, P., and Lee, K. Surf: Semi-supervised reward learning with data augmentation for feedback-efficient preference-based re-inforcement learning. arXiv preprint arXiv:2203.10050 ,2022. Schulman, J. Trust region policy optimization. arXiv preprint arXiv:1502.05477 , 2015. Shin, D., Dragan, A. D., and Brown, D. S. Benchmarks and algorithms for offline preference-based reward learning. 
+
+arXiv preprint arXiv:2301.01392 , 2023. Tassa, Y., Doron, Y., Muldal, A., Erez, T., Li, Y., Casas, D. d. L., Budden, D., Abdolmaleki, A., Merel, J., Lefrancq, A., et al. Deepmind control suite. arXiv preprint arXiv:1801.00690 , 2018. Xue, W., An, B., Yan, S., and Xu, Z. Reinforcement learn-ing from diverse human preferences. arXiv preprint arXiv:2301.11774 , 2023. Yu, T., Quillen, D., He, Z., Julian, R., Hausman, K., Finn, C., and Levine, S. Meta-world: A benchmark and evalua-tion for multi-task and meta reinforcement learning. In 
+
+Conference on robot learning , pp. 1094–1100. PMLR, 2020. Yuan, H. and Lu, Z. Robust task representations for of-fline meta-reinforcement learning via contrastive learning. In International Conference on Machine Learning , pp. 25747–25759. PMLR, 2022. 10 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+## A. Additional Proofs and Theoretical Analysis 
+
+A.1. Proof of Proposition 5.1: Margin Lower Bound Theorem A.1 (Proposition 5.1, restated) . Let Dp be a distribution over trajectory-pairs (σ0, σ 1, p ) where p ∈{0, 1, no cop }. Define 
+
+P = (σ0, σ 1) | p ∈ { 0, 1} , N = (σ0, σ 1) | p = no cop . (13) 
+
+Let ϕ∗ = arg min  
+
+> ϕ
+
+Lamb (ϕ). Assume: 1. (Compactness) The support of Dp in (σ0, σ 1)-space is compact, and each fϕ is continuous. 2. (Richness) For any two pairs (z+0 , z +1 ) with (σ+0 , σ +1 ) ∈ P and (z− 
+
+> 0
+
+, z − 
+
+> 1
+
+) with (σ− 
+
+> 0
+
+, σ − 
+
+> 1
+
+) ∈ N , there exists an infinitesimal perturbation of ϕ∗ that simultaneously changes ℓ(z+0 , z +1 ) and ℓ(z− 
+
+> 0
+
+, z − 
+
+> 1
+
+) without affect other embeddings. Write zi = fϕ∗ (σi) and define 
+
+d+min = inf  
+
+> (σ0,σ 1)∈P
+
+ℓ(z0, z 1), d− 
+
+> max
+
+= sup 
+
+> (σ0,σ 1)∈N
+
+ℓ(z0, z 1). (14) 
+
+Then there exists a constant δ > 0 such that 
+
+d+min ≥ d− 
+
+> max
+
++ δ > 0. (15) 
+
+Proof. We first show that 
+
+d+min > d −
+
+> max
+
+. (16) Set 
+
+A(ϕ) := E(σ0,σ 1)∈P
+
+ℓ fϕ(σ0), f ϕ(σ1) , B(ϕ) := E(σ0,σ 1)∈D
+
+ℓ fϕ(σ0), f ϕ(σ1) , (17) so that Lamb (ϕ) = −A(ϕ) + B(ϕ). Since ϕ∗ is a global minimizer, 
+
+Lamb (ϕ∗) ≤ L amb (ϕ∗ + ∆ ϕ) =⇒ −A(ϕ∗) + B(ϕ∗) ≤ − A(ϕ∗ + ∆ ϕ) + B(ϕ∗ + ∆ ϕ) (18) for every infinitesimal admissible ∆ϕ.Suppose for contradiction that 
+
+d+min ≤ d−
+
+> max
+
+. (19) Then there exist one distinguished pair (σ+0 , σ +1 ) and one ambiguous pair (σ− 
+
+> 0
+
+, σ − 
+
+> 1
+
+) such that 
+
+ℓ z+0 , z +1
+
+ ≤ ℓ z− 
+
+> 0
+
+, z −
+
+> 1
+
+. (20) Because ℓ is strictly increasing in the Euclidean norm, we can choose a tiny ε > 0 and perturb 
+
+z+0 7 → z+0 + ε 
+
+> 2
+
+u+, z+1 7 → z+1 − ε 
+
+> 2
+
+u+, z− 
+
+> 0
+
+7 → z− 
+
+> 0
+
+− ε 
+
+> 2
+
+u−, z− 
+
+> 1
+
+7 → z− 
+
+> 1
+
++ ε 
+
+> 2
+
+u−, (21) where u+ is the unit-vector from z+1 to z+0 (and similarly u−), so as to increase ℓ(z+0 , z +1 ) by some δ′ > 0 and decrease 
+
+ℓ(z− 
+
+> 0
+
+, z − 
+
+> 1
+
+) by some δ′′ > 0. By the richness assumption, this arises from some ϕ∗ + ∆ ϕ.Under this perturbation, 
+
+A(ϕ∗ + ∆ ϕ) = A(ϕ∗) + 1  
+
+> N+
+
+δ′ + (higher-order terms) , B(ϕ∗ + ∆ ϕ) = B(ϕ∗) − 1  
+
+> N−
+
+δ′′ + · · · , (22) so 
+
+Lamb (ϕ∗ + ∆ ϕ) − L amb (ϕ∗) = − 1  
+
+> N+
+
+δ′
+
+| {z }
+
+> <0
+
++ 1  
+
+> N−
+
+δ′′ 
+
+| {z } 
+
+> >0
+
+< 0 (23) for sufficiently small ε. This contradicts the global optimality of ϕ∗. Therefore 
+
+d+min > d −
+
+> max
+
+, (24) 11 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+as claimed. Then we show the strict gap via compactness. Since the support of Dp is compact and fϕ∗ , ℓ are continuous, the image sets 
+
+S+ = {ℓ(z0, z 1) | (σ0, σ 1) ∈ P }, S− = {ℓ(z0, z 1) | (σ0, σ 1) ∈ N } (25) are compact and, by the separation result, disjoint in R. Two disjoint compact subsets of R have a strictly positive gap: 
+
+δ = inf S+ − sup S− > 0. (26) Therefore 
+
+d+min = inf S+ ≥ sup S− + δ = d− 
+
+> max
+
++ δ, (27) completing the proof. 
+
+A.2. Proof of Proposition 5.2: Convex Separability Proposition A.2 (Margin Guarantee for Lquad ). Let C+ and C− ⊂ Rd be convex, and write 
+
+μ+ = E[z+], μ− = E[z−], w = μ+ − μ−, b = − 12
+
+ ∥μ+∥2 − ∥ μ−∥2. (28) 
+
+Define the signed distance ed(z) = ( w⊤z + b)/∥w∥. If ϕ globally minimizes 
+
+Lquad = −E
+
+h
+
+ℓ(z+, z ′−) + ℓ(z′
+
+> +
+
+, z −) − ℓ(z+, z −) − ℓ(z′
+
+> +
+
+, z ′−)
+
+i
+
+, (29) 
+
+then for every z+ ∈ C+ and z− ∈ C−,
+
+ed(z+) ≥ η, ed(z−) ≤ − η, (30) 
+
+where η = 12 ∥μ+ − μ−∥.Proof. Writing out the expectation and differentiating under the integral sign, we can find 
+
+∂Lquad 
+
+∂w = 2  w − (μ+ − μ−) = 0 , ∂Lquad 
+
+∂b = 2  b + 12 (∥μ+∥2 − ∥ μ−∥2) = 0 . (31) Hence, at any global minimum, 
+
+w = μ+ − μ−, b = − 12
+
+ ∥μ+∥2 − ∥ μ−∥2. (32) A direct expansion shows 
+
+w⊤z + b = 12
+
+ ∥z − μ−∥2 − ∥ z − μ+∥2, (33) so 
+
+ed(μ+) = ∥μ+ − μ−∥2
+
+2∥μ+ − μ−∥ = 12 ∥μ+ − μ−∥ = η, ed(μ−) = −η. (34) Since ed(z) is an affine function of z and C+, C− are convex, the entire set C+ must lie on or beyond the level set { ed = η},and C− on or beyond { ed = −η}. Equivalently, 
+
+ed(z+) ≥ η, ed(z−) ≤ − η, (35) for every z+ ∈ C+, z− ∈ C−, as claimed. 12 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+A.3. Gradient Dynamics of Lquad and Lamb 
+
+The gradient expressions reveal two key mechanisms that govern the dynamics of the embedding: • Parametric Alignment ( Lquad ): The gradient ∇z+Lquad = 2( z+′ − z−′) induces a relational drift , which does not move z+ towards fixed coordinates but instead navigates based on the relative positions of its augmented counterpart 
+
+z+′ and the negative sample z−′. This leads to a self-supervised clustering effect, where trajectories with similar preference labels naturally group together in tight neighborhoods. • Discriminant Scaling ( Lamb ): The distance-maximization gradient for distinguishable pairs, −2( z0 − z1), enforces 
+
+repulsive dynamics , similar to the Coulomb forces between same-charge particles. In contrast, the gradient for indistinguishable pairs, 2( z0 − z1), acts like spring forces, pulling uncertain samples toward neutral regions. This dynamic equilibrium prevents the embedding from collapsing while maintaining geometric coherence with the preference signals. Together, these dynamics resemble a potential field in physics: high-preference trajectories act as attractors, low-preference ones as repulsors, and ambiguous regions as saddle points. This resulting geometry directly facilitates our query selection objective. 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 
+
+(a) (0 .1, 5) 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 (b) (0 .1, 1) 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0 (c) (1 , 1) 0.0 0.2 0.4 0.6 0.8 1.0 0.0 0.2 0.4 0.6 0.8 1.0  
+
+> 0.0 0.2 0.4 0.6 0.8 1.0 Normalized Return
+
+(d) (5 , 1) 
+
+Figure 6: Embedding visualizations of the drawer-open task with ϵ = 0 .5, under different hyperparameters settings. The subfigure captions of are the values of (λamb , λ quad ), and (λamb , λ quad ) = (0 .1, 1) is the setting we use in experiments. 
+
+## B. Additional Experimental Results 
+
+Ablation on hyperparameters. As Figure 6 visualizes, when varying the values of λamb , λquad , and λnorm , the quality of embedding space remains largely unaffected. This demonstrates the robustness of CLARIFY to hyperparameter changes, as small adjustments do not significantly alter the quality of learned embeddings. 
+
+## C. Experimental Details 
+
+C.1. Tasks 
+
+The robotic manipulation tasks from Metaworld (Yu et al., 2020) and the locomotion tasks from DMControl (Tassa et al., 2018) used in our experiments are shown in Figure 7. The descriptions of these tasks are as follows. 
+
+Metaworld Tasks: 
+
+1. Box-close: An agent controls a robotic arm to close a box lid from an open position. 2. Dial-turn: An agent controls a robotic arm to rotate a dial to a target angle. 3. Drawer-open: An agent controls a robotic arm to grasp and pull open a drawer. 4. Handle-pull-side: An agent controls a robotic arm to pull a handle sideways to a target position. 5. Hammer: An agent controls a robotic arm to pick up a hammer and use it to drive a nail into a surface. 13 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+Algorithm 1 The proposed offline PbRL method using CLARIFY embedding 
+
+Require: Offline dataset D with no reward signal, total feedback number Ntotal , query batch size M , number of discretization 
+
+nbin , number of gradient steps ninit , n emb , n reward , coefficients λamb , λquad , λnorm 
+
+// Reward learning  
+
+> 1:
+
+Initialize preference dataset Dp = ∅ 
+
+> 2:
+
+Randomly select M queries {(σ0, σ 1, p )}M , update Dp ← { (σ0, σ 1, p )}M ∪ Dp 
+
+> 3:
+
+Optimize the encoder fϕ based on Eq. 11 by ninit gradient steps  
+
+> 4:
+
+Optimize the reward model ˆrθ based on Eq. 2 by nreward gradient steps  
+
+> 5:
+
+while total feedback < N total do  
+
+> 6:
+
+Select M queries {(σ0, σ 1, p )}M based on the query selection method in Section 4.2, update Dp ← { (σ0, σ 1, p )}M ∪
+
+Dp 
+
+> 7:
+
+Optimize the encoder fϕ based on Eq. 11 by nemb gradient steps  
+
+> 8:
+
+Optimize the reward model ˆrψ based on Eq. 2 by nreward gradient steps  
+
+> 9:
+
+end while 
+
+// Policy learning  
+
+> 10:
+
+Label the offline dataset D using reward model ˆrθ 
+
+> 11:
+
+Train the IQL policy πθ using the relabeled dataset D
+
+6. Peg-insert-side: An agent controls a robotic arm to insert a peg into a hole from the side. 7. Sweep-into: An agent controls a robotic arm to sweep an object into a target area. 
+
+DMControl Tasks: 
+
+1. Cheetah-run: A planar biped is trained to control its body and run on the ground. 2. Walker-walk: A planar walker is trained to control its body and walk on the ground. We use the offline dataset from LiRE (Choi et al., 2024) for our experiments. LiRE allows for control over dataset quality by adjusting the size of the replay buffer (replay buffer size = data quality value * 100000), which provides different levels of dataset quality. The dataset quality in our experiments differs from the one used in LiRE, as detailed in Table 7. The number of total preference feedback used in our experiments is detailed in Table 8.        
+
+> (a) Box-close (b) Dial-turn (c) Drawer-open (d) Hammer (e) Handle-pull-side
+> (f) peg-insert-side (g) Sweep-into (h) Cheetah-run (i) Walker-walk
+
+Figure 7: Nine tasks from Metaworld (a-g) and DMControl (h, i). 14 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+Table 7: The dataset quality in our experiments. Specifically, to prevent all the methods from failing under our teacher with the skip mechanism, we enhanced the dataset quality for several tasks. Task Value of LiRE Value of CLARIFY Box-close 8.0 9.0 Dial-turn 3.5 3.5 Drawer-open 1.0 1.0 Hammer 5.0 5.0 Handle-pull-side 1.0 2.5 Peg-insert-side 5.0 5.0 Sweep-into 1.0 1.5 Cheetah-run / 6.0 Walker-walk 1.0 1.0 Table 8: Total feedback number Ntotal .Task Value Metaworld tasks 1000 Cheetah-run 500 Walker-walk 200 
+
+C.2. Implementation Details 
+
+In our experiments, MR, PT, OPRL, LiRE, and CLARIFY are all two-step PbRL methods. In these methods, the reward model is first trained, followed by offline RL using the trained reward model. The reward models used in CLARIFY, MR, and OPRL share the same structure, as outlined in Table 9. We use the trained reward model to estimate the reward for every 
+
+(s, a ) pair in the offline RL dataset, and we apply min-max normalization to the reward values so that the minimum and maximum values are mapped to 0 and 1, respectively. We use IQL as the default offline RL algorithm. The total number of gradient descent steps in offline RL is 200,000, and we evaluate the success rate or episodic return for 20 episodes every 5,000 steps. For all baselines and our method, we run 6 different seeds. We report the average success rate or episodic return of the last five trained policies. The hyperparameters for offline policy learning are provided in Table 9. We follow the official implementations of MR and PT 1, OPPO 2, and LiRE 3. Note that LiRE treats queries with a too-small reward difference as equally preferred ( p = 0 .5), while in our setting, these queries are labeled as no cop and excluded from reward learning. For the BDT implementation in CLARIFY, we follow the implementation of HIM (Furuta et al., 2021a) 4, using the BERT architecture as the encoder and the GPT architecture as the decoder. The code repository of our method is: 
+
+https://github.com/MoonOutCloudBack/CLARIFY PbRL 
+
+The hyperparameters for both the baselines and our method are listed in Table 10. 
+
+C.3. Details of the Intuitive Example 
+
+To validate the effectiveness of proposed Lquad , we generated 1,000 data points with values uniformly distributed between 0
+
+and 1. Each data point’s embedding was initialized as a 2-dimensional vector sampled from a standard normal distribution. To simulate the issue of ambiguous queries, we defined queries with value differences smaller than 0.3 as ambiguous. We 
+
+> 1https://github.com/csmile-1006/PreferenceTransformer
+> 2https://github.com/bkkgbkjb/OPPO
+> 3https://github.com/chwoong/LiRE
+> 4https://github.com/frt03/generalized dt
+
+15 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+then optimized these embeddings using the quadrilateral loss. To ensure stability during training, we imposed a penalty to constrain the L2 norm of the embedding vectors to 1. The learning rate was set to 0.1, and the hyperparameters λquad and 
+
+λnorm were set to 1 and 0.1, respectively. Table 9: Hyperparameters of reward learning and policy learning. Hyperparameter Value Reward model Optimizer Adam Learning rate 3e-4 Segment length H 50 Batch size 128 Hidden layer dim 256 Hidden layers 3Activation function ReLU Final activation Tanh # of updates nreward 50 # of ensembles 3Reward from the ensemble models Average Query batch size M 50 IQL Optimizer Adam Critic, Actor, Value hidden dim 256 Critic, Actor, Value hidden layers 2Critic, Actor, Value activation function ReLU Critic, Actor, Value learning rate 0.5 Mini-batch size 256 Discount factor 0.99 
+
+β 3.0 
+
+τ 0.7 
+
+## D. Human Experiments 
+
+Preference collection. We collect feedback from human labelers (the authors) familiar with the tasks. Specifically, they watched video renderings of each segment and selected the one that better achieved the objective. Each trajectory segment was 1.5 seconds long, consisting of 50 timesteps. For Figure 5, labelers provided labels for 20 queries for each reward difference across 3 random seeds. For Figure 4, we ran 3 random seeds for each method, with labelers providing 20 preference labels for each run. For Table 5, we ran 3 random seeds for each method, with labelers providing 100 preference labels for each run, and the preference batch size M = 20 .
+
+Prompts given to human labelers. The prompts below describe the task objectives and guide preference judgments. 
+
+Metaworld dial-turn task. 
+
+Task Purpose: In this task, you will be comparing two segments of a robotic arm trying to turn a dial. Your goal is to evaluate which segment performs better in achieving the task’s objectives. Instructions: • Step 1: First, choose the segment where the robot’s arm reaches the dial more accurately (the reach component). • Step 2: If the reach performance is the same in both segments, then choose the one where the robot’s gripper is closed more appropriately (the gripper closed component). • Step 3: If both reach and gripper closure are equal, choose the segment that has the robot’s arm placed closer to the target position (the in-place component). 16 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+Metaworld hammer task. 
+
+Task Purpose: In this task, you will be comparing two segments where a robotic arm is hammering a nail. The aim is to evaluate which segment results in a better execution of the hammering process. Instructions: • Step 1: First, choose the segment where the hammerhead is in a better position and the nail is properly hit (the in-place component). • Step 2: If the hammerhead positioning is similar in both segments, choose the one where the robot is better holding the hammer and the nail (the grab component). • Step 3: If both the hammerhead position and grasping are the same, select the segment where the orientation of the hammer is more suitable (the quaternion component). 
+
+DMControl walker-walk task. 
+
+Task Purpose: In this task, you will compare two segments where a bipedal robot is attempting to walk. Your goal is to determine which segment shows better walking performance. Instructions: • Step 1: First, choose the segment where the robot stands more stably (the standing reward). • Step 2: If both segments have the same stability, choose the one where the robot moves faster or more smoothly (the move reward). • Step 3: If both standing and moving are comparable, select the segment where the robot maintains a better upright posture (the upright reward). 
+
+## E. Introduction to Bi-directional Decision Transformer 
+
+Introduction to Hindsight Information Matching (HIM). Hindsight Information Matching (HIM) (Furuta et al., 2021a) aims to improve offline reinforcement learning by aligning the state distribution of learned policies with expert demonstrations. Instead of directly imitating actions, HIM minimizes the discrepancy between the marginal state distributions of the learned and expert policies, ensuring that the agent visits states similar to those in expert trajectories. This approach is particularly effective for multi-task and imitation learning settings, where aligning state distributions across different tasks can enhance generalization. 
+
+The main idea of BDT. BDT is designed for offline one-shot imitation learning, also known as offline multi-task imitation learning. In this setting, the agent must generalize to unseen tasks after observing only a few expert demonstrations. Standard Decision Transformer (DT) faces challenges in such scenarios due to its reliance on autoregressive action prediction and task-specific fine-tuning. In contrast, BDT improves generalization by utilizing bidirectional context, enabling it to infer useful patterns from limited data. This makes BDT particularly effective for imitation learning tasks where the agent needs to efficiently adapt to new environments with just a small number of demonstrations. BDT extends the Decision Transformer (DT) framework by incorporating bidirectional context, which improves sequence modeling in offline reinforcement learning. Unlike standard DT, which predicts actions autoregressively using causal attention, BDT adds an anti-causal transformer that processes the trajectory in reverse order. This anti-causal component enables BDT to use both past and future information, making it highly effective for state-marginal matching and imitation learning. 17 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+The architecture of BDT. In this paper, we utilize the encoder-decoder framework of BDT to learn the trajectory representation. The architecture of BDT consists of two transformer networks: a causal transformer that models forward dependencies in the trajectory, and an anti-causal transformer that captures backward dependencies. This bidirectional structure allows BDT to extract richer temporal patterns, improving its ability to learn from diverse offline datasets. 18 CLARIFY: Contrastive Preference RL for Untangling Ambiguous Queries 
+
+Table 10: Hyperparameters of baselines and CLARIFY. Hyperparameter Value OPRL Initial preference labels M = 50 
+
+Query selection Maximizing disagreement PT Optimizer AdamW # of layers 1# of attention heads 4Embedding dimension 256 Dropout rate 0.1 OPPO Optimizer AdamW Learning rate 1e-4 
+
+z∗ learning rate 1e-3 Number of layers 4 Number of attention heads 4Activation function ReLU Triplet loss margin 1Batch size 256 Context length 50 Embedding dimension 16 Dropout 0.1 Grad norm clip 0.25 Weight decay 1e-4 
+
+α 0.5 
+
+β 0.1 LiRE Reward model Linear RLT feedback limit Q 100 CLARIFY Embedding dimension 16 Activation function ReLU 
+
+λamb 0.1 
+
+λquad 1
+
+λnorm 0.1 Batch size 256 Context length 50 Dropout 0.1 Number of layers 4 Number of attention heads 4Grad norm clip 0.25 Weight decay 1e-4 
+
+ninit 20000 
+
+nemb 2000 19

@@ -1,0 +1,1448 @@
+Title: RVI-SAC: Average Reward Off-Policy Deep Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=xB6YJZOKyT
+
+Number of Pages: 22
+
+Markdown Content:
+# RVI-SAC: Average Reward Off-Policy Deep Reinforcement Learning 
+
+Yukinari Hisaki 1 Isao Ono 1
+
+# Abstract 
+
+In this paper, we propose an off-policy deep rein-forcement learning (DRL) method utilizing the average reward criterion. While most existing DRL methods employ the discounted reward cri-terion, this can potentially lead to a discrepancy between the training objective and performance metrics in continuing tasks, making the average reward criterion a recommended alternative. We introduce RVI-SAC, an extension of the state-of-the-art off-policy DRL method, Soft Actor-Critic (SAC) (Haarnoja et al., 2018a;b), to the average reward criterion. Our proposal consists of (1) Critic updates based on RVI Q-learning (Abounadi et al., 2001), (2) Actor updates in-troduced by the average reward soft policy im-provement theorem, and (3) automatic adjust-ment of Reset Cost enabling the average reward reinforcement learning to be applied to tasks with termination. We apply our method to the Gymnasium’s Mujoco tasks, a subset of locomo-tion tasks, and demonstrate that RVI-SAC shows competitive performance compared to existing methods. 
+
+# 1. Introduction 
+
+Model-free reinforcement learning aims to acquire optimal policies through interaction with the environment. Partic-ularly, Deep Reinforcement Learning (DRL), which ap-proximates functions such as policy or value using Neu-ral Networks, has seen rapid development in recent years. This advancement has enabled solving tasks with high-dimensional continuous action spaces, such as those in OpenAI Gym’s Mujoco tasks (Todorov et al., 2012). In the realm of DRL methods applicable to tasks with high-                
+
+> 1Tokyo Institute of Technology Yokohama, Kana-gawa, Japan. Correspondence to: Yukinari Hisaki
+> <hiskai.y@ic.c.titech.ac.jp >, Isao Ono <isao@c.titech.ac.jp >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+dimensional continuous action spaces, methods such as TRPO (Schulman et al., 2015), PPO (Schulman et al., 2017), DDPG (Silver et al., 2014; Lillicrap et al., 2019), TD3 (Fujimoto et al., 2018), and SAC (Haarnoja et al., 2018a;b) are well-known. These methods utilize the dis-counted reward criterion, which is applicable to a variety of MDP-formulated tasks (Puterman, 1994). In particular, for continuing tasks where there is no natural breakpoint in episodes, such as in robot locomotion (Todorov et al., 2012) or Access Control Queuing Tasks(Sutton & Barto, 2018), where the interaction between an agent and an envi-ronment can continue indefinitely, the discount rate plays a role in keeping the infinite horizon return bounded. How-ever, discounting introduces an undesirable effect in con-tinuing tasks by prioritizing rewards closer to the current time over those in the future. An approach to mitigate this effect is to bring the discount rate closer to 1, but it is com-monly known that a large discount rate can lead to instabil-ity and slower convergence(Fujimoto et al., 2018; Dewanto & Gallagher, 2021). In recent years, the average reward criterion has begun to gain attention as an alternative to the discounted reward criterion. Reinforcement learning using the average re-ward criterion aims to maximize the time average of the infinite horizon return in continuing tasks. In continuing tasks, the average reward criterion is considered more nat-ural than the discounted reward criterion. Even within the realm of DRL with continuous action space, although few, there have been proposals for methods that utilize the av-erage reward criterion. Notably, ATRPO (Zhang & Ross, 2021) and APO (Ma et al., 2021), which are extensions of the state-of-the-art on-policy DRL methods, TRPO and PPO, to the average reward criterion, have been reported to demonstrate performance on par with or superior to meth-ods using the discounted reward criterion in Mujoco tasks (Todorov et al., 2012). Research combining the average reward criterion with off-policy methods, generally known for their higher sam-ple efficiency than on-policy approaches, remains limited. There are several theoretical and tabular approaches to off-policy methods using the average reward criterion, includ-ing R-learning (Schwartz, 1993; Singh, 1994), RVI Q-1RVI-SAC 
+
+learning (Abounadi et al., 2001), Differential Q-learning (Wan et al., 2020), and CSV Q-learning (Yang et al., 2016). However, to our knowledge, the only off-policy DRL method with continuous action space that employs the average reward criterion is ARO-DDPG (Saxena et al., 2023) which optimize determinisitic policy. In DRL re-search using discount rate, Maximum Entropy Reinforce-ment Learning, which optimizes stochastic policies for entropy-augmented objectives, is known to improve sample efficiency significantly. Off-policy DRL methods with con-tinuous action space that have adopted this concept (Mnih et al., 2016; Haarnoja et al., 2017; 2018a;b; Abdolmaleki et al., 2018) have achieved success. However, to the best of our knowledge, there are no existing DRL methods us-ing the average reward criterion as powerful and sample-efficient as Soft-Actor Critic. Our goal is to propose RVI-SAC, an off-policy Actor-Critic DRL method that employs the concept of Maximum En-tropy Reinforcement Learning under the average reward criterion. In our proposed method, we use a new Q-Network update method based on RVI Q-learning to up-date the Critic. Unlike Differential Q-learning, which was the basis for ARO-DDPG, RVI Q-learning can uniquely de-termine the convergence point of the Q function (Abounadi et al., 2001; Wan et al., 2020). We identify problems that arise when naively extending RVI Q-learning to a Neu-ral Network update method and address these problems by introducing a technique called Delayed f(Q) Update, enabling the extension of RVI Q-learning to Neural Net-works. We also provide an asymptotic convergence analy-sis of RVI Q-learning with the Delayed f(Q) Update tech-nique, in a tabular setting using ODE. Regarding the update of the Actor, we construct a new policy update method that guarantees the improvement of soft average reward by de-riving an average reward soft policy improvement theorem, based on soft policy improvement theorem in discounted reward (Haarnoja et al., 2018a;b). Our proposed approach addresses the key challenge in ap-plying the average reward criterion to tasks that are not purely continuing, such as in robotic locomotion tasks, for example, Mujoco’s Ant, Hopper, Walker2d and Humanoid. In these tasks, robots may fall, leading to the termination of an episode, which is not permissible in average reward re-inforcement learning that aims to optimize the time average of the infinite horizon return. Similar to ATRPO (Zhang & Ross, 2021), our method introduces a procedure in these tasks that, after a fall, gives a penalty reward (Reset Cost) and resets the environment. In ATRPO, the Reset Cost was provided as a hyperparameter. However, the optimal Reset Cost is non-trivial, and setting a sub-optimal Reset Cost could lead to decreased performance. In our proposed method, we introduce a technique for automatically adjust-ing the Reset Cost by formulating a constrained optimiza-tion problem where the frequency of environment resets, which is independent of the reward scale, is constrained. Our main contributions in this work are as follows: • We introduce a new off-policy Actor-Critic DRL method, RVI-SAC, utilizing the average reward cri-terion. This method is comprised of two key compo-nents: (1) a novel Q-Network update approach, RVI Q-learning with the Delayed f(Q) Update technique, and (2) a policy update method derived from the av-erage reward soft policy improvement theorem. We further provide an asymptotic convergence analysis of RVI Q-learning with the Delayed f(Q) Update tech-nique in a tabular setting using ODE. • To adapt our proposed method for tasks that are not purely continuing, we incorporate environment reset and Reset Cost(Zhang & Ross, 2021). By formulating a constrained optimization problem with a constraint based on the frequency of environment resets, an in-dependent measure of the reward scale, we propose a method for automatically adjusting the Reset Cost. • Through benchmark experiments using Mujoco, we demonstrate that our proposed method exhibits com-petitive performance compared to SAC(Haarnoja et al., 2018b) with various discount rates and ARO-DDPG (Saxena et al., 2023). 
+
+# 2. Preliminaries 
+
+In this section, we introduce problem setting and average reward reinforcement learning, which is the core concept of our proposed method. The mathematical notations em-ployed throughout this paper are detailed in Appendix A. 
+
+2.1. Markov Decision Process 
+
+We define the interaction between the environment and the agent as a Markov Decision Process (MDP) M =(S, A, r, p ). Here, s ∈ S represents the state space, a ∈ A 
+
+represents the action space, r : S × A → R, |r(·, ·)| ≤ ∥r∥∞ is the reward function, and p : S × A × S → [0 , 1] 
+
+is the state transition function. At each discrete time step 
+
+t = 0 , 1, 2, . . . , the agent receives a state St ∈ S from the MDP and selects an action At ∈ A . The environ-ment then provides a reward Rt = r(St, A t) and the next state St+1 ∈ S , repeating this process. The state tran-sition function is defined for all s, s ′ ∈ S, a ∈ A as 
+
+p (s′ | s, a ) := Pr ( St+1 = s′ | St = s, A t = a). Further-more, we use a stationary Markov policy π : S×A → [0 , 1] 
+
+as the criterion for action selection. This represents the probability of selecting an action a ∈ A given a state s ∈ S 
+
+and is defined as π(a|s) := Pr ( At = a | St = s).2RVI-SAC 
+
+2.2. Average Reward Reinforcement Learning 
+
+To simplify the discussion that follows, we make the fol-lowing assumption for the MDPs where average reward re-inforcement learning is applied: 
+
+Assumption 2.1. For any policy π, the MDP M is ergodic. Under this assumption, for any policy π, a stationary state distribution dπ (s) exists. The distribution including actions is denoted as dπ (s, a ) = dπ (s)π(s|a).The average reward for a policy π is defined as: 
+
+ρπ := lim  
+
+> T→∞
+
+1
+
+T Eπ
+
+[ T∑
+
+> t=0
+
+Rt
+
+]
+
+= ∑
+
+> s∈S ,a ∈A
+
+dπ (s, a )r(s, a ).
+
+(1) The optimal policy in average reward criterion is defined as: 
+
+π∗ = arg max 
+
+> π
+
+ρπ . (2) The Q function for average reward reinforcement learning is defined as: 
+
+Qπ (s, a ) := Eπ
+
+[ ∞∑
+
+> t=0
+
+(Rt − ρπ )|S0 = s, A 0 = a
+
+]
+
+. (3) The optimal Bellman equation for average reward is as fol-lows: 
+
+Q(s, a ) = r(s, a ) − ρ + ∑
+
+> s′∈S
+
+p(s′|s, a ) max  
+
+> a′
+
+Q(s′, a ′),
+
+∀(s, a ) ∈ S × A .
+
+(4) From existing research (e.g., Puterman (1994)), it is known that this equation has the following properties: • There exists a unique solution for ρ as ρ = ρπ∗
+
+.• There exisits a unique solution only up to a constant 
+
+c ∈ R for Q(s, a ) as q(s, a ) = Qπ∗
+
+(s, a ) + c.• For the solution Q to the equation, a deterministic pol-icy μ(s) = arg max a q(s, a ) is one of the optimal policies. Henceforth, we denote ρπ∗
+
+as ρ∗.
+
+2.3. RVI Q-learning 
+
+RVI Q-learning (Konda & Borkar, 1999; Wan et al., 2020) is one of the average reward reinforcement learning meth-ods for the tabular Q function, and updates the Q function as follows: 
+
+Qt+1 (St, A t) = Qt(St, A t)+ 
+
+αt
+
+(
+
+Rt − f (Qt) + max  
+
+> a′
+
+Qt(St+1 , a ′) − Qt(St, A t)
+
+)
+
+. (5) From the convergence proof of generalized RVI Q-learning (Wan et al., 2020), the function f can be any function that satisfies the following assumption: 
+
+Assumption 2.2 (From Wan et al. (2020)) . f : R|S×A| →
+
+R is Lipschitz, and there exists some u > 0 such that for all 
+
+c ∈ R and x ∈ R|S×A| , f (e) = u, f (x + ce ) = f (x) + cu 
+
+and f (cx ) = cf (x).In practice, f often takes forms such as 
+
+f (Q) = Q(S, A ), max a Q(S, a ) using arbi-trary state/action pair (S, A ) as the Reference State, or the sum over all state/action pairs, 
+
+f (Q) = g ∑ 
+
+> (s,a )∈S×A
+
+Q(s, a ), g ∑ 
+
+> s∈S
+
+max a Q(s, a ),with gain ∀g > 0. This assumption plays an important role in demonstrating the convergence of the algorithm. Intuitively, this indicates that the function f , satisfying this assumption, can include functions that correspond to specific elements of the vector x or their weighted linear sum. This algorithm, under certain appropriate assumptions, converges almost surely to a unique solution q∗, and it has been shown that q∗ satisfies both the optimal Bellman equa-tion (Equation 4) and 
+
+ρ∗ = f (q∗)
+
+as demonstrated in Wan et al. (2020). 
+
+# 3. Proposed Method 
+
+We propose a new off-policy Actor-Critic DRL method based on average reward. To this end, in Section 3.1, we present a Critic update method based on RVI Q-learning, and in Section 3.2, we demonstrate an Actor update method based on SAC (Haarnoja et al., 2018a;b). Additionally, in Section 3.3, we introduce a method to apply average reward reinforcement learning to problems that are not purely con-tinuing tasks, such as locomotion tasks with termination. The overall algorithm is detailed in Appendix B. 
+
+3.1. RVI Q-learning based Q-Network update 
+
+We extend the RVI Q-learning algorithm described in Equation 5 to an updating method for the Q function rep-resented by a Neural Network. Following traditional ap-proach in Neural Network-based Q-learning, we update the parameters ϕ of the Q-Network Qϕ using the target: 
+
+Y (r, s ′) = r − f (Qϕ′ ) + max  
+
+> a′
+
+Qϕ′ (s′, a ′),
+
+and by minimizing the following loss function: 
+
+1
+
+|B| 
+
+∑
+
+> (s,a,r,s ′)∈B
+
+(Y (r, s ′) − Qϕ(s, a )) 2 .
+
+3RVI-SAC 
+
+B is a mini-batch uniformly sampled from the Re-play Buffer D, which accumulates experiences 
+
+(St, A t, R t, S t+1 ) obtained during training, and ϕ′
+
+are the parameters of the target network (Mnih et al., 2013). In implementing this method, we need to consider the fol-lowing two points: The first point is the choice of function f . As mentioned in Section 2.3, tabular RVI Q-learning typically uses a Refer-ence State (S, A ) ∈ S × A or the sum over all state/action pairs to calculate f (Q). Using the Reference State is easily applicable to problems with continuous state/action spaces in Neural Network-based methods. However, concerns arise about performance dependency on the visitation fre-quency to the Reference State and the accuracy of its Q-value (Wan et al., 2020). On the other hand, calculating the sum over all state/action pairs does not require a Reference State but is not directly computable with Neural Networks for f (Qϕ′ ). To address these issues, we substitute f (Qϕ′ )
+
+with f (Qϕ′ ; B), calculated using mini-batch B, as shown in Equation 6: 
+
+f (Qϕ′ ; B) = 1
+
+|B| 
+
+∑
+
+> s∈B
+
+max  
+
+> a
+
+Qϕ′ (s, a ). (6) Equation 6 serves as an unbiased estimator of f (Qϕ′ ) when set as: 
+
+f (Qϕ′ ) = Es∼db(·)
+
+[
+
+max  
+
+> a
+
+Qϕ′ (s, a )
+
+]
+
+, (7) where b represents the behavior policy in off-policy meth-ods, and db(·) denotes the stationary state distribution un-der the behavior policy b. In our method, we use settings as shown in Equations 6 and 7, but this discussion is applica-ble to any setting that satisfies: 
+
+f (Qϕ′ ) = EXt [f (Qϕ′ ; Xt)] (8) for the random variable Xt. Thus, the target value used for the Q-Network update becomes: 
+
+Y (r, s ′; B) = r − f (Qϕ′ ; B) + max  
+
+> a′
+
+Qϕ′ (s′, a ′). (9) The second point is that the variance of the sample value 
+
+f (Qϕ′ ; B) (Equation 6) can increase the variance of the tar-get value (Equation 9), potentially leading to instability in learning. This issue is pronounced when the variance of the Q-values is large. A high variance in Q-values can po-tentially lead to an increase in the variance of the target values, creating a feedback loop that might further amplify the variance of Q-values. To mitigate the variance of the target value, we propose the Delayed f(Q) Update tech-nique. Delayed f(Q) Update employs a value ξt, updated as follows, instead of using f (Qϕ′ ; B) for calculating the target value: 
+
+ξt+1 = ξt + βt (f (Qϕ′ ; B) − ξt) ,βt denotes the learning rate for ξt. The new target value using ξt is then: 
+
+Y (r, s ′; ξt) = r − ξt + max  
+
+> a′
+
+Qϕ′ (s′, a ′).
+
+In this case, ξt serves as a smoothed value of f (Qϕ′ ; B),and this update method is expected to reduce the variance of the target value. 
+
+Theoretical Analysis of Delayed f(Q) Update 
+
+We reinterpret the Q-Network update method using De-layed f(Q) Update in the context of a tabular Q-learning algorithm, it can be expressed as follows:                  
+
+> Qt+1 (St, A t) = Qt(St, A t)+
+> αt
+> (
+> Rt−ξt+ max
+> a′Qt(St+1 , a ′)−Qt(St, A t)
+> )
+> ,ξt+1 =ξt+βt(f(Qt;Xt)−ξt).
+> (10)
+
+This update formula is a specialization of asynchronous stochastic approximation (SA) on two time scales (Borkar, 1997; Konda & Borkar, 1999). By selecting appropriate learning rates such that αt 
+
+> βt
+
+→ 0, the update of ξt in Equa-tion 10 can be considered faster relative to the update of 
+
+Qt. Therefore, since ξt can be considered a “relative con-stant”, it can be viewed as being equivalent to f (Qt). The convergence of this algorithm is discussed in Appendix C and summarized in Theorem 3.1: 
+
+Theorem 3.1 (Sketch) . The algorithm expressed by the fol-lowing equations converges almost surely to a uniquely de-termined q∗ under appropriate assumptions (see Appendix C):                             
+
+> Qt+1 (St, A t) = Qt(St, A t)+
+> αt
+> (
+> Rt−ˆξt+ max
+> a′Qt(St+1 , a ′)−Qt(St, A t)
+> )
+> ,ξt+1 =ξt+βt(f(Qt;X)−ξt),
+> where ˆξt=clip (ξt,−∥ r∥∞−ϵ, ∥r∥∞+ϵ),∀ϵ > 0.
+
+3.2. Average Reward Soft Policy Improvement Theorem 
+
+We propose a policy update method for the average re-ward criterion, inspired by the policy update method of the SAC(Haarnoja et al., 2018a;b). In the SAC, a soft-Q function defined for the discount rate 
+
+γ ∈ (0 , 1) and a policy π (Haarnoja et al., 2017): 
+
+Qπ,γ (s, a ) := 
+
+Eπ
+
+[ ∞∑
+
+> t=0
+
+γt(Rt − log π(At+1 |St+1 )) |S0 = s, A 0 = a
+
+]
+
+.
+
+(11) 4RVI-SAC 
+
+The policy is then updated in the following manner for 
+
+∀s ∈ S :
+
+πnew (·| s) = arg min 
+
+> π∈Π
+
+DKL 
+
+(
+
+π(·| s)
+
+∣∣∣∣
+
+exp ( Qπold ,γ (s, ·)) 
+
+Zπold (s)
+
+)
+
+.
+
+(12) The partition function Zπold (s) normalizes the distribu-tion and can be ignored in the gradient of the new pol-icy (refer to Haarnoja et al. (2018a)). Π represents the set of policies, such as a parametrized family like Gaus-sian policies. According to the soft policy improvement theorem (Haarnoja et al., 2018a;b), for the updated policy 
+
+πnew , the condition Qπnew ,γ (s, a ) ≥ Qπold ,γ (s, a ), ∀(s, a ) ∈S × A holds, indicating policy improvement. The ac-tor’s update rule in the SAC is constructed based on this theorem. Further, defining the entropy-augmented re-ward Rent  
+
+> t
+
+:= Rt − Es′∼p(·| St,A t),a ′∼π(·| s′)[log π(a′|s′)] ,the Q function in Equation 11 can be reformulated as 
+
+Qπ,γ (s, a ) := Eπ [∑∞ 
+
+> t=0
+
+γtRent  
+
+> t
+
+|S0 = s, A 0 = a], allow-ing the application of the standard discounted Q-learning framework for the critic’s update (Haarnoja et al., 2018a;b). In the context of average reward reinforcement learning, the soft average reward is defined as: 
+
+ρπ 
+
+> soft
+
+= lim  
+
+> T→∞
+
+1
+
+T Eπ
+
+[ T∑
+
+> t=0
+
+Rt − log π(At|St)
+
+]
+
+. (13) Correspondingly, the average reward soft-Q function is de-fined as: 
+
+Qπ (s, a ) := 
+
+Eπ
+
+[ ∞∑
+
+> t=0
+
+Rt − ρπ 
+
+> soft
+
+− log π(At+1 |St+1 )|S0 = s, A 0 = a
+
+]
+
+.
+
+(14) From Equation 14, the soft Q function represents the expected cumulative sum of rewards minus the aver-age reward. Thus, the relationship Qπnew (s, a ) ≥
+
+Qπold (s, a ), ∀(s, a ) ∈ S × A in the policy improvement theorem for the discounted SAC does not guarantee policy improvement. We present a new average reward soft policy improvement theorem using the soft average reward ρπ 
+
+> soft
+
+as a metric. 
+
+Theorem 3.2 (Average Reward Soft Policy Improvement) .
+
+Let πold ∈ Π and let πnew be the optimizer of the minimiza-tion problem defined in Equation 12. Then ρπnew ≥ ρπold 
+
+holds. Proof. See Appendix D. This result demonstrates that updating the policy in the same manner as SAC leads to improvements in the pol-icy under the average reward criterion. Additionally, defin-ing the entropy-augmented reward Rent  
+
+> t
+
+and the entropy-augmented Q function Qπ, ent (s, a ) as 
+
+Rent  
+
+> t
+
+:= Rt − log π(At|St),Qπ, ent (s, a ) := Qπ (s, a ) − log π(At|St). (15) allows the Q function in Equation 14 to be reformulated as Qπ, ent (s, a ) := Eπ [∑∞ 
+
+> t=0
+
+Rent  
+
+> t
+
+− ρπ
+
+> soft
+
+|S0 = s, A 0 = a].This formulation aligns with the definition of the Q func-tion in average reward reinforcement learning (Equation 3), enabling the application of the average reward Q-learning framework. 
+
+3.3. Automatic Reset Cost Adjustment 
+
+In this section, we address the challenge associated with applying the average reward criterion to tasks that are not purely continuing tasks, such as locomotion tasks where episodes may end due to falls. Average reward reinforce-ment learning assumes continuing tasks that do not have an episode termination. This is because average rewards are defined over the infinite horizon, and after the end of an episode, the agent continues to receive a reward of zero, leading to an average reward of zero. However, in many tasks, such as locomotion tasks, episodes may end due to events like robot falls, depending on the policy. In these cases, the tasks are not purely continuing. To apply average reward reinforcement learning to such tasks, we employ the environment reset and the Reset Cost which ATRPO (Zhang & Ross, 2021) does. The envi-ronment reset regards a terminated episode as a continu-ing one by initializing the environment. Reset Cost is the penalty reward given for resetting the environment, denoted as −rcost (where rcost > 0). This means that, even after an episode ends in a certain terminal state St, initializing the environment, and observing the initial state S0, the expe-rience (St−1, A t−1, r (St−1, A t−1) − rcost , S 0) is obtained, and the episode is treated as continued. In ATRPO, for experiments in the Mujoco environment, the Reset Cost rcost is fixed at 100, but the optimal Reset Cost is generally non-trivial. Instead of setting the rcost , we pro-pose a method to control the frequency at which the agent reaches termination states. Let’s consider a new MDP from MDPs with termination, where we only introduce environ-ment resets without adding the Reset Cost (equivalent to the environment when rcost = 0 ). Let Sterm be the set of termination states in the original MDP, and define the fre-quency ρπ 
+
+> reset
+
+at which the agent reaches termination states under the policy π as follows: 
+
+ρπ 
+
+> reset
+
+= lim  
+
+> T→∞
+
+1
+
+T Eπ
+
+[ T∑
+
+> t=0
+
+Es′∼p(·| St,A t) [1 (s′ ∈ S term )] 
+
+]
+
+.
+
+Using ρπ
+
+> reset
+
+, we consider the following constrained opti-5RVI-SAC 
+
+mization problem: 
+
+max  
+
+> π
+
+ρπ ,
+
+s.t. ρπ 
+
+> reset
+
+≤ ϵreset . (16) This problem aims to maximize the average reward ρπ with a constraint on the frequency of reaching termination states, where the termination frequency target ϵreset ∈ (0 , 1) is a user parameter. Note that ρπ here refers to the average re-ward when the Reset Cost is set to zero. To solve this constrained optimization problem, we define the Lagrangian for the dual variable λ as follows: 
+
+L(π, λ ) = ρπ − λρ π 
+
+> reset
+
+− λϵ reset .
+
+Following prior research in constrained optimization prob-lems, the primal problem is formulated as: 
+
+max  
+
+> π
+
+min  
+
+> λ≥0
+
+L(π, λ ).
+
+In our approach to solving this problem, similar to the ad-justment of the temperature parameter in Maximum En-tropy Reinforcement Learning (Haarnoja et al., 2018b; Ab-dolmaleki et al., 2018), we alternate between outer and in-ner optimization steps. The outer optimization step is up-dating π to maximize ρπ − λρ π 
+
+> reset
+
+for a fixed λ. Since 
+
+ρπ − λρ π 
+
+> reset
+
+is equal to the average reward when rcost = λ,this optimization step is equivalent to the policy update step in average reward reinforcement learning with Reset Cost. The inner optimization step is updating λ to min-imize −λρ π 
+
+> reset
+
+− λϵ reset . To compute this objective, it is necessary to obtain ρπ
+
+> reset
+
+. Hence, we estimate the value of ρπ 
+
+> reset
+
+by updating the Q function Qreset under the set-ting r(s, a ) = Es′∼p(·| s,a ) [1 (s′ ∈ S term )] using the update method described in Section 3.1. 
+
+# 4. Experiment 
+
+In our benchmark experiments, we aim to verify two as-pects: (1) A comparison of the performance between RVI-SAC, SAC(Haarnoja et al., 2018b) with various discount rates, and the existing off-policy average reward DRL method, ARO-DDPG (Saxena et al., 2023). (2) How does each component in our proposed method contribute to per-formance? To demonstrate these, we conducted benchmark ex-periments using six tasks (Ant, HalfCheetah, Hopper, Walker2d, Humanoid, and Swimmer) implemented in the Gymnasium (Towers et al., 2023) and MuJoCo physical simulator (Todorov et al., 2012). Note that there is no ter-mination in the Swimmer and HalfCheetah environments, meaning that resets do not occur. The source code for this experiment can be found on our GitHub repository at https://github.com/ yhisaki/average-reward-drl .
+
+4.1. Comparative evaluation 
+
+We conducted experiments with 10 different random seed trials for each algorithm, sampling evaluation scores every 5,000 steps. For RVI-SAC and SAC, stochastic policies are treated as deterministic during evaluation. The maximum episode step is limited to 1,000 during training and evalua-tion. Figure 1 shows the learning curves of RVI-SAC, SAC with various discount rates, and ARO-DDPG. These exper-iments set the evaluation score as the total return over 1,000 steps. Results of experiments with the evaluation score set as an average reward (total return / survival step) are pre-sented in Appendix F.1. From the results shown in Figure 1, when comparing RVI-SAC with SAC with various discount rates, RVI-SAC demonstrates equal or better performance than SAC with the best discount rate in all environments except HalfChee-tah. A notable observation is from the Swimmer environ-ment experiments (Figure 1a). SAC’s recommended dis-count rate of γ = 0.99 (Haarnoja et al., 2018a;b) per-forms better than the other rates in environments other than Swimmer. However, a larger discount rate of γ = 0 .999 
+
+is required in the Swimmer environment. However, setting a large discount rate can lead to destabilization of learn-ing and slow convergence (Fujimoto et al., 2018; Dewanto & Gallagher, 2021), and indeed, in the environments other than Swimmer, a setting of γ = 0 .999 shows lower per-formance. Compared to SAC, RVI-SAC shows the same performance as SAC ( γ = 0 .999 ) in the Swimmer environ-ment and equal or better than SAC ( γ = 0 .99 ) in the other environments. This result suggests that while traditional SAC using a discount rate may be significantly impacted by the choice of discount rate, RVI-SAC using the average reward resolves this issue. When comparing RVI-SAC with ARO-DDPG, RVI-SAC shows higher performance in all environments. SAC has improved performance over methods using deterministic policies by introducing the concept of Maximum Entropy Reinforcement Learning. Similarly, it can be considered that the introduction of this concept to RVI-SAC is the primary reason for RVI-SAC’s superior performance over ARO-DDPG. 
+
+4.2. Design evaluation 
+
+In the previous section, we demonstrated that RVI-SAC overall exhibits better performance compared to SAC us-ing various discount rates and ARO-DDPG. In this section, we show how each component of RVI-SAC contributes to the overall performance. 
+
+Performance Comparison of RVI-SAC, SAC with au-tomatic Reset Cost adjustment and ARO-DDPG with automatic Reset Cost adjustment 
+
+6RVI-SAC      
+
+> (a) Swimmer (b) Ant (c) Walker2d
+> (d) Humanoid (e) Hopper (f) HalfCheetah Figure 1. Learning curves for the Gymnasium’s Mujoco tasks. The horizontal axis represents Steps, and the vertical axis represents the evaluation value (total return). Lines and shades represent the mean and standard deviation of the evaluation values over 10 trials, respectively.
+
+Since RVI-SAC introduces the automatic Reset Cost ad-justment, RVI-SAC uses a different reward structures from that used in SAC and ARO-DDPG in which the reward is set to zero after termination. To compare the performance of RVI-SAC, SAC and ARO-DDPG under the same re-ward structure, we conduct comparative experiments with 
+
+RVI-SAC , SAC with the automatic Reset Cost adjustment (SAC with Reset ) and ARO-DDPG with the automatic Re-set Cost adjustment( ARO-DDPG with Reset ). Figure 2a shows the learning curves of these experiments in the Ant environment. (Results for other environments are shown in Appendix F.2). Here, the discount rate of SAC is set to 
+
+γ = 0 .99 .Figure 2a demonstrates that RVI-SAC outperforms SAC with automatic Reset Cost adjustment and ARO-DDPG with automatic Reset Cost adjustment. This result suggests that the improved performance of RVI-SAC is not solely due to the different reward structure but also due to the ef-fects of using the average reward criterion. 
+
+Ablation Study of Delayed f(Q) Update 
+
+In this section, we evaluate the effectiveness of the Delayed f(Q) Update described in Section 3.1. This method stabi-lizes learning without depending on a specific state/action pair for updating the Q function. To validate the effec-tiveness of this method, we examine whether the follow-ings are correct: (1) When the function f (Q) is f (Q) = 
+
+Q(S, A ) for state/action pair (S, A ) ∈ S × A , the perfor-mance depends on the choice of (S, A ). (2) When the Q function is updated using Equation 6 directory as f (Q),learning becomes unstable. To examine these, we con-ducted performance comparisons with three algorithms: (1) RVI-SAC , (2) RefState (s, a )−#1 , (s, a )−#2 and 
+
+(s, a ) − #3 that are RVI-SACs updating the Q functions with f (Q) = Q(s, a ), using sampled state/action pairs, 
+
+(s, a )−#1 , (s, a )−#2 and (s, a )−#3 , as Reference States obtained from when agent takes random actions, respec-tively, (3) RVI-SAC without Delay that is RVI-SAC up-dating the Q function using Equation 6 directory as f (Q).Figure 2b shows the learning curves for these methods in the Ant environment. Firstly, comparing RVI-SAC with RefState (s, a )−#1 , (s, a )−#2 and (s, a )−#3 , except for RefState (s, a ) − #1 , the methods using Reference States show lower performance than RVI-SAC. Furthermore, comparing the results of RefState (s, a ) − #1 , (s, a ) − #2 
+
+and (s, a ) − #3 , it suggests that performance depends on the choice of Reference State. These results suggest the ef-fectiveness of RVI-SAC, which shows good performance without depending on a specific state/action pair. Next, comparing RVI-SAC with RVI-SAC without Delay, which directly uses Equation 6, it is observed that RVI-SAC per-forms significantly better. This result suggests that, in RVI-SAC, implementing the Delayed f(Q) Update con-tributes to stabilizing the learning process, thereby achiev-ing higher performance. It indicates the effectiveness of the Delayed f(Q) Update, aiming at stabilizing updates of the 7RVI-SAC            
+
+> (a) Performance Comparison of RVI-SAC, SAC with automatic Reset Cost adjustment, and ARO-DDPG with automatic Reset Cost adjustment
+> (b) Ablation Study of Delayed f(Q) Update (c) Performance Comparison of RVI-SAC and RVI-SAC with Fixed Reset Cost (rcost = 0 ,10 ,100 ,250 ,500 )Figure 2. Experimental results demonstrating the effectiveness of each component of RVI-SAC. All three graphs represent learning curves on the Ant environment.
+
+Q-function. 
+
+RVI-SAC with Fixed Reset Cost 
+
+To demonstrate the effectiveness of the Automatic Reset Cost Adjustment, we compare the performance of RVI-SAC and RVI-SAC with fixed Reset Costs in the Ant en-vironment. Figure 2c shows the learning curves of RVI-SAC and RVI-SAC with fixed Reset Costs, rcost =0, 10 , 100 , 250 , 500 . These results show that settings other than the optimal fixed Reset Cost of rcost = 10 for this environment decrease performance. Moreover, the per-formance of RVI-SAC with fixed Reset Costs is highly de-pendent on its setting. This result suggests the effectiveness of the automatic adjustment of Reset Cost, which does not require specific settings. 
+
+# 5. Related Works 
+
+The importance of using the average reward criterion in continuing tasks has been suggested. Blackwell (1962) showed that a Blackwell optimal policy π∗ maximizes the average reward exists, and that, for any discount reward criterion satisfying γ ≥ γ∗, the optimal policy coincides with the Blackwell optimal policy. However, Dewanto & Gallagher (2021) demonstrated that setting a high discount rate to satisfy γ ≥ γ∗ can slow down convergence, and a lower discount rate may lead to a sub-optimal policy. Ad-ditionally, they noted various benefits of directly applying the average reward criterion to recurrent MDPs. Naik et al. (2019) pointed out that discounted reinforcement learning with function approximation is not an optimization prob-lem, and the optimal policy is not well-defined. Although there are fewer studies on tabular Q-learning methods and theoretical analyses for the average reward criterion compared to those for the discounted reward cri-terion, several notable works exist (Schwartz, 1993; Singh, 1994; Abounadi et al., 2001; Wan et al., 2020; Yang et al., 2016) . RVI Q-learning, which forms the foundational idea of our proposed method, was proposed by Abounadi et al. (2001) and generalized by Wan et al. (2020) with respect to the function f . Differential Q-learning (Wan et al., 2020) is a special case of RVI Q-learning. The asymptotic conver-gence of these methods in weakly communicating MDPs has been established by Wan & Sutton (2022). Several methods focusing on function approximation for average reward criterion have been proposed (Saxena et al., 2023; Abbasi-Yadkori et al., 2019; Zhang & Ross, 2021; Ma et al., 2021; Zhang et al., 2021a;b). A notable study by Saxena et al. (2023) extended DDPG to the average reward criterion and demonstrated performance using dm-control’s Mujoco tasks. This work is deeply relevant to our proposed method. This research provides asymptotic con-vergence and finite time analysis in a linear function ap-proximation. Another contribution is POLITEX (Abbasi-Yadkori et al., 2019), which updates a policy using a Boltz-mann distribution over the sum of action-value estimates from a prior policy. POLITEX demonstrated performance using an Atari’s Ms Pacman. ATRPO (Zhang & Ross, 2021) and APO (Ma et al., 2021) update a policy based on policy improvement bounds to the average reward setting within an on-policy framework. ATRPO and APO demon-strated performance using OpenAI Gym’s Mujoco tasks. 
+
+# 6. Conclusion 
+
+In this paper, we proposed RVI-SAC, a novel off-policy DRL method with the average reward criterion. RVI-SAC is composed of three components. The first component is the Critic update based on RVI Q-learning. We did not sim-ply extend RVI Q-learning to the Neural Network method, but introduced a new technique called Delayed f(Q) Up-date, enabling stable learning without dependence on a Reference State. Additionally, we proved the asymptotic convergence of this method. The second component is the 8RVI-SAC 
+
+Actor update using the Average Reward Soft Policy Im-provement Theorem. The third component is the automatic adjustment of the Reset Cost to apply average reward re-inforcement learning to locomotion tasks with termination. We applied RVI-SAC to the Gymnasium’s Mujoco tasks, and demonstrated that RVI-SAC showed competitive per-formance compared to existing methods. For future work, on the theoretical side, we consider to provide asymptotic convergence and finite-time analysis of the proposed method using a linear function approximator. On the experimental side, we plan to compare the perfor-mance of RVI-SAC using benchmark tasks other than Mu-joco tasks and compare it with average reward on-policy methods such as APO (Ma et al., 2021). 9RVI-SAC 
+
+# Impact Statement 
+
+This paper presents work whose goal is to advance the field of Reinforcement Learning. There are many potential so-cietal consequences of our work, none which we feel must be specifically highlighted here. 
+
+# References 
+
+Abbasi-Yadkori, Y., Bartlett, P., Bhatia, K., Lazic, N., Szepesvari, C., and Weisz, G. POLITEX: Regret bounds for policy iteration using expert prediction. In Chaudhuri, K. and Salakhutdinov, R. (eds.), Pro-ceedings of the 36th International Conference on Ma-chine Learning , volume 97 of Proceedings of Ma-chine Learning Research , pp. 3692–3702. PMLR, 09– 15 Jun 2019. URL https://proceedings.mlr. press/v97/lazic19a.html .Abdolmaleki, A., Springenberg, J. T., Tassa, Y., Munos, R., Heess, N., and Riedmiller, M. A. Maximum a posteriori policy optimisation. CoRR , abs/1806.06920, 2018. URL 
+
+http://arxiv.org/abs/1806.06920 .Abounadi, J., Bertsekas, D., and Borkar, V. S. Learn-ing algorithms for markov decision processes with average cost. SIAM Journal on Control and Op-timization , 40(3):681–698, 2001. doi: 10.1137/ S0363012999361974. URL https://doi.org/ 10.1137/S0363012999361974 .Blackwell, D. Discrete dynamic programming. An-nals of Mathematical Statistics , 33:719–726, 1962. URL https://api.semanticscholar.org/ CorpusID:120274575 .Borkar, V. S. Stochastic approximation with two time scales. Systems & Control Letters , 29 (5):291–294, 1997. ISSN 0167-6911. doi: https://doi.org/10.1016/S0167-6911(97)90015-3. URL https://www.sciencedirect.com/ science/article/pii/S0167691197900153 .Borkar, V. S. Stochastic Approximation: A Dynami-cal Systems Viewpoint . Texts and Readings in Math-ematics. Hindustan Book Agency Gurgaon, 1 edition, Jan 2009. ISBN 978-93-86279-38-5. doi: 10.1007/ 978-93-86279-38-5. URL https://doi.org/10. 1007/978-93-86279-38-5 . eBook Packages: Mathematics and Statistics, Mathematics and Statistics (R0). Dewanto, V. and Gallagher, M. Examining average and discounted reward optimality criteria in reinforcement learning. CoRR , abs/2107.01348, 2021. URL https: //arxiv.org/abs/2107.01348 .Fujimoto, S., van Hoof, H., and Meger, D. Address-ing function approximation error in actor-critic methods. 
+
+CoRR , abs/1802.09477, 2018. URL http://arxiv. org/abs/1802.09477 .Gosavi, A. Reinforcement learning for long-run average cost. European Journal of Operational Research ,155(3):654–674, 2004. ISSN 0377-2217. doi: https://doi.org/10.1016/S0377-2217(02)00874-3. URL https://www.sciencedirect.com/ science/article/pii/S0377221702008743 .Traffic and Transportation Systems Analysis. Haarnoja, T., Tang, H., Abbeel, P., and Levine, S. Re-inforcement learning with deep energy-based policies. 
+
+CoRR , abs/1702.08165, 2017. URL http://arxiv. org/abs/1702.08165 .Haarnoja, T., Zhou, A., Abbeel, P., and Levine, S. Soft actor-critic: Off-policy maximum entropy deep rein-forcement learning with a stochastic actor, 2018a. Haarnoja, T., Zhou, A., Hartikainen, K., Tucker, G., Ha, S., Tan, J., Kumar, V., Zhu, H., Gupta, A., Abbeel, P., and Levine, S. Soft actor-critic algorithms and appli-cations. CoRR , abs/1812.05905, 2018b. URL http: //arxiv.org/abs/1812.05905 .Konda, V. R. and Borkar, V. S. Actor-critic–type learning algorithms for markov decision processes. SIAM Journal on Control and Optimization , 38(1):94–123, 1999. doi: 10.1137/S036301299731669X. URL https://doi. org/10.1137/S036301299731669X .Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., Silver, D., and Wierstra, D. Continuous control with deep reinforcement learning, 2019. Ma, X., Tang, X., Xia, L., Yang, J., and Zhao, Q. Average-reward reinforcement learning with trust region meth-ods. CoRR , abs/2106.03442, 2021. URL https: //arxiv.org/abs/2106.03442 .Mnih, V., Kavukcuoglu, K., Silver, D., Graves, A., Antonoglou, I., Wierstra, D., and Riedmiller, M. A. Playing atari with deep reinforcement learning. CoRR ,abs/1312.5602, 2013. URL http://arxiv.org/ abs/1312.5602 .Mnih, V., Badia, A. P., Mirza, M., Graves, A., Lil-licrap, T., Harley, T., Silver, D., and Kavukcuoglu, K. Asynchronous methods for deep reinforcement learning. In Balcan, M. F. and Weinberger, K. Q. (eds.), Proceedings of The 33rd International Con-ference on Machine Learning , volume 48 of Pro-ceedings of Machine Learning Research , pp. 1928– 1937, New York, New York, USA, 20–22 Jun 10 RVI-SAC 
+
+2016. PMLR. URL https://proceedings.mlr. press/v48/mniha16.html .Naik, A., Shariff, R., Yasui, N., and Sutton, R. S. Dis-counted reinforcement learning is not an optimization problem. CoRR , abs/1910.02140, 2019. URL http: //arxiv.org/abs/1910.02140 .Puterman, M. L. Markov Decision Processes: Discrete Stochastic Dynamic Programming . John Wiley & Sons, Inc., USA, 1st edition, 1994. ISBN 0471619779. Saxena, N., Khastigir, S., Kolathaya, S., and Bhatnagar, S. Off-policy average reward actor-critic with deterministic policy search, 2023. Schulman, J., Levine, S., Moritz, P., Jordan, M. I., and Abbeel, P. Trust region policy optimization. CoRR ,abs/1502.05477, 2015. URL http://arxiv.org/ abs/1502.05477 .Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+CoRR , abs/1707.06347, 2017. URL http://arxiv. org/abs/1707.06347 .Schwartz, A. A reinforcement learning method for maxi-mizing undiscounted rewards. In Utgoff, P. E. (ed.), Ma-chine Learning, Proceedings of the Tenth International Conference, University of Massachusetts, Amherst, MA, USA, June 27-29, 1993 , pp. 298–305. Morgan Kauf-mann, 1993. doi: 10.1016/B978-1-55860-307-3. 50045-9. URL https://doi.org/10.1016/ b978-1-55860-307-3.50045-9 .Silver, D., Lever, G., Heess, N., Degris, T., Wierstra, D., and Riedmiller, M. Deterministic policy gradient algo-rithms. In Xing, E. P. and Jebara, T. (eds.), Proceed-ings of the 31st International Conference on Machine Learning , volume 32 of Proceedings of Machine Learn-ing Research , pp. 387–395, Bejing, China, 22–24 Jun 2014. PMLR. URL https://proceedings.mlr. press/v32/silver14.html .Singh, S. Reinforcement learning algorithms for average-payoff markovian decision processes. In 
+
+AAAI Conference on Artificial Intelligence , 1994. URL https://api.semanticscholar.org/ CorpusID:17854729 .Sutton, R. S. and Barto, A. G. Reinforcement Learn-ing: An Introduction . The MIT Press, second edi-tion, 2018. URL http://incompleteideas. net/book/the-book-2nd.html .Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics en-gine for model-based control. In 2012 IEEE/RSJ Inter-national Conference on Intelligent Robots and Systems ,pp. 5026–5033, Vilamoura-Algarve, Portugal, 2012. doi: 10.1109/IROS.2012.6386109. Towers, M., Terry, J. K., Kwiatkowski, A., Balis, J. U., Cola, G. d., Deleu, T., Goul˜ ao, M., Kallinteris, A., KG, A., Krimmel, M., Perez-Vicente, R., Pierr´ e, A., Schul-hoff, S., Tai, J. J., Shen, A. T. J., and Younis, O. G. Gym-nasium, March 2023. URL https://zenodo.org/ record/8127025 .Tsitsiklis, J. N. Asynchronous stochastic approximation and q-learning. Machine Learning , 16(3):185–202, 9 1994. doi: 10.1023/A:1022689125041. URL https: //doi.org/10.1023/A:1022689125041 .Wan, Y. and Sutton, R. S. On convergence of average-reward off-policy control algorithms in weakly commu-nicating mdps, 2022. Wan, Y., Naik, A., and Sutton, R. S. Learning and planning in average-reward markov decision processes. CoRR ,abs/2006.16318, 2020. URL https://arxiv.org/ abs/2006.16318 .Yang, S., Gao, Y., An, B., Wang, H., and Chen, X. Effi-cient average reward reinforcement learning using con-stant shifting values. Proceedings of the AAAI Confer-ence on Artificial Intelligence , 30(1), Mar. 2016. doi: 10. 1609/aaai.v30i1.10285. URL https://ojs.aaai. org/index.php/AAAI/article/view/10285 .Zhang, S., Wan, Y., Sutton, R. S., and Whiteson, S. Average-reward off-policy policy evaluation with func-tion approximation. CoRR , abs/2101.02808, 2021a. URL https://arxiv.org/abs/2101.02808 .Zhang, S., Yao, H., and Whiteson, S. Breaking the deadly triad with a target network. In Meila, M. and Zhang, T. (eds.), Proceedings of the 38th International Conference on Machine Learning , volume 139 of Proceedings of Machine Learning Research , pp. 12621–12631. PMLR, 18–24 Jul 2021b. URL https://proceedings. mlr.press/v139/zhang21y.html .Zhang, Y. and Ross, K. W. On-policy deep reinforce-ment learning for the average-reward criterion. CoRR ,abs/2106.07329, 2021. URL https://arxiv.org/ abs/2106.07329 .11 RVI-SAC 
+
+# A. Mathematical Notations 
+
+In this paper, we utilize the following mathematical notations: • e denotes a vector with all elements being 1. • DKL (p|q) represents the Kullback-Leibler divergence, defined between probability distributions p and q as 
+
+DKL (p|q) = ∑ 
+
+> x
+
+p(x) log p(x) 
+
+> q(x)
+
+.• Here, 1(“some condition” ) is an indicator function, taking the value 1 when “some condition” is satisfied, and 0
+
+otherwise. • ∥ · ∥ ∞ denotes the sup-norm. 
+
+# B. Overall RVI-SAC algorithm and implementation 
+
+Algorithm 1 RVI-SAC 
+
+1: Initialize: Q-Network parameters ϕ1, ϕ 2, ϕ ′
+
+> 1
+
+, ϕ ′
+
+> 2
+
+, Delayed f (Q) update parameter ξ, Policy-Network parameters θ, Temperature parameter α, Q-Network parameters for reset ϕreset , ϕ ′
+
+> reset
+
+, Delayed f (Q) update parameter ξreset for reset, and Reset Cost rcost .2: for each iteration do 
+
+3: Sample action a ∼ π(·| s)
+
+4: Sample next state s′ ∼ p(·| s, a ) and reward r
+
+5: if s′ /∈ S term then 
+
+6: Store transition (s, a, r, s ′, is reset step = false ) in replay buffer D
+
+7: else if s′ ∈ S term then 
+
+8: Reset environment to initial state s0
+
+9: Store transition (s, a, r, s 0, is reset step = true ) in replay buffer D
+
+10: end if 
+
+11: Sample a mini-batch B from D
+
+12: Update ϕ1, ϕ 2 by minimizing Q-Network loss J(ϕi) (Eq. 17) 13: Update ξ using delayed f(Q) update method (Eq. 18) 14: Update ϕreset by minimizing Reset Q-Network loss J(ϕreset ) (Eq. 22) 15: Update ξreset using delayed f(Q) update method (Eq. 23) 16: Update θ by minimizing Policy-Network loss J(θ) (Eq. 20) 17: Update α by minimizing Temperature Parameter loss J(α) (Eq. 21) 18: Update rcost by minimizing Reset Cost loss J(rcost ) (Eq. 24) 19: Update ϕ′
+
+> 1
+
+, ϕ ′
+
+> 2
+
+, ϕ ′
+
+> reset
+
+(Eq. 25) 20: end for 
+
+In this section, based on Sections 3.1, 3.2, and 3.3, we present the overall algorithm of RVI-SAC. The main parameters to be updated in this algorithm are: • The parameters ϕ1, ϕ 2 of the Q-Network and their corresponding target network parameters ϕ′
+
+> 1
+
+, ϕ ′
+
+> 2
+
+,• The parameter ξ for the Delayed f(Q) Update, • The parameters θ of the Policy-Network, • Additionally, this method introduces automatic adjustment of the temperature parameter α, as introduced in SAC-v2(Haarnoja et al., 2018b). Note that the update of the Q-Network uses the Double Q-Value function approximator (Fujimoto et al., 2018). In cases where environment resets are needed, the following parameters are also updated: • The Reset Cost rcost ,• The parameters ϕreset of the Q-Network for estimating the frequency of environment resets and their corresponding target network parameters ϕ′
+
+> reset
+
+,12 RVI-SAC 
+
+• The parameter ξreset for the Delayed f(Q) Update. The Q-Network used to estimate the frequency of environment resets is not directly used in policy updates, therefore the Double Q-Value function approximator is not employed for it. From Sections 3.1 and 3.2, the parameters ϕ1, ϕ 2 of the Q-Network are updated by minimizing the following loss function: 
+
+J(ϕi) = 1
+
+|B| 
+
+∑
+
+> (s,a,r,s ′,is reset step )∈B
+
+(Y (s, a, r, s ′, is reset step ) − Qϕi (s, a )) 2 , i = 1 , 2, (17) where Y (s, a, r, s ′, is reset step ) = ˆ r − ξ + min  
+
+> j=1 ,2
+
+Qϕ′ 
+
+> j
+
+(s′, a ′) − α log πθ (a′|s′),
+
+ˆr = r − rcost 1 (is reset step ) , a ′ ∼ πθ (·| s′).
+
+Note that ˆr is the reward penalized by the Reset Cost. ξ is updated as follows using the parameter κ, based on the Delayed f(Q) update: 
+
+ξ ← ξ + κ (f (Qent  
+
+> ϕ′
+
+; B) − ξ) ,Qent  
+
+> ϕ′
+
+(s, a ) := Qϕ′ (s, a ) − α log πθ (a|s). (18) 
+
+Qent  
+
+> ϕ′
+
+(s, a ) represents the entropy augmented Q function as in Equation 15. For a function Q : S × A → R, f (Q; B) is calculated as follows: 
+
+f (Q; B) = 1
+
+|B| 
+
+∑
+
+> (s,a,r,s ′,is reset step )∈B
+
+Q(s′, a ′),a′ ∼ πθ (·| s′).
+
+(19) The parameters θ of the Policy-Network is updated to minimize the following loss function, as described in Section 3.2, using the same method as in SAC: 
+
+J(θ) = 1
+
+|B| 
+
+∑
+
+> (s,a,r,s ′,is reset step )∈B
+
+(
+
+α log πθ (a′|s) − min  
+
+> j=1 ,2
+
+Qϕj (s, a ′)
+
+)
+
+, a ′ ∼ πθ (·| s). (20) Furthermore, since the theory and update method for the temperature parameter α do not depend on the discount rate γ, it is updated in the same way as in SAC: 
+
+J(α) = 1
+
+|B| 
+
+∑
+
+> (s,a,r,s ′,is reset step )∈B
+
+α (− log πθ (a′|s) − H ) , a ′ ∼ πθ (·| s). (21) where H is the entropy target. The parameters ϕreset of the Q-Network for estimating the frequency of environment resets are updated to minimize the following loss function, 
+
+J(ϕreset ) = 1
+
+|B| 
+
+∑
+
+> (s,a,r,s ′,is reset step )∈B
+
+(Yreset (s, a, r, s ′, is reset step ) − Qϕreset (s, a )) 2 ,Yreset (s, a, r, s ′, is reset step ) = 1 (is reset step ) − ξreset + Qϕ′ 
+
+> reset
+
+(s′, a ′),a′ ∼ πθ (·| s′),
+
+(22) and ξreset is updated as 
+
+ξreset ← ξreset + κ (f (Qϕ′ 
+
+> reset
+
+; B) − ξreset 
+
+) (23) using the calculation for f (Qϕ′ 
+
+> reset
+
+; B) provided in Equation 19. When using ξreset as an estimator for ρπ
+
+> reset
+
+, the Reset Cost rcost is updated to minimize the following loss function, as described in Section 3.3: 
+
+J(rcost ) = −rcost (ξreset − ϵreset ) . (24) 13 RVI-SAC 
+
+The parameters of the target network ϕ′
+
+> 1
+
+, ϕ ′
+
+> 2
+
+, ϕ ′ 
+
+> reset
+
+are updated according to the parameter τ as follows: 
+
+ϕ′ 
+
+> 1
+
+← τ ϕ 1 + (1 − τ )ϕ′
+
+> 1
+
+ϕ′ 
+
+> 2
+
+← τ ϕ 2 + (1 − τ )ϕ′
+
+> 2
+
+ϕ′ 
+
+> reset
+
+← τ ϕ reset + (1 − τ )ϕ′
+
+> reset
+
+(25) The pseudocode for the entire algorithm is presented in Algorithm 1. 
+
+# C. Convergence Proof of RVI Q-learning with Delayed f (Q) Update 
+
+In this section, we present the asymptotic convergence of the Delayed f(Q) Update algorithm, as outlined in Equation 10. This algorithm is a two-time-scale stochastic approximation (SA) and updates the Q-values and offsets in average reward-based Q-learning at different time scales. This approach is similar to the algorithm proposed in Gosavi (2004). Moreover, the convergence discussion in this section largely draws upon the discussions in Konda & Borkar (1999); Gosavi (2004). 
+
+C.1. Proposed algorithm 
+
+In this section, we reformulate the algorithm for which we aim to prove convergence. Consider an MDP with a finite state-action space that satisfies Assumption 2.1. For all (s, a ) ∈ S × A , let us define the update equations for a scalar sequence ξk and a tabular Q function Qk as follows: 
+
+ξk+1 = ξk + a(k) ( f (Qk; Xk) − ξk) , (26) 
+
+Qk+1 (s, a ) = Qk(s, a ) + b(ν(k, s, a )) 
+
+(
+
+r(s, a ) − gη (ξk) + max  
+
+> a′
+
+Qk(s′, a ′) − Qk(s, a )
+
+)
+
+1 (( s, a ) = ϕk) . (27) 
+
+gη (·) is a clip function newly added from Equation 10 to ensure the convergence of this algorithm. For any η > 0, it is defined as: 
+
+gη (x) = 
+
+
+
+∥r∥∞ + η for x ≥ ∥ r∥∞ + η, x for −∥ r∥∞ − η < x < ∥r∥∞ + η, 
+
+−∥ r∥∞ − η for x ≤ −∥ r∥∞ − η. 
+
+(28) At discrete time steps k, ϕk denotes the sequence of state/action pairs updated at time k, and s′ represents the next state sampled when the agent selects action a in state s. The function ν(k, s, a ) counts the number of updates to Q(s, a )
+
+up to time k, defined as ν(k, s, a ) = ∑km=0 1 (( s, a ) = ϕm). The functions a(·) and b(·) represent the step-size. For the random variable Xk and the function f (·; ·), we introduce the following assumption within the increasing σ-field 
+
+Fk = σ(ξn, Q n, n ≤ k, w n, 1, w n, 2, n < k ), where wn, 1, w n, 2 are defined in Equation 35. 
+
+Assumption C.1. It holds that 
+
+E [f (Qk; Xk) − f (Qk) | F k] = 0 ,
+
+and for some constant K,
+
+E [∥f (Qk; Xk) − f (Qk)∥2 | F k
+
+] < K (1 + ∥Qk∥2).
+
+This assumption is obviously satisfied when f is set as in Equation 7. 
+
+C.2. The ODE framework and stochastic approximation(SA) 
+
+In this section, we revisit the convergence results for SA with two update equations on different time scales, as demonstrated in Konda & Borkar (1999); Gosavi (2004). The sequences {xk} and {yk} are in Rn and Rl, respectively. For i = 1 , . . . , n and j = 1 , . . . , l , they are generated according to the following update equations: 
+
+xik+1 = xik + a(ν1(k, i )) (hi (xk, y k) + wik, 1
+
+) 1 (i = ϕk, 1) , (29) 
+
+yjk+1 = yjk + b(ν2(k, j )) 
+
+(
+
+f j (xk, y k) + wjk, 2
+
+)
+
+1 (j = ϕk, 2) , (30) 14 RVI-SAC 
+
+where the superscripts in each vector represent vector indices, and {ϕk, 1} and {ϕk, 2} are stochastic processes taking values on the sets S1 = {1, 2, . . . , n } and S2 = {1, 2, . . . , l }, respectively. The functions h(·, ·) and f (·, ·) are arbitrary functions of (xk, y k). The terms wk, 1, w k, 2 represent noise components, and ν1, ν 2 are defined as: 
+
+ν1(k, i ) = 
+
+> k
+
+∑
+
+> m=0
+
+1 (i = ϕm, 1) ,ν2(k, j ) = 
+
+> k
+
+∑
+
+> m=0
+
+1 (j = ϕm, 2) .
+
+In the context of the proposed method (Equations 26 and 27), xk corresponds to ξk, and yk corresponds to Qk. This implies that n is 1, and l is equal to the number of state/action pairs. Consequently, ν1(k, i ) corresponds k due to n = 1 ,and ν2(k, j ) corresponds to ν(k, s, a ).We assume the following assumptions for this SA: 
+
+Assumption C.2. The functions h and f are Lipschitz continuous. 
+
+Assumption C.3. There exist ∆ > 0 such that 
+
+lim inf 
+
+> k→∞
+
+ν1(k, i )
+
+k + 1 ≥ ∆,
+
+and 
+
+lim inf 
+
+> k→∞
+
+ν2(k, j )
+
+k + 1 ≥ ∆.
+
+almost surely , for all i = 1 , 2, . . . , n and j = 1 , 2, . . . , l . Furthermore, if, for a(·), b (·) and x > 0,
+
+N (k, x ) = min 
+
+{
+
+m > k :
+
+> m
+
+∑
+
+> i=k+1
+
+a(i) ≥ x
+
+}
+
+,N ′(k, x ) = min 
+
+{
+
+m > k :
+
+> m
+
+∑
+
+> i=k+1
+
+b(i) ≥ x
+
+}
+
+,
+
+where a(i) = a(ν1(i, ϕ i, 1)) , b (i) = b(ν2(i, ϕ i, 2)) , then the limits 
+
+lim 
+
+> k→∞
+
+∑ν1(N (k,x ),i ′) 
+
+> m=ν1(k,i ′)
+
+a(m)
+
+∑ν1(N (k,x ),i ) 
+
+> m=ν1(k,i )
+
+a(m) ,
+
+lim 
+
+> k→∞
+
+∑ν2(N ′(k,x ),j ′) 
+
+> m=ν2(k,j ′)
+
+b(m)
+
+∑ν2(N ′(n,x ),j ) 
+
+> m=ν2(k,j )
+
+b(m)
+
+exist almost surely for all i, i ′, j, j ′ (Together, these conditions imply that the components are updated “comparably often” in an “evenly spread” manner.) 
+
+Assumption C.4. Let c(k) be a(k) or b(k). The standard conditions for convergence that c(k) must satisfy are as follows: • ∑ 
+
+> k
+
+c(k) = ∞, ∑ 
+
+> k
+
+c2(k) < ∞
+
+• For x ∈ (0 , 1) ,
+
+sup 
+
+> k
+
+c([ xk ]) /c (k) < ∞,
+
+where [· · · ] stands for the integer part of “...”. 15 RVI-SAC 
+
+• For x ∈ (0 , 1) and A(k) = ∑ki=0 c(i),
+
+A([ yk ]) /A (k) → 1,
+
+uniformly in y ∈ [x, 1] .
+
+Assumption C.5. In addition to Assumption C.4, the following conditions must be satisfied: 
+
+lim  
+
+> k→∞
+
+sup b(k)
+
+a(k) = 0 
+
+.
+
+Assumption C.6. Let Fk = σ(xn, y n, n ≤ k, w n, 1, w n, 2, n < k ) be a increasing σ-field. For some constants , K1 and K2,the following condition is satisfied: 
+
+E [wk, 1 | F k] = 0 ,
+
+E
+
+[
+
+∥wk, 1∥2 | F k
+
+]
+
+≤ K1(1 + ∥xk∥2 + ∥yk∥2),
+
+and 
+
+E [wk, 2 | F k] = 0 ,
+
+E
+
+[
+
+∥wk, 2∥2 | F k
+
+]
+
+≤ K2(1 + ∥xk∥2 + ∥yk∥2).
+
+Assumption C.7. The iterations of xk and yk are bounded. 
+
+Assumption C.8. For all y ∈ Rl, the ODE 
+
+˙xt = h(xt, y ) (31) has an asymptotically stable critical point λ(y) such that the map λ is Lipschitz continuous. 
+
+Assumption C.9. The ODE 
+
+˙yt = f (λ(yt), y t) (32) has a global asymptotically stable critical point y∗.Note that, t represents continuous time. From Konda & Borkar (1999); Gosavi (2004), the following theorem holds: 
+
+Theorem C.10. Let Assumption C.2 to C.9 hold. Then, {(xk, y k)} converges almost surely to (λ (y∗) , y ∗).
+
+This theorem is slightly different from the problem setting for the convergence of two-time-scale SA as described in Konda & Borkar (1999). In Konda & Borkar (1999), it is assumed that a projection mapping P is applied to the entire right-hand side of the update equation for yk (Equation 30), such that P (x) = y, y ∈ G, |x − y| = inf z∈G |z − x| for some closed convex set G. Instead of this setting, we assume in Assumption C.7 that yk is bounded. With this assumption, there exists a projection mapping P that, even if applied to the right-hand side of Equation 30, would not affect the values of yk.Therefore, Theorem C.10 is essentially encompassed by the results in Konda & Borkar (1999). 
+
+C.3. Proof 
+
+We show the convergence of the proposed method by verifying that each of the assumptions presented in the previous section is satisfied. First, we prepare ODEs related to the update equations 26 and 27. The mappings H1 and H2 are defined as follows: 
+
+H1(ξ, Q ) = f (Q),H2(ξ, Q )( s, a ) = r(s, a ) − gη (ξ) + ∑
+
+> s′
+
+p(s′|s, a )max  
+
+> a′
+
+Q(s′, a ′).
+
+16 RVI-SAC 
+
+We rewrite Equations 26 and 27 using the mappings H1 and H2 as follows: 
+
+ξk+1 = ξk + a(k) ( H1(ξk, Q k) − ξk + wk, 1) , (33) 
+
+Qk+1 (s, a ) = Qk(s, a ) + b(ν(k, s, a )) ( H2(ξk, Q k)( s, a ) − Qk(s, a ) + wk, 2(s, a )) 1 (( s, a ) = ϕk) . (34) Here, the noise terms wk, 1 and wk, 2 are defined respectively as follows: 
+
+wk, 1 = f (Qk; Xk) − H1(Qk, ξ k) = f (Qk; Xk) − f (Qk),wk, 2(s, a ) = r(s, a ) − gη (ξk) + max  
+
+> a′
+
+Qk(s′, a ′) − H2(Qk, ξ k)( s, a ). (35) Using H1 and H2, we define the ODEs related to Equations 26 and 27 (where Equation 36 corresponds to Equation 26, and Equation 37 corresponds to Equation 27) as follows: 
+
+˙ξt = H1(ξt, Q ) − ξt, ∀Q (36) 
+
+˙Qt = H2(λ(Qt), Q t) − Qt. (37) C.3.1. B OUNDNESS OF THE ITERATION (A SSUMPTION C.7) In this section, we show that Assumption C.7 holds for the iterations defined in Equations 26 and 27. To this end, we introduce an assumption for the MDP as introduced in Gosavi (2004) 
+
+Assumption C.11. There exists a state s in the Markov chain such that for some integer m, and for all initial states and all stationary policies, s is visited with a positive probability at least once within the first m timesteps. Under this assumption, the mapping T defined as 
+
+T (Q)( s, a ) = r(s, a ) + ∑
+
+> s′
+
+p(s′|s, a )max  
+
+> a′
+
+Q(s′, a ′) (38) is shown to be a contraction mapping with respect to a certain weighted sup-norm. (For proof, see Appendix A.5 in Gosavi (2004)). This means that there exists a vector γ and a scalar δ ∈ (0 , 1) , D > 0, such that 
+
+∥T (Q)∥γ ≤ δ∥Q∥γ + D
+
+is satisfied. Here, |v|γ is defined as a weighted sup-norm given by 
+
+∥v∥γ = max 
+
+> s,a ∈S×A
+
+|v(s, a )|
+
+γ(s, a ) .
+
+Regarding H2, it holds that 
+
+H2(ξ, Q )( s, a ) = T (Q)( s, a ) − gη (ξ)
+
+⇒ | H2(ξ, Q )( s, a )| ≤ | T (Q)( s, a )| + |gη (ξ)|, ∀s, a. 
+
+From the definition of gη (ξ) (Equation 28), gη (ξ) is bounded. Therefore, for some D1 > 0 and for any ξ, the following is satisfied: ∥H2(ξ, Q )∥γ ≤ ∥ T (Q)∥γ + D1
+
+⇒ ∥ H2(ξ, Q )∥γ ≤ δ∥Q∥γ + D + D1.
+
+Consequently, utilizing the results from (Tsitsiklis, 1994), the iteration expressed in Equation 34, which employs H2,maintains the boundedness of Qk. Additionally, when Qk is bounded, f (Qk; Xk) is also bounded, thereby ensuring that 
+
+ξk remains bounded as well. C.3.2. C ONVERGENCE OF THE ODE (A SSUMPTION C.8, C.9) We verify that Equation 36 satisfies Assumption C.8. The function H1(ξ, Q ) in Equation 36 is independent of ξ, and when 
+
+Q is fixed, H1(ξ, Q ) becomes a constant. Therefore, it is obvious that Assumption C.8 is satisfied, and we have 
+
+λ(Q) = f (Q).
+
+17 RVI-SAC 
+
+Consequently, we can rewrite Equation 37 as follows: 
+
+˙Qt = H2(f (Qt), Q t) − Qt = T (Qt) − gη (f (Qt)) e − Qt. (39) Next, we verify Assumption C.9 for Equation 39. To demonstrate the convergence of Equation 39, we introduce the following lemma from Wan et al. (2020): 
+
+Lemma C.12. The following ODE 
+
+˙wt = T (wt) − f (wt)e − wt (40) 
+
+is globally asymptotically stable and converges to wt → q∗. Here, q∗ satisfies the optimal Bellman equation (as shown in Equation 4) and the following conditions with respect to the function f :
+
+q∗(s, a ) = r(s, a ) − ρ∗ + ∑
+
+> s′∈S
+
+p(s′|s, a ) max  
+
+> a′
+
+q∗(s′, a ′),ρ∗ = f (q∗).
+
+For Equation 39, we demonstrate that the following lemma holds: 
+
+Lemma C.13. The ODE shown in Equation 39 is globally asymptotically stable and converges to Qt → q∗. Here, q∗ is the same as the q∗ in Lemma C.12. Proof. First, from the definition of function gη (·) (Equation 28), it is obvious that gη (f (q∗)) = f (q∗), thus q∗ is an equilibrium point of the ODE shown in Equation 39. Next, we show that the ODE presented in Equation 39 satisfies Lyapunov stability. That is, we need to show that, for any given ϵ > 0, there exists δ > 0 such that if ∥q∗ − Q0∥∞ ≤ δ, then it implies ∥q∗ − Qt∥∞ ≤ ϵ for all t ≥ 0. To demonstrate this, the following lemma is presented: 
+
+Lemma C.14. Let L be the Lipschitz constant of the function f . If ∥q∗ − Q0∥∞ ≤ ηL(1+ L) , then for the solution Qt of the ODE (Equation 39) and the solution wt of the ODE (Equation 40) with Q0 = w0, it holds that Qt = wt.Proof. From Wan et al. (2020), it is known that the following holds for the ODE in Equation 40: 
+
+|ρ∗ − f (wt)| = |f (q∗) − f (wt)|≤ L∥q∗ − wt∥∞
+
+≤ L(1 + L)∥q∗ − w0∥∞.
+
+Here, we choose w0 such that ∥q∗ − w0∥∞ ≤ ηL(1+ L) . Under this condition, 
+
+|ρ∗ − f (wt)| ≤ η
+
+⇒ ρ∗ − η ≤ f (wt) ≤ ρ∗ + η
+
+⇒ −∥ r∥∞ − η ≤ f (wt) ≤ ∥ r∥∞ + η. 
+
+This result implies that gη (f (wt)) = f (wt) for all t ≥ 0. Therefore, for the ODE in Equation 39 with Q0 = w0, it follows that Qt = wt.Given that the ODE in Equation 40 satisfies Lyapunov stability (as shown in Wan et al. (2020)), it follows from Lemma C.14 that, for any ϵ, by choosing δ ≤ ηL(1+ L) , the ODE in Equation 39 also satisfies Lyapunov stability. To demonstrate global asymptotic stability, we need to show that, for any initial Q0, lim t→∞ ∥q∗ − Qt∥∞ = 0 . Setting 
+
+w0 = Q0 and defining vte = wt − Qt. Then, we have 
+
+˙vte = ˙ wt − ˙Qt
+
+= T (wt) − f (wt)e − wt − (T (Qt) − gη (f (Qt)) e − Qt)= T (wt) − T (wt − vte) − (f (wt)e − gη (f (wt − vte)) e) − vte
+
+= T (wt) − T (wt) + vte − (f (wt)e − gη (f (wt) − uv t)e) − vte
+
+= −f (wt)e + gη (f (wt) − uv t)e. 
+
+18 RVI-SAC 
+
+From the definition of gη (·), ˙vt can be expressed as follows: 
+
+˙vt =
+
+
+
+−f (wt) + ∥r∥∞ + η for f (wt) − uv t ≥ ∥ r∥∞ + η, 
+
+−uv t for −∥ r∥∞ − η < f (wt) − uv t < ∥r∥∞ + η, 
+
+−f (wt) − ∥ r∥∞ − η for f (wt) − uv t ≤ −∥ r∥∞ − η. 
+
+Here, we consider a time Tη′ that satisfies the following condition for some 0 < η ′ < η :
+
+|ρ∗ − f (wt)| ≤ | f (q∗) − f (wt)|≤ L∥q∗ − wt∥∞
+
+≤ η′, ∀t ≥ Tη′ .
+
+(Lemma C.12 ensures the existence of such Tη′ .) For t ≥ Tη′ , the following holds: 
+
+−η′ ≤ f (wt) − ρ∗ ≤ η′
+
+⇒ −∥ r∥∞ − η < ρ ∗ − η′ ≤ f (wt) ≤ ρ∗ + η′ < ∥r∥∞ + η. 
+
+Therefore, for vt, the following holds: • When f (wt) − uv t ≥ ∥ r∥∞ + η ⇒ vt ≤ f (wt)−∥ r∥∞−ηu < 0, we have 
+
+˙vt = −f (wt) + ∥r∥∞ + η > 0
+
+• When −∥ r∥∞ − η < f (wt) − uv t < ∥r∥∞ + η ⇒ −∥ r∥∞−ηu < v t < ∥r∥∞+ηu ,
+
+˙vt = −uv t
+
+• When f (wt) − uv t ≤ −∥ r∥∞ − η ⇒ vt ≥ f (wt)+ ∥r∥∞+ηu > 0, we have 
+
+˙vt = −f (wt) − ∥ r∥∞ − η < 0
+
+Setting the Lyapunov function as V (v) = 12 v2, ˙V (vt) = vt ˙vt is such that ˙V (vt) = 0 when vt = 0 , and ˙V (vt) < 0 when 
+
+vt̸ = 0 . Thus, from the Lyapunov Second Method, v = 0 is a globally asymptotically stable point. Therefore, for any initial vTη′ , we can achieve vt → 0, leading to lim t→∞ ∥q∗ − Qt∥∞ = 0 . Hence, the ODE in Equation 39 is globally asymptotically stable at q∗.C.3.3. V ERIFICATION OF OTHER ASSUMPTIONS 
+
+We verify the remaining assumptions (Assumption C.2, C.3, C.4, C.5 and C.6). First, regarding Assumption C.2, the function h corresponds to H1(ξ, Q )−ξ, and the function f corresponds to H2(ξ, Q )−
+
+Q. It is clear that all terms constituting these functions are Lipschitz continuous. Therefore, the overall functions are also Lipschitz continuous, satisfying Assumption C.2. Assumption C.3 concerns the update frequency of elements in the vector being updated during the learning process, which is commonly used in asynchronous SA (Borkar, 2009; Abounadi et al., 2001; Wan et al., 2020). Since ξk, corresponding to 
+
+xk, is a scalar, it clearly satisfies this assumption. For the updates of Qk, corresponding to yk, we introduce the following assumption on the learning process of our proposed method. 
+
+Assumption C.15. There exists ∆ > 0 such that 
+
+lim inf 
+
+> k→∞
+
+ν(k, s, a )
+
+k + 1 ≥ ∆
+
+almost surely , for all s ∈ S , a ∈ A . Furthermore, if, for b(·) and x > 0,
+
+N ′(k, x ) = min 
+
+{
+
+m > k :
+
+> m
+
+∑
+
+> i=k+1
+
+b(i) ≥ x
+
+}
+
+,
+
+19 RVI-SAC 
+
+where b(i) = ν(i, ϕ i) , then the limits 
+
+lim 
+
+> k→∞
+
+∑ν2(N ′(k,x ),s ′,a ′) 
+
+> m=ν2(k,s ′,a ′)
+
+b(m)
+
+∑ν2(N ′(n,x ),s,a ) 
+
+> m=ν2(k,s,a )
+
+b(m)
+
+exist almost surely for all s, a, s ′, a ′
+
+Assumption C.4 is a common assumption about step sizes in asynchronous SA, typically used in various studies (Borkar, 2009; Abounadi et al., 2001; Wan et al., 2020). Assumption C.5 is a standard assumption for two time-scale SA, as found in the literature (Borkar, 2009; 1997; Gosavi, 2004; Konda & Borkar, 1999). In our proposed method, we assume the selection of step sizes that satisfy these assumptions. Assumption C.6 is about the noise term. The assumption regarding the mean of the noise is satisfied because, by the defini-tion of noise (Equation 35), the noise is the difference between the sample and its conditional expectation. The assumption regarding the variance of the noise can be easily verified by Assumption C.1 and applying the triangle inequality. Based on the above discussion, for a finite MDP, when Assumptions 2.1, C.1, C.11, C.4, C.5, and C.15 are satisfied, it has been shown that our proposed update equations 27 and 26 converge almost surely Qk → q∗ and ξk → f (q∗).
+
+# D. Proof of the Average Reward Soft Policy Improvement (Theorem 3.2) 
+
+In this section, we prove Theorem 3.2 as introduced in Section 3.2. From the definition of the average reward soft-Q function in Equation 14, the following equation holds: 
+
+Qπ (s, a ) = r(s, a ) − ρπ 
+
+> soft
+
++ Es′∼p(·| s,a )
+
+> a′∼π(·| s′)
+
+[Qπ (s′, a ′) − log π(a′|s′)] .
+
+Using this, we perform the following algebraic transformation with respect to ρπold  
+
+> soft
+
+:
+
+ρπold  
+
+> soft
+
+= r(s, a ) − Qπold (s, a ) + E s′∼p(·| s,a )
+
+> a′∼πold (·| s′)
+
+[Qπold (s′, a ′) − log πold (a′|s′)] = E(s,a )∼dπnew (·,·)
+
+[
+
+r(s, a ) − Qπold (s, a ) + E s′∼p(·| s,a )
+
+> a′∼πold (·| s′)
+
+[Qπold (s′, a ′) − log πold (a′|s′)] 
+
+]
+
+= ρπnew  
+
+> soft
+
+− E(s,a )∼dπnew (·,·) [− log πnew (a|s)] + E(s,a )∼dπnew (·,·)
+
+[
+
+−Qπold (s, a ) + E s′∼p(·| s,a )
+
+> a′∼πold (·| s′)
+
+[Qπold (s′, a ′) − log πold (a′|s′)] 
+
+]
+
+· · · .
+
+Here, according to Haarnoja et al. (2018a;b), with the update in Equation 12, the following relationship holds for πold and 
+
+πnew :
+
+Ea∼πnew (·| s) [Qπold (s, a ) − log πnew (a|s)] ≥ Ea∼πold (·| s) [Qπold (s, a ) − log πold (a|s)] , ∀s ∈ S .
+
+Continuing the transformation with this, we get: 
+
+ρπold  
+
+> soft
+
+= · · · ≤ ρπnew  
+
+> soft
+
+− E(s,a )∼dπnew (·,·) [− log πnew (a|s)] + E(s,a )∼dπnew (·,·)
+
+[
+
+−Qπold (s, a ) + E s′∼p(·| s,a )
+
+> a′∼πnew (·| s′)
+
+[Qπold (s′, a ′) − log πnew (a′|s′)]]
+
+= ρπnew 
+
+> soft
+
+((((((((((((( (
+
+−E(s,a )∼dπnew (·,·) [− log πnew (a|s)] (((((((((((( (
+
++E(s,a )∼dπnew (·,·) [−Qπold (s, a )] 
+
+(((((((((((( (
+
++E(s,a )∼dπnew (·,·) [−Qπold (s, a )] + (((((((((((( (
+
+E(s,a )∼dπnew (·,·) [− log πnew (a|s)] = ρπnew  
+
+> soft
+
+.
+
+Therefore, Theorem 3.2 has been shown. 20 RVI-SAC 
+
+# E. Hyperparameter settings 
+
+We summarize the hyperparameters used in RVI-SAC and SAC in Table 1. We used the same hyperparameters for ARO-DDPG as Saxena et al. (2023). RVI-SAC SAC Discount Factor γ N/A [0.97, 0.99, 0.999] Optimizer Adam Adam Learning Rate 3e-4 3e-4 Batch Size |B| 256 256 Replay Buffer Size |D| 1e6 1e6 Critic Network [256, 256] [256, 256] Actor Network [256, 256] [256, 256] Activation Function ReLU ReLU Target Smoothing Coefficient τ 5e-3 5e-3 Entrpy Target H - dim action - dim action Critc Network for Reset [64, 64] N/A Delayd f(Q) Update Parameter κ 5e-3 N/A Termination Frequency Target ϵreset 1e-3 N/A 
+
+> Table 1. Hyperparameters of RVI-SAC and SAC.
+
+# F. Additional Results 
+
+F.1. Average reward evaluation 
+
+Figure 3 shows the learning curves of RVI-SAC, SAC with various discount rates, and ARO-DDPG when the evaluation metric is set as average reward (total return / survival step). Note that in the Swimmer and HalfCheetah environments, where there is no termination, the results evaluated by average reward are the same as those evaluated by total return (shown in Figure 1). These results, similar to those shown in Figure 1, demonstrate that RVI-SAC also exhibits overall higher performance in terms of average reward. 
+
+F.2. Perfomance Comparison with SAC and ARO-DDPG with Reset 
+
+Figure 4 presents the learning curves for all environments with termination (Ant, Hopper, Walker2d and Humanoid), similar to Figure 2a in Section 4.2, comparing RVI-SAC with SAC with automatic Reset Cost adjustment and ARO-DDPG with automatic Reset Cost adjustment. Here, the discount rate of SAC is set to γ = 0 .99 . The results demonstrate that RVI-SAC outperforms SAC with automatic Reset Cost adjustment and ARO-DDPG with automatic Reset Cost adjustment across all environments. 21 RVI-SAC 
+
+(a) Swimmer (b) Ant (c) Walker2d 
+
+(d) Humanoid (e) Hopper (f) HalfCheetah Figure 3. Learning curves for the Gymnasium’s Mujoco tasks. The horizontal axis represents Steps, and the vertical axis represents the evaluation value (average reward). Lines and shades represent the mean and standard deviation of the evaluation values over 10 trials, respectively. 
+
+(a) Ant (b) Hopper (c) Walker2d 
+
+(d) Humanoid Figure 4. This figure represent learning curves for all environments with termination, compare RVI-SAC (red) with SAC (blue) with automatic Reset Cost adjustment and ARO-DDPG(purple) with automatic Reset Cost adjustment. 
+
+22

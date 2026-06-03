@@ -1,0 +1,2215 @@
+Title: Multi-objective Linear Reinforcement Learning with Lexicographic Rewards
+
+URL Source: https://openreview.net/pdf?id=RTHTyTsRT3
+
+Number of Pages: 21
+
+Markdown Content:
+# Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Bo Xue 1 Dake Bu 1 Ji Cheng 1 Yuanyu Wan 2 Qingfu Zhang 1
+
+## Abstract 
+
+Reinforcement Learning (RL) with linear tran-sition kernels and reward functions has recently attracted growing attention due to its computa-tional efficiency and theoretical advancements. However, prior theoretical research in RL has primarily focused on single-objective problems, resulting in limited theoretical development for multi-objective reinforcement learning (MORL). To bridge this gap, we examine MORL under lexicographic reward structures, where rewards comprise m hierarchically ordered objectives. In this framework, the agent maximizes objectives sequentially, prioritizing the highest-priority ob-jective before considering subsequent ones. We introduce the first MORL algorithm with prov-able regret guarantees. For any objective i ∈{1, 2, . . . , m }, our algorithm achieves a regret bound of ˜O(Λ i(λ) · √d2H4K), where Λi(λ) = 1 + λ + · · · + λi−1, λ quantifies the trade-off between conflicting objectives, d is the feature dimension, H is the episode length, and K is the number of episodes. Furthermore, our algorithm can be applied in the misspecified setting, where the regret bound for the i-th objective becomes 
+
+˜O(Λ i(λ) · (√d2H4K + dH 2K)) , with  denot-ing the degree of misspecification. 
+
+## 1. Introduction 
+
+Reinforcement Learning (RL) is a powerful paradigm wherein an agent learns to solve tasks through iterative trial and error with an unknown environment, dynamically ad-justing its actions based on received reward signals (Sutton & Barto, 2018). This framework has proven effective in tackling complex decision-making challenges across var-ious domains, including robotics (Kober et al., 2013), fi-      
+
+> 1Department of Computer Science, City University of Hong Kong, Hong Kong, China 2School of Software Technology, Zhe-jiang University, Ningbo, China. Correspondence to: Qingfu Zhang <qingfu.zhang@cityu.edu.hk >.
+> Proceedings of the 42 nd International Conference on Machine Learning , Vancouver, Canada. PMLR 267, 2025. Copyright 2025 by the author(s).
+
+nance (Liu et al., 2022), healthcare (Yu et al., 2021), and autonomous systems (Merkle et al., 2024). Therefore, es-tablishing a solid theoretical foundation for RL is crucial. Over the years, significant advancements have been made in understanding RL with linear transition kernels and reward functions, a subfield often referred to as linear RL or linear Markov Decision Process (MDP) (Zhang et al., 2024a; Zhou & Gu, 2022; Zhang et al., 2024b; Vial et al., 2022; He et al., 2021; Cassel et al., 2024; Xiong et al., 2023; Jin et al., 2020; Li & Sun, 2024; Li et al., 2024a). Nevertheless, these stud-ies have primarily concentrated on single-objective prob-lems, where a single reward function is optimized during the agent’s interactions with the environment. In contrast, many real-world decision-making problems re-quire the simultaneous optimization of multiple, often con-flicting objectives. For example, in autonomous driving, systems must simultaneously optimize safety and efficiency (Zhang et al., 2023), while energy management systems face trade-offs between cost and sustainability (Qiao et al., 2023). Traditional single-objective RL methods are are insufficient for handling the complexities arising from multiple objec-tives, motivating the development of Multi-objective Re-inforcement Learning (MORL) (G ´abor et al., 1998; Roi-jers et al., 2013; Abdolmaleki et al., 2020; Xu et al., 2020; Momma et al., 2022; Skalse et al., 2022; Cai et al., 2023). Recent work in MORL extends conventional RL frame-works to accommodate multiple objectives through two pri-mary approaches: (1) reward aggregation, which combine multiple objectives into a single objective using weighted sums or other scalarization techniques (Roijers et al., 2013). However, this method is highly sensitive to the choice of weights and requires precise knowledge of the relative im-portance of the objectives, which may not always be avail-able or straightforward. (2) Pareto front construction, which assumes all objectives hold equal importance and employs Pareto dominance to identify Pareto-optimal decisions (Xu et al., 2020). Although this method does not require knowl-edge of objective importance, it may lack practical appli-cability in cases where the objectives are not of equal im-portance. For example, a hotel recommendation system must prioritize price, location, and service according to user preferences (Yager et al., 2011). To overcome these limitations, a growing line of MORL 1Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+research has introduced lexicographic reward structures that enforce hierarchical optimization of objectives (G ´abor et al., 1998; Wray & Zilberstein, 2015; Skalse et al., 2022; Ter-can & Prabhu, 2024). This approach optimizes objectives hierarchically, ensuring that the most critical objectives are prioritized while still enabling effective optimization of sec-ondary objectives. Such a hierarchical structure offers a more flexible and practical solution for decision-making in complex scenarios where the relative importance of objec-tives is partially known. Although algorithmic advances has been made in MORL concerning scalarization methods (Roijers et al., 2013), Pareto front construction (Xu et al., 2020) and lexicographic rewards (Skalse et al., 2022), most of them heavily focused on empirical evaluations, with limited attention given to theoretical guarantees. This lack of analysis has hindered the development of principled algorithms with provable performance bounds. To bridge this gap, we leverage es-tablished theoretical foundations in single-objective linear reinforcement learning (He et al., 2023; Jin et al., 2020) and extend them to the finite-horizon MORL framework, specifically focusing on environments with linear transition kernels and reward functions. We term this framework as Multi-Objective Linear Reinforcement Learning (MOLRL). Our work provides a comprehensive theoretical analysis of regret bounds, thereby contributing to the development of more robust and scalable solutions in this field. To the best of our knowledge, this is the first work to address MOLRL with lexicographic rewards. A key challenge in this setting is that the Bellman optimality equation (Sutton & Barto, 2018) does not hold, which invalidates greedy action-selection strategies, such as LSVI-UCB (Jin et al., 2020) and LSVI-UCB++ (He et al., 2023). We tackle this challenge and make the following contributions: 
+
+• We propose an MOLRL algorithm that decomposes the action-selection process into multiple stages, enabling a more refined balance between conflicting objectives. This approach prioritizes higher-level objectives while effectively managing lower-level ones. 
+
+• For the proposed algorithm, we derive a regret bound of ˜O(Λ i(λ) · √d2H4K) for any objective i ∈{1, 2, . . . , m }, where m is the number of objectives and Λi(λ) = 1+ λ+· · · +λi−1. λ depicts the trade-off between conflicting objectives, d is the feature vector dimension, H denotes the episode length, and K is the total number of episodes. 
+
+• Our algorithm can be applied in the misspecified MOLRL setting, where the transition kernel and reward function of the true environment are approximated by linear functions with a misspecification level of  ≥ 0.In this setting, our algorithm achieves a regret bound                 
+
+> Table 1. Comparisons of the regret bounds for linear RL. Algorithm Objectives Regret Jin et al. (2020) Single ˜O(√d3H4K)
+> Zanette et al. (2020) Single ˜O(√d4H4K+d4H5)
+> He et al. (2023) Single ˜O(√d2H3K+d7H8)
+> This work Multiple ˜O(Λ i(λ)· √d2H4K)
+
+of ˜O(Λ i(λ) · (√d2H4K + dH 2K)) , maintaining ro-bustness to model inaccuracies. 
+
+• As shown in Table 1, our algorithm achieves a regret bound comparable to single-objective RL algorithms in terms of the leading-order term K, while simultane-ously optimizing multiple objectives. 
+
+## 2. Related Work 
+
+In this section, we briefly review the development of linear RL and multi-objective RL. 
+
+2.1. Linear Reinforcement Learning 
+
+The existing literature on linear reinforcement learning can be broadly categorized into two main research directions. The first direction focuses on establishing minimax-type re-gret bounds for proposed algorithms. Yang & Wang (2019) assumed linearity in both the reward function and transition probabilities and analyzed the complexity of finding an -optimal policy. Later, Jin et al. (2020) focused on regret minimization, proposing a linear RL algorithm that achieves a regret bound of ˜O(√d3H4K). Their algorithm can also be applied to misspecified linear RL, attaining a regret bound of ˜O(√d3H4K + dH 2K). In an improved approach, Vial et al. (2022) introduced a parameter-free algorithm for the misspecified linear RL problem, which does not require knowledge of the misspecification level . Zanette et al. (2020) applied the Thompson sampling approach to linear RL, achieving a regret bound of ˜O(√d4H5K). He et al. (2023) developed a computationally efficient algorithm with a regret bound of ˜O(√d2H3K + d7H8) for linear RL. The second research direction emphasizes deriving gap-dependent regret bounds for linear RL. He et al. (2021) established a regret bound of ˜O(d3H5/∆ log( K)) for the algorithm of Jin et al. (2020), where ∆ is the minimal sub-optimality gap. More recently, Zhang et al. (2024a) pro-posed an improved algorithm that achieves a regret bound of ˜O(d3H5/∆) , which is independent of the episode num-ber K. Additionally, other studies have explored linear RL in various settings. Zhou et al. (2021) achieved a nearly opti-mal minimax regret bound for RL with linear mixture MDPs, where the transition probability is a linear combination of several base models. Li et al. (2024b) analyzed dynamic 2Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+regret bounds for adversarial linear mixture MDPs, where optimal policies change over time. Dai et al. (2024) stud-ied multi-agent linear RL, in which multiple agents share a common state space but have independent action spaces. However, these studies mainly address single-objective set-tings and do not extend to multi-objective problems. 
+
+2.2. Multi-objective Reinforcement Learning 
+
+Early approaches to MORL employed scalarization meth-ods, which aggregate the reward vector into a single scalar through a weighted sum (Roijers et al., 2013; Van Moffaert et al., 2013; Agarwal et al., 2022). Although these meth-ods are simple and intuitive, they require careful tuning of the weights (Abels et al., 2019; Yang et al., 2019). More recent MORL research has explored alternative strategies to address these challenges. For instance, Abdolmaleki et al. (2020) proposed encoding preferences via constraints on each objective, enabling the specification of desired prefer-ences in a scale-invariant manner. Xu et al. (2020) incor-porated the multi-objective policy gradient method into an evolutionary framework to identify a set of Pareto-optimal policies, where no objective can be improved without de-grading another. Momma et al. (2022) introduced a general framework capable of incorporating multiple forms of pref-erences to identify Pareto-optimal policies. In the context of MORL with lexicographic rewards, G ´abor et al. (1998) first formalized this problem and introduced a greedy-based algorithm to solve it. Wray et al. (2015) introduced the slack-based Lexicographic RL, which allows for deviations from the optimal policy rather than adhering to absolute thresholds. More recently, Skalse et al. (2022) presented a family of algorithms based on action-value and policy gradient methods for solving lexicographic MORL. In the simplified setting of lexicographic bandits (i.e., RL with horizon H = 1 ), related work has been conducted on multi-armed bandits (H ¨uy ¨uk & Tekin, 2021), contextual bandits (Turgay et al., 2018), Lipschitz bandits (Xue et al., 2024), and linear bandits (Xue et al., 2025). While many existing MORL studies focus primarily on em-pirical evaluations, several also offer valuable theoretical insights, such as convergence analyses and structural re-sults (e.g., (G ´abor et al., 1998)). However, formal regret guarantees, particularly in the setting of linear MDPs, re-main underexplored. To address this gap, we present a comprehensive theoretical analysis of regret bounds within the MORL framework, thereby paving the way for more robust and scalable solutions in this domain. 
+
+## 3. Preliminaries 
+
+Notation. For any positive integer N ∈ Z+, we define 
+
+[N ] , {1, 2, . . . , N }. The superscript i ∈ [m] distinguishes symbols associated with different objectives and the symbol (ˆ·) signifies that the variable is an estimate, e.g., ˆQi(·, ·) is the estimated action-value function for the i-th objective. The Euclidean norm of a vector φ ∈ Rd is denoted by ‖φ‖.The norm induced by a positive-definite matrix U ∈ Rd×d
+
+is defined by ‖φ‖U = √φ>U−1φ.
+
+MORL. MORL is a framework in which an agent interacts with an environment to learn an optimal policy. Formally, MORL is modeled as a Multi-Objective Markov Decision Process (MOMDP), defined by the tuple (S, A, H, P, r),where S is the state space, A is the action space, H ∈ Z+ is the length of each episode. P = {Ph}Hh=1 and r = {rh}Hh=1 
+
+are the transition probability functions and reward functions for each h ∈ H. Specifically, Ph(x′|x, a ) represents the probability of transitioning from state x ∈ S to state x′ ∈ S 
+
+after taking action a at step h ∈ [H]. The reward function at step h, rh : S × A → [0 , 1] m, is a deterministic function that maps state-action pair (x, a ) in to a reward vector 
+
+rh(x, a ) = [ r1
+
+> h
+
+(x, a ), r 2
+
+> h
+
+(x, a ), . . . , r mh (x, a )] ,
+
+where rih(x, a ) is the reward corresponding to the objective 
+
+i ∈ [m], and m is the number of objectives. A policy of an agent is a function π : S × [H] → A , where 
+
+π(x, h ) specifies the action that the agent takes at state 
+
+x ∈ S and step h ∈ [H]. For each objective i ∈ [m] and state-action pair (x, a ) ∈ S × A , the action-value function 
+
+Qiπ,h (x, a ) (also known as the Q-function) and the value function V iπ,h (x) of a policy π are defined as 
+
+Qiπ,h (x, a ) = rih(x, a )+ 
+
+E
+
+[ H∑
+
+> h′=h+1
+
+rih′ (xh′ , π (xh′ , h ′)) | xh = x, a h = a
+
+]
+
+V iπ,h (x) = E
+
+[ H∑
+
+> h′=h
+
+rih′ (xh′ , a h′ ) | xh = x
+
+]
+
+Let [PhV ]( x, a ) = Ex′∼Ph(·| x,a )[V (x′)] denote the ex-pected value of function V under the transition dynamics 
+
+Ph. The Bellman equation for objective i ∈ [m] is 
+
+Qiπ,h (x, a ) = rih(x, a ) + [ PhV iπ,h +1 ]( x, a ),V iπ,h (x) = Qiπ,h (x, π (x, h )) . (1) This formulation provides a recursive relationship between the Q-function and the value function, which is fundamental to the analysis and optimization of policies in RL. 
+
+The Learning Process. The learning process in MORL comprises K episodes. At the start of each episode k =1, 2, . . . , K , the agent selects a policy πk based on data collected from the previous k − 1 episodes. The agent then interacts with the environment following πk over H time 3Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+steps. At each step h = 1 , 2, . . . , H , the agent observes the environment state xk,h and selects an action ak,h =
+
+πk(xk,h , h ). Subsequently, the environment transitions to a new state xk,h +1 ∼ Ph(·| xk,h , a k,h ) and provides the agent with a reward vector rk,h . After completing all H steps, the agent collects the data {xk,h , a k,h , rk,h }Hh=1 and uses it to refine its policy, thereby improving future decision-making. How to evaluate policies in a multi-objective context re-mains an open issue. Since conflicting objectives cannot be maximized simultaneously, multi-objective work defines a notion of dominance to compare reward vectors and assess policies, such as Pareto dominance (Xu et al., 2020) and lexicographic dominance (Skalse et al., 2022). In this pa-per, we adopt the lexicographic order, where objectives are prioritized. The formal definition is as follows. 
+
+Definition 1 (Lexicographic Order ). Consider two vec-tors u = [ u1, . . . , u m], v = [ v1, . . . , v m] ∈ Rm. u lexi-cographically dominates v if and only if there exists some 
+
+i∗ ∈ [m] such that ui = vi for i ∈ [i∗ − 1] and ui∗
+
+> v i∗
+
+.
+
+Lexicographic order compares vectors element-wise, start-ing from the first and proceeding sequentially to the last. For example, [5 , 3, 4] lexicographically dominates [5 , 2, 5] 
+
+and [4 , 8, 1] . Based on this ordering, we define the lexico-graphically optimal policy (Skalse et al., 2022). 
+
+Definition 2 (Lexicographically Optimal Policy ). A pol-icy π∗ is lexicographically optimal if and only if, for any x ∈S, its vector of values [V 1
+
+> π∗,1
+
+(x), V 2
+
+> π∗,1
+
+(x), . . . , V mπ∗,1(x)] is not lexicographically dominated by that of any other policy. 
+
+A lexicographically optimal policy ensures that the most important objective is maximized, while still allowing some optimization of the lower-priority objectives. Following single-objective RL (Jin et al., 2020), we evaluate the performance of the agent by regret, which quantifies the difference between the accumulated rewards of the agent’s policy and those of a lexicographically optimal policy, i.e., 
+
+Ri(K) = 
+
+> K
+
+∑
+
+> k=1
+
+V iπ∗,1(xk, 1) − V iπk ,1(xk, 1), i ∈ [m].
+
+To establish a regret bound for MORL, we quantify the trade-offs among conflicting objectives as follows. 
+
+Assumption 1. Let ˜Qih(x, a ) = rih(x, a ) + [ Ph ˜V ih+1 ]( x, a )
+
+for any i ∈ [m] and (x, a, h ) ∈ S × A × [H]. Let π∗(x, h )
+
+denote the action chosen by a lexicographically optimal policy at (x, h ). We assume π∗(x, h ) is the lexicographic optimal action for ˜Qih(x, a ) and the trade-off among objec-tives is governed by λ ≥ 0, such that for all h ∈ [H] and 
+
+i ∈ [m],
+
+˜Qih(x, a ) − ˜Qih(x, π ∗(x, h )) 
+
+≤ λ · max 
+
+> j∈[i−1]
+
+{ ˜Qjh(x, π ∗(x, h )) − ˜Qjh(x, a )
+
+}
+
+.
+
+Here, ˜V ih (x) = 〈w(x), rih:H 〉, where w(x) ∈ RH−h+1 is a shared weighting vector across all objectives, and rih:H =[rih(·, ·), r ih+1 (·, ·), . . . , r iH (·, ·)] .
+
+Here, λ bounds the improvement in the value of the i-th objective for each unit decrease in the preceding i − 1 ob-jectives. In multi-objective optimization, objectives often conflict, thus it is common to introduce parameters to quan-tify trade-offs, such as the global trade-off (Miettinen, 1999), the marginal rate of substitution (Miettinen, 1999), and the allowable trade-off (Wiecek, 2007). In this paper, we focus on the linear MOMDP, a natural ex-tension of linear MDP (Jin et al., 2020), defined as follows: 
+
+Definition 3. M(S, A, H, P, r) is a linear MOMDP with a feature map φ : S × A → Rd, if for any h ∈ [H], there exist unknown measures μh(·) : S → Rd and unknown vectors θih ∈ Rd, such that for any (x, a ) ∈ S × A ,
+
+Ph(·| x, a ) = 〈φ(x, a ), μh(·)〉, r ih(x, a ) = 〈φ(x, a ), θih〉,
+
+where ‖φ(x, a )‖ ≤ 1 for all (x, a ) ∈ S × A , and 
+
+max {‖ μh(·)‖, ‖θih‖} ≤ √d for all h ∈ [H] and i ∈ [m].
+
+In environments with large state and action spaces, linear structure significantly reduces computational complexity, and well-established mathematical techniques and tools for the liner model facilitate rigorous analysis. Regarding the relationship between general and linear MDP, any MDP with a finite state space S and action space A can be represented as a linear MDP by encoding each state-action pair (x, a ) as a one-hot feature vector in Rd, where d = |S| × |A| . The transition kernel Ph(· | x, a ) and reward function rih(x, a )
+
+can be expressed as inner products between the feature vector of (x, a ) and learnable parameters. 
+
+## 4. Algorithm 
+
+In this section, we present the Lexicographic Linear Rein-forcement Learning (LLRL) algorithm, which effectively combines the computational efficiency of linear MOMDPs with the hierarchical prioritization inherent in lexicographic rewards, ensuring that higher-priority objectives are maxi-mized before considering lower-priority ones. 
+
+Initialization. LLRL learns the optimal policy over K
+
+episodes, with each episode comprises H interaction steps with the environment. Initially, the covariance matrix Uh is initialized as the identity matrix I ∈ Rd×d for all h ∈ [H].Similarly, the Q-functions ˆQih(·, ·) are initialized to zero for all objectives i ∈ [m] and time steps h ∈ [H]. Both the covariance matrix and Q-functions are updated iteratively across episodes based on the rewards received at each step. At the terminal step H +1 , the Q-functions for all objectives are set to zero, as no further rewards can be obtained. 4Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Algorithm 1 Lexicographic Linear Reinforcement Learning 
+
+Input: δ, d, m, K, H, λ, {βk}k∈[K]
+
+1: Initialize Uh = I , ˆQ1
+
+> h
+
+(·, ·) = · · · = ˆQmh (·, ·) = 0 ,
+
+∀h ∈ [H], ˆQ1
+
+> H+1
+
+(·, ·) = · · · = ˆQmH+1 (·, ·) = 0 
+
+2: for k = 1 , 2, . . . , K do 
+
+3: Receive the initial state xk, 1
+
+4: for h = 1 , 2, . . . , H do 
+
+5: Initialize s = 1 , As = A
+
+6: repeat 
+
+7: if ‖φ(xk,h , a )‖Uh ≤ 1/√K, ∀a ∈ A s then 
+
+8: Run Algorithm 2 to refine actions: AK =
+
+LAE ({ ˆQih(xk,h , ·)}i∈[m], β k, As, 1/√K)
+
+9: Randomly take an action ak,h ∈ A K
+
+10: else if ‖φ(xk,h , a k,h )‖Uh > 2−s, ∃ak,h ∈ A s
+
+then 
+
+11: Take the action ak,h 
+
+12: else 
+
+13: Run Algorithm 2 to refine actions: As+1 =
+
+LAE ({ ˆQih(xk,h , ·)}i∈[m], β k, As, 2−s)
+
+14: Update s = s + 1 
+
+15: end if 
+
+16: until an action ak,h is taken 
+
+17: Observe rewards rk,h and next state xk,h +1 
+
+18: end for 
+
+19: for h = H, H − 1, . . . , 1 do 
+
+20: Uh = ∑kτ =1 φ(xτ,h , a τ,h )φ(xτ,h , a τ,h )> + I 
+
+21: ˆriτ,h = riτ,h + ˆQih+1 (xτ,h +1 , a τ,h +1 ), ∀τ ∈ [k]
+
+and i ∈ [m]
+
+22: ˆwih = U −1
+
+> h
+
+∑kτ =1 φ(xτ,h , a τ,h ) · ˆriτ,h , ∀i ∈ [m]
+
+23: Update the estimated Q-function: ˆQih(x, a ) = 
+
+〈 ˆwih, φ (x, a )〉, ∀(x, a ) ∈ S × A and i ∈ [m]
+
+24: end for 
+
+25: end for Decision-making. In each episode, LLRL begins by receiv-ing an initial state xk, 1 and then enters into H interaction steps. At each step h = 1 , 2, . . . , H , LLRL selects an action by balancing exploration (i.e., acquiring information about rarely observed actions) and exploitation (i.e., choosing the most promising action ). To manage trade-offs among differ-ent objectives, the decision-making process is divided into multiple stages . Actions are refined based on uncertainty checks and lexicographic prioritization. Before the decision-making process begins, LLRL initial-izes the stage index s = 1 and the candidate action set 
+
+As = A. Then, LLRL iteratively refines the candidate ac-tions until a final action is chosen. For the given state xk,h 
+
+of current step, LLRL considers three scenarios: (i) If ‖φ(xk,h , a )‖Uh ≤ 1√K for all a ∈ A s, this indicates that all actions in As have been sufficiently explored . In this case, LLRL invokes the Lexicographic Action Elimination 
+
+Algorithm 2 Lexicographic Action Elimination 
+
+Input: { ˆQih(xk,h , ·)}i∈[m], β k, As, C 
+
+1: Initialize A0 
+
+> s
+
+= As
+
+2: for i = 1 , 2, . . . , m do 
+
+3: ˆaik,h = argmax a∈A i−1
+
+> s
+
+ˆQih(xk,h , a )
+
+4: Ais = {a ∈ A i−1 
+
+> s
+
+| ˆQih(xk,h , ˆaik,h ) − ˆQih(xk,h , a ) ≤
+
+(2 + 4 λ + · · · + 4 λi−1) · βk · C}
+
+5: end for 
+
+6: Return Ams
+
+(LAE) algorithm (Algorithm 2) to refine the candidate action set, producing a smaller subset of promising actions AK . An action ak,h is then randomly selected from AK . LAE uses the estimated Q-functions ˆQih(xk,h , ·) and the uncertainty bound 1/√K to sequentially eliminate suboptimal actions from As by the priority of objectives. Further details on the LAE are provided in the following content. (ii) If ‖φ(xk,h , a k,h )‖Uh > 2−s for some action ak,h ∈ A s,this action is directly selected due to its high uncertainty ,which requires further exploration. (iii) If all actions a ∈ A s satisfy ‖φ(xk,h , a )‖Uh ≤ 2−s, it implies that the uncertainty in the estimated Q-functions for all a ∈ A s is bounded by 2−s. In this case, LAE is invoked again to refine the candidate set, using the uncertainty bound 
+
+2−s as the exploration threshold. The stage index s is then incremented to s + 1 for a more refined elimination process. This iterative process continues until an action is selected. Once an action ak,h is chosen, LLRL observes the corre-sponding reward rk,h = [ r1
+
+> k,h
+
+, r 2
+
+> k,h
+
+, . . . , r mk,h ] and transi-tions to the next state xk,h +1 . The episode concludes after all H steps are completed. The intuition behind this policy design is further discussed in Section 6. 
+
+Lexicographic Action Elimination. LAE plays a crucial role in balancing trade-offs among conflicting objectives. It iteratively refines the action set by prioritizing objectives sequentially, from the first to the last. Initially, LAE defines the action set as A0 
+
+> s
+
+= As, which contains all candidate actions of the current stage. For each objective i ∈ [m],LAE selects the action ˆaik,h ∈ A i−1 
+
+> s
+
+that maximizes the estimated Q-value ˆQih(xk,h , a ), i.e., 
+
+ˆaik,h = argmax 
+
+> a∈A i−1
+> s
+
+ˆQih(xk,h , a ).
+
+This action, ˆaik,h , serves as the reference point to eliminate suboptimal actions. Precisely, LAE removes actions whose estimated Q-values deviate significantly from ˆaik,h , i.e., 
+
+Ais = {a ∈ A i−1 
+
+> s
+
+| ˆQih(xk,h , ˆaik,h ) − ˆQih(xk,h , a )
+
+≤ (2 + 4 λ + · · · + 4 λi−1) · βk · C},
+
+5Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+where C is a dynamically adjusted threshold to balance exploration and exploitation. Specifically, C = 1 /√K in case (i), and C = 2 −s in case (iii) of the s-th stage. After processing all m objectives, the final set Ams consists of actions deemed promising across all objectives and can be returned to LLRL for a more refined decision-making process in the next stage s + 1 .
+
+Policy Update. In each episode k, after completing its inter-actions with the environment, the agent gathers the dataset 
+
+{xk,h , a k,h , rk,h }Hh=1 and initiates a backward update pro-cedure. Owing to the linear structure of the linear MDP, the inherent Q-function Qiπ,h (·, ·) for any objective i ∈ [m]
+
+and policy π exhibits linearity with respect to the feature vector φ(x, a ). This property is formally expressed in the following proposition, which generalizes Proposition 2.3 of Jin et al. (2020) to a multi-objective context. 
+
+Proposition 1. In a linear MOMDP, for any objective i ∈
+
+[m] and any policy π, there exist weights {wiπ,h }h∈[H] such that for any (x, a, h ) ∈ S × A × [H], we have 
+
+Qiπ,h (x, a ) = 〈φ(x, a ), wiπ,h 〉.
+
+Based on Proposition 1, LLRL estimates Qiπ,h (x, a ) follow-ing the procedure of least-squares estimation. According to the Bellman equation (Eq. (1) ), the Q-function at the h-th step Qiπ,h is influenced by the future value function V iπ,h +1 .Therefore, the estimation process starts from the final step 
+
+h = H and proceeds backward to the first step h = 1 .During the backward pass, for each step h = H, . . . , 1,LLRL first updates the covariance matrix Uh using the fea-ture vectors observed at the h-th step of previous episodes: 
+
+Uh =
+
+> k
+
+∑ 
+
+> τ=1
+
+φ(xτ,h , a τ,h )φ(xτ,h , a τ,h )> + I . (2) Subsequently, to perform least-squares estimation for ob-jective i ∈ [m], LLRL combines the immediate reward 
+
+rik,h and the future Q-value ˆQih+1 (xk,h +1 , a k,h +1 ) to form a surrogate reward, given by: 
+
+ˆrik,h = rik,h + ˆQih+1 (xk,h +1 , a k,h +1 ). (3) This bootstrapping procedure integrates immediate rewards with long-term Q-values, aligning with the principle of Bell-man equation (1). LLRL then estimates the parameter wiπ,h for objective i ∈
+
+[m] using least-squares estimation, formulated as: 
+
+ˆwih = argmin 
+
+> w∈Rd
+> k
+
+∑ 
+
+> τ=1
+
+(〈φ(xτ,h , a τ,h ), w〉 − ˆriτ,h ))2
+
++ ‖w‖2
+
+= U −1
+
+> hk
+
+∑ 
+
+> τ=1
+
+ˆriτ,h · φ(xτ,h , a τ,h ).
+
+(4) Finally, the estimated Q-function ˆQih(·, ·) for objective i ∈
+
+[m] is updated using the newly obtained parameter ˆwih, i.e., 
+
+ˆQih(x, a ) = 〈 ˆwih, φ (x, a )〉, ∀(x, a ) ∈ S × A . (5) The steps outlined in Eqs. (2) , (3) , (4) , and (5) constitute the core of the backward pass in the LLRL algorithm. By iter-atively updating the Q-functions of each objective, LLRL reduces uncertainty in parameter estimation and progres-sively improves the agent’s policies over time. 
+
+## 5. Theoretical Guarantees 
+
+In this section, we provide the regret bounds for LLRL to rig-orously analyze its performance. We establish two theorems that offer theoretical guarantees for different models. Specif-ically, Theorem 1 characterizes the performance of LLRL in the linear MOMDP setting, while Theorem 2 examines its behavior in the -approximate linear MOMDP. These results not only validate the reliability of LLRL across different scenarios but also provide insights into its limitations. 
+
+Theorem 1. Let Λi(λ) = 1 + λ + · · · + λi−1 for i ∈
+
+[m]. For a linear MOMDP, if LLRL is run with βk =3H
+
+√
+
+d log ( 2mkH δ
+
+), then with probability at least 1 − 2δ,the regret for any objective i ∈ [m] satisfies 
+
+Ri(K) ≤ ˜O
+
+(
+
+Λi(λ) · √d2H4K
+
+)
+
+.
+
+Remark 1. Theorem 1 states that for linear MOMDPs with lexicographic rewards, LLRL achieves a regret bound of ˜O
+
+(
+
+Λi(λ) · √d2H4K
+
+)
+
+for any objective i ∈ [m]. This matches the near-optimal dependence on feature dimension 
+
+d and time horizon K observed in single-objective RL (He et al., 2023). The multiplicative factor Λi(λ) quantifies the trade-off in lexicographic optimization: for the primary objective, Λ1(λ) = 1 leads to an improved bound compared to single-objective baselines (Jin et al., 2020) in terms of 
+
+d, while lower-priority objectives incur increasing regret as 
+
+Λi(λ) grows with their position i in the priority hierarchy. Theorem 1 relies on the linear structure of the MDP. How-ever, real-world applications often involve nonlinear MDPs, leading to potential misspecification when assuming linear-ity. To address this, we first introduce an approximate linear model and then establish the regret bounds of LLRL under such misspecified conditions. 
+
+Definition 4. M(S, A, H, P, r) is an -approximate linear MOMDP with a feature map φ : S × A → Rd, if for any 
+
+h ∈ [H], there exist unknown measures μh(·) : S → Rd
+
+and unknown vectors θih ∈ Rd, such that for any (x, a ) ∈S × A ,
+
+‖Ph(·| x, a ) − 〈 φ(x, a ), μh(·)〉‖ 1 ≤ , 
+
+|rih(x, a ) − 〈 φ(x, a ), θih〉| ≤ , (6) 6Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+where ‖φ(x, a )‖ ≤ 1 for all (x, a ) ∈ S × A , and 
+
+max {‖ μh(·)‖, ‖θih‖} ≤ √d for all h ∈ [H] and i ∈ [m].
+
+Theorem 2. Let Λi(λ) = 1 + λ + · · · + λi−1 for i ∈ [m].For an -approximate linear MOMDP, if LLRL is run with 
+
+βk = 3 H
+
+√
+
+d log ( 2mkH δ
+
+) + 2 H √kd and the threshold C
+
+in LAE is modified by C + 2 H , then with probability at least 1 − δ, the regret for any objective i ∈ [m] satisfies 
+
+Ri(K) ≤ ˜O
+
+(
+
+Λi(λ) ·
+
+(√d2H4K + dH 2K
+
+)) 
+
+.
+
+Remark 2. Theorem 2 states that for -approximate linear MOMDPs with lexicographic rewards, LLRL achieves a re-gret bound of ˜O
+
+(
+
+Λi(λ) ·
+
+(√d2H4K + dH 2K
+
+)) 
+
+for any objective i ∈ [m]. This matches the dependence on , H ,and K observed in single-objective RL (Jin et al., 2020), while improving the dependence on d. The linear model serves as an approximation of the true environment. Com-pared to Theorem 1, the additional regret term ˜O(dH 2K)
+
+stems from approximation error, which decreases as model accuracy improves. 
+
+Complexity Analysis. We provide a detailed complexity analysis of Algorithm 1 and discuss its computational limi-tations. In Step 7, the complexity is O(d2|A| ), while Step 8 requires O(md |A| ) computations due to the LAE procedure. Step 22 incurs a computational cost of O(mkd + md 2), pri-marily driven by the matrix inversion of Uh (O(d2)) and the computation of m linear regressions (i.e., O(mkd + md 2)). Summing over all H layers of the MDP, the overall com-plexity becomes O(Hmd |A| +Hd 2|A| +Hmkd +Hmd 2).When aggregated over K rounds, the total computational complexity is O(KHd |A| (m + d) + K2Hmd + KHmd 2).Notably, the O(K2) term results in significantly higher com-plexity compared to standard bandit algorithms (Xue et al., 2025). Nevertheless, our approach remains competitive with existing methods for single-objective MDP (Jin et al., 2020; Zanette et al., 2020; He et al., 2023). 
+
+Further Improvements. As summarized in Table 1, our al-gorithm’s regret bound remains slightly higher than the near-optimal ˜O(√d2H3K + d7H8) bound for single-objective linear MDPs in terms of H (He et al., 2023). This gap does not stem from a fundamental limitation but our cur-rent policy update mechanism, which employs a simpler approach compared to advanced methods. By incorporat-ing the LSVI-UCB++ update framework (He et al., 2023), we anticipate refining LLRL to achieve an improved regret bound of ˜O
+
+(
+
+Λi(λ) ·
+
+(√d2H3K + d7H8
+
+)) 
+
+. We plan to investigate this promising direction in future research. 
+
+## 6. Challenges and Key Techniques 
+
+In this section, we analyze the main challenges in designing algorithms for linear MOMDPs with lexicographic rewards and highlight our techniques to resolve them. 
+
+6.1. Challenges Optimal Action Preservation Dilemma. The first chal-lenge in the lexicographic setting is how to keep the optimal action during action elimination procedures. Lexicographic RL requires sequential elimination across objectives, but uncertainty in transition dynamics Ph(·| x, a ) brings optimal action preservation risks during confidence interval-based elimination. Precisely, when addressing the i-th objective, the agent constructs the confidence intervals of Q-values and eliminates actions whose Q-value intervals do not overlap with that of the most promising action. In the lexicographic setting, however, the confidence interval of the lexicograph-ically optimal action may not overlap with that of the most promising action, leading to the loss of the optimal action. An example is provided to illustrate this issue. 
+
+Example 1. Suppose there are three Q-value vectors: 
+
+[5 , 5, 5] , [1 , 5, 5] and [4 , 10 , 1] for actions a1, a 2 and a3, re-spectively. a1 is the lexicographically optimal action. When eliminating actions based on the first objective, a2 is elim-inated because 1 is far from 5, but a3 is kept as 4 is close to 5. After this step, only actions {a1, a 3} are contained in the candidate action. Next, the agent proceeds to eliminate actions based on the second objective. Since 10 is much big-ger than 5, thus the optimal action a1 is eliminated, which is disappointing because a3 is awful for the third objective. 
+
+This demonstrates that standard elimination techniques may discard the lexicographically optimal action, necessitating novel preservation mechanisms. 
+
+Failure of Bellman Optimality. Another challenge is to develop a decision-making approach that progressively con-verges to the optimal policy. In single-objective RL, the Bellman optimality equation serves as a foundation for al-gorithm design and theoretical analysis. It characterizes the optimal value function through an intuitive decision-making process and a recursive relationship, i.e., 
+
+Vπ∗,h (x) = max  
+
+> a∈A
+
+Qπ∗,h (x, a ),Qπ∗,h (x, a ) = rh(x, a ) + [ PhVπ∗,h +1 ]( x, a ),
+
+(7) where we omit the superscript for single-objective notation. This framework enables straightforward policies like: 
+
+ak,h = argmax 
+
+> a∈A
+
+ˆQh(xk,h , a ), (8) as employed in LSVI-UCB (Jin et al., 2020) and LSVI-UCB++ (He et al., 2023). In the lexicographic setting, this structure breaks down for secondary objectives, as shown in the following example. 
+
+Example 2. Let [Q1
+
+> π∗,h
+
+(x, a 1), Q 2
+
+> π∗,h
+
+(x, a 1)] = [2 , 3] and 
+
+[Q1
+
+> π∗,h
+
+(x, a 2), Q 2
+
+> π∗,h
+
+(x, a 2)] = [1 , 4] for actions a1, a 2 ∈
+
+7Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+A and x ∈ S . Since [2 , 3] lexicographically dominates [1 , 4] ,the lexicographically optimal action π∗(x, h ) = a1. Ac-cording to the Bellman equation (1) , we obtain V 2
+
+> π∗,h
+
+(x) = 
+
+Q2
+
+> π∗,h
+
+(x, π ∗(x, h )) = 3 . However, for the second objective, the maximum Q-value is max a∈{ a1,a 2} Q2
+
+> π∗,h
+
+(x, a ) = 4 ,which does not equal to V 2
+
+> π∗,h
+
+(x).
+
+This example establishes the following proposition. 
+
+Proposition 2. There exists an MOMDP with lexicographic rewards problem, where for some (x, a ) ∈ S × A and 
+
+i ∈ [m],
+
+V iπ∗,h (x) 6 = max  
+
+> a∈A
+
+Qiπ∗,h (x, a )
+
+for the lexicographically optimal poliy π∗.
+
+This divergence from Bellman optimality complicates both algorithm design and theoretical analysis, precluding the direct methods like Eq. (8). 
+
+6.2. Key Techniques 
+
+In this part, we highlight the key techniques used to address the aforementioned challenges. For clarity, we denote Uk,h , ˆwik,h , and ˆQik,h as the param-eters and the estimated Q-function at episode k, with πk
+
+representing the policy at k-th episode. The estimated value function ˆV ik,h is defined as ˆV ik,h (x) = ˆQik,h (x, π k(x, h )) .For any (x, a, k, h ) ∈ S × A × [K] × [H], we define the surrogate Q-function for objective i ∈ [m] as 
+
+¯Qik,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)Ph(x′|x, a )d x′.
+
+Since rih(x, a ) and Ph(x′|x, a ) depend on the unknown pa-rameters θih and μh(x′), respectively, we first provide con-fidence intervals for the surrogate Q-functions. 
+
+Lemma 1. Let βk = 3 H
+
+√
+
+d log ( 2mkH δ
+
+). With probability at least 1 − δ, for all (x, a, k, h ) ∈ S × A × [K] × [H] and 
+
+i ∈ [m], we have 
+
+|〈 φ(x, a ), ˆwik,h 〉 − ¯Qik,h (x, a )| ≤ βk‖φ(x, a )‖Uk,h .
+
+Building on this, we analyze the discrepancy between esti-mated and inherent value functions under policy πk:
+
+Lemma 2. Let δik,h = ˆV ik,h (xk,h )−V iπk ,h (xk,h ) and ζik,h =
+
+δik,h − E[δik,h |xk,h , a k,h ]. With probability at least 1 − δ,for any (k, h ) ∈ [K] × [H] and i ∈ [m], we have 
+
+ˆV ik,h (xk,h ) − V iπk ,h (xk,h )
+
+≤
+
+> H
+
+∑
+
+> h′=h
+
+2βk · 2−sk,h ′ (xk,h ′ ) +
+
+> H
+
+∑
+
+> h′=h+1
+
+ζik,h ′ ,
+
+where sk,h ′ (xk,h ′ ) denotes the stage at which LLRL selects the action for state xk,h ′ .
+
+Now, we highlight how to avoid losing the lexicographically optimal action. Lemma 1 reveals that all objectives share a common confidence term βk‖φ(x, a )‖Uk,h , a distinctive feature of MOMDPs. To ensure the overlap between con-fidence intervals of lexicographically optimal actions and the most promising action of current round, we scale the confidence term. As detailed in Algorithm 2, the confidence term C is scaled by the following factor: 
+
+2 + 4 λ + · · · + 4 λi−1,
+
+which is specially designed to guarantee the confidence intervals of the lexicographic optimal action and the most promising action of current round overlap. Therefore, the lexicographically optimal action is preserved, as formalized in the following lemma: 
+
+Lemma 3. For Algorithm 2, if π∗(x, h ) ∈ A s, then with probability at least 1 − δ, for any objective i ∈ [m] and action a ∈ A is, we have 
+
+π∗(x, h ) ∈ A is, and 
+
+¯Qik,h (x, π ∗(x, h )) − ¯Qik,h (x, a ) ≤ 4Λ i(λ) · βk · C. 
+
+Finally, we highlight the basic idea of dealing with the failure of Bellman optimality in MORL. Since the Bellman optimality equation does not hold, direct maximization of Q-values fails to recover lexicographically optimal actions due to conflicting objectives and environment uncertainty. As an alternative, LLRL initiates a multi-stage action refinement process, which progressively eliminates suboptimal actions using geometrically decreasing confidence thresholds 2−s.This mechanism operates in three regimes: 1) Aggressive pruning under low uncertainty, 2) Exploration prioritiza-tion for high-uncertainty actions ‖φ(x, a )‖Uh > 2−s, and 3) Confidence-constrained elimination via the LAE sub-routine for intermediate uncertainty As+1 = LAE (·, 2−s).Crucially, lexicographic optimality is preserved through overlapping confidence intervals, ensuring the retention of lexicographically optimal actions despite Bellman equation violations. By replacing Q-maximization with a threshold-adaptive elimination paradigm , LLRL decouples action selection from Bellman optimality assumptions while con-trolling cumulative suboptimality via geometrically tighten-ing thresholds. The resultant value function gap, formalized in Lemma 4, quantifies how uncertainty reduction across stages drives convergence to near-optimal policies. 
+
+Lemma 4. With probability at least 1 − δ, for all 
+
+(x, a, k, h ) ∈ S × A × [K] × [H] and i ∈ [m], we have 
+
+V iπ∗,h (xk,h )− ˆV ik,h (xk,h ) ≤
+
+> H
+
+∑
+
+> h′=h
+
+10Λ i(λ)·βk·2−sk,h ′ (xk,h ′ )
+
+where sk,h ′ (xk,h ′ ) denotes the stage at which LLRL selects the action for state xk,h ′ .
+
+8Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+As the learning process advances, the uncertainty in value estimation diminishes geometrically, evidenced by the ex-ponential decay of the term 2−sk,h ′ (xk,h ′ ). This ensures the estimated value functions ˆV ik,h converge toward their optimal counterparts V iπ∗,h . By combining Lemma 2 and Lemma 4, we can bound the per-episode instantaneous re-gret V iπ∗,h (xk, 1) − V iπk ,h (xk, 1) at each episode k ∈ [K],leading to the regret bound ˜O(Λ i(λ) · √d2H4K) in Theo-rem 1. Please refer to appendix for more details. 
+
+## 7. Conclusion and Future Work 
+
+This work establishes the first theoretical regret guaran-tee for MORL. We propose the LLRL algorithm, which addresses the failure of Bellman optimality through a multi-stage confidence-guided elimination strategy. By decompos-ing action selection into refined phases with geometrically decaying thresholds 2−s, LLRL attains a regret bound of 
+
+˜O(Λ i(λ) · √d2H4K) for all objectives i ∈ [m], matching single-objective baselines (Jin et al., 2020; He et al., 2023) in leading K-dependence. Meanwhile, Λ1(λ) = 1 indi-cates LLRL recover the near-optimal regret bounds of He et al. (2023) for the first objective in terms of both d and 
+
+K. Furthermore, LLRL naturally extends to misspecified settings through minor algorithmic modifications, maintain-ing ˜O(Λ i(λ) · (√d2H4K + dH 2K)) regret — a crucial robustness property for practical applications. While our analysis relies on Assumption 1 to manage inter-objective trade-offs, a fundamental open question is whether comparable regret bounds can be derived without this as-sumption. Additional directions include improving the re-gret bound of our algorithm by employing the policy update mechanism of He et al. (2023). 
+
+## Acknowledgements 
+
+The work described in this paper was supported by the Research Grants Council of the Hong Kong Special Admin-istrative Region, China [GRF Project No. CityU 11215622]. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Abbasi-yadkori, Y., P ´al, D., and Szepesv ´ari, C. Improved algorithms for linear stochastic bandits. In Advances in Neural Information Processing Systems 24 , pp. 2312– 2320, 2011. Abdolmaleki, A., Huang, S., Hasenclever, L., Neunert, M., Song, F., Zambelli, M., Martins, M., Heess, N., Hadsell, R., and Riedmiller, M. A distributional view on multi-objective policy optimization. In Proceedings of the 37th International Conference on Machine Learning , pp. 11– 22, 2020. Abels, A., Roijers, D., Lenaerts, T., Now ´e, A., and Steck-elmacher, D. Dynamic weights in multi-objective deep reinforcement learning. In Proceedings of the 36th In-ternational Conference on Machine Learning , pp. 11–20, 2019. Agarwal, M., Aggarwal, V., and Lan, T. Multi-objective re-inforcement learning with non-linear scalarization. In 
+
+Proceedings of the 21st International Conference on Autonomous Agents and Multiagent Systems , pp. 9–17, 2022. Cai, X.-Q., Zhang, P., Zhao, L., Jiang, B., Sugiyama, M., and Llorens, A. J. Distributional pareto-optimal multi-objective reinforcement learning. In Advances in Neural Information Processing Systems 36 , pp. 15593–15613, 2023. Cassel, A., Luo, H., Rosenberg, A., and Sotnikov, D. Near-optimal regret in linear mdps with aggregate bandit feed-back. In Proceedings of the 41st International Conference on Machine Learning , pp. 5757–5791, 2024. Chu, W., Li, L., Reyzin, L., and Schapire, R. Contextual bandits with linear payoff functions. In Proceedings of the 14th International Conference on Artificial Intelligence and Statistics , pp. 208–214, 2011. Dai, Y., Cui, Q., and Du, S. S. Refined sample complex-ity for markov games with independent linear function approximation. In Proceedings of 37th Conference on Learning Theory , pp. 1260–1261, 2024. G ´abor, Z., Kalm ´ar, Z., and Szepesv ´ari, C. Multi-criteria reinforcement learning. In Proceedings of the 15th Inter-national Conference on Machine Learning , pp. 197–205, 1998. He, J., Zhou, D., and Gu, Q. Logarithmic regret for rein-forcement learning with linear function approximation. In Proceedings of the 38th International Conference on Machine Learning , pp. 4171–4180, 2021. He, J., Zhao, H., Zhou, D., and Gu, Q. Nearly minimax op-timal reinforcement learning for linear Markov decision processes. In Proceedings of the 40th International Con-ference on Machine Learning , pp. 12790–12822, 2023. H ¨uy ¨uk, A. and Tekin, C. Multi-objective multi-armed bandit with lexicographically ordered and satisficing objectives. 
+
+Machine Learning , 110(6):1233–1266, 2021. 9Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Jin, C., Yang, Z., Wang, Z., and Jordan, M. I. Provably effi-cient reinforcement learning with linear function approxi-mation. In Proceedings of 33rd Conference on Learning Theory , pp. 2137–2143, 2020. Kober, J., Bagnell, J. A., and Peters, J. Reinforcement learning in robotics: A survey. International Journal of Robotics Research , 32(11):1238–1274, 2013. Li, L.-F., Zhang, Y.-J., Zhao, P., and Zhou, Z.-H. Provably efficient reinforcement learning with multinomial logit function approximation. In Advances in Neural Informa-tion Processing Systems 37 , pp. 58539–58573, 2024a. Li, L.-F., Zhao, P., and Zhou, Z.-H. Near-optimal dynamic regret for adversarial linear mixture mdps. In Advances in Neural Information Processing Systems 37 , pp. 55858– 55883, 2024b. Li, X. and Sun, Q. Variance-aware decision making with linear function approximation under heavy-tailed rewards. 
+
+Transactions on Machine Learning Research , pp. 2835– 8856, 2024. Liu, X.-Y., Yang, H., Gao, J., and Wang, C. D. Finrl: deep reinforcement learning framework to automate trading in quantitative finance. In Proceedings of the 2nd ACM International Conference on AI in Finance , pp. 1–9, 2022. Merkle, F., Blossey, G., Haeussler, S., and Schneckenreither, M. Reinforcement learning in autonomous multi-vehicle systems: A structured review. In Proceedings of the 13th International Conference on Software and Computer Applications , pp. 310–317, 2024. Miettinen, K. Nonlinear Multiobjective Optimization .Kluwer Academic Publishers, Boston, USA, 1999. Momma, M., Dong, C., and Liu, J. A multi-objective / multi-task learning framework induced by pareto stationarity. In Proceedings of the 39th International Conference on Machine Learning , pp. 15895–15907, 2022. Qiao, Y., Hu, F., Xiong, W., Guo, Z., Zhou, X., and Li, Y. Multi-objective optimization of integrated energy sys-tem considering installation configuration. Energy , 263: 125785, 2023. Roijers, D. M., Vamplew, P., Whiteson, S., and Dazeley, R. A survey of multi-objective sequential decision-making. 
+
+Journal of Artificial Intelligence Research , 48(1):67–113, 2013. Skalse, J., Hammond, L., Griffin, C., and Abate, A. Lex-icographic multi-objective reinforcement learning. In 
+
+Proceedings of the 31st International Joint Conference on Artificial Intelligence , pp. 3430–3436, 2022. Sutton, R. S. and Barto, A. G. Reinforcement Learning: An Introduction . The MIT Press, second edition, 2018. Tercan, A. and Prabhu, V. S. Thresholded lexicographic ordered multiobjective reinforcement learning. In The 27th European Conference on Artificial Intelligence , pp. 3006–3014, 2024. Turgay, E., Oner, D., and Tekin, C. Multi-objective con-textual bandit problem with similarity information. In 
+
+Proceedings of the 21st International Conference on Arti-ficial Intelligence and Statistics , pp. 1673–1681, 2018. Van Moffaert, K., Drugan, M. M., and Now ´e, A. Scalar-ized multi-objective reinforcement learning: Novel de-sign techniques. In 2013 IEEE Symposium on Adaptive Dynamic Programming and Reinforcement Learning , pp. 191–199, 2013. Vial, D., Parulekar, A., Shakkottai, S., and Srikant, R. Im-proved algorithms for misspecified linear markov deci-sion processes. In Proceedings of the 25th International Conference on Artificial Intelligence and Statistics , pp. 4723–4746, 2022. Wiecek, M. M. Advances in cone-based preference model-ing for decision making with multiple criteria. Decision Making in Manufacturing and Services , 1(2):153–173, 2007. Wray, K., Zilberstein, S., and Mouaddib, A.-I. Multi-objective mdps with conditional lexicographic reward preferences. In Proceedings of the 29th AAAI Conference on Artificial Intelligence , pp. 3418–3424, 2015. Wray, K. H. and Zilberstein, S. Multi-objective pomdps with lexicographic reward preferences. In Proceedings of the 24th International Joint Conference on Artificial Intelligence , pp. 1719–1725, 2015. Xiong, W., Zhong, H., Shi, C., Shen, C., Wang, L., and Zhang, T. Nearly minimax optimal offline reinforcement learning with linear function approximation: Single-agent MDP and markov game. In The 11th International Con-ference on Learning Representations , 2023. Xu, J., Tian, Y., Ma, P., Rus, D., Sueda, S., and Matusik, W. Prediction-guided multi-objective reinforcement learn-ing for continuous robot control. In Proceedings of the 37th International Conference on Machine Learning , pp. 10607–10616, 2020. Xue, B., Cheng, J., Liu, F., Wang, Y., and Zhang, Q. Multi-objective lipschitz bandits under lexicographic ordering. pp. 16238–16246, 2024. Xue, B., Lin, X., Zhang, X., and Zhang, Q. Multiple trade-offs: An improved approach for lexicographic linear ban-dits. pp. 21850–21858, 2025. 10 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Yager, R. R., Gumrah, G., and Reformat, M. Z. Using a web personal evaluation tool – pet for lexicographic multi-criteria service selection. Knowledge-Based Systems , 24 (7):929–942, 2011. Yang, L. and Wang, M. Sample-optimal parametric q-learning using linearly additive features. In Proceedings of the 36th International Conference on Machine Learn-ing, , pp. 6995–7004, 2019. Yang, R., Sun, X., and Narasimhan, K. A generalized algorithm for multi-objective reinforcement learning and policy adaptation. In Advances in Neural Information Processing Systems 32 , pp. 14636 – 14647, 2019. Yu, C., Liu, J., Nemati, S., and Yin, G. Reinforcement learn-ing in healthcare: A survey. ACM Computing Surveys , 55 (1), 2021. Zanette, A., Brandfonbrener, D., Brunskill, E., Pirotta, M., and Lazaric, A. Frequentist regret bounds for randomized least-squares value iteration. In Proceedings of the 23rd International Conference on Artificial Intelligence and Statistics , pp. 1954–1964, 2020. Zhang, H., Lin, Y., Han, S., and Lv, K. Lexicographic actor-critic deep reinforcement learning for urban autonomous driving. IEEE Transactions on Vehicular Technology , 72 (4):4308–4319, 2023. Zhang, W., Fan, Z., He, J., and Gu, Q. Achieving constant regret in linear markov decision processes. In Advances in Neural Information Processing Systems 37 , pp. 130694– 130738, 2024a. Zhang, Z., Lee, J. D., Chen, Y., and Du, S. S. Horizon-free regret for linear markov decision processes. In The 12th International Conference on Learning Representations ,2024b. Zhou, D. and Gu, Q. Computationally efficient horizon-free reinforcement learning for linear mixture mdps. In 
+
+Advances in Neural Information Processing Systems 35 ,pp. 36337–36349, 2022. Zhou, D., Gu, Q., and Szepesvari, C. Nearly minimax optimal reinforcement learning for linear mixture markov decision processes. In Proceedings of 34th Conference on Learning Theory , pp. 4532–4576, 2021. 11 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+## A. Proof of Theorem 1 
+
+Notation. We denote Uk,h , ˆwik,h , and ˆQik,h as the parameters and the estimated Q-function at episode k, with πk representing the policy at k-th episode. The estimated value function ˆV ik,h is defined as ˆV ik,h (x) = ˆQik,h (x, π k(x, h )) . For notational simplicity, we let φk,h = φ(xk,h , a k,h ). For any (x, a, k, h ) ∈ S × A × [K] × [H], the surrogate Q-function for objective 
+
+i ∈ [m] is defined as 
+
+¯Qik,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)Ph(x′|x, a )d x′. (9) Equipped with Lemma 2 and Lemma 4, we decompose the regret for objective i ∈ [m] as 
+
+Ri(K) = 
+
+> K
+
+∑
+
+> k=1
+
+V iπ∗,1(xk, 1) − V iπk ,1(xk, 1)=
+
+> K
+
+∑
+
+> k=1
+
+V iπ∗,1(xk, 1) − ˆV ik, 1(xk, 1) + 
+
+> K
+
+∑
+
+> k=1
+
+ˆV ik, 1(xk, 1) − V iπk ,1(xk, 1).
+
+(10) Lemma 2 establishes that 
+
+ˆV ik, 1(xk, 1) − V iπk ,1(xk, 1) ≤
+
+> H
+
+∑
+
+> h=1
+
+2βk · 2−sk,h (xk,h ) +
+
+> H
+
+∑
+
+> h=2
+
+ζik,h , (11) while Lemma 4 implies 
+
+V iπ∗,1(xk, 1) − ˆV ik, 1(xk, 1) ≤
+
+> H
+
+∑
+
+> h=1
+
+10Λ i(λ) · βk · 2−sk,h (xk,h ). (12) Substituting (11) and (12) into (10), we obtain with probability at least 1 − δ, for any i ∈ [m],
+
+Ri(K) ≤
+
+> K
+
+∑
+
+> k=1
+> H
+
+∑
+
+> h=1
+
+12Λ i(λ) · βk · 2−sk,h (xk,h ) +
+
+> K
+
+∑
+
+> k=1
+> H
+
+∑
+
+> h=2
+
+ζik,h 
+
+≤
+
+> H
+
+∑
+
+> h=1
+> S
+
+∑
+
+> s=1
+
+12Λ i(λ) · βK · | ψh,s | · 2−s +
+
+> K
+
+∑
+
+> k=1
+> H
+
+∑
+
+> h=2
+
+ζik,h ,
+
+(13) where ψh,s = {k ∈ [K]|2−s+1 ≥ ‖ φk,h ‖Uh > 2−s}. The bound S ≤ log( K) arises from the termination threshold 1/√K
+
+in Step 7 of ALgorithm 1, as 2− log( K) ≤ 1/√K.By Lemma 13, ∑ 
+
+> τ∈ψh,s
+
+‖φτ,h ‖Uτ ≤ 5
+
+√
+
+d|ψh,s | log( |ψh,s |).
+
+Since ‖φτ,h ‖Uτ > 2−s for τ ∈ ψh,s , this implies to 
+
+2−s|ψh,s | ≤ 5
+
+√
+
+d|ψh,s | log( |ψh,s |).
+
+Thus, 
+
+> S
+
+∑
+
+> s=1
+
+12Λ i(λ) · βK · | ψh,s | · 2−s ≤
+
+> S
+
+∑
+
+> s=1
+
+60Λ i(λ) · βK ·
+
+√
+
+d|ψh,s | log( |ψh,s |)
+
+≤ 60Λ i(λ) · βK log( K)√dK, 
+
+(14) where the last inequality follows from the Cauchy–Schwarz inequality and ∑Ss=1 |ψh,s | = K.12 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+For the term ∑Kk=1 
+
+∑Hh=2 ζik,h in Eq. (13) , observe that ζik,h = δik,h − E[δik,h |xk,h , a k,h ] forms a martingale difference sequence with |ζik,h | ≤ 2H for all (k, h ). By the Azuma-Hoeffding inequality, with probability at least 1 − δ, for any 
+
+i ∈ [m],
+
+> K
+
+∑
+
+> k=1
+> H
+
+∑
+
+> h=2
+
+ζik,h ≤ √2KH 3 · log( m/δ ). (15) Combining Eq. (14) and Eq. (15) in Eq. (13), we conclude with probability at least 1 − 2δ, for all i ∈ [m],
+
+Ri(K) ≤ 60Λ i(λ) · βK log( K)√dH 2K + √2KH 3 · log( m/δ ).
+
+Substituting βK = 3 H√d log(2 mKH/δ ), this yields 
+
+Ri(K) ≤ ˜O
+
+(
+
+Λi(λ) · √d2H4K
+
+)
+
+,
+
+completing the proof of Theorem 1. 
+
+## B. Proof of Proposition 1 
+
+For any objective i ∈ [m] and timestep h ∈ [H], the Bellman equation (1) implies: 
+
+Qiπ,h (x, a ) = rih(x, a ) + [ PhV iπ,h +1 ]( x, a )= rih(x, a ) + Ex′∼Ph(·| x,a )[V iπ,h +1 (x′)] = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+V iπ,h +1 (x′)Ph(x′|x, a )d x′.
+
+(16) By the definition of a linear MOMDP, the reward and transition functions satisfy: 
+
+rih(x, a ) = 〈φ(x, a ), θih〉, Ph(x′|x, a ) = 〈φ(x, a ), μh(x′)〉.
+
+Substituting these expressions into Eq. (16) yields: 
+
+Qiπ,h (x, a ) = 〈φ(x, a ), θih〉 +
+
+∫
+
+> x′∈S
+
+V iπ,h +1 (x′) · 〈 φ(x, a ), μh(x′)〉dx′
+
+= 〈φ(x, a ), θih +
+
+∫
+
+> x′∈S
+
+V iπ,h +1 (x′)μh(x′)d x′〉.
+
+Letting wiπ,h = θih + ∫ 
+
+> x′∈S
+
+V iπ,h +1 (x′)d μh(x′) finishes the proof of Proposition 1. 
+
+## C. Proof of Lemma 1 
+
+Following a similar proof of Proposition 1, we derive 
+
+¯Qik,h (x, a ) = rih(x, a ) + [ Ph ˆV ik,h +1 ]( x, a ) = 〈φ(x, a ), ¯wik,h 〉, (17) where ¯wik,h = θih + ∫ 
+
+> x′∈S
+
+ˆV ik,h +1 (x′)d μh(x′). Therefore, the equation in Lemma 1 can be rewritten as 
+
+〈φ(x, a ), ˆwik,h 〉 − ¯Qik,h (x, a ) = 〈φ(x, a ), ˆwik,h − ¯wik,h 〉. (18) Recalling the expression for ˆwik,h from Eq. (4), we obtain 
+
+ˆwik,h − ¯wik,h = U −1
+
+> k,h k
+
+∑ 
+
+> τ=1
+
+φτ,h · ˆriτ,h − ¯wik,h .
+
+13 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Eq. (3) indicates that ˆriτ,h = riτ,h + ˆQik,h +1 (xτ,h +1 , a τ,h +1 ) for all τ ∈ [k]. Substituting this yields 
+
+ˆwik,h − ¯wik,h = U −1
+
+> k,h
+
+( k∑ 
+
+> τ=1
+
+φτ,h ·
+
+(
+
+riτ,h + ˆQik,h +1 (xτ,h +1 , a τ,h +1 )
+
+)
+
+− Uk,h ¯wik,h 
+
+)
+
+= U −1
+
+> k,h
+
+( k∑ 
+
+> τ=1
+
+φτ,h ·
+
+(
+
+riτ,h + ˆV ik,h +1 (xτ,h +1 )
+
+)
+
+− Uk,h ¯wik,h 
+
+)
+
+.
+
+From Eq. (17) , we observe that riτ,h = 〈φτ,h , ¯wik,h 〉 − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h ). Substituting this into the above equation gives 
+
+ˆwik,h − ¯wik,h = U −1
+
+> k,h
+
+( k∑ 
+
+> τ=1
+
+φτ,h · (〈φτ,h , ¯wik,h 〉 − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h ) + ˆV ik,h +1 (xτ,h +1 )) − Uk,h ¯wik,h 
+
+)
+
+= U −1
+
+> k,h
+
+(
+
+− ¯wik,h +
+
+> k
+
+∑ 
+
+> τ=1
+
+φτ,h ·
+
+( ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+)) (19) where the final equality follows from Uk,h = ∑kτ =1 φ(xτ,h , a τ,h )φ(xτ,h , a τ,h )> + I .Substituting Eq. (19) into Eq. (18), we decompose the bound into two terms: 
+
+∣∣〈φ(x, a ), ˆwik,h − ¯wik,h 
+
+〉∣ ∣
+
+≤
+
+∣∣∣〈
+
+φ(x, a ), U−1 
+
+> k,h
+
+¯wik,h 
+
+〉∣ ∣∣︸ ︷︷ ︸
+
+> A1
+
++
+
+∣∣∣∣∣〈
+
+φ(x, a ), U−1
+
+> k,h k
+
+∑ 
+
+> τ=1
+
+φτ,h ·
+
+( ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+)〉∣ ∣∣∣∣︸ ︷︷ ︸
+
+> A2
+
+. (20) To bound A1 and A2, we introduce two lemmas: 
+
+Lemma 5. Let ¯wik,h denote the corresponding weights satisfying ¯Qik,h (x, a ) = 〈φ(x, a ), ¯wik,h 〉 for all (x, a, h ) ∈ S × A × 
+
+[H] and i ∈ [m]. Then, ‖ ¯wik,h ‖ ≤ 2H√d.
+
+Lemma 6. With probability at least 1 − δ, for any (k, h ) ∈ [K] × [H] and i ∈ [m],
+
+∥∥∥∥∥
+
+> k
+
+∑ 
+
+> τ=1
+
+φτ,h 
+
+( ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+)∥∥∥∥∥
+
+> 2Uk,h
+
+≤ dH 2 log 
+
+( 2mkH δ
+
+)
+
+.
+
+Applying Lemma 5, we bound A1 as 
+
+A1 = |〈 φ(x, a ), U−1 
+
+> k,h
+
+¯wik,h 〉| ≤ ‖ φ(x, a )‖Uk,h · ‖ ¯wik,h ‖Uk,h ≤ ‖ φ(x, a )‖Uk,h · ‖ ¯wik,h ‖ ≤ 2H√d · ‖ φ(x, a )‖Uk,h . (21) For A2, Lemma 6 and the Cauchy-Schwarz inequality imply 
+
+A2 ≤ ‖ φ(x, a )‖Uk,h ·
+
+∥∥∥∥∥
+
+> k
+
+∑ 
+
+> τ=1
+
+φτ,h ·
+
+( ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+)∥∥∥∥∥Uk,h 
+
+≤ H
+
+√
+
+d log 
+
+( 2mkH δ
+
+)
+
+· ‖ φ(x, a )‖Uk,h 
+
+(22) Taking Eq. (21) and Eq. (22) into Eq. (20), we obtain 
+
+|〈 φ(x, a ), ˆwik,h 〉 − ¯Qik,h (x, a )| ≤ 
+
+(
+
+2H√d + H
+
+√
+
+d log 
+
+( 2mkH δ
+
+))
+
+· ‖ φ(x, a )‖Uk,h ,
+
+which concludes the proof of Lemma 1 since βk = 3 H
+
+√
+
+d log ( 2mkH δ
+
+). 
+
+14 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+## D. Proof of Lemma 2 
+
+To bound the term ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) in Lemma 2, we begin by decomposing it as follows: 
+
+ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) = ˆV ik,h (xk,h ) − ¯Qik,h (xk,h , π k(xk,h , h )) 
+
+︸ ︷︷ ︸
+
+> B3
+
++ ¯Qik,h (xk,h , π k(xk,h , h )) − V iπk ,h (xk,h )
+
+︸ ︷︷ ︸
+
+> B4
+
+. (23) 
+
+Analysis of B3: By Lemma 1, with probability at least 1 − δ, for any (x, k, h ) ∈ S × [K] × [H] and i ∈ [m], we have 
+
+∣∣〈φ(x, π k(x, h )) , ˆwik,h 〉 − ¯Qik,h (x, π k(x, h )) ∣∣ ≤ βk‖φ(x, π k(x, h )) ‖Uk,h .
+
+Since ˆV ik,h (x) = ˆQik,h (x, π k(x, h )) = 〈φ(x, π k(x, h )) , ˆwik,h 〉, it follows that 
+
+∣∣∣ ˆV ik,h (x) − ¯Qik,h (x, π k(x, h )) 
+
+∣∣∣ ≤ βk‖φ(x, π k(x, h )) ‖Uk,h . (24) Let sk,h (x) denotes the stage at which Algorithm 1 selects the action for state x ∈ S . From Step 10 of Algorithm 1, we have 2−sk,h (x) ≤ ‖ φ(x, π k(x, h )) ‖Uk,h ≤ 2−sk,h (x)+1 . Substituting this into Eq. (24) yields 
+
+∣∣∣ ˆV ik,h (x) − ¯Qik,h (x, π k(x, h )) 
+
+∣∣∣ ≤ 2βk · 2−sk,h (x).
+
+Thus, term B3 satisfies 
+
+B3 = ˆV ik,h (xk,h ) − ¯Qik,h (xk,h , π k(xk,h , h )) ≤ 2βk · 2−sk,h (xk,h ). (25) 
+
+Analysis of B4: Using the definition of ¯Qik,h (·, ·) in Eq. (9) and the Bellman equation, we observe: 
+
+¯Qik,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)Ph(x′|x, a )d x′,V iπ,h (x) = Qiπ,h (x, π (x, h )) , Q iπ,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+V iπ,h +1 (x′)Ph(x′|x, a )d x′.
+
+This implies B4 can be expressed as 
+
+B4 = ¯Qik,h (xk,h , π k(xk,h , h )) − V iπk ,h (xk,h ) = 
+
+∫
+
+> x′∈S
+
+( ˆV ik,h +1 (x′) − V ik,h +1 (x′)
+
+)
+
+Ph(x′|xk,h , π k(xk,h , h ))d x′. (26) 
+
+Combining results: Substituting (25) and (26) into (23) gives 
+
+ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) ≤ 2βk · 2−sk,h (xk,h ) +
+
+∫
+
+> x′∈S
+
+( ˆV ik,h +1 (x′) − V ik,h +1 (x′)) Ph(x′|xk,h , π k(xk,h , h ))d x′.
+
+Recalling the notation δik,h = ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) and ζik,h = δik,h − E[δik,h |xk,h , a k,h ] from Lemma 2, we obtain 
+
+ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) ≤ 2βk · 2−sk,h (xk,h ) + δik,h +1 + ζik,h +1 
+
+≤
+
+> H
+
+∑
+
+> h′=h
+
+2βk · 2−sk,h ′ (xk,h ′ ) +
+
+> H
+
+∑
+
+> h′=h+1
+
+ζik,h ′ ,
+
+where the second inequality follows by a simple inductive argument. The proof of Lemma 2 is finished. 
+
+## E. Proof of Lemma 3 
+
+We prove this lemma by mathematical induction on the objective index i ∈ [m] to prove this lemma. First, we note that in Algorithm 2, the confidence terms of all actions are bounded by C. By Lemma 1, for any (x, a ) ∈ S × A s and objective 
+
+i ∈ [m], we have 
+
+| ˆQik,h (x, a ) − ¯Qik,h (x, a )| ≤ βk · C. (27) 15 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Base case i = 1 : The candidate action set A0 
+
+> s
+
+= As and the refined set A1 
+
+> s
+
+is constructed as 
+
+A1 
+
+> s
+
+= {a ∈ A 0
+
+> s
+
+| ˆQ1
+
+> h
+
+(xk,h , ˆa1
+
+> k,h
+
+) − ˆQ1
+
+> h
+
+(xk,h , a ) ≤ 2βk · C}. (28) Since π∗(x, h ) ∈ A s and ˆa1 
+
+> k,h
+
+∈ A 0 
+
+> s
+
+= As, Eq. (27) implies 
+
+ˆQ1
+
+> k,h
+
+(x, π ∗(x, h )) + βk · C ≥ ¯Q1
+
+> k,h
+
+(x, π ∗(x, h )) ≥ ¯Q1
+
+> k,h
+
+(x, ˆa1
+
+> k,h
+
+) ≥ ˆQ1
+
+> k,h
+
+(x, ˆa1
+
+> k,h
+
+) − βk · C, 
+
+where the inequality ¯Q1
+
+> k,h
+
+(x, π ∗(x, h )) ≥ ¯Q1
+
+> k,h
+
+(x, ˆa1
+
+> k,h
+
+) follows from Assumption 1 and the optimality of π∗(x, h ).Substituting these bounds into Eq. (28), we conclude π∗(x, h ) ∈ A 1
+
+> s
+
+.For any a ∈ A 1
+
+> s
+
+, applying the confidence interval in Eq. (27) and the refined operation in Eq. (28) gives 
+
+¯Q1
+
+> k,h
+
+(x, a ) ≥ ˆQ1
+
+> k,h
+
+(x, a ) − βk · C ≥ ˆQ1
+
+> h
+
+(xk,h , ˆa1
+
+> k,h
+
+) − 3βk · C. 
+
+Since ˆa1 
+
+> k,h
+
+= argmax a∈A 0
+
+> s
+
+ˆQ1
+
+> k,h
+
+(x, a ) and π∗(x, h ) ∈ A 0
+
+> s
+
+, we further derive 
+
+¯Q1
+
+> k,h
+
+(x, a ) ≥ ˆQ1
+
+> h
+
+(xk,h , ˆa1
+
+> k,h
+
+) − 3βk · C ≥ ˆQ1
+
+> h
+
+(xk,h , π ∗(x, h )) − 3βk · C ≥ ¯Q1
+
+> h
+
+(xk,h , π ∗(x, h )) − 4βk · C. 
+
+Thus, ¯Q1
+
+> h
+
+(xk,h , π ∗(x, h )) − ¯Q1
+
+> k,h
+
+(x, a ) ≤ 4βk · C.
+
+Inductive step: Assume for any j ∈ [i − 1] that: 
+
+π∗(x, h ) ∈ A js, and 
+
+¯Qjk,h (x, π ∗(x, h )) − ¯Qjk,h (x, a ) ≤ 4Λ j (λ) · βk · C, (29) then we prove the following statements hold for the objective i:
+
+π∗(x, h ) ∈ A is, and 
+
+¯Qik,h (x, π ∗(x, h )) − ¯Qik,h (x, a ) ≤ 4Λ i(λ) · βk · C. 
+
+By, Assumption 1, the trade-off among different objectives are bounded by λ, which implies that 
+
+¯Qik,h (x, ˆaik,h ) − ¯Qik,h (x, π ∗(x, h )) ≤ λ · max 
+
+> j∈[i−1]
+
+{ ¯Qjk,h (x, π ∗(x, h )) − ¯Qjk,h (x, ˆaik,h )}.
+
+Substituting Eq. (29) into the right-hand side yields 
+
+¯Qik,h (x, ˆaik,h ) − ¯Qik,h (x, π ∗(x, h )) ≤ λ · 4Λ i−1(λ) · βk · C. (30) Applying the confidence intervals from Eq. (27) to bound ¯Qik,h (x, ˆaik,h ) and ¯Qik,h (x, π ∗(x, h )) , we rewrite Eq. (30) as 
+
+ˆQik,h (x, ˆaik,h ) − ˆQik,h (x, π ∗(x, h )) ≤ 2βk · C + λ · 4Λ i−1(λ) · βk · C. (31) Given Λi(λ) = 1 + λ + · · · + λi−1 for i ∈ [m] and Step 4 of Algorithm 2, which constructs, 
+
+Ais = {a ∈ A i−1 
+
+> s
+
+| ˆQih(xk,h , ˆaik,h ) − ˆQih(xk,h , a ) ≤ (2 + 4 λ + · · · + 4 λi−1) · βk · C},
+
+Eq. (31) ensures π∗(x, h ) ∈ A is.Since ˆaik,h = argmax a∈A i−1
+
+> s
+
+ˆQih(xk,h , a ) and π∗(x, h ) ∈ A i−1 
+
+> s
+
+, the construction of Ais implies 
+
+ˆQih(xk,h , π ∗(x, h )) − ˆQih(xk,h , a ) ≤ ˆQih(xk,h , ˆaik,h ) − ˆQih(xk,h , a ) ≤ (2 + 4 λ + · · · + 4 λi−1) · βk · C. (32) By the confidence interval in Eq. (27), we have 
+
+¯Qih(xk,h , π ∗(x, h )) ≤ ˆQih(xk,h , π ∗(x, h )) + βk · C, ˆQih(xk,h , a ) − ¯Qih(xk,h , a ) ≤ βk · C. 
+
+Substituting this into Eq. (32) yields 
+
+¯Qih(xk,h , π ∗(x, h )) − ¯Qih(xk,h , a ) ≤ 4(1 + λ + · · · + λi−1) · βk · C. 
+
+This completes the proof of Lemma 3. 
+
+16 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+## F. Proof of Lemma 4 
+
+Recall the definition of ¯Qik,h (·, ·) in Eq. (9) and Bellman equation: 
+
+¯Qik,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)Ph(x′|x, a )d x′,V iπ,h (x) = Qiπ,h (x, π (x, h )) , Q iπ,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+V iπ,h +1 (x′)Ph(x′|x, a )d x′.
+
+From these, we can write V iπ∗,h (x) as 
+
+V iπ∗,h (x) = ¯Qik,h (x, π ∗(x, h )) + 
+
+∫
+
+> x′∈S
+
+(
+
+V iπ∗,h +1 (x′) − ˆV ik,h +1 (x′)
+
+)
+
+Ph(x′|x, π ∗(x, h ))d x′.
+
+Lemma 3 establishes the bound 
+
+¯Qik,h (xk,h , π ∗(xk,h , h )) − ¯Qik,h (xk,h , π k(xk,h , h )) ≤ 8Λ i(λ) · βk · 2−sk,h (xk,h )
+
+where πk(xk,h , h ) ∈ A sk,h (xk,h ) and Ask,h (xk,h ) is constructed by setting C = 2 −sk,h (xk,h )+1 in the LAE procedure. Substituting this into the expression for V iπ∗,h (x), we obtain 
+
+V iπ∗,h (xk,h ) ≤ ¯Qik,h (xk,h , π k(xk,h , h )) + 8Λ i(λ) · βk · 2−sk,h (xk,h )
+
++
+
+∫
+
+> x′∈S
+
+(
+
+V iπ∗,h +1 (x′) − ˆV ik,h +1 (x′)
+
+)
+
+Ph(x′|xk,h , π ∗(xk,h , h ))d x′. (33) Lemma 1 provides the confidence interval 
+
+¯Qik,h (xk,h , π k(xk,h , h )) ≤ ˆQik,h (xk,h , π k(xk,h , h )) + βk · ‖ φ(xk,h , π k(xk,h , h )) ‖Uk,h 
+
+≤ ˆQik,h (xk,h , π k(xk,h , h )) + 2 βk · 2−sk,h (xk,h )
+
+= ˆV ik,h (xk,h ) + 2 βk · 2−sk,h (xk,h ).
+
+Substituting this inequality into (33) yields 
+
+V iπ∗,h (xk,h ) ≤ ˆV ik,h (xk,h ) + 2 βk · 2−sk,h (xk,h ) + 8Λ i(λ) · βk · 2−sk,h (xk,h )
+
++ max 
+
+> a∈A
+
+∫
+
+> x′∈S
+
+(
+
+V iπ∗,h +1 (x′) − ˆV ik,h +1 (x′)
+
+)
+
+Ph(x′|xx,k , a )d x′.
+
+Applying induction over h, we have 
+
+V iπ∗,h (xk,h ) − ˆV ik,h (xk,h ) ≤
+
+> H
+
+∑
+
+> h′=h
+
+10Λ i(λ) · βk · 2−sk,h ′ (xk,h ′ ).
+
+This completes the proof of Lemma 4. 
+
+## G. Proof of Theorem 2 
+
+Notation. Let Uk,h , ˆwik,h , and ˆQik,h denote the parameters and the estimated Q-function for episode k, with πk representing the policy at k-th episode. The estimated value function ˆV ik,h is defined as ˆV ik,h (x) = ˆQik,h (x, π k(x, h )) . For notational simplicity, we define φk,h = φ(xk,h , a k,h ). For any (x, a, k, h ) ∈ S × A × [K] × [H], the surrogate Q-function for objective 
+
+i ∈ [m] is given by 
+
+¯Qik,h (x, a ) = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)Ph(x′|x, a )d x′. (34) We now present the following proposition and lemmas, which extend key tools used in the proof of Theorem 1. Specifically, Proposition 3 extends Proposition 3, while Lemmas 7, 8, 9, and 10 extend Lemmas 1, 2, 3, and 4, respectively. 17 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Proposition 3. In an -approximate linear MOMDP, for any objective i ∈ [m] and any k ∈ [K], there exist weights 
+
+{ ¯wik,h }h∈[H] such that for any (x, a, h ) ∈ S × A × [H], we have 
+
+| ¯Qik,h (x, a ) − 〈 φ(x, a ), ¯wik,h 〉| ≤ 2H. 
+
+Proof. From the definition of ¯Qik,h (x, a ) in Eq. (34), for all i ∈ [m] and h ∈ [H]¯Qik,h (x, a ) = rih(x, a ) + [ Ph ˆV ik,h +1 ]( x, a )= rih(x, a ) + Ex′∼Ph(·| x,a )[ ˆV ik,h +1 (x′)] = rih(x, a ) + 
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)Ph(x′|x, a )d x′.
+
+(35) By the definition of -approximate linear MOMDP, 
+
+|rih(x, a ) − 〈 φ(x, a ), θih〉| ≤ , ‖Ph(x′|x, a ) − 〈 φ(x, a ), μh(x′)〉‖ 1 ≤ . 
+
+Taking these bounds into Eq. (35), we derive: 
+
+¯Qik,h (x, a ) ≤ 〈 φ(x, a ), θih〉 +  +
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′) · 〈 φ(x, a ), μh(x′)〉dx′ + H 
+
+≤ 〈 φ(x, a ), θih +
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)μh(x′)d x′〉 + 2 H. 
+
+A symmetric argument provides the lower bound: 
+
+〈φ(x, a ), θih +
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)μh(x′)d x′〉 − 2H ≤ ¯Qik,h (x, a ).
+
+Thus, setting ¯wik,h = θih + ∫ 
+
+> x′∈S
+
+ˆV ik,h +1 (x′)d μh(x′) completes the proof of Proposition 3. 
+
+Lemma 7. Let βk = 3 H
+
+√
+
+d log ( 2mkH δ
+
+)+2 H √kd . With probability at least 1−δ, for all (x, a, k, h ) ∈ S ×A× [K]×[H]
+
+and i ∈ [m], we have 
+
+|〈 φ(x, a ), ˆwik,h 〉 − ¯Qik,h (x, a )| ≤ βk‖φ(x, a )‖Uk,h + 2 H. 
+
+Proof. By Proposition 3, we derive the initial bound: 
+
+|〈 φ(x, a ), ˆwik,h 〉 − ¯Qik,h (x, a )| ≤ |〈 φ(x, a ), ˆwik,h − ¯wik,h 〉| + 2 H. (36) From the definition of ˆwik,h in Eq. (4), we express the difference: 
+
+ˆwik,h − ¯wik,h = U −1
+
+> k,h k
+
+∑ 
+
+> τ=1
+
+φτ,h · ˆriτ,h − ¯wik,h .
+
+Using the surrogate reward relation in Eq. (3), where ˆriτ,h = riτ,h + ˆQik,h +1 (xτ,h +1 , a τ,h +1 ) for all τ ∈ [k], we expand: 
+
+ˆwik,h − ¯wik,h = U −1
+
+> k,h
+
+( k∑ 
+
+> τ=1
+
+φτ,h ·
+
+(
+
+riτ,h + ˆQik,h +1 (xτ,h +1 , a τ,h +1 )
+
+)
+
+− Uk,h ¯wik,h 
+
+)
+
+= U −1
+
+> k,h
+
+( k∑ 
+
+> τ=1
+
+φτ,h ·
+
+(
+
+riτ,h + ˆV ik,h +1 (xτ,h +1 )
+
+)
+
+− Uk,h ¯wik,h 
+
+)
+
+.
+
+Let ˜Ph(·| x, a ) = 〈φ(x, a ), μh(·)〉. Recalling the proof of Proposition 3 that ¯wik,h = θih + ∫ 
+
+> x′∈S
+
+ˆV ik,h +1 (x′)d μh(x′), we restructure the above equation to 
+
+ˆwik,h − ¯wik,h = −U−1 
+
+> k,h
+
+¯wik,h + U −1
+
+> k,h k
+
+∑ 
+
+> τ=1
+
+φτ,h 
+
+(
+
+riτ,h − 〈 φτ,h , θih〉 + [( Ph − ˜Ph) ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+)
+
++ U −1
+
+> k,h
+
+( k∑ 
+
+> τ=1
+
+φτ,h ·
+
+( ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+))
+
+.
+
+(37) 18 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Taking the Eq. (37) into Eq. (36), we have 
+
+∣∣〈φ(x, a ), ˆwik,h − ¯wik,h 
+
+〉∣ ∣
+
+≤
+
+∣∣∣〈
+
+φ(x, a ), U−1 
+
+> k,h
+
+¯wik,h 
+
+〉∣ ∣∣︸ ︷︷ ︸
+
+> A1
+
++
+
+∣∣∣∣∣〈
+
+φ(x, a ), U−1
+
+> k,h k
+
+∑ 
+
+> τ=1
+
+φτ,h ·
+
+( ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+)〉∣ ∣∣∣∣︸ ︷︷ ︸
+
+> A2
+
++
+
+∣∣∣∣∣〈
+
+φ(x, a ), U−1
+
+> k,h k
+
+∑ 
+
+> τ=1
+
+φτ,h 
+
+(
+
+riτ,h − 〈 φτ,h , θih〉 + ( Ph − ˜Ph) ˆV ik,h +1 (xτ,h , a τ,h )
+
+)〉∣ ∣∣∣∣︸ ︷︷ ︸
+
+> A3
+
+.
+
+(38) Term A1 and A2 are bounded by the same methodology as Lemma 1. For A3, noting that |riτ,h − 〈 φτ,h , θih〉| ≤  and 
+
+‖Ph − ˜Ph‖1 ≤ , we can bound A3 as 
+
+A3 ≤ 2H · | 
+
+> k
+
+∑ 
+
+> τ=1
+
+φ(x, a )>U−1
+
+> k,h
+
+φτ,h |≤ 2H ·
+
+√√√√ k∑ 
+
+> τ=1
+
+φ(x, a )>U−1
+
+> k,h
+
+φ(x, a ) ·
+
+> k
+
+∑ 
+
+> τ=1
+
+φ>
+
+> τ,h
+
+U−1
+
+> k,h
+
+φτ,h 
+
+≤ 2H √kd · ‖ φ(x, a ‖Uk,h .
+
+(39) Integrating Eqs. (21), Eq. (22), and Eq. (39) into Eq. (38) produces: 
+
+|〈 φ(x, a ), ˆwik,h 〉 − ¯Qik,h (x, a )| ≤ 
+
+(
+
+3H
+
+√
+
+d log 
+
+( 2mkH δ
+
+)
+
++ 2 H √kd 
+
+)
+
+· ‖ φ(x, a )‖Uk,h + 2 H, 
+
+which concludes the proof of Lemma 7. 
+
+The proofs of the following three lemmas follow analogous arguments to their counterparts in Lemmas 2, 3, and 4, requiring only the replacement of βk‖φ(x, a )‖Uk,h with βk‖φ(x, a )‖Uk,h + 2 H . We therefore omit their full proofs for brevity. 
+
+Lemma 8. Let δik,h = ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) and ζik,h = δik,h − E[δik,h |xk,h , a k,h ]. With probability at least 1 − δ, for any (k, h ) ∈ [K] × [H] and i ∈ [m], we have 
+
+ˆV ik,h (xk,h ) − V iπk ,h (xk,h ) ≤
+
+> H
+
+∑
+
+> h′=h
+
+2βk · 2−sk,h ′ (xk,h ′ ) +
+
+> H
+
+∑
+
+> h′=h+1
+
+ζik,h ′ + 2 H(H − h + 1) , 
+
+where sk,h ′ (xk,h ′ ) denotes the stage at which LLRL selects the action for state xk,h ′ .
+
+Lemma 9. For Algorithm 2, if π∗(x, h ) ∈ A s, then with probability at least 1 − δ, for any objective i ∈ [m] and action 
+
+a ∈ A is, we have 
+
+π∗(x, h ) ∈ A is, and 
+
+¯Qik,h (x, π ∗(x, h )) − ¯Qik,h (x, a ) ≤ 4Λ i(λ) · βk · (C + 2 H ).
+
+Lemma 10. With probability at least 1 − δ, for all (x, a, k, h ) ∈ S × A × [K] × [H] and i ∈ [m], we have 
+
+V iπ∗,h (xk,h ) − ˆV ik,h (xk,h ) ≤
+
+> H
+
+∑
+
+> h′=h
+
+10Λ i(λ) · βk · 2−sk,h ′ (xk,h ′ ) + 20Λ i(λ) · (H − h + 1) H 
+
+where sk,h ′ (xk,h ′ ) denotes the stage at which LLRL selects the action for state xk,h ′ .
+
+19 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+Proof of Theorem 2: Using Lemma 8 and Lemma 10, we decompose the regret for each objective i ∈ [m] as: 
+
+Ri(K) = 
+
+> K
+
+∑
+
+> k=1
+
+V iπ∗,1(xk, 1) − V iπk ,1(xk, 1)=
+
+> K
+
+∑
+
+> k=1
+
+V iπ∗,1(xk, 1) − ˆV ik, 1(xk, 1) + 
+
+> K
+
+∑
+
+> k=1
+
+ˆV ik, 1(xk, 1) − V iπk ,1(xk, 1).
+
+Following an analogous procedure to Theorem 1, we derive: 
+
+Ri(K) ≤ 60Λ i(λ) · βK log( K)√dH 2K + √2KH 3 · log( m/δ ) + 22Λ i(λ) · H2K. 
+
+Substituting βK = 3 H√d log (2 mKH/δ ) + 2 H √Kd yields: 
+
+Ri(K) ≤ ˜O
+
+(
+
+Λi(λ) ·
+
+(√d2H4K + dH 2K 
+
+)) 
+
+.
+
+This completes the proof of Theorem 2. 
+
+## H. Proof of Lemma 5 
+
+By the Bellman equation in Eq. (1), for any (x, a, k, h ) ∈ S × A × [K] × [H] and i ∈ [m], we have 
+
+¯Qik,h (x, a ) = rih(x, a ) + [ Ph ˆV ik,h +1 ]( x, a ).
+
+Applying reasoning analogous to Proposition 1, we derive 
+
+¯wik,h = θih +
+
+∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)d μh(x′).
+
+Given the bounded reward rih(x, a ) ∈ [0 , 1] , the value function satisfies ˆV ik,h +1 (x′) ≤ H for any state x′. Therefore, 
+
+‖θh‖ ≤ √d, and 
+
+∥∥∥∥∫
+
+> x′∈S
+
+ˆV ik,h +1 (x′)d μh(x′)
+
+∥∥∥∥ ≤ H√d, 
+
+which finishes the proof. 
+
+## I. Proof of Lemma 6 
+
+According to Lemma 11, for any fixed i ∈ [m] and h ∈ [H], with probability at least 1 − δ, the following inequality holds for all k ≥ 1:
+
+∥∥∥∥∥
+
+> k
+
+∑ 
+
+> τ=1
+
+φτ,h 
+
+[ ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+]∥∥∥∥∥
+
+> 2Uk,h
+
+≤ 2H2 log 
+
+[ √ det(U k)
+
+δ
+
+]
+
+.
+
+Lemma 12 simplifies this bound via the inequality det , yielding: 
+
+∥∥∥∥∥
+
+> k
+
+∑ 
+
+> τ=1
+
+φτ,h 
+
+[ ˆV ik,h +1 (xτ,h +1 ) − [Ph ˆV ik,h +1 ]( xτ,h , a τ,h )
+
+]∥∥∥∥∥
+
+> 2Uk,h
+
+≤ 2H2 log 
+
+[ √ (1 + k/d )d
+
+δ
+
+]
+
+≤ dH 2 log 
+
+[ 1 + kδ
+
+]
+
+.
+
+Applying a union bound over all i ∈ [m] and h ∈ [H] completes the proof. 
+
+20 Multi-objective Linear Reinforcement Learning with Lexicographic Rewards 
+
+## J. Auxiliary Lemmas 
+
+Lemma 11. (Abbasi-yadkori et al., 2011, Theorem 1) Let {t}Tt=1 be a real-valued stochastic process adapted to filtration 
+
+{F t}∞
+
+> t=0
+
+, where t|F t−1 be zero-mean and σ-subGaussian, i.e., 
+
+E[t|F t−1] = 0 , and ∀λ ∈ R, E[eλ t |F t−1] ≤ eλ2σ2/2.
+
+Let {φt}∞ 
+
+> t=0
+
+⊆ Rd be a stochastic process where φt ∈ F t−1. Assume U0 is a d × d positive definite matrix, and let 
+
+Ut = U 0 + ∑ts=1 φsφ> 
+
+> s
+
+. Then for any δ > 0, with probability at least 1 − δ, for all t ≥ 0:
+
+∥∥∥∥∥
+
+> t
+
+∑
+
+> s=1
+
+φss
+
+∥∥∥∥∥
+
+> 2Ut
+
+≤ 2σ2 log 
+
+( √ det(U t)/det(U 0)
+
+δ
+
+)
+
+.
+
+Lemma 12. (Abbasi-yadkori et al., 2011, Lemma 10) Let φ1, φ 2, . . . , φ t ∈ Rd satisfy ‖φs‖2 ≤ L for any 1 ≤ s ≤ t.Define Ut = λI + ∑ts=1 φsφ> 
+
+> s
+
+for some λ > 0. Then: 
+
+det(U t) ≤ (λ + tL 2/d )d.
+
+Lemma 13. (Chu et al., 2011, Lemma 3) Let φ1, φ 2, . . . , φ t ∈ Rd and Ut = I + ∑ts=1 φsφ> 
+
+> s
+
+. Then: 
+
+> t
+
+∑
+
+> s=1
+
+‖φs‖Us ≤ 5√dt log t. 
+
+21

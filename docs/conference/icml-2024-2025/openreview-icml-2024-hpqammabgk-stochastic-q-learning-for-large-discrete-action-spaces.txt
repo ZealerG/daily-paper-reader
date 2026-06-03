@@ -1,0 +1,1878 @@
+Title: Stochastic Q-learning for Large Discrete Action Spaces
+
+URL Source: https://openreview.net/pdf?id=HPQaMmABgK
+
+Number of Pages: 26
+
+Markdown Content:
+# Stochastic Q-learning for Large Discrete Action Spaces 
+
+Fares Fourati 1 Vaneet Aggarwal 2 Mohamed-Slim Alouini 1
+
+## Abstract 
+
+In complex environments with large discrete ac-tion spaces, effective decision-making is criti-cal in reinforcement learning (RL). Despite the widespread use of value-based RL approaches like Q-learning, they come with a computational burden, necessitating the maximization of a value function over all actions in each iteration. This burden becomes particularly challenging when addressing large-scale problems and using deep neural networks as function approximators. In this paper, we present stochastic value-based RL approaches which, in each iteration, as opposed to optimizing over the entire set of n actions, only consider a variable stochastic set of a sub-linear number of actions, possibly as small as 
+
+O(log( n)) . The presented stochastic value-based RL methods include, among others, Stochastic Q-learning, StochDQN, and StochDDQN, all of which integrate this stochastic approach for both value-function updates and action selection. The theoretical convergence of Stochastic Q-learning is established, while an analysis of stochastic max-imization is provided. Moreover, through empir-ical validation, we illustrate that the various pro-posed approaches outperform the baseline meth-ods across diverse environments, including dif-ferent control problems, achieving near-optimal average returns in significantly reduced time. 
+
+## 1. Introduction 
+
+Reinforcement learning (RL), a continually evolving field of machine learning, has achieved notable successes, espe-cially when combined with deep learning (Sutton & Barto, 2018; Wang et al., 2022). While there have been several      
+
+> 1Computer, Electrical and Mathematical Science and Engineer-ing Division, King Abdullah University of Science and Technology (KAUST), Thuwal, KSA. 2School of Industrial Engineering, Pur-due University, West Lafayette, IN 47907, USA. Correspondence to: Fares Fourati <fares.fourati@kaust.edu.sa >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+advances in the field, a significant challenge lies in nav-igating complex environments with large discrete action spaces (Dulac-Arnold et al., 2015; 2021). In such scenarios, standard RL algorithms suffer in terms of computational efficiency (Akkerman et al., 2023). Identifying the optimal actions might entail cycling through all of them, in general, multiple times within different states, which is computa-tionally expensive and may become prohibitive with large discrete action spaces (Tessler et al., 2019). Such challenges apply to various domains, including combi-natorial optimization (Mazyavkina et al., 2021; Fourati et al., 2023; 2024b;a), natural language processing (He et al., 2015; 2016a;b; Tessler et al., 2019), communications and network-ing (Luong et al., 2019; Fourati & Alouini, 2021), recom-mendation systems (Dulac-Arnold et al., 2015), transporta-tion (Al-Abbasi et al., 2019; Haliem et al., 2021; Li et al., 2022), and robotics (Dulac-Arnold et al., 2015; Tavakoli et al., 2018; Tang & Agrawal, 2020; Seyde et al., 2021; 2022; Gonzalez et al., 2023; Ireland & Montana, 2024). Al-though tailored solutions leveraging action space structures and dimensions may suffice in specific contexts, their ap-plicability across diverse problems, possibly unstructured, still needs to be expanded. We complement these works by proposing a general method that addresses a broad spectrum of problems, accommodating structured and unstructured single and multi-dimensional large discrete action spaces. Value-based and actor-based approaches are both prominent approaches in RL. Value-based approaches, which entail the agent implicitly optimizing its policy by maximizing a value function, demonstrate superior generalization capabilities but demand significant computational resources, particularly in complex settings. Conversely, actor-based approaches, which entail the agent directly optimizing its policy, offer computational efficiency but often encounter challenges in generalizing across multiple and unexplored actions (Dulac-Arnold et al., 2015). While both hold unique advantages and challenges, they represent distinct avenues for addressing the complexities of decision-making in large action spaces. However, comparing them falls outside the scope of this work. While some previous methods have focused on the latter (Dulac-Arnold et al., 2015), our work concentrates on the former. Specifically, we aim to exploit the natural generalization inherent in value-based RL approaches while reducing their per-step computational complexity. 1Stochastic Q-learning for Large Discrete Action Spaces 
+
+Q-learning, as introduced by Watkins & Dayan (1992), for discrete action and state spaces, stands out as one of the most famous examples of value-based RL methods and re-mains one of the most widely used ones in the field. As an off-policy learning method, it decouples the learning process from the agent’s current policy, allowing it to leverage past experiences from various sources, which becomes advanta-geous in complex environments. In each step of Q-learning, the agent updates its action value estimates based on the observed reward and the estimated value of the best action in the next state. Some approaches have been proposed to apply Q-learning to continuous state spaces, leveraging deep neural networks (Mnih et al., 2013; Van Hasselt et al., 2016). Moreover, sev-eral improvements have also been suggested to address its inherent estimation bias (Hasselt, 2010; Van Hasselt et al., 2016; Zhang et al., 2017; Lan et al., 2020; Wang et al., 2021). However, despite the different progress and its nu-merous advantages, a significant challenge still needs to be solved in Q-learning-like methods when confronted with large discrete action spaces. The computational complexity associated with selecting actions and updating Q-functions increases proportionally with the increasing number of ac-tions, which renders the conventional approach impractical as the number of actions substantially increases. Conse-quently, we confront a crucial question: Is it possible to mitigate the complexity of the different Q-learning methods while maintaining a good performance? 
+
+This work proposes a novel, simple, and practical ap-proach for handling general, possibly unstructured, single-dimensional or multi-dimensional, large discrete action spaces. Our approach targets the computational bottleneck in value-based methods caused by the search for a maximum (max and arg max ) in every learning iteration, which scales as O(n), i.e., linearly with the number of possible actions n.Through randomization, we can reduce this linear per-step computational complexity to logarithmic. We introduce stoch max and stoch arg max , which, instead of exhaustively searching for the precise maximum across the entire set of actions, rely on at most two random sub-sets of actions, both of sub-linear sizes, possibly each of size ⌈log( n)⌉. The first subset is randomly sampled from the complete set of actions, and the second from the pre-viously exploited actions. These stochastic maximization techniques amortize the computational overhead of stan-dard maximization operations in various Q-learning meth-ods (Watkins & Dayan, 1992; Hasselt, 2010; Mnih et al., 2013; Van Hasselt et al., 2016). Stochastic maximization methods significantly accelerate the agent’s steps, including action selection and value-function updates in value-based RL methods, making them practical for handling challeng-ing, large-scale, real-world problems. We propose Stochastic Q-learning, Stochastic Double Q-learning, StochDQN, and StochDDQN, which are ob-tained by changing max and arg max to stoch max and 
+
+stoch arg max in the Q-learning (Watkins & Dayan, 1992), the Double Q-learning (Hasselt, 2010), the deep Q-network (DQN) (Mnih et al., 2013) and the Double DQN (DDQN) (Van Hasselt et al., 2016), respectively. Furthermore, we observed that our approach works even for the on-policy Sarsa (Rummery & Niranjan, 1994). We conduct a theoretical analysis of the proposed method, proving the convergence of Stochastic Q-learning, which integrates these techniques for action selection and value updates, and establishing a lower bound on the probability of sampling an optimal action from a random set of size 
+
+⌈log( n)⌉ and analyze the error of stochastic maximization compared to exact maximization. Furthermore, we evaluate the proposed RL algorithms on environments from Gymna-sium (Brockman et al., 2016). For the stochastic deep RL algorithms, the evaluations were performed on control tasks within the multi-joint dynamics with contact (MuJoCo) en-vironment (Todorov et al., 2012) with discretized actions (Dulac-Arnold et al., 2015; Tavakoli et al., 2018; Tang & Agrawal, 2020). These evaluations demonstrate that the stochastic approaches outperform non-stochastic ones re-garding wall time speedup and sometimes rewards. Our key contributions are summarized as follows: • We introduce novel stochastic maximization techniques denoted as stoch max and stoch arg max , offering a com-pelling alternative to exact maximization operations, par-ticularly beneficial for handling large discrete action spaces, ensuring sub-linear complexity regarding the num-ber of actions. • We present a suite of value-based RL algorithms suit-able for large discrete actions, including Stochastic Q-learning, Stochastic Sarsa, Stochastic Double Q-learning, StochDQN, and StochDDQN, which integrate stochas-tic maximization within Q-learning, Sarsa, Double Q-learning, DQN, and DDQN, respectively. • We analyze stochastic maximization and demonstrate the convergence of Stochastic Q-learning. Furthermore, we empirically validate our approach on tasks from the Gym-nasium and MuJoCO environments, encompassing vari-ous dimensional discretized actions. 
+
+## 2. Related Works 
+
+While RL has shown promise in diverse domains, practical applications often grapple with real-world complexities. A significant hurdle arises when dealing with large discrete action spaces (Dulac-Arnold et al., 2015; 2021). Previous research has investigated strategies to address this challenge 2Stochastic Q-learning for Large Discrete Action Spaces 
+
+by leveraging the combinatorial or the dimensional struc-tures in the action space (He et al., 2016b; Tavakoli et al., 2018; Tessler et al., 2019; Delarue et al., 2020; Seyde et al., 2021; 2022; Fourati et al., 2023; 2024b;a; Akkerman et al., 2023; Fourati et al., 2024b;a; Ireland & Montana, 2024). For example, He et al. (2016b) leveraged the combinatorial structure of their language problem through sub-action em-beddings. Compressed sensing was employed in (Tessler et al., 2019) for text-based games with combinatorial ac-tions. Delarue et al. (2020) formulated the combinatorial action decision of a vehicle routing problem as a mixed-integer program. Moreover, Akkerman et al. (2023) in-troduced dynamic neighbourhood construction specifically for structured combinatorial large discrete action spaces. Previous works tailored solutions for multi-dimensional spaces such as those in (Seyde et al., 2021; 2022; Ireland & Montana, 2024), among others, while practical in the multi-dimensional spaces, may not be helpful for single-dimensional large action spaces. While relying on the struc-ture of the action space is practical in some settings, not all problems with large action spaces are multi-dimensional or structured. We complement these works by making no assumptions about the structure of the action space. Some approaches have proposed factorizing the action spaces to reduce their size. For example, these include factorizing into binary subspaces (Lagoudakis & Parr, 2003; Sallans & Hinton, 2004; Pazis & Parr, 2011; Dulac-Arnold et al., 2012), expert demonstration (Tennenholtz & Mannor, 2019), tensor factorization (Mahajan et al., 2021), and sym-bolic representations (Cui & Khardon, 2016). Additionally, some hierarchical and multi-agent RL approaches employed factorization as well (Zhang et al., 2020; Kim et al., 2021; Peng et al., 2021; Enders et al., 2023). While some of these methods effectively handle large action spaces for certain problems, they necessitate the design of a representation for each discrete action. Even then, for some problems, the resulting space may still be large. Methods presented in (Van Hasselt & Wiering, 2009; Dulac-Arnold et al., 2015; Wang et al., 2020) combine continuous-action policy gradients with nearest neighbour search to generate continuous actions and identify the nearest dis-crete actions. Although these methods have shown good performance on different tasks, they require continuous-to-discrete mapping and are mainly policy-based rather than value-based approaches. In the works of Kalashnikov et al. (2018) and Quillen et al. (2018), the cross-entropy method (Rubinstein, 1999) was utilized to approximate action maxi-mization. This approach requires multiple iterations ( r) for a single action selection. During each iteration, it samples n′
+
+values, where n′ < n , fits a Gaussian distribution to m < n ′
+
+of these samples, and subsequently draws a new batch of 
+
+n′ samples from this Gaussian distribution. As a result, this approximation remains costly, with a complexity of O(rn ′).Additionally, in the work of Van de Wiele et al. (2020), a neural network was trained to predict the optimal action in combination with a uniform search. This approach involves the use of an expensive autoregressive proposal distribution to generate n′ actions and samples a large number of ac-tions ( m), thus remaining computationally expensive, with 
+
+O(n′ + m). In (Metz et al., 2017), sequential DQN allows the agent to choose sub-actions one by one, which increases the number of steps needed to solve a problem and requires 
+
+d steps with a linear complexity of O(i) for a discretization granularity i. Additionally, Tavakoli et al. (2018) employs a branching technique with duelling DQN for combinatorial control problems. Their approach has a complexity of O(di )
+
+for actions with discretization granularity i and d dimen-sions, whereas our method, in a similar setting, achieves 
+
+O(d log( i)) . Another line of work introduces action elim-ination techniques, such as the action elimination DQN (Zahavy et al., 2018), which employs an action elimination network guided by an external elimination signal from the environment. However, it requires this domain-specific sig-nal and can be computationally expensive ( O(n′) where 
+
+n′ ≤ n are the number of remaining actions). In contrast, curriculum learning, as proposed by Farquhar et al. (2020), initially limits an agent’s action space, gradually expanding it during training for efficient exploration. However, its ef-fectiveness relies on having an informative restricted action space, and as the action space size grows, its complexity scales linearly with its size, eventually reaching O(n).In the context of combinatorial bandits with a single state but large discrete action spaces, previous works have ex-ploited the combinatorial structure of actions, where each action is a subset of main arms. For instance, for submodu-lar reward functions, which imply diminishing returns when adding arms, in (Fourati et al., 2023) and (Fourati et al., 2024b), stochastic greedy algorithms are used to avoid exact search. The former evaluates the marginal gains of adding and removing sub-actions (arms), while the latter assumes monotonic rewards and considers adding the best arm until a cardinality constraint is met. For general reward func-tions, Fourati et al. (2024a) propose using approximation algorithms to evaluate and add sub-actions. While these methods are practical for bandits, they exploit the combina-torial structure of their problems and consider a single-state scenario, which is different from general RL problems. While some approaches above are practical for handling specific problems with large discrete action spaces, they often exploit the dimensional or combinatorial structures inherent in their considered problems. In contrast, we com-plement these approaches by proposing a solution to tackle any general, potentially unstructured, single-dimensional or multi-dimensional, large discrete action space without relying on structure assumptions. Our proposed solution is general, simple, and efficient. 3Stochastic Q-learning for Large Discrete Action Spaces 
+
+## 3. Problem Description 
+
+In the context of a Markov decision process (MDP), we have specific components: a finite set of actions denoted as 
+
+A, a finite set of states denoted as S, a transition probability distribution P : S × A × S → [0 , 1] , a bounded reward function r : S × A → R, and a discount factor γ ∈ [0 , 1] .Furthermore, for time step t, we denote the chosen action as at, the current state as st, and the received reward as 
+
+rt ≜ r(st, at). Additionally, for time step t, we define a learning rate function αt : S × A → [0 , 1] .The cumulative reward an agent receives during an episode in an MDP with variable length time T is the return Rt. It is calculated as the discounted sum of rewards from time step t until the episode terminates: Rt ≜ PTi=t γi−tri. RL aims to learn a policy π : S → A mapping states to ac-tions that maximize the expected return across all episodes. The state-action value function, denoted as Qπ (s, a), repre-sents the expected return when starting from a given state s,taking action a, and following a policy π afterwards. The function Qπ can be expressed recursively using the Bellman equation: 
+
+Qπ (s, a) = r(s, a) + γ X
+
+> s′∈S
+
+P(s′ | s, a)Qπ (s′, π (s′)) . (1) Two main categories of policies are commonly employed in RL systems: value-based and actor-based policies (Sutton & Barto, 2018). This study primarily concentrates on the former type, where the value function directly influences the policy’s decisions. An example of a value-based policy in a state s involves an εs-greedy algorithm, selecting the action with the highest Q-function value with probability 
+
+(1 − εs), where εs ≥ 0, function of the state s, requiring the use of arg max operation, as follows: 
+
+πQ(s) = 
+
+(
+
+play randomly with proba. ϵs
+
+arg max a∈A Q(s, a) otherwise. (2) Furthermore, during the training, to update the Q-function, Q-learning (Watkins & Dayan, 1992), for example, uses the following update rule, which requires a max operation: 
+
+Qt+1 (st, at) = (1 − αt (st, at)) Qt (st, at)+ αt (st, at)
+
+
+
+rt + γ max  
+
+> b∈A
+
+Qt (st+1 , b )
+
+
+
+. (3) Therefore, the computational complexity of both the ac-tion selections in Eq. (2) and the Q-function updates in Eq. (3) scales linearly with the cardinality n of the action set A, making this approach infeasible as the number of actions increases significantly. The same complexity is-sues remain for other Q-learning variants, such as Double Q-learning (Hasselt, 2010), DQN (Mnih et al., 2013), and DDQN (Van Hasselt et al., 2016), among several others. When representing the value function as a parameterized function, such as a neural network, taking only the current state s as input and outputting the values for all actions, as proposed in DQN (Mnih et al., 2013), the network must accommodate a large number of output nodes, which results in increasing memory overhead and necessitates extensive predictions and maximization over these final outputs in the last layer. A notable point about this approach is that it does not exploit contextual information (representation) of actions, if available, which leads to lower generalization capability across actions with similar features and fails to generalize over new actions. Previous works have considered generalization over actions by taking the features of an action a and the current state s
+
+as inputs to the Q-network and predicting its value (Zahavy et al., 2018; Metz et al., 2017; Van de Wiele et al., 2020). However, it leads to further complications when the value function is modeled as a parameterized function with both state s and action a as inputs. Although this approach al-lows for improved generalization across the action space by leveraging contextual information from each action and generalizing across similar ones, it requires evaluating the function for each action within the action set A. This results in a linear increase in the number of function calls as the number of actions grows. This scalability issue becomes particularly problematic when dealing with computation-ally expensive function approximators, such as deep neural networks (Dulac-Arnold et al., 2015). Addressing these challenges forms the motivation behind this work. 
+
+## 4. Proposed Approach 
+
+To alleviate the computational burden associated with max-imizing a Q-function at each time step, especially when dealing with large action spaces, we introduce stochastic maximization methods with sub-linear complexity relative to the size of the action set A. Then, we integrate these methods into different value-based RL algorithms. 
+
+4.1. Stochastic Maximization 
+
+We introduce stochastic maximization as an alternative to maximization when dealing with large discrete action spaces. Instead of conducting an exhaustive search for the precise maximum across the entire set of actions A, stochastic maxi-mization searches for a maximum within a stochastic subset of actions of sub-linear size relative to the total number of actions. In principle, any size can be used, trading off time complexity and approximation. We mainly focus on 
+
+O(log( n)) to illustrate the power of the method in recover-ing Q-learning, even with such a small number of actions, with logarithmic complexity. We consider two approaches to stochastic maximization: 4Stochastic Q-learning for Large Discrete Action Spaces 
+
+memoryless and memory-based approaches. The memory-less one samples a random subset of actions R ⊆ A with a sublinear size and seeks the maximum within this sub-set. On the other hand, the memory-based one expands the randomly sampled set to include a few actions M with a sub-linear size from the latest exploited actions E and uses the combined sets to search for a stochastic maximum. Stochas-tic maximization, which may miss the exact maximum in both versions, is always upper-bounded by deterministic maximization, which finds the exact maximum. However, by construction, it has sublinear complexity in the number of actions, making it appealing when maximizing over large action spaces becomes impractical. Formally, given a state s, which may be discrete or contin-uous, along with a Q-function, a random subset of actions 
+
+R ⊆ A , and a memory subset M ⊆ E (empty in the memo-ryless case), each subset being of sublinear size, such as at most O(log( n)) each, the stoch max is the maximum value computed from the union set C = R ∪ M , defined as: 
+
+stoch max  
+
+> k∈A
+
+Qt(s, k ) ≜ max  
+
+> k∈C
+
+Qt(s, k ). (4) Besides, the stoch arg max is computed as follows: 
+
+stoch arg max 
+
+> k∈A
+
+Qt(s, k ) ≜ arg max 
+
+> k∈C
+
+Qt(s, k ). (5) In the analysis of stochastic maximization, we explore both memory-based and memoryless maximization. In the anal-ysis and experiments, we consider the random set R to consist of ⌈log( n)⌉ actions. When memory-based, in our experiments, within a given discrete state, we consider the two most recently exploited actions in that state. For con-tinuous states, where it is impossible to retain the latest exploited actions for each state, we consider a randomly sampled subset M ⊆ E , which includes ⌈log( n)⌉ actions, even though they were played in different states. We demon-strate that this approach was sufficient to achieve good re-sults in the benchmarks considered; see Section 7.3. Our Stochastic Q-learning convergence analysis considers mem-oryless stochastic maximization with a random set R of any size. 
+
+Remark 4.1 . By setting C equal to A, we essentially revert to standard approaches. Consequently, our method is an extension of non-stochastic maximization. However, in pur-suit of our objective to make RL practical for large discrete action spaces, for a given state s, in our analysis and experi-ments, we keep the union set C limited to at most 2⌈log( n)⌉,ensuring sub-linear (logarithmic) complexity. 
+
+4.2. Stochastic Q-learning 
+
+We introduce Stochastic Q-learning, described in Algorithm 1, and Stochastic Double Q-learning, described in Algorithm 
+
+Algorithm 1 Stochastic Q-learning                                       
+
+> Initialize Q(s,a)for all s∈ S ,a∈ A
+> for each episode do
+> Observe state s.
+> for each step of episode do
+> Choose afrom swith policy πSQ(s).Take action a, observe r,s′.
+> b∗←stoch arg max b∈A Q(s′, b ).
+> ∆←r+γQ (s′, b ∗)−Q(s,a).
+> Q(s,a)←Q(s,a) + α(s,a)∆ .
+> s←s′.
+> end for end for
+
+2 in Appendix C, that replace the max and arg max opera-tions in Q-learning and Double Q-learning with stoch max 
+
+and stoch arg max , respectively. Furthermore, we introduce Stochastic Sarsa, described in Algorithm 3 in Appendix C, which replaces the maximization in the greedy action selec-tion ( arg max ) in Sarsa. Our proposed solution takes a distinct approach from the conventional method of selecting the action with the high-est Q-function value from the complete set of actions A.Instead, it uses stochastic maximization, which finds a max-imum within a stochastic subset C ⊆ A , constructed as explained in Section 4.1. Our stochastic policy πSQ(s), uses an εs-greedy algorithm, in a given state s, with a probability of (1 − εs), for εs > 0, is defined as follows: 
+
+πSQ(s) ≜
+
+(
+
+play randomly with proba. ϵs
+
+stoch arg max a∈A Q(s, a) otherwise .
+
+(6) Furthermore, during the training, to update the Q-function, our proposed Stochastic Q-learning uses the following rule: 
+
+Qt+1 (st, at) = (1 − αt (st, at)) Qt (st, at)+ αt (st, at)
+
+
+
+rt + γ stoch max  
+
+> b∈A
+
+Qt (st+1 , b )
+
+
+
+. (7) While Stochastic Q-learning, like Q-learning, employs the same values for action selection and action evaluation, Stochastic Double Q-learning, similar to Double Q-learning, learns two separate Q-functions. For each update, one Q-function determines the policy, while the other determines the value of that policy. Both stochastic learning methods remove the maximization bottleneck from exploration and training updates, making these proposed algorithms signifi-cantly faster than their deterministic counterparts. 
+
+4.3. Stochastic Deep Q-network 
+
+We introduce Stochastic DQN (StochDQN), described in Algorithm 4 in Appendix C, and Stochastic DDQN (StochD-DQN) as efficient variants of deep Q-networks. These vari-ants substitute the maximization steps in the DQN (Mnih 5Stochastic Q-learning for Large Discrete Action Spaces 
+
+et al., 2013) and DDQN (Van Hasselt et al., 2016) algo-rithms with the stochastic maximization operations. In these modified approaches, we replace the εs-greedy exploration strategy with the same exploration policy as in Eq. (6). For StochDQN, we employ a deep neural network as a function approximator to estimate the action-value function, represented as Q(s, a; θ) ≈ Q(s, a), where θ denotes the weights of the Q-network. This network is trained by min-imizing a series of loss functions denoted as Li(θi), with these loss functions changing at each iteration i as follows: 
+
+Li (θi) ≜ Es,a∼ρ(·)
+
+h
+
+(yi − Q (s, a; θi)) 2i
+
+, (8) where yi ≜ E [r + γ stoch max b∈A Q(s′, b ; θi−1)| s, a]. In this context, yi represents the target value for an iteration i,and ρ(.) is a probability distribution that covers states and actions. Like the DQN approach, we keep the parameters fixed from the previous iteration, denoted as θi−1 when optimizing the loss function Li(θi).These target values depend on the network weights, which differ from the fixed targets typically used in supervised learning. We employ stochastic gradient descent for the training. While StochDQN, like DQN, employs the same values for action selection and evaluation, StochDDQN, like DDQN, trains two separate value functions. It does this by randomly assigning each experience to update one of the two value functions, resulting in two sets of weights, θ
+
+and θ′. For each update, one set of weights determines the policy, while the other set determines the values. 
+
+## 5. Stochastic Maximization Analysis 
+
+In the following, we study stochastic maximization with and without memory compared to exact maximization. 
+
+5.1. Memoryless Stochastic Maximization 
+
+Memoryless stochastic maximization, i.e., C = R ∪ ∅ , does not always yield an optimal maximizer. To return an optimal action, this action needs to be randomly sampled from the set of actions. Finding an exact maximizer, without rely-ing on memory M, is a random event with a probability p,representing the likelihood of sampling such an exact maxi-mizer. In the following lemma, we provide a lower bound on the probability of discovering an optimal action within a uniformly randomly sampled subset C = R of ⌈log( n)⌉
+
+actions, which we prove in Appendix B.1.1. 
+
+Lemma 5.1. For any given state s, the probability p of sam-pling an optimal action from a uniformly randomly chosen subset C of size ⌈log( n)⌉ actions is at least ⌈log( n)⌉ 
+
+> n
+
+.
+
+While finding an exact maximizer through sampling may not always occur, the rewards of near-optimal actions can still be similar to those obtained from an optimal action. Therefore, the difference between stochastic maximization and exact maximization might be a more informative metric than just the probability of finding an exact maximizer. Thus, at time step t, given state s and the current estimated Q-function 
+
+Qt, we define the estimation error as βt(s), as follows: 
+
+βt(s) ≜ max  
+
+> a∈A
+
+Qt (s, a) − stoch max  
+
+> a∈A
+
+Qt (s, a) . (9) Furthermore, we define the similarity ratio ωt(s), as follows: 
+
+ωt(s) ≜ stoch max  
+
+> a∈A
+
+Qt (s, a) / max  
+
+> a∈A
+
+Qt (s, a) . (10) It can be seen from the definitions that βt(s) ≥ 0 and 
+
+ωt(s) ≤ 1. While sampling the exact maximizer is not al-ways possible, near-optimal actions may yield near-optimal values, providing good approximations, i.e., βt(s) ≈ 0 and 
+
+ωt(s) ≈ 1. In general, this difference depends on the value distribution over the actions. While we do not make any specific assumptions about the value distribution in our work, we note that with some sim-plifying assumptions on the value distributions over the actions, one can derive more specialized guarantees. For ex-ample, assuming that the rewards are uniformly distributed over the actions, we demonstrate in Appendix B.3 that for a given discrete state s, if the values of the sampled actions independently follow a uniform distribution from the inter-val [Qt(s, a⋆t ) − bt(s), Q t(s, a⋆t )] , where bt(s) represents the range of the Qt(s, . ) values over the actions in state s
+
+at time step t, then the expected value of βt(s), even with-out memory, is: E [βt(s) | s] ≤ bt(s) 
+
+> ⌈log( n)⌉+1
+
+. Furthermore, we empirically demonstrate that for the considered control problems, the difference βt(s) is not large, and the ratio 
+
+ωt(s) is close to one, as shown in Section 7.4. 
+
+5.2. Stochastic Maximization with Memory 
+
+While memoryless stochastic maximization could approach the maximum value or find it with the probability p, lower-bounded in Lemma 5.1, it does not converge to an exact maximization, as it keeps sampling purely at random, as can be seen in Fig. 6 in Appendix E.2.1. However, memory-based stochastic maximization, i.e., C = R ∪ M with M̸ =
+
+∅, can become an exact maximization when the Q-function becomes stable, as we state in the Corollary 5.3, which we prove in Appendix B.2.1, and as confirmed in Fig. 6. 
+
+Definition 5.2. A Q-function is considered stable for a given time range and state s when its maximizing action in that state remains unchanged for all subsequent steps within that time, even if the Q-function’s values themselves change. A straightforward example of a stable Q-function occurs during validation periods when no function updates are performed. However, in general, a stable Q-function does 6Stochastic Q-learning for Large Discrete Action Spaces 
+
+not have to be static and might still vary over the rounds; the critical characteristic is that its maximizing action re-mains the same even when its values are updated. Although the stoch max has sub-linear complexity compared to the 
+
+max , without any assumption of the value distributions, the following corollary shows that, on average, for a stable Q-function, after a certain number of iterations, the output of the stoch max matches precisely the output of max .
+
+Corollary 5.3. For a given state s, assuming a time range where the Q-function becomes stable in that state, βt(s) is expected to converge to zero after n 
+
+> ⌈log( n)⌉
+
+iterations. 
+
+Recalling the definition of the similarity ratio ωt, it follows that ωt(s) = 1 − β(s)/ max a∈A Qt(s, a). Therefore, for a given state s, where the Q-function becomes stable, given the boundedness of iterates in Q-learning, it is expected that ωt converges to one. This observation was confirmed, even with continuous states and using neural networks as function approximators, in Section 7.4. 
+
+## 6. Stochastic Q-learning Convergence 
+
+In this section, we analyze the convergence of the Stochastic Q-learning, described in Algorithm 1. This algorithm em-ploys the policy πSQ(s), as defined in Eq. (6), with εs > 0 to guarantee that Pπ [at = a | st = s] > 0 for all state-action pairs (s, a) ∈ S × A . The value update rule, on the other hand, uses the update rule specified in Eq. (7). In the convergence analysis, we focus on memoryless max-imization. While the stoch arg max operator for action selection can be employed with or without memory, we as-sume a memoryless stoch max operator for value updates, which means that value updates are performed by maxi-mizing over a randomly sampled subset of actions from A,sampled independently from both the next state s′ and the set used for the stoch arg max .For a stochastic variable subset of actions C ⊆ A , following some probability distribution P : 2 A → [0 , 1] , we consider, without loss of generality Q(., ∅) = 0 , and define, according to P, a target Q-function, denoted as Q∗, as: 
+
+Q∗(s, a) ≜ E
+
+
+
+r(s, a) + γ max  
+
+> b∈C∼ P
+
+Q∗(s′, b ) | s, a
+
+
+
+. (11) 
+
+Remark 6.1 . The Q∗ defined above depends on the sam-pling distribution P. Therefore, it does not represent the optimal value function of the original MDP problem; in-stead, it is optimal under the condition where only a random subset of actions following the distribution P is available to the agent at each time step. However, as the sampling cardinality increases, it increasingly better approximates the optimal value function of the original MDP and fully recov-ers the optimal Q-function of the original problem when the sampling distribution becomes P(A) = 1 .The following theorem states the convergence of the iterates 
+
+Qt of Stochastic Q-learning with memoryless stochastic maximization to the Q∗, defined in Eq. (11) , for any sam-pling distribution P, regardless of the cardinality. 
+
+Theorem 6.2. For a finite MDP, as described in Section 3, let C be a randomly independently sampled subset of actions from A, of any cardinality, following any distribu-tion P, exclusively sampled for the value updates, for the Stochastic Q-learning, as described in Algorithm 1, given by the following update rule: 
+
+Qt+1 (st, at) = (1 − αt (st, at)) Qt (st, at)+ αt (st, at)
+
+
+
+rt + γ max  
+
+> b∈C∼ P
+
+Qt (st+1 , a)
+
+
+
+,
+
+given any initial estimate Q0, Qt converges with probability 1 to Q∗, defined in Eq. (11), as long as P 
+
+> t
+
+αt(s, a) = ∞
+
+and P 
+
+> t
+
+α2 
+
+> t
+
+(s, a) < ∞ for all (s, a) ∈ S × A .
+
+The theorem’s result demonstrates that for any cardinality of actions, Stochastic Q-learning converges to Q∗, as defined in Eq. (11), which recovers the convergence guarantees of Q-learning when the sampling distribution is P(A) = 1 .
+
+Remark 6.3 . In principle, any size can be used, balancing time complexity and approximation. Our empirical experi-ments focused on log( n) to illustrate the method’s ability to recover Q-learning, even with a few actions. Using √n will approach the value function of Q-learning more closely com-pared to using log( n), albeit at the cost of higher complexity than log( n).The theorem shows that even with memoryless stochastic maximization, using randomly sampled O(log( n)) actions, the convergence is still guaranteed. However, relying on memory-based stochastic maximization helps minimize the approximation error in stochastic maximization, as shown in Corollary 5.3, and outperforms Q-learning as shown in the experiments in Section 7.1. In the following, we provide a sketch of the proof addressing the extra stochasticity due to stochastic maximization. The full proof is provided in Appendix A. We tackle the additional stochasticity depending on the sam-pling distribution P, by defining an operator function Φ,which for any q : S × A → R, is as follows: 
+
+(Φ q)( s, a) ≜ X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a)
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+q(s′, b )
+
+
+
+. (12) We then demonstrate that it is a contraction in the sup-norm, as shown in Lemma 6.4, which we prove in Appendix A.2. 
+
+Lemma 6.4. The operator Φ, defined in Eq. (12) , is a contraction in the sup-norm, with a contraction factor γ,i.e., ∥Φq1 − Φq2∥∞ ≤ γ ∥q1 − q2∥∞ .
+
+7Stochastic Q-learning for Large Discrete Action Spaces 
+
+We then use the above lemma to establish the conver-gence of Stochastic Q-learning. Given any initial estimate 
+
+Q0, using the considered update rule for Stochastic Q-learning, subtracting from both sides Q∗ (st, at) and letting 
+
+∆t(s, a ) ≜ Qt(s, a ) − Q∗(s, a ), yields 
+
+∆t+1 (st, at) = (1 − αt (st, at)) ∆ t (st, at)+ αt(st, at)Ft(st, at), with 
+
+Ft(s, a) ≜ r(s, a) + γ max  
+
+> b∈C
+
+Qt (s′, b ) − Q∗ (s, a) . (13) With Ft representing the past at time t,
+
+E [Ft(s, a) | F t] = X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a) [ Ft(s, a)] = (Φ( Qt)) ( s, a) − Q∗(s, a).
+
+Using the fact that Q∗ = Φ Q∗ and Lemma 6.4, 
+
+∥E [Ft(s, a) | F t]∥∞ ≤ γ ∥Qt − Q∗∥∞ = γ ∥∆t∥∞ .
+
+(14) Given that r is bounded, its variance is bounded by some constant B. Thus, as shown in Appendix A.1, for C =max {B + γ2∥Q∗∥2
+
+> ∞
+
+, γ 2}, var [ Ft(s, a) | F t] ≤ C(1 + 
+
+∥∆t∥∞)2. Then, by this inequality, Eq. (14) , and Theo-rem 1 in (Jaakkola et al., 1993), ∆t converges to zero with probability 1, i.e., Qt converges to Q∗ with probability 1. 
+
+## 7. Experiments 
+
+We compare stochastic maximization to exact maximiza-tion and evaluate the proposed RL algorithms in Gymna-sium (Brockman et al., 2016) and MuJoCo (Todorov et al., 2012) environments. The stochastic tabular Q-learning ap-proaches are tested on CliffWalking-v0, FrozenLake-v1, and a generated MDP environment. Additionally, the stochas-tic deep Q-network approaches are tested on control tasks and compared against their deterministic counterparts, as well as against DDPG (Lillicrap et al., 2015), A2C (Mnih et al., 2016), and PPO (Schulman et al., 2017), using Stable-Baselines implementations (Hill et al., 2018), which can directly handle continuous action spaces. Further details can be found in Appendix D. 
+
+7.1. Stochastic Q-learning Average Return 
+
+We test Stochastic Q-learning, Stochastic Double Q-learning, and Stochastic Sarsa in environments with discrete states and actions. Interestingly, as shown in Fig. 1, our stochastic algorithms outperform their deterministic counter-parts. Furthermore, we observe that Stochastic Q-learning outperforms all the methods considered regarding the cu-mulative rewards in the FrozenLake-v1. Moreover, in the CliffWalking-v0 (as shown in Fig. 10), as well as for the generated MDP environment with 256 actions (as shown in Fig. 12), all the stochastic and non-stochastic methods reach the optimal policy in a similar number of steps. 0 100000 200000 300000 400000 500000 
+
+> Steps
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> Cumulative Rewards
+> Stochastic Q-learning
+> Stochastic Double Q-learning
+> Stochastic Sarsa
+> Q-learning
+> Double Q-learning
+> Sarsa
+> Random
+
+Figure 1: Comparison of stochastic vs. non-stochastic value-based variants on the FrozenLake-v1, with steps on the x-axis and cumulative rewards on the y-axis. 
+
+7.2. Exponential Wall Time Speedup 
+
+Stochastic maximization methods exhibit logarith-mic complexity regarding the number of actions. Therefore, StochDQN and StochDDQN, which apply these techniques for action selection and up-dates, have exponentially faster execution times than DQN and DDQN, as confirmed in Fig. 2. 22 24 26 28 210 212 
+
+> Number of Actions
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> Time Step Duration (s)  StochDQN
+> StochDDQN
+> DQN
+> DDQN
+> Random
+
+Figure 2: Comparison of wall time in seconds of stochastic and non-stochastic DQN methods on various action set sizes. 
+
+For the time duration of action selection alone, please refer to Appendix E.1. The time analysis results show that the pro-posed methods are nearly as fast as a random algorithm that selects actions randomly. Specifically, in the experiments with the InvertedPendulum-v4, the stochastic methods took around 0.003 seconds per step for a set of 1000 actions, while the non-stochastic methods took 0.18 seconds, which indicates that the stochastic versions are 60 times faster than their deterministic counterparts. Furthermore, for the HalfCheetah-v4 experiment, we considered 4096 actions, where one (D)DQN step takes 0.6 seconds, needing around 17 hours to run for 100,000 steps, while the Stoch(D)DQN needs around 2 hours to finish the same 100,000 steps. In other words, we can easily run for 10x more steps in the same period (seconds). This makes the stochastic methods more practical, especially with large action spaces. 
+
+7.3. Stochastic Deep Q-network Average Return 
+
+Fig. 3 shows the performance of various RL algorithms on the InvertedPendulum-v4 task, which has 512 actions. StochDQN achieves the optimal average return in fewer steps than DQN, with a lower per-step time advantage (as shown in Section 7.2). Interestingly, while DDQN strug-gles, StochDDQN nearly reaches the optimal average return, demonstrating the effectiveness of stochasticity. StochDQN and StochDDQN significantly outperform DDQN, A2C, 8Stochastic Q-learning for Large Discrete Action Spaces 0 5000 10000 15000 20000 25000 30000 
+
+> Steps
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Average Return  StochDQN
+> StochDDQN
+> DQN
+> DDQN
+> PPO
+> A2C
+> DDPG
+> Random
+
+Figure 3: Comparison of stochastic DQN variants against other RL algorithms on the InvertedPendulum-v4, with 1000 actions, with steps on the x-axis and average returns on the y-axis. 
+
+and PPO by obtaining higher average returns in fewer steps. Similarly, Fig. 9b in Appendix E.3 shows the results for the HalfCheetah-v4 task, which has 4096 actions. Stochastic methods, particularly StochDDQN, achieve results com-parable to the non-stochastic methods. Notably, all DQN methods (stochastic and non-stochastic) outperform PPO and A2C, highlighting their efficiency in such scenarios. 
+
+Remark 7.1 . While comparing them falls outside the scope of our work, we note that DDQN was proposed to mitigate the inherent overestimation in DQN. However, exchanging overestimation for underestimation bias is not always ben-eficial, as our results demonstrate and as shown in other studies such as (Lan et al., 2020). 
+
+7.4. Stochastic Maximization 
+
+This section analyzes stochastic maximization by tracking returned values of ωt (Eq. (10) )across the steps. As shown in Fig. 4, for StochDQN, for the InvertedPendulum-v4, 
+
+ωt approaches one rapidly, similarly for the HalfCheetah-v4, as shown in Appendix E.2.2. 10 1 10 2 10 3 10 4
+
+> Steps
+> 0.95
+> 0.96
+> 0.97
+> 0.98
+> 0.99
+> 1.00
+> Values
+
+Figure 4: The stoch max and 
+
+max ratio values tracked over the steps on the InvertedPendulum-v4. 
+
+Furthermore, we track the returned values of the difference 
+
+βt (Eq. (9) ) and show that it is bounded by small values in both environments, as illustrated in Appendix E.2.2. 
+
+## 8. Discussion 
+
+In this work, we focus on adapting value-based methods, which excel in generalization compared to actor-based ap-proaches (Dulac-Arnold et al., 2015). However, this advan-tage comes at the cost of lower computational efficiency due to the maximization operation required for action selection and value function updates. Therefore, our primary motiva-tion is to provide a computationally efficient alternative for situations with general large discrete action spaces. We focus mainly on Q-learning-like methods among value-based approaches due to their off-policy nature and proven success in various applications. We demonstrate that these methods can be applied to large discrete action spaces while achieving exponentially lower complexity and maintaining good performance. Furthermore, our proposed stochastic maximization method performs well even when applied to the on-policy Sarsa algorithm, extending its potential beyond off-policy methods. Consequently, the suggested stochastic approach offers broader applicability to other value-based approaches, resulting in lower complexity and improved efficiency with large discrete action spaces. While the primary goal of this work is to reduce the com-plexity and wall time of Q-learning-like algorithms, our ex-periments revealed that stochastic methods not only achieve shorter step times (in seconds) but also, in some cases, yield higher rewards and exhibit faster convergence in terms of the number of steps compared to other methods. These im-provements can be attributed to several factors. Firstly, in-troducing more stochasticity into the greedy choice through 
+
+stoch arg max enhances exploration. Secondly, Stochastic Q-learning specifically helps to reduce the inherent over-estimation in Q-learning-like methods (Hasselt, 2010; Lan et al., 2020; Wang et al., 2021). This reduction is achieved using stoch max , a lower bound to the max operation. Q-learning methods, focused initially on discrete actions, can be adapted to tackle continuous problems with dis-cretization techniques and stochastic maximization. Our control experiments show that Q-network methods with discretization achieve superior performance to algorithms with continuous actions, such as PPO, by obtaining higher rewards in fewer steps, which aligns with observations in previous works that highlight the potential of discretiza-tion for solving continuous control problems (Dulac-Arnold et al., 2015; Tavakoli et al., 2018; Tang & Agrawal, 2020). Notably, the logarithmic complexity of the proposed stochas-tic methods concerning the number of considered actions makes them well-suited for scenarios with finer-grained discretization, leading to more practical implementations. 
+
+## 9. Conclusion 
+
+We propose adapting Q-learning-like methods to mitigate the computational bottleneck associated with the max and 
+
+arg max operations in these methods. By reducing the maximization complexity from linear to sublinear using 
+
+stoch max and stoch arg max , we pave the way for prac-tical and efficient value-based RL for large discrete action spaces. We prove the convergence of Stochastic Q-learning, analyze stochastic maximization, and empirically show that it performs well with significantly low complexity. 9Stochastic Q-learning for Large Discrete Action Spaces 
+
+## Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+## References 
+
+Akkerman, F., Luy, J., van Heeswijk, W., and Schiffer, M. Handling large discrete action spaces via dynamic neigh-borhood construction. arXiv preprint arXiv:2305.19891 ,2023. Al-Abbasi, A. O., Ghosh, A., and Aggarwal, V. Deeppool: Distributed model-free algorithm for ride-sharing using deep reinforcement learning. IEEE Transactions on Intel-ligent Transportation Systems , 20(12):4714–4727, 2019. Brockman, G., Cheung, V., Pettersson, L., Schneider, J., Schulman, J., Tang, J., and Zaremba, W. Openai gym. 
+
+arXiv preprint arXiv:1606.01540 , 2016. Cui, H. and Khardon, R. Online symbolic gradient-based optimization for factored action mdps. In IJCAI , pp. 3075–3081, 2016. Delarue, A., Anderson, R., and Tjandraatmadja, C. Rein-forcement learning with combinatorial actions: An appli-cation to vehicle routing. Advances in Neural Information Processing Systems , 33:609–620, 2020. Dulac-Arnold, G., Denoyer, L., Preux, P., and Gallinari, P. Fast reinforcement learning with large action sets using error-correcting output codes for mdp factoriza-tion. In Joint European Conference on Machine Learning and Knowledge Discovery in Databases , pp. 180–194. Springer, 2012. Dulac-Arnold, G., Evans, R., van Hasselt, H., Sunehag, P., Lillicrap, T., Hunt, J., Mann, T., Weber, T., Degris, T., and Coppin, B. Deep reinforcement learning in large discrete action spaces. arXiv preprint arXiv:1512.07679 , 2015. Dulac-Arnold, G., Levine, N., Mankowitz, D. J., Li, J., Paduraru, C., Gowal, S., and Hester, T. Challenges of real-world reinforcement learning: definitions, bench-marks and analysis. Machine Learning , 110(9):2419– 2468, 2021. Enders, T., Harrison, J., Pavone, M., and Schiffer, M. Hybrid multi-agent deep reinforcement learning for autonomous mobility on demand systems. In Learning for Dynamics and Control Conference , pp. 1284–1296. PMLR, 2023. Farquhar, G., Gustafson, L., Lin, Z., Whiteson, S., Usunier, N., and Synnaeve, G. Growing action spaces. In Interna-tional Conference on Machine Learning , pp. 3040–3051. PMLR, 2020. Fourati, F. and Alouini, M.-S. Artificial intelligence for satellite communication: A review. Intelligent and Con-verged Networks , 2(3):213–243, 2021. Fourati, F., Aggarwal, V., Quinn, C., and Alouini, M.-S. Randomized greedy learning for non-monotone stochas-tic submodular maximization under full-bandit feedback. In International Conference on Artificial Intelligence and Statistics , pp. 7455–7471. PMLR, 2023. Fourati, F., Alouini, M.-S., and Aggarwal, V. Federated combinatorial multi-agent multi-armed bandits. arXiv preprint arXiv:2405.05950 , 2024a. Fourati, F., Quinn, C. J., Alouini, M.-S., and Aggarwal, V. Combinatorial stochastic-greedy bandit. In Proceed-ings of the AAAI Conference on Artificial Intelligence ,volume 38, pp. 12052–12060, 2024b. Gonzalez, G., Balakuntala, M., Agarwal, M., Low, T., Knoth, B., Kirkpatrick, A. W., McKee, J., Hager, G., Aggarwal, V., Xue, Y., et al. Asap: A semi-autonomous precise system for telesurgery during communication de-lays. IEEE Transactions on Medical Robotics and Bion-ics , 5(1):66–78, 2023. Haliem, M., Mani, G., Aggarwal, V., and Bhargava, B. A distributed model-free ride-sharing approach for joint matching, pricing, and dispatching using deep reinforce-ment learning. IEEE Transactions on Intelligent Trans-portation Systems , 22(12):7931–7942, 2021. Hasselt, H. Double q-learning. Advances in neural informa-tion processing systems , 23, 2010. He, J., Chen, J., He, X., Gao, J., Li, L., Deng, L., and Osten-dorf, M. Deep reinforcement learning with an unbounded action space. arXiv preprint arXiv:1511.04636 , 5, 2015. He, J., Chen, J., He, X., Gao, J., Li, L., Deng, L., and Ostendorf, M. Deep reinforcement learning with a nat-ural language action space. In Proceedings of the 54th Annual Meeting of the Association for Computational Linguistics (Volume 1: Long Papers) , pp. 1621–1630, Berlin, Germany, August 2016a. Association for Compu-tational Linguistics. doi: 10.18653/v1/P16-1153. URL 
+
+https://aclanthology.org/P16-1153 .He, J., Ostendorf, M., He, X., Chen, J., Gao, J., Li, L., and Deng, L. Deep reinforcement learning with a combinato-rial action space for predicting popular Reddit threads. In 
+
+Proceedings of the 2016 Conference on Empirical Meth-ods in Natural Language Processing , pp. 1838–1848, Austin, Texas, November 2016b. Association for Compu-tational Linguistics. doi: 10.18653/v1/D16-1189. URL 
+
+https://aclanthology.org/D16-1189 .10 Stochastic Q-learning for Large Discrete Action Spaces 
+
+Hill, A., Raffin, A., Ernestus, M., Gleave, A., Kanervisto, A., Traore, R., Dhariwal, P., Hesse, C., Klimov, O., Nichol, A., Plappert, M., Radford, A., Schulman, J., Sidor, S., and Wu, Y. Stable baselines. https://github.com/ hill-a/stable-baselines , 2018. Ireland, D. and Montana, G. Revalued: Regularised ensem-ble value-decomposition for factorisable markov decision processes. arXiv preprint arXiv:2401.08850 , 2024. Jaakkola, T., Jordan, M., and Singh, S. Convergence of stochastic iterative dynamic programming algorithms. 
+
+Advances in neural information processing systems , 6, 1993. Kalashnikov, D., Irpan, A., Pastor, P., Ibarz, J., Herzog, A., Jang, E., Quillen, D., Holly, E., Kalakrishnan, M., Vanhoucke, V., et al. Qt-opt: Scalable deep reinforcement learning for vision-based robotic manipulation. arXiv preprint arXiv:1806.10293 , 2018. Kim, M., Park, J., et al. Learning collaborative policies to solve np-hard routing problems. Advances in Neural Information Processing Systems , 34:10418–10430, 2021. Lagoudakis, M. G. and Parr, R. Reinforcement learning as classification: Leveraging modern classifiers. In Proceed-ings of the 20th International Conference on Machine Learning (ICML-03) , pp. 424–431, 2003. Lan, Q., Pan, Y., Fyshe, A., and White, M. Maxmin q-learning: Controlling the estimation bias of q-learning. 
+
+arXiv preprint arXiv:2002.06487 , 2020. Li, S., Wei, C., and Wang, Y. Combining decision making and trajectory planning for lane changing using deep reinforcement learning. IEEE Transactions on Intelligent Transportation Systems , 23(9):16110–16136, 2022. Lillicrap, T. P., Hunt, J. J., Pritzel, A., Heess, N., Erez, T., Tassa, Y., Silver, D., and Wierstra, D. Continuous control with deep reinforcement learning. arXiv preprint arXiv:1509.02971 , 2015. Luong, N. C., Hoang, D. T., Gong, S., Niyato, D., Wang, P., Liang, Y.-C., and Kim, D. I. Applications of deep rein-forcement learning in communications and networking: A survey. IEEE Communications Surveys & Tutorials , 21 (4):3133–3174, 2019. Mahajan, A., Samvelyan, M., Mao, L., Makoviychuk, V., Garg, A., Kossaifi, J., Whiteson, S., Zhu, Y., and Anand-kumar, A. Reinforcement learning in factored action spaces using tensor decompositions. arXiv preprint arXiv:2110.14538 , 2021. Mazyavkina, N., Sviridov, S., Ivanov, S., and Burnaev, E. Reinforcement learning for combinatorial optimiza-tion: A survey. Computers & Operations Research , 134: 105400, 2021. Metz, L., Ibarz, J., Jaitly, N., and Davidson, J. Discrete sequential prediction of continuous actions for deep rl. 
+
+arXiv preprint arXiv:1705.05035 , 2017. Mnih, V., Kavukcuoglu, K., Silver, D., Graves, A., Antonoglou, I., Wierstra, D., and Riedmiller, M. Playing atari with deep reinforcement learning. arXiv preprint arXiv:1312.5602 , 2013. Mnih, V., Badia, A. P., Mirza, M., Graves, A., Lillicrap, T., Harley, T., Silver, D., and Kavukcuoglu, K. Asyn-chronous methods for deep reinforcement learning. In 
+
+International conference on machine learning , pp. 1928– 1937. PMLR, 2016. Nair, V. and Hinton, G. E. Rectified linear units improve restricted boltzmann machines. In Proceedings of the 27th international conference on machine learning (ICML-10) ,pp. 807–814, 2010. Pazis, J. and Parr, R. Generalized value functions for large action sets. In Proceedings of the 28th International Conference on Machine Learning (ICML-11) , pp. 1185– 1192, 2011. Peng, B., Rashid, T., Schroeder de Witt, C., Kamienny, P.-A., Torr, P., B ¨ohmer, W., and Whiteson, S. Facmac: Factored multi-agent centralised policy gradients. Ad-vances in Neural Information Processing Systems , 34: 12208–12221, 2021. Quillen, D., Jang, E., Nachum, O., Finn, C., Ibarz, J., and Levine, S. Deep reinforcement learning for vision-based robotic grasping: A simulated comparative evaluation of off-policy methods. In 2018 IEEE International Confer-ence on Robotics and Automation (ICRA) , pp. 6284–6291. IEEE, 2018. Rubinstein, R. The cross-entropy method for combinatorial and continuous optimization. Methodology and comput-ing in applied probability , 1:127–190, 1999. Rummery, G. A. and Niranjan, M. On-line Q-learning using connectionist systems , volume 37. University of Cambridge, Department of Engineering Cambridge, UK, 1994. Sallans, B. and Hinton, G. E. Reinforcement learning with factored states and actions. The Journal of Machine Learning Research , 5:1063–1088, 2004. Schulman, J., Wolski, F., Dhariwal, P., Radford, A., and Klimov, O. Proximal policy optimization algorithms. 
+
+arXiv preprint arXiv:1707.06347 , 2017. 11 Stochastic Q-learning for Large Discrete Action Spaces 
+
+Seyde, T., Gilitschenski, I., Schwarting, W., Stellato, B., Riedmiller, M., Wulfmeier, M., and Rus, D. Is bang-bang control all you need? solving continuous control with bernoulli policies. Advances in Neural Information Processing Systems , 34:27209–27221, 2021. Seyde, T., Werner, P., Schwarting, W., Gilitschenski, I., Riedmiller, M., Rus, D., and Wulfmeier, M. Solv-ing continuous control via q-learning. arXiv preprint arXiv:2210.12566 , 2022. Sutton, R. S. and Barto, A. G. Reinforcement learning: An introduction . MIT press, 2018. Tang, Y. and Agrawal, S. Discretizing continuous action space for on-policy optimization. In Proceedings of the aaai conference on artificial intelligence , volume 34, pp. 5981–5988, 2020. Tavakoli, A., Pardo, F., and Kormushev, P. Action branch-ing architectures for deep reinforcement learning. In Pro-ceedings of the AAAI conference on Artificial Intelligence ,volume 32, 2018. Tennenholtz, G. and Mannor, S. The natural language of ac-tions. In International Conference on Machine Learning ,pp. 6196–6205. PMLR, 2019. Tessler, C., Zahavy, T., Cohen, D., Mankowitz, D. J., and Mannor, S. Action assembly: Sparse imitation learning for text based games with combinatorial action spaces. 
+
+arXiv preprint arXiv:1905.09700 , 2019. Todorov, E., Erez, T., and Tassa, Y. Mujoco: A physics engine for model-based control. In 2012 IEEE/RSJ inter-national conference on intelligent robots and systems , pp. 5026–5033. IEEE, 2012. Van de Wiele, T., Warde-Farley, D., Mnih, A., and Mnih, V. Q-learning in enormous action spaces via amortized approximate maximization. arXiv preprint arXiv:2001.08116 , 2020. Van Hasselt, H. and Wiering, M. A. Using continuous action spaces to solve discrete problems. In 2009 International Joint Conference on Neural Networks , pp. 1149–1156. IEEE, 2009. Van Hasselt, H., Guez, A., and Silver, D. Deep reinforce-ment learning with double q-learning. In Proceedings of the AAAI conference on artificial intelligence , volume 30, 2016. Wang, G., Shi, D., Xue, C., Jiang, H., and Wang, Y. Bic-ddpg: Bidirectionally-coordinated nets for deep multi-agent reinforcement learning. In International Confer-ence on Collaborative Computing: Networking, Applica-tions and Worksharing , pp. 337–354. Springer, 2020. Wang, H., Lin, S., and Zhang, J. Adaptive ensemble q-learning: Minimizing estimation bias via error feedback. 
+
+Advances in Neural Information Processing Systems , 34: 24778–24790, 2021. Wang, X., Wang, S., Liang, X., Zhao, D., Huang, J., Xu, X., Dai, B., and Miao, Q. Deep reinforcement learning: a survey. IEEE Transactions on Neural Networks and Learning Systems , 2022. Watkins, C. J. and Dayan, P. Q-learning. Machine learning ,8:279–292, 1992. Zahavy, T., Haroush, M., Merlis, N., Mankowitz, D. J., and Mannor, S. Learn what not to learn: Action elimination with deep reinforcement learning. Advances in neural information processing systems , 31, 2018. Zhang, T., Guo, S., Tan, T., Hu, X., and Chen, F. Gen-erating adjacency-constrained subgoals in hierarchical reinforcement learning. Advances in Neural Information Processing Systems , 33:21579–21590, 2020. Zhang, Z., Pan, Z., and Kochenderfer, M. J. Weighted double q-learning. In IJCAI , pp. 3455–3461, 2017. 12 Stochastic Q-learning for Large Discrete Action Spaces 
+
+## A. Stochastic Q-learning Convergence Proofs 
+
+In this section, we prove Theorem 6.2, which states the convergence of Stochastic Q-learning. This algorithm uses a stochastic policy for action selection, employing a stoch arg max with or without memory, possibly dependent on the current state s. For value updates, it utilizes a stoch max without memory, independent of the following state s′.
+
+A.1. Proof of Theorem 6.2 
+
+Proof. Stochastic Q-learning employs a stochastic policy in a given state s, which use stoch arg max operation, with or without memory M, with probability (1 − εs), for εs > 0, which can be summarized by the following equation: 
+
+πSQ(s) = 
+
+(
+
+play randomly with probability ϵs
+
+stoch arg max a∈A Q(s, a) otherwise . (15) This policy, with εs > 0, ensures that Pπ [at = a | st = s] > 0 for all (s, a) ∈ S × A .Furthermore, during the training, to update the Q-function, given any initial estimate Q0, we consider a Stochastic Q-learning which uses stoch max operation as in the following stochastic update rule: 
+
+Qt+1 (st, at) = (1 − αt (st, at)) Qt (st, at) + αt (st, at)
+
+
+
+rt + γ stoch max  
+
+> b∈A
+
+Qt (st+1 , b )
+
+
+
+. (16) For the function updates, we consider a stoch max without memory, which involves a max over a random subset of action 
+
+C sampled from a set probability distribution P defined over the combinatorial space of actions, i.e., P : 2 A → [0 , 1] , which can be a uniform distribution over the action sets of size ⌈log( n)⌉.Hence, for a random subset of actions C, the update rule of Stochastic Q-learning can be written as: 
+
+Qt+1 (st, at) = (1 − αt (st, at)) Qt (st, at) + αt (st, at)
+
+
+
+rt + γ max  
+
+> b∈C
+
+Qt (st+1 , b )
+
+
+
+. (17) We define an optimal Q-function, denoted as Q∗, as follows: 
+
+Q∗(s, a) = E
+
+
+
+r(s, a) + γ stoch max  
+
+> b∈A
+
+Q∗(s′, b ) | s, a
+
+
+
+(18) 
+
+= E
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+Q∗(s′, b ) | s, a
+
+
+
+. (19) Subtracting from both sides Q∗ (st, at) and letting 
+
+∆t(s, a) = Qt(s, a) − Q∗(s, a), (20) yields 
+
+∆t+1 (st, at) = (1 − αt (st, at)) ∆ t (st, at) + αt(st, at)Ft(st, at), (21) with 
+
+Ft(s, a) = r(s, a) + γ max  
+
+> b∈C
+
+Qt (s′, b ) − Q∗ (s, a) . (22) For the transition probability distribution P : S × A × S → [0 , 1] , the set probability distribution P : 2 A → [0 , 1] , the reward function r : S × A → R, and the discount factor, γ ∈ [0 , 1] , we define the following contraction operator Φ, defined for a function q : S × A → R as 
+
+(Φ q)( s, a) = X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a)
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+q(s′, b )
+
+
+
+. (23) Therefore, with Ft representing the past at time step t,
+
+E [Ft(s, a) | F t] = X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a)
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+Qt (s′, b ) − Q∗ (s, a)
+
+
+
+= (Φ( Qt)) ( s, a) − Q∗(s, a).
+
+13 Stochastic Q-learning for Large Discrete Action Spaces 
+
+Using the fact that Q∗ = Φ Q∗,
+
+E [Ft(s, a) | F t] = (Φ Qt) ( s, a) − (Φ Q∗) ( s, a).
+
+It is now immediate from Lemma 6.4, which we prove in Appendix A.2, that 
+
+∥E [Ft(s, a) | F t]∥∞ ≤ γ ∥Qt − Q∗∥∞ = γ ∥∆t∥∞ . (24) Moreover, 
+
+var [ Ft(s, a) | F t] = E
+
+"
+
+r(s, a) + γ max  
+
+> b∈C
+
+Qt(s′, b ) − Q∗(s, a) − (Φ Qt) ( s, a) + Q∗(s, a)
+
+2
+
+| F t
+
+#
+
+= E
+
+"
+
+r(s, a) + γ max  
+
+> b∈C
+
+Qt(s′, b ) − (Φ Qt) ( s, a)
+
+2
+
+| F t
+
+#
+
+= var 
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+Qt(s′, b ) | F t
+
+
+
+= var [ r(s, a) | F t] + γ2 var 
+
+
+
+max  
+
+> b∈C
+
+Qt(s′, b ) | F t
+
+
+
++ 2 γ cov( r(s, a), max  
+
+> b∈C
+
+Qt(s′, b ) | F t)= var [ r(s, a) | F t] + γ2 var 
+
+
+
+max  
+
+> b∈C
+
+Qt(s′, b ) | F t
+
+
+
+.
+
+The last line follows from the fact that the randomness of max b∈C Qt(s′, b ) | F t only depends on the random set C and the next state s′. Moreover, we consider the reward r(s, a) independent of the set C and the next state s′, by not using the same set C for both the action selection and the value update. Given that r is bounded, its variance is bounded by some constant B. Therefore, 
+
+var [ Ft(s, a) | F t] ≤ B + γ2 var 
+
+
+
+max  
+
+> b∈C
+
+Qt(s′, b ) | F t
+
+
+
+= B + γ2E
+
+
+
+(max  
+
+> b∈C
+
+Qt(s′, b )) 2 | F t
+
+
+
+− γ2E
+
+
+
+max  
+
+> b∈C
+
+Qt(s′, b ) | F t
+
+2
+
+≤ B + γ2E
+
+
+
+(max  
+
+> b∈C
+
+Qt(s′, b )) 2 | F t
+
+
+
+≤ B + γ2E
+
+
+
+(max  
+
+> s′∈S
+
+max  
+
+> b∈A
+
+Qt(s′, b )) 2 | F t
+
+
+
+≤ B + γ2(max  
+
+> s′∈S
+
+max  
+
+> b∈A
+
+Qt(s′, b )) 2
+
+= B + γ2∥Qt∥2
+
+> ∞
+
+= B + γ2∥∆t + Q∗∥2
+
+> ∞
+
+≤ B + γ2∥Q∗∥2 
+
+> ∞
+
++ γ2∥∆t∥2
+
+> ∞
+
+≤ (B + γ2∥Q∗∥2
+
+> ∞
+
+)(1 + ∥∆t∥2
+
+> ∞
+
+) + γ2(1 + ∥∆t∥2
+
+> ∞
+
+)
+
+≤ max {B + γ2∥Q∗∥2
+
+> ∞
+
+, γ 2}(1 + ∥∆t∥2
+
+> ∞
+
+)
+
+≤ max {B + γ2∥Q∗∥2
+
+> ∞
+
+, γ 2}(1 + ∥∆t∥∞)2.
+
+Therefore, for constant C = max {B + γ2∥Q∗∥2
+
+> ∞
+
+, γ 2},
+
+var [ Ft(s, a) | F t] ≤ C(1 + ∥∆t∥∞)2. (25) Then, by Eq. (24) , Eq. (25) , and Theorem 1 in (Jaakkola et al., 1993), ∆t converges to zero with probability 1, i.e., Qt
+
+converges to Q∗ with probability 1. 14 Stochastic Q-learning for Large Discrete Action Spaces 
+
+A.2. Proof of Lemma 6.4 
+
+Proof. For the transition probability distribution P : S × A × S → [0 , 1] , the set probability distribution P defined over the combinatorial space of actions, i.e., P : 2 A → [0 , 1] , the reward function r : S × A → R, and the discount factor γ ∈ [0 , 1] ,for a function q : S × A → R, the operator Φ is defined as follows: 
+
+(Φ q)( s, a) = X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a)
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+q(s′, b )
+
+
+
+. (26) Therefore, 
+
+∥Φq1 − Φq2∥∞ = max 
+
+> s,a
+
+X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a)
+
+
+
+r(s, a) + γ max  
+
+> b∈C
+
+q1(s′, b ) − r(s, a) + γ max  
+
+> b∈C
+
+q2(s′, b )
+
+
+
+= max  
+
+> s,a
+
+γ X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a)
+
+
+
+max  
+
+> b∈C
+
+q1(s′, b ) − max  
+
+> b∈C
+
+q2(s′, b )
+
+
+
+≤ max  
+
+> s,a
+
+γ X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a) max  
+
+> b∈C
+
+q1(s′, b ) − max  
+
+> b∈C
+
+q2(s′, b )
+
+≤ max  
+
+> s,a
+
+γ X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a) max  
+
+> z,b
+
+|q1(z, b ) − q2(z, b )|≤ max  
+
+> s,a
+
+γ X
+
+> C∈ 2A
+
+P(C) X
+
+> s′∈S
+
+P(s′ | s, a) ∥q1 − q2∥∞
+
+= γ ∥q1 − q2∥∞ .
+
+15 Stochastic Q-learning for Large Discrete Action Spaces 
+
+## B. Stochastic Maximization 
+
+We analyze the proposed stochastic maximization method by comparing its error to that of exact maximization. First, we consider the case without memory, where C = R, and then the case with memory, where M̸ = ∅. Finally, we provide a specialized bound for the case where the action values follow a uniform distribution. 
+
+B.1. Memoryless Stochastic Maximization 
+
+In the following lemma, we give a lower bound on the probability of finding an optimal action within a uniformly sampled subset R of ⌈log( n)⌉ actions. We prove that for a given state s, the probability p of sampling an optimal action within the uniformly randomly sampled subset R of size ⌈log( n)⌉ actions is lower bounded with p ≥ ⌈log( n)⌉ 
+
+> n
+
+.B.1.1. P ROOF OF LEMMA 5.1 
+
+Proof. In the presence of multiple maximizers, we focus on one of them, denoted as a∗
+
+> 0
+
+, and then the probability p of sampling at least one maximizer is lower-bounded by the probability pa∗ 
+
+> 0
+
+of finding a∗
+
+> 0
+
+, i.e., 
+
+p ≥ pa∗ 
+
+> 0
+
+.
+
+The probability pa∗ 
+
+> 0
+
+of finding a∗ 
+
+> 0
+
+is the probability of sampling a∗ 
+
+> 0
+
+within the random set R of size ⌈log( n)⌉, which is the fraction of all possible combinations of size ⌈log( n)⌉ that include a∗
+
+> 0
+
+.This fraction can be calculated as   n−1
+
+> ⌈log( n)⌉− 1
+
+ divided by all possible combinations of size ⌈log( n)⌉, which is   n
+
+> ⌈log( n)⌉
+
+.Therefore, pa∗ 
+
+> 0
+
+= ( n−1
+
+> ⌈log( n)⌉− 1
+
+)( n
+
+> ⌈log( n)⌉
+
+) .Consequently, 
+
+p ≥ ⌈log( n)⌉
+
+n . (27) 
+
+B.2. Stochastic Maximization with Memory 
+
+While stochastic maximization without memory could approach the maximum value or find it with the probability p,lower-bounded in Lemma 5.1, it never converges to an exact maximization, as it keeps sampling purely at random, as can be seen in Fig. 6. However, stochastic maximization with memory can become an exact maximization when the Q-function becomes stable, which we prove in the following Corollary. Although the stoch max has sub-linear complexity compared to the max, the following Corollary shows that, on average, for a stable Q-function, after a certain number of iterations, the output of the stoch max matches the output of max. 
+
+Definition B.1. A Q-function is considered stable for a given state s if its best action in that state remains unchanged for all subsequent steps, even if the Q-function’s values themselves change. A straightforward example of a stable Q-function occurs during validation periods when no function updates are performed. However, in general, a stable Q-function does not have to be static and might still vary over the rounds; the key characteristic is that its maximizing action remains the same even when its values are updated. Although the stoch max has sub-linear complexity compared to the max , without any assumption of the value distributions, the following Corollary shows that, on average, for a stable Q-function, after a certain number of iterations, the output of the stoch max matches exactly the output of max .B.2.1. P ROOF OF COROLLARY 5.3 
+
+Proof. We formalize the problem as a geometric distribution where the success event is the event of sampling a subset of size ⌈log( n)⌉ that includes at least one maximizer. The geometric distribution gives the probability that the first time to sample a subset that includes an optimal action requires k independent calls, each with success probability p. From Lemma 5.1, we have p ≥ ⌈log( n)⌉ 
+
+> n
+
+. Therefore, on an average, success requires: 1 
+
+> p
+
+≤ n 
+
+> ⌈log( n)⌉
+
+calls. 16 Stochastic Q-learning for Large Discrete Action Spaces 
+
+For a given discrete state s, M keeps track of the most recent best action found. For C = R ∪ M ,
+
+stoch max  
+
+> a∈A
+
+Q(s, a) = max  
+
+> a∈C
+
+Q(s, a) ≥ max  
+
+> a∈M
+
+Q(s, a). (28) Therefore, for a given state s, on average, if the Q-function is stable, then within n 
+
+> ⌈log( n)⌉
+
+, M will contain the optimal action 
+
+a∗. Therefore, on an average, after n 
+
+> ⌈log( n)⌉
+
+time steps, 
+
+stoch max  
+
+> a∈A
+
+Q(s, a) ≥ max  
+
+> a∈M
+
+Q(s, a) = max  
+
+> a∈A
+
+Q(s, a).
+
+We know that, stoch max a∈A Q(s, a) ≤ max a∈A Q(s, a). Therefore, for a stable Q-function, on an average, after n
+
+> ⌈log( n)⌉
+
+time steps, stoch max a∈A Q(s, a) becomes max a∈A Q(s, a).
+
+B.3. Stochastic Maximization with Uniformly Distributed Rewards 
+
+While the above corollary outlines an upper-bound on the average number of calls needed to determine the exact optimal action eventually, the following lemma offers insights into the expected maximum value of a randomly sampled subset of actions, comprising ⌈log( n)⌉ elements when their values are uniformly distributed. 
+
+Lemma B.2. For a given state s and a uniformly randomly sampled subset R of size ⌈log( n)⌉ actions, if the values of the sampled actions follow independently a uniform distribution in the interval [Qt(s, a⋆t ) − bt(s), Q t(s, a⋆t )] , then the expected value of the maximum Q-function within this random subset is: 
+
+E
+
+
+
+max  
+
+> k∈R
+
+Qt(s, k ) | s, a⋆t
+
+
+
+= Qt(s, a⋆t ) − bt(s)
+
+⌈log( n)⌉ + 1 . (29) 
+
+Proof. For a given state s we assume a uniformly randomly sampled subset R of size ⌈log( n)⌉ actions, and the values of the sampled actions are independent and follow a uniform distribution in the interval [Qt(s, a⋆t ) − bt(s), Q t(s, a⋆t )] . Therefore, the cumulative distribution function (CDF) for the value of an action a given the state s and the optimal action a∗ 
+
+> t
+
+is: 
+
+G(y; s, a) = 
+
+
+
+0 for y < Q t(s, a∗ 
+
+> t
+
+) − bt(s)
+
+y for y ∈ [Qt(s, a∗ 
+
+> t
+
+) − bt, Q t(s, a∗)] 1 for y > Q t(s, a∗ 
+
+> t
+
+) .
+
+We define the variable x = ( y − (Qt(s, a∗ 
+
+> t
+
+) − bt(s))) /b t(s).
+
+F (x; s, a) = 
+
+
+
+0 for x < 0
+
+x for x ∈ [0 , 1] 1 for x > 1 .
+
+If we select ⌈log( n)⌉ such actions, the CDF of the maximum of these actions, denoted as Fmax is the following: 
+
+Fmax (x; s, a) = P
+
+
+
+max  
+
+> a∈R
+
+Qt(s, a) ≤ x
+
+
+
+= Y
+
+> a∈R
+
+P (Qt(s, a) ≤ x)= Y
+
+> a∈R
+
+F (x; s, a)= F (x; s, a)⌈log( n)⌉.
+
+The second line follows from the independence of the values, and the last line follows from the assumption that all actions follow the same uniform distribution. The CDF of the maximum is therefore given by: 
+
+Fmax (x; s, a) = 
+
+
+
+0 for x < 0
+
+x⌈log( n)⌉ for x ∈ [0 , 1] 1 for x > 1 .
+
+17 Stochastic Q-learning for Large Discrete Action Spaces 
+
+Now, we can determine the desired expected value as 
+
+E
+
+
+
+max 
+
+> a∈R
+
+Qt(s, a) − (Qt(s, a∗ 
+
+> t
+
+) − bt(s)) 
+
+bt(s)
+
+
+
+=
+
+Z ∞−∞ 
+
+x dFmax (x; s, a)=
+
+Z 10
+
+x dFmax (x; s, a)= [ xF max (x; s, a)] 10 −
+
+Z 10
+
+Fmax (x; s, a) dx
+
+= 1 −
+
+Z 10
+
+x⌈log( n)⌉ dx
+
+= 1 − 1
+
+⌈log( n)⌉ + 1 .
+
+We employed the identity R 10 x dμ(x) = R 10 1 − μ(x) dx, which can be demonstrated through integration by parts. To return to the original scale, we can first multiply by bt and then add Qt(s, a∗ 
+
+> t
+
+) − bt(s), resulting in: 
+
+E
+
+
+
+max  
+
+> a∈R
+
+Qt(s, a) | s, a∗
+
+> t
+
+
+
+= Qt(s, a∗ 
+
+> t
+
+) − bt(s)
+
+⌈log( n)⌉ + 1 .
+
+As an example of this setting, for Qt(s, a⋆t ) = 100 , bt = 100 , for a setting with n = 1000 actions, ⌈log( n)⌉+1 = 11 . Hence the E [max k∈R Qt(s, k ) | s, a⋆t ] ≈ 91 . This shows that even with a randomly sampled set of actions R, the stoch max can be close to the max. We simulate this setting in the experiments in Fig. 6. Our proposed stochastic maximization does not solely rely on the randomly sampled subset of actions R but also considers actions from previous experiences through M. Therefore, the expected stoch max should be higher than the above result, providing an upper bound on the expected βt as described in the following corollary of Lemma B.2. 
+
+Corollary B.3. For a given discrete state s, if the values of the sampled actions follow independently a uniform distribution from the interval [Qt(s, a⋆t ) − bt(s), Q t(s, a⋆t )] , then the expected value of βt(s) is: 
+
+E [βt(s) | s] ≤ bt(s)
+
+⌈log( n)⌉ + 1 . (30) 
+
+Proof. At time step t, given a state s, and the current estimated Q-function Qt, βt(s) is defined as follows: 
+
+βt(s) = max  
+
+> a∈A
+
+Qt (s, a) − stoch max  
+
+> a∈A
+
+Qt (s, a) . (31) For a given state s and a uniformly randomly sampled subset R of size ⌈log( n)⌉ actions and a subset of some previous played actions M ⊂ E , using the law of total expectation, 
+
+E [βt(s) | s] = E [E [βt(s) | s, a⋆t ] | s]= E
+
+
+
+E
+
+
+
+max  
+
+> k∈A
+
+Qt(s, k ) − stoch max  
+
+> k∈A
+
+Qt(s, k ) | s, a⋆t
+
+
+
+| s
+
+
+
+= E
+
+
+
+E
+
+
+
+max  
+
+> k∈A
+
+Qt(s, k ) − max  
+
+> k∈R∪M
+
+Qt(s, k ) | s, a⋆t
+
+
+
+| s
+
+
+
+≤ E
+
+
+
+E
+
+
+
+max  
+
+> k∈A
+
+Qt(s, k ) − max  
+
+> k∈R
+
+Qt(s, k ) | s, a⋆t
+
+
+
+| s
+
+
+
+= E
+
+
+
+Qt(s, a∗ 
+
+> t
+
+) − E
+
+
+
+max  
+
+> k∈R
+
+Qt(s, k ) | s, a⋆t
+
+
+
+| s
+
+
+
+.
+
+18 Stochastic Q-learning for Large Discrete Action Spaces 
+
+Therefore by Lemma B.2: 
+
+E [βt(s) | s] ≤ E
+
+
+
+Qt(s, a∗ 
+
+> t
+
+) − (Qt(s, a∗ 
+
+> t
+
+) − bt(s)
+
+⌈log( n)⌉ + 1 ) | s
+
+
+
+= E
+
+ bt(s)
+
+⌈log( n)⌉ + 1 | s
+
+
+
+= bt(s)
+
+⌈log( n)⌉ + 1 .
+
+19 Stochastic Q-learning for Large Discrete Action Spaces 
+
+## C. Pseudocodes 
+
+Algorithm 2 Stochastic Double Q-learning Initialize QA(s, a) and QB (s, a) for all s ∈ S , a ∈ A , n = | A | 
+
+for each episode do 
+
+Observe state s.
+
+for each step of episode do 
+
+Choose a from s via QA + QB with policy πS 
+
+> (QA+QB)
+
+(s) in Eq. (6). Take action a, observe r, s′.Choose either UPDATE(A) or UPDATE(B), for example randomly. 
+
+if UPDATE(A) then 
+
+∆A ← r + γQ B (s′, stoch arg max b∈A QA(s′, b )) − QA(s, a).
+
+QA(s, a) ← QA(s, a) + α(s, a)∆ A.
+
+else if UPDATE(B) then 
+
+∆B ← r + γQ A(s′, stoch arg max b∈A QB (s′, b )) − QB (s, a).
+
+QB (s, a) ← QB (s, a) + α(s, a)∆ B .
+
+end if 
+
+s ← s′.
+
+end for end for Algorithm 3 Stochastic Sarsa Initialize Q(s, a) for all s ∈ S , a ∈ A , n = | A | 
+
+for each episode do 
+
+Observe state s.Choose a from s with policy πSQ(s) in Eq. (6). 
+
+for each step of episode do 
+
+Take action a, observe r, s′.Choose a′ from s′ with policy πSQ(s′) in Eq. (6). 
+
+Q(s, a) ← Q(s, a) + α(s, a)[ r + γQ (s′, a′) − Q(s, a)] .
+
+s ← s′; a ← a′.
+
+end for end for 
+
+## D. Experimental Details 
+
+D.1. Environments 
+
+We test our proposed algorithms on a standardized set of environments using open-source libraries. We compare stochastic maximization to exact maximization and evaluate the proposed stochastic RL algorithms on Gymnasium environments (Brockman et al., 2016). Stochastic Q-learning and Stochastic Double Q-learning are tested on the CliffWalking-v0, the FrozenLake-v1, and a generated MDP environment, while stochastic deep Q-learning approaches are tested on MuJoCo control tasks (Todorov et al., 2012). D.1.1. E NVIRONMENTS WITH DISCRETE STATES AND ACTIONS 
+
+We generate an MDP environment with 256 actions, with rewards following a normal distribution of mean -50 and standard deviation of 50, with 3 states. Furthermore, while our approach is designed for large discrete action spaces, we tested it in Gymnasium environments (Brockman et al., 2016) with only four discrete actions, such as CliffWalking-v0 and FrozenLake-v1. CliffWalking-v0 involves navigating a grid world from the starting point to the destination without falling off a cliff. FrozenLake-v1 requires moving from the starting point to the goal without stepping into any holes on the frozen surface, which can be challenging due to the slippery nature of the ice. 20 Stochastic Q-learning for Large Discrete Action Spaces 
+
+Algorithm 4 Stochastic Deep Q-Network (StochDQN) 
+
+Algorithm parameters: learning rate α ∈ (0 , 1] , replay buffer E, update rate τ .
+
+Initialize: neural network Q(s, a; θ) with random weights θ, target network ˆQ(s, a; θ−) with θ− = θ, set of actions A of size n.
+
+for each episode do 
+
+Initialize state s.
+
+while not terminal state is reached do 
+
+Choose a from s using a stochastic policy as defined in Eq. (15) using Q(s, . ; θ).Take action a, observe reward r(s, a) and next state s′.Store (s, a, r (s, a), s′) in replay buffer E.Compute target values for the mini-batch: 
+
+yi =
+
+(
+
+ri if s′ 
+
+> i
+
+is terminal 
+
+ri + γ ˆQ(s′
+
+> i
+
+, stoch arg max a′∈A ˆQ(s′
+
+> i
+
+, a′; θ−); θ−) otherwise .
+
+Perform a gradient descent step on the loss: 
+
+L(θ) = 1
+
+⌈log( n)⌉
+
+> ⌈log( n)⌉
+
+X
+
+> i=1
+
+(yi − Q(si, ai; θ)) 2.
+
+Update the target network weights: 
+
+θ− ← τ · θ + (1 − τ ) · θ−.
+
+Update the Q-network weights using gradient descent: 
+
+θ ← θ + α∇θ L(θ).
+
+s ← s′.
+
+end while end for 
+
+21 Stochastic Q-learning for Large Discrete Action Spaces 
+
+D.1.2. E NVIRONMENTS WITH CONTINUOUS STATES : D ISCRETIZING CONTROL TASKS 
+
+We test the stochastic deep Q-learning approaches on MuJoCo (Todorov et al., 2012) for continuous states discretized control tasks. We discretize each action dimension into i equally spaced values, creating a discrete action space with n = id
+
+d-dimensional actions. We mainly focused on the inverted pendulum and the half-cheetah. The inverted pendulum involves a cart that can be moved left or right, intending to balance a pole on top using a 1D force, with i = 512 resulting in 512 actions. The half-cheetah is a robot with nine body parts aiming to maximize forward speed. It can apply torque to 6 joints, resulting in 6D actions with i = 4 , which results in 4096 actions. 
+
+D.2. Algorithms 
+
+D.2.1. S TOCHASTIC MAXIMIZATION 
+
+We have two scenarios, one for discrete and the other for continuous states. For discrete states, E is a dictionary with the keys as the states in S with corresponding values of the latest played action in every state. In contrast, E comprises the actions in the replay buffer for continuous states. Indeed, we do not consider the whole set E either. Instead, we only consider a subset 
+
+M ⊂ E . For discrete states, for a given state s, M includes the latest two exploited actions in state s. For continuous states, where it is impossible to retain the last exploited action for each state, we consider randomly sampled subset M ⊂ E , which includes ⌈log( n)⌉ actions, even though they were played in different states. In the experiments involving continuous states, we demonstrate that this was sufficient to achieve good results, see Section 7.3. D.2.2. T ABULAR Q-LEARNING METHODS 
+
+We set the training parameters the same for all the Q-learning variants. We follow similar hyper-parameters as in (Hasselt, 2010). We set the discount factor γ to 0.95 and apply a dynamical polynomial learning rate α with αt(s, a) = 1 /z t(s, a)0.8,where zt(s, a) is the number of times the pair (s, a) has been visited, initially set to one for all the pairs. For the exploration rate, we use use a decaying ε, defined as ε(s) = 1 /p(z(s)) where z(s) is the number of times state s has been visited, initially set to one for all the states. For Double Q-learning zt(s, a) = zAt (s, a) if QA is updated and zt(s, a) = zBt (s, a) if 
+
+QB is updated, where zAt and zBt store the number of updates for each action for the corresponding value function. We averaged the results over ten repetitions. For Stochastic Q-learning, we track a dictionary D with keys being the states, and values being the latest exploited action. Thus, for a state s, the memory M = D(s), thus M is the latest exploited action in the same state s.D.2.3. D EEP Q-NETWORK METHODS 
+
+We set the training parameters the same for all the deep Q-learning variants. We set the discount factor γ to 0.99 and the learning rate α to 0.001. Our neural network takes input of a size equal to the sum of the dimensions of states and actions with a single output neuron. The network consists of two hidden linear layers, each with a size of 64, followed by a ReLU activation function (Nair & Hinton, 2010). We keep the exploration rate ε the same for all states, initialize it at 1, and apply a decay factor of 0.995, with a minimum threshold of 0.01. For n total number of actions, during training, to train the network, we use stochastic batches of size ⌈log( n)⌉ uniformly sampled from a buffer of size 2⌈log( n)⌉. We averaged the results over five repetitions. For the stochastic methods, we consider the actions in the batch of actions as the memory set 
+
+M. We choose the batch size in this way to keep the complexity of the Stochastic Q-learning within O(log( n)) .
+
+D.3. Compute and Implementation 
+
+We implement the different Q-learning methods using Python 3.9, Numpy 1.23.4, and Pytorch 2.0.1. For proximal policy optimization (PPO) (Schulman et al., 2017), asynchronous actor-critic (A2C) (Mnih et al., 2016), and deep deterministic policy gradient (DDPG) (Lillicrap et al., 2015), we use the implementations of Stable-Baselines (Hill et al., 2018). We test the training time using a CPU 11th Gen Intel(R) Core(TM) i7-1165G7 @ 2.80GHz 1.69 GHz. with 16.0 GB RAM. 22 Stochastic Q-learning for Large Discrete Action Spaces 22 24 26 28 210 212 
+
+> Number of Actions
+> 0.00
+> 0.05
+> 0.10
+> 0.15
+> 0.20
+> 0.25
+> Time (s)
+> stoch max
+> max
+
+(a) Action Selection Time 22 24 26 28 210 212  
+
+> Number of Actions
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+> Time Step Duration (s)  StochDQN
+> StochDDQN
+> DQN
+> DDQN
+> Random
+
+(b) Full Step Duration 
+
+Figure 5: Comparison results for the stochastic and deterministic methods. The x-axis represents the number of possible actions, and the y-axis represents the time step duration of the agent in seconds. 0 50 100 150 200 250 300 
+
+> Steps
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Values
+> max
+> stochmax w/
+> stochmax w/o
+> random
+
+Figure 6: stoch max with (w/) and without (w/o) memory M vs. max on uniformly distributed action values as described in Section B. The x-axis and y-axis represent the steps and the values, respectively. 
+
+## E. Additional Results 
+
+E.1. Wall Time Speed 
+
+Stochastic maximization methods exhibit logarithmic complexity regarding the number of actions, as confirmed in Fig. 5a. Therefore, both StochDQN and StochDDQN, which apply these techniques for action selection and updates, have exponentially faster execution times compared to both DQN and DDQN, which can be seen in Fig 5b which shows the complete step duration for deep Q-learning methods, which include action selection and network update. The proposed methods are nearly as fast as a random algorithm, which samples and selects actions randomly and has no updates. 
+
+E.2. Stochastic Maxmization 
+
+E.2.1. S TOCHASTIC MAXMIZATION VS MAXIMIZATION WITH UNIFORM REWARDS 
+
+In the setting described in Section B.3 with 5000 uniformly independently distributed action values in the range of [0, 100], as shown in Fig. 6, stoch max without memory, i.e., M = ∅ reaches around 91 in average return, and keeps fluctuating around, while stoch max with M quickly achieves the optimal reward. E.2.2. S TOCHASTIC MAXIMIZATION ANALYSIS 
+
+In this section, we analyze stochastic maximization by tracking returned values across rounds, ωt (Eq. (10) ), and βt (Eq. (9) ), which we provide here. At time step t, given a state s, and the current estimated Q-function Qt, we define the non-negative 23 Stochastic Q-learning for Large Discrete Action Spaces 0 5000 10000 15000 20000 25000 30000 
+
+> Steps
+> 0
+> 50
+> 100
+> 150
+> 200
+> Values
+> stoch max
+> max
+
+(a) stoch max vs max 0 5000 10000 15000 20000 25000 30000  
+
+> Steps
+> 0.95
+> 0.96
+> 0.97
+> 0.98
+> 0.99
+> 1.00
+> Values
+
+(b) Ratio ωt0 5000 10000 15000 20000 25000 30000  
+
+> Steps
+> 0.0
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> Values
+
+(c) Difference βt
+
+Figure 7: Comparison results for the stochastic and non-stochastic methods for the Inverted Pendulum with 512 actions. 0 2000 4000 6000 8000 10000 
+
+> Steps
+> 50
+> 0
+> 50
+> 100
+> 150
+> 200
+> 250
+> 300
+> 350
+> Values
+> stoch max
+> max
+
+(a) stoch max vs max 0 2000 4000 6000 8000 10000  
+
+> Steps
+> 8
+> 6
+> 4
+> 2
+> 0
+> Values
+
+(b) Ratio ωt0 2000 4000 6000 8000 10000  
+
+> Steps
+> 0
+> 2
+> 4
+> 6
+> 8
+> Values
+
+(c) Difference βt
+
+Figure 8: Comparison results for the stochastic and non-stochastic methods for the Half Cheetah with 4096 actions. underestimation error as βt(s), as follows: 
+
+βt(s) = max  
+
+> a∈A
+
+Qt (s, a) − stoch max  
+
+> a∈A
+
+Qt (s, a) . (32) Furthermore, we define the ratio ωt(s), as follows: 
+
+ωt(s) = stoch max a∈A Qt (s, a)max a∈A Qt (s, a) . (33) It follows that: 
+
+ωt(s) = 1 − βt(s)max a∈A Qt (s, a) . (34) For Deep Q-Networks, for the InvertedPendulum-v4, both stoch max and max return similar values (Fig. 7a), ωt approaches one rapidly (Fig. 7b) and βt remains below 0.5 (Fig. 7c). In the case of HalfCheetah-v4, both stoch max and max return similar values (Fig. 8a), ωt quickly converges to one (Fig. 8b), and βt is upper bounded below eight (Fig. 8c). While the difference βt remains bounded, the values of both stoch max and max increase over the rounds as the agent explores better options. This leads to the ratio ωt converging to one as the error becomes negligible over the rounds, as expected according to Eq. (34). 
+
+E.3. Stochastic Q-network Reward Analysis 
+
+As illustrated in Fig. 9a and Fig. 9b for the inverted pendulum and half cheetah experiments, which involve 512 and 4096 actions, respectively, both StochDQN and StochDDQN attain the optimal average return in a comparable number of rounds to DQN and DDQN. Additionally, StochDQN exhibits the quickest attainment of optimal rewards for the inverted pendulum. Furthermore, while DDQN did not perform well on the inverted pendulum task, its modification, i.e., StochDDQN, reached the optimal rewards. 24 Stochastic Q-learning for Large Discrete Action Spaces 0 5000 10000 15000 20000 25000 30000 
+
+> Steps
+> 0
+> 20
+> 40
+> 60
+> 80
+> 100
+> Average Return  StochDQN
+> StochDDQN
+> DQN
+> DDQN
+> PPO
+> A2C
+> DDPG
+> Random
+
+(a) Inverted Pendulum 0 20000 40000 60000 80000 100000  
+
+> Steps
+> 0
+> 25
+> 50
+> 75
+> 100
+> 125
+> 150
+> 175
+> Average Return  StochDQN
+> StochDDQN
+> DQN
+> DDQN
+> PPO
+> A2C
+> Random
+
+(b) Half Cheetah 
+
+Figure 9: Stochastic vs non-stochastic of deep Q-learning variants on Inverted Pendulum and Half Cheetah, with steps on the x-axis and average returns, smoothed over a size 100 window on the y-axis. 
+
+(a) Instantaneous Rewards 0 2000 4000 6000 8000 10000  
+
+> Steps
+> 100000
+> 80000
+> 60000
+> 40000
+> 20000
+> 0
+> Cumulative Rewards
+> Stochastic Q-learning
+> Stochastic Double Q-learning
+> Stochastic Sarsa
+> Q-learning
+> Double Q-learning
+> Sarsa
+> Random
+
+(b) Cumulative Rewards 
+
+Figure 10: Comparing stochastic and non-stochastic Q-learning approaches on the Cliff Walking, with steps on the x-axis, instantaneous rewards smoothed over a size 1000 window on the y-axis for plot (a), and cumulative rewards on the y-axis for plot (b). 
+
+E.4. Stochastic Q-learning Reward Analysis 
+
+We tested Stochastic Q-learning, Stochastic Double Q-learning, and Stochastic Sarsa in environments with both discrete states and actions. Interestingly, as shown in Fig. 11, our stochastic algorithms outperform their deterministic counterparts in terms of cumulative rewards. Furthermore, we notice that Stochastic Q-learning outperforms all the considered methods regarding the cumulative rewards. Moreover, in the CliffWalking-v0 (as shown in Fig. 10), as well as for the generated MDP environment with 256 possible actions (as shown in Fig. 12), all the stochastic and non-stochastic algorithms reach the optimal policy in a similar number of steps. 25 Stochastic Q-learning for Large Discrete Action Spaces 
+
+(a) Instantaneous Rewards 0 100000 200000 300000 400000 500000  
+
+> Steps
+> 0
+> 500
+> 1000
+> 1500
+> 2000
+> Cumulative Rewards
+> Stochastic Q-learning
+> Stochastic Double Q-learning
+> Stochastic Sarsa
+> Q-learning
+> Double Q-learning
+> Sarsa
+> Random
+
+(b) Cumulative Rewards 
+
+Figure 11: Comparing stochastic and non-stochastic Q-learning approaches on the Frozen Lake, with steps on the x-axis, instantaneous rewards smoothed over a size 1000 window on the y-axis for plot (a), and cumulative rewards on the y-axis for plot (b). 
+
+(a) Instantaneous Rewards 0 2000 4000 6000 8000 10000  
+
+> Steps
+> 400000
+> 200000
+> 0
+> 200000
+> 400000
+> 600000
+> Cumulative Rewards
+> Stochastic Q-learning
+> Stochastic Double Q-learning
+> Stochastic Sarsa
+> Q-learning
+> Double Q-learning
+> Sarsa
+> Random
+
+(b) Cumulative Rewards 
+
+Figure 12: Comparing stochastic and non-stochastic Q-learning approaches on the generated MDP environment, with steps on the x-axis, instantaneous rewards smoothed over a size 1000 window on the y-axis for plot (a), and cumulative rewards on the y-axis for plot (b). 26

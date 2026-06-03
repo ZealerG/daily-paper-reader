@@ -1,0 +1,6305 @@
+Title: Federated Offline Reinforcement Learning: Collaborative Single-Policy Coverage Suffices
+
+URL Source: https://openreview.net/pdf?id=LIPGadocTe
+
+Number of Pages: 37
+
+Markdown Content:
+## Federated Offline Reinforcement Learning: Collaborative Single-Policy Coverage Suffices 
+
+Jiin Woo 1 Laixi Shi 2 Gauri Joshi 1 Yuejie Chi 1
+
+Abstract 
+
+Offline reinforcement learning (RL), which seeks to learn an optimal policy using offline data, has garnered significant interest due to its potential in critical applications where online data collec-tion is infeasible or expensive. This work ex-plores the benefit of federated learning for offline RL, aiming at collaboratively leveraging offline datasets at multiple agents. Focusing on finite-horizon episodic tabular Markov decision pro-cesses (MDPs), we design FedLCB-Q , a variant of the popular model-free Q-learning algorithm tailored for federated offline RL. FedLCB-Q up-dates local Q-functions at agents with novel learn-ing rate schedules and aggregates them at a cen-tral server using importance averaging and a care-fully designed pessimistic penalty term. Our sam-ple complexity analysis reveals that, with appro-priately chosen parameters and synchronization schedules, FedLCB-Q achieves linear speedup in terms of the number of agents without requir-ing high-quality datasets at individual agents, as long as the local datasets collectively cover the state-action space visited by the optimal policy, highlighting the power of collaboration in the fed-erated setting. In fact, the sample complexity al-most matches that of the single-agent counterpart, as if all the data are stored at a central location, up to polynomial factors of the horizon length. Fur-thermore, FedLCB-Q is communication-efficient, where the number of communication rounds is only linear with respect to the horizon length up to logarithmic factors.       
+
+> 1Department of Electrical and Computer Engineering, Carnegie Mellon University, Pittsburgh, PA 15213, USA 2Department of Computing Mathematical Sciences, California Institute of Tech-nology, CA 91125, USA. Correspondence to: Jiin Woo <ji-inw@andrew.cmu.edu >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+1. Introduction 
+
+Offline RL (Levine et al., 2020), also known as batch RL, ad-dresses the challenge of learning a near-optimal policy using offline datasets collected a priori, without further interac-tions with an environment. Fueled by the cost-effectiveness of utilizing pre-collected datasets compared to real-time explorations, offline RL has received increasing attention. However, the performance of offline RL crucially depends on the quality of offline datasets due to the lack of addi-tional interactions with the environment, where the quality is determined by how thoroughly the state-action space is explored during data collection. Encouragingly, recent research (Rashidinejad et al., 2021; Shi et al., 2022; Xie et al., 2021b; Li et al., 2024b) indi-cates that being more conservative on unseen state-action pairs, known as the principle of pessimism, enables learning of a near-optimal policy even with partial coverage of the state-action space, as long as the distribution of datasets encompasses the trajectory of the optimal policy. However, acquiring high-quality datasets that have good coverage of the optimal policy poses challenges because it requires the state-action visitation distribution induced by a behav-ior policy employed for data collection to be very close to the optimal policy. Alternatively, multiple datasets can be merged into one dataset to supplement insufficient cover-age of one other, but this may be impractical when offline datasets are scattered and cannot be easily shared due to privacy and communication constraints. 
+
+Federated offline RL. Driven by the need to harvest mul-tiple datasets to address insufficient coverage, there is a growing interest in implementing offline RL in a federated manner without the need to share datasets (Zhou et al., 2024; Woo et al., 2023; Khodadadian et al., 2022). For model-based RL, a study has proposed a federated variant of pes-simistic value iteration (Zhou et al., 2024), which requires sharing of model estimates. On the other hand, for model-free RL, while Woo et al. (2023) introduced a federated Q-learning algorithm that achieves linear speedup with collab-orative coverage of agents, due to the absence of pessimism, it still carries the risk of overestimation on state-action pairs that are insufficiently covered by the agents. Indeed, it re-mains unknown whether the principle of pessimism can be 1Federated Offline Reinforcement Learning 
+
+type reference number of coverage sample communication agents complexity rounds model-based 
+
+VI-LCB (Xie et al., 2021b) 1 single H6SC ⋆ 
+
+> ε2
+
+-
+
+PEVI-Adv (Xie et al., 2021b) 1 single H4SC ⋆ 
+
+> ε2
+
+-
+
+VI-LCB (Li et al., 2024b) 1 single H4SC ⋆ 
+
+> ε2
+
+-model-free 
+
+LCB-Q (Shi et al., 2022) 1 single H6SC ⋆ 
+
+> ε2
+
+-
+
+LCB-Q-Adv (Shi et al., 2022) 1 single H4SC ⋆ 
+
+> ε2
+
+-
+
+FedAsynQ (Woo et al., 2023) M collaborative H6 
+
+> M d avg ε2
+> HM davg
+
+FedLCB-Q (Theorem 3.1) M collaborative H7SC ⋆ 
+
+> avg
+> M ε 2
+
+H
+
+Table 1: Comparison of sample complexity upper bounds of model-based and model-free algorithms for offline RL to learn an ε-optimal policy in finite-horizon non-stationary MDPs, where logarithmic factors and burn-in costs are hidden. Here, S
+
+is the size of state space, A is the size of action space, H is the horizon length, M is the number of agents, C⋆ and C⋆
+
+> avg
+
+denote the single-policy concentrability and the average single-policy concentrability, respectively (cf. (8) and (9) ), and 
+
+davg is the minimum entry of the average stationary state-action occupancy distribution of all agents. We follow standard conversion to translate the best sample complexity in Woo et al. (2023) to the finite-horizon setting for comparison. implemented in federated offline RL to eliminate the risk of overestimation, while fully utilizing the collaborative cov-erage provided by agents, and without sharing datasets or model estimates. Our goal in this paper is to develop a federated variant of Q-learning (Watkins & Dayan, 1992) for offline RL, which allows agents to learn a near-optimal Q-function with improved sample efficiency and relaxed coverage assump-tion. In the single-agent case, pessimism is implemented by penalizing the value estimates by subtracting a penalty term measuring the uncertainty of the estimates (Yan et al., 2023; Shi et al., 2022). However, federated settings are communication-constrained, implying that agents only have a limited chance of synchronization and they perform mul-tiple local updates without knowing other agents’ training progress. Allowing multiple local updates leads to higher uncertainty of local Q-estimates beyond the control of the pessimism penalty, potentially impacting both sample com-plexity and communication efficiency. This underscores the technical challenge of incorporating pessimism while managing local updates and raises the question: 
+
+How to judiciously incorporate the principle of pessimism in federated RL without hurting its sample and communication efficiency? 
+
+1.1. Our contribution 
+
+This work presents a federated Q-learning algorithm with pessimism for offline RL, which achieves linear speedup 
+
+and low communication cost , while requiring only collabo-rative coverage of the optimal policy . Formally, we consider episodic finite-horizon tabular Markov decision processes (MDPs) with S states, A actions, and horizon length H. A total number of M agents, each with K trajectories (col-lected using its local behavior policy), collaborate in a fed-erated setting with the help of a central server to learn the optimal policy. Our main contributions are summarized as below; see also Table 1 for a detailed comparison. • Federated Q-learning for offline RL. We propose a fed-erated offline Q-learning algorithm named FedLCB-Q ,which involves iterative local updates at agents and global aggregation at a central server with scheduled synchro-nizations. We introduce essential components that im-plement pessimism compensating for the uncertainty in both local and global Q-function updates. First, to address the uncertainty arising from independent local updates, we employ learning rate rescaling at local agents and 
+
+importance averaging at server aggregation. The for-mer restricts the drifts of local Q-estimates by rapidly decreasing the learning rates during local updates, and the latter reduces uncertainty of the aggregated Q-estimates by assigning smaller weights to rarely updated local val-2Federated Offline Reinforcement Learning 
+
+ues. Additionally, for every global aggregation, a global penalty calculated based on aggregated visitation counts is subtracted from the aggregated global Q-estimate. These design choices play a crucial role in achieving both sam-ple and communication efficiency while preventing the overestimation of the Q-function. • Linear speedup with collaborative single-policy cover-age. Our analysis of sample complexity of FedLCB-Q 
+
+(see Theorem 3.1) demonstrates that FedLCB-Q finds an 
+
+ε-optimal policy, as long as the total number of samples per agent T = KH exceeds 
+
+eO H7SC ⋆
+
+> avg
+
+M ε 2
+
+!
+
+,
+
+where C⋆ 
+
+> avg
+
+denotes the average single-policy concentra-bility coefficient of all agents (see (10) for the formal definition). This shows linear speedup in terms of number agents M , which is achieved with a significantly weaker data requirement at individual agents than prior art. In truth, each agent affords to have a non-expert dataset collected by a sub-optimal behavior policy, as long as all agents collectively cover the state-action pairs visited by the optimal policy, even they don’t cover the entire state-action space as in Woo et al. (2023). The bound nearly matches the sample complexity obtained for a single-agent pessimistic Q-learning algorithm (Shi et al., 2022) with a similar Hoeffding-style penalty, up to a fac-tor of H, as if all the datasets are processed at a central location. • Low communication cost. Under appropriate choices of synchronization schedules, FedLCB-Q requires approxi-mately eO(H) rounds of synchronizations to achieve the targeted accuracy (see Corollary 3.2), which is almost independent with the size of the state-action space and the number of agents. The analysis suggests that frequent synchronizations are not necessary, outperforming prior art (Woo et al., 2023). 
+
+1.2. Related work Offline RL. Offline RL addresses the problem of learning improved policies from a logged static dataset. The main challenge of offline RL is how to reliably estimate the val-ues of unseen or rarely visited state-action pairs. To tackle this challenge, most offline RL algorithms prevent agents from taking uncertain actions by regularizing the policy to be close to the behavior policy (Fujimoto et al., 2019; Siegel et al., 2020; Fujimoto & Gu, 2021) or penalizing value estimates on out-of-distribution state-action pairs (Ku-mar et al., 2020; Liu et al., 2020; Kostrikov et al., 2022; Wu et al., 2019), which is also known as the principle of pes-simism. Recently, the pessimistic approach has been devel-oped and theoretically studied for various RL settings, such as model-based approaches (Xie et al., 2021b; Rashidine-jad et al., 2021; Kidambi et al., 2020; Yu et al., 2020; Jin et al., 2021; Li et al., 2024b; Yin & Wang, 2021; Kim & Oh, 2023; Shi & Chi, 2022), policy-based approaches (Xie et al., 2021a; Zanette et al., 2021), and model-free approaches (Shi et al., 2022; Yan et al., 2023; Uehara et al., 2023). Most of these works have focused on the single-agent case and sug-gested that the state-action visitation distribution induced by the behavior policy should cover that of the optimal pol-icy (Rashidinejad et al., 2021; Shi et al., 2022; Yan et al., 2023), and the distribution mismatch among the two visi-tation distributions governs the hardness of offline RL (Li et al., 2024b). Another interesting work (Shi et al., 2023) considered offline RL from multiple perturbed data sources, requiring a centralized setting in which an agent has full access to all the datasets. 
+
+Federated RL. There has been an increasing interest in federated and distributed RL, driven by the need to address more realistic constraints, including privacy, communica-tion efficiency, and data heterogeneity, as well as training speedup. Recent works have investigated federated RL from various perspectives, such as robustness to adversarial at-tacks (Wu et al., 2021; Fan et al., 2021), environment or task heterogeneity (Yang et al., 2023; Jin et al., 2022; Wang et al., 2023; Zhou et al., 2024), as well as sample and communica-tion complexities under asynchronous sampling (Khodada-dian et al., 2022; Woo et al., 2023) and online sampling (Zheng et al., 2024; Zhang et al., 2024). In addition, to address unreliable estimation on unseen state-action pairs in local batch datasets under the federated setting, Shen et al. (2023) proposed a federated offline policy gradient algo-rithm that regularizes the distribution of an estimated policy to be close to the averaged visitation distributions of agents with regularization loss, and Zhou et al. (2024) studied a federated variant of pessimistic value iteration. However, for model-free RL, although Woo et al. (2023) provided a federated Q-learning algorithm that achieves linear speedup in terms of the number of agents with relaxed coverage assumption for individual agents, it still requires agents to cover the entire state-action space uniformly due to the lack of pessimism. 
+
+Q-learning. Characterizing the finite-sample complexity of single-agent Q-learning has been examined extensively under various data collection and function approximation schemes, including but not limited the synchronous setting (Even-Dar & Mansour, 2003; Beck & Srikant, 2012; Li et al., 2024a; Wainwright, 2019), the asynchronous and offline setting (Li et al., 2021; 2024a; Qu & Wierman, 2020; Yan et al., 2023; Shi et al., 2022), the online setting (Jin et al., 2018; Bai et al., 2019; Wang et al., 2019), under function approximation (Fan et al., 2020; Chen et al., 2019; Xu & Gu, 2020), to mention just a few. 3Federated Offline Reinforcement Learning 
+
+Notation. In this paper, we use ∆( S) to refer to the prob-ability simplex over a set S, and [K] := {1, · · · , K } for any positive integer K > 0. In addition, f (·) = eO(g(·)) or 
+
+f ≲ g (resp. f (·) = eΩ( g(·)) or f ≳ g) indicates that f (·) is order-wise not larger than (resp. not smaller than) g(·) up to some logarithmic factors. The notation f ≍ g signifies that both f ≲ g and f ≳ g simultaneously hold. 
+
+2. Background and problem formulation 
+
+2.1. Background Basics of episodic finite-horizon MDPs. Consider an episodic finite-horizon MDP represented by 
+
+M =  S, A, H, {Ph}Hh=1 , {rh}Hh=1 
+
+,
+
+where S is the state space of size S, A is the action space of size A, H is the horizon length, Ph : S × A → ∆( S) and 
+
+rh : S × A → [0 , 1] denote the probability transition kernel and the reward function at the h-th time step (1 ≤ h ≤ H),respectively. A policy is denoted by π = {πh}Hh=1 , where πh : S → 
+
+∆( A) specifies the probability distribution over the action space at time step h in state s. With slight abuse of notation, we use πh(s) to denote the selected action when the policy 
+
+πh is deterministic. For h = 1 , . . . , H , the value function 
+
+V πh (s) of policy π is defined as the expected cumulative rewards starting from state s at step h by following π, i.e., 
+
+V πh (s) := E
+
+" HX
+
+> t=h
+
+rt
+
+ st, a t
+
+ sh = s
+
+#
+
+, (1) where the expectation is taken over the randomness of the trajectory {st, a t, r t}Ht=h induced by the policy π as well as the MDP transitions according to at ∼ πt(· | st) and 
+
+st+1 ∼ Pt(· | st, a t). Similarly, the Q-function Qπh (s, a ) of a policy π at step h in state-action pair (s, a ) is defined as 
+
+Qπh (s, a ) := rh(s, a ) + E
+
+" HX
+
+> t=h+1
+
+rt(st, a t) sh = s, a h = a
+
+#
+
+,
+
+(2) where the expectation is again over the randomness induced by π and the MDP transitions. It is well-known (Puterman, 2014) that one can always find a deterministic optimal policy π⋆ = {π⋆h}Hh=1 , which maxi-mizes the value function (resp. the Q-function) simultane-ously over all states (resp. state-action pairs) among all poli-cies. The resulting optimal value function V ⋆ = {V ⋆h }Hh=1 
+
+and optimal Q-functions Q⋆ = {Q⋆h}Hh=1 are denoted re-spectively by 
+
+V ⋆h (s) := V π⋆ 
+
+> h
+
+(s) = max  
+
+> π
+
+V πh (s),Q⋆h(s, a ) := Qπ⋆ 
+
+> h
+
+(s, a ) = max  
+
+> π
+
+Qπh (s, a )
+
+for any (s, a, h ) ∈ S × A × [H]. Given an initial state distribution ρ ∈ ∆( S), the expected value of a given policy 
+
+π and that of the optimal policy π⋆ at the initial step are defined respectively by 
+
+V π 
+
+> 1
+
+(ρ) := Es1∼ρ
+
+V π 
+
+> 1
+
+(s1), V ⋆ 
+
+> 1
+
+(ρ) := Es1∼ρ
+
+V ⋆ 
+
+> 1
+
+(s1).
+
+(3) 
+
+Bellman equations. Of crucial importance are the Bellman equations that connect the value functions across different time steps (Bertsekas, 2017). For any policy π, it follows that 
+
+Qπh (s, a ) = rh(s, a ) + Es′∼Ph,s,a 
+
+V πh+1 (s′) (4) for all (s, a, h ) ∈ S × A × [H], where V πH+1 (s) = 0 for any s ∈ S . Moreover, Bellman’s optimality equation says that 
+
+Q⋆h(s, a ) = rh(s, a ) + Es′∼Ph,s,a 
+
+V ⋆h+1 (s′) (5) for all (s, a, h ) ∈ S × A × [H], and the optimal policy satisfies π⋆h(s) = arg max a∈A Q⋆h(s, a ).
+
+2.2. Problem formulation: federated offline RL 
+
+In offline RL, one has access to a offline dataset containing episodes collected by following some behavior policy. Here, we formulate a federated version of the offline RL problem with M agents, where each agent has access to a local offline dataset. For 1 ≤ m ≤ M , the offline dataset Dm at agent m
+
+is composed of K episodes, 1 each generated independently according to a behavior policy μm = {μmh }Hh=1 , resulting in 
+
+Dm := 
+
+n smk, 1, a mk, 1, r mk, 1, . . . , s mk,H , a mk,H , r mk,H 
+
+oKk=1 
+
+,
+
+where the initial state smk, 1 ∼ ρ is drawn from some initial state distribution ρ ∈ ∆( S), smk,h amk,h , r mk,h are the state, action and reward at step h in the k-th episode, amk,h ∼
+
+μmh (· | smk,h ) and rmk,h = rh(smk,h amk,h ).
+
+Goal. The goal of federated offline RL is to learn an ε-optimal policy bπ = {bπh}Hh=1 satisfying 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) ≤ ε
+
+using the history dataset D = Dm 
+
+> 1≤m≤M
+
+without shar-ing the local offline datasets, with the help of a parameter server. Furthermore, it is greatly desirable to achieve as high 
+
+> 1
+
+For simplicity, we assume all the agents have the same number of episodes. It is straightforward to generalize to the scenario when the local offline datasets have different sizes. 
+
+4Federated Offline Reinforcement Learning 
+
+accuracy as possible, in a memory- and communication-efficient manner. 
+
+Metric. Obviously, the success of offline RL highly relies on the quality of the history dataset. In order to define the metric, let us first introduce the occupancy distributions 
+
+dπh (s) and dπh (s, a ) induced by policy π at step h, given by 
+
+dπh (s) := P(sh = s | s1 ∼ ρ, π ), (6) 
+
+dπh (s, a ) := P(sh = s | s1 ∼ ρ, π ) πh(a | s). (7) Recent works (Rashidinejad et al., 2021; Xie et al., 2021b; Shi et al., 2022) have advocated the notion of single-policy concentrability , which measures the mismatch between the occupancy distributions induced by the optimal policy π⋆
+
+and the behavior policy μ, with the benefit that this assumes away the need for the offline dataset to cover the entire state-action space, which is often impractical. Li et al. (2024b) offered a more refined notion called single-policy clipped concentrability , defined as follows. 
+
+Definition 2.1 (single-policy clipped concentrability) . The single-policy clipped concentrability coefficient C⋆ ∈
+
+[1 /S, ∞) of a behavior policy μ is defined to be the smallest quantity that satisfies 
+
+max 
+
+(h,s,a )∈[H]×S×A 
+
+min {dπ⋆
+
+h (s, a ), 1/S }
+
+dμh(s, a ) ≤ C⋆, (8) where we adopt the convention 0/0 = 0 .The single-policy clipped concentrability coefficient C⋆ <
+
+∞ is finite whenever the behavior policy covers the state-action pairs visited by the optimal policy, rather than having to cover the entire state-action space. Recall that since π⋆
+
+is deterministic, dπ⋆
+
+h (s, a ) = dπ⋆
+
+h (s)I(a = π⋆h(s)) , that is, 
+
+dπ⋆
+
+h (s, a ) is non-zero only for the optimal action a = π⋆h(s).Compared with the unclipped counterpart introduced in Rashidinejad et al. (2021), the clipping of the occupancy distribution dπ⋆
+
+h (s, a ) by the threshold 1/S ensures that 
+
+C⋆ will not be excessively large when dπ⋆
+
+h (s) is highly concentrated in a small number of states in state space. In the federated setting, we further introduce a tailored notion that highlights the potential benefit of collaborative learning in the presence of multiple agents. For ease of notation, denote 
+
+dmh (s) = dμm
+
+h (s) and dmh (s, a ) = dμm
+
+h (s, a )
+
+as the occupancy distributions induced by the behavior pol-icy μm at agent m. Based on these, we define the average occupancy distributions as 
+
+davg 
+
+h (s) = 1
+
+M
+
+MX
+
+m=1 
+
+dmh (s), davg 
+
+h (s, a ) = 1
+
+M
+
+MX
+
+m=1 
+
+dmh (s, a ).
+
+(9) Episodes 
+
+Agent 1
+
+Agent 𝑀 
+
+> …
+
+…
+
+…
+
+Central server …
+
+Local updates Aggregation  
+
+> <latexit sha1_base64="FtHR7xtsWmxaZJC4riIRfghcI+o=">AAAB7HicbVBNS8NAEJ34WetX1aOXxSJ4KomIeix68SK0YNpCG8tmu2mXbjZhdyKU0t/gxYMiXv1B3vw3btsctPXBwOO9GWbmhakUBl3321lZXVvf2CxsFbd3dvf2SweHDZNkmnGfJTLRrZAaLoXiPgqUvJVqTuNQ8mY4vJ36zSeujUjUA45SHsS0r0QkGEUr+fWu93jfLZXdijsDWSZeTsqQo9YtfXV6CctirpBJakzbc1MMxlSjYJJPip3M8JSyIe3ztqWKxtwE49mxE3JqlR6JEm1LIZmpvyfGNDZmFIe2M6Y4MIveVPzPa2cYXQdjodIMuWLzRVEmCSZk+jnpCc0ZypEllGlhbyVsQDVlaPMp2hC8xZeXSeO84l1WvPpFuXqTx1GAYziBM/DgCqpwBzXwgYGAZ3iFN0c5L8678zFvXXHymSP4A+fzByFrjj4=</latexit>
+
+QM
+
+1 
+
+> <latexit sha1_base64="MgMvB3V9RNOTWl/hcjJ5TADu+R4=">AAAB7HicbVBNSwMxEJ3Ur1q/qh69BIvgqewWUY9FL16EFty20K4lm2bb0Gx2SbJCWfobvHhQxKs/yJv/xrTdg7Y+GHi8N8PMvCARXBvH+UaFtfWNza3idmlnd2//oHx41NJxqijzaCxi1QmIZoJL5hluBOskipEoEKwdjG9nfvuJKc1j+WAmCfMjMpQ85JQYK3nNfu3xvl+uOFVnDrxK3JxUIEejX/7qDWKaRkwaKojWXddJjJ8RZTgVbFrqpZolhI7JkHUtlSRi2s/mx07xmVUGOIyVLWnwXP09kZFI60kU2M6ImJFe9mbif143NeG1n3GZpIZJulgUpgKbGM8+xwOuGDViYgmhittbMR0RRaix+ZRsCO7yy6ukVau6l1W3eVGp3+RxFOEETuEcXLiCOtxBAzygwOEZXuENSfSC3tHHorWA8plj+AP0+QMi8Y4/</latexit>
+
+QM
+
+2 
+
+> <latexit sha1_base64="7GcedvK+pKEbFZR3nNqdtzjy/kc=">AAAB7HicbVBNS8NAEJ34WetX1aOXxSJ4KomIeix68SK0YNpCG8tmu2mXbjZhdyKU0t/gxYMiXv1B3vw3btsctPXBwOO9GWbmhakUBl3321lZXVvf2CxsFbd3dvf2SweHDZNkmnGfJTLRrZAaLoXiPgqUvJVqTuNQ8mY4vJ36zSeujUjUA45SHsS0r0QkGEUr+fXu8PG+Wyq7FXcGsky8nJQhR61b+ur0EpbFXCGT1Ji256YYjKlGwSSfFDuZ4SllQ9rnbUsVjbkJxrNjJ+TUKj0SJdqWQjJTf0+MaWzMKA5tZ0xxYBa9qfif184wug7GQqUZcsXmi6JMEkzI9HPSE5ozlCNLKNPC3krYgGrK0OZTtCF4iy8vk8Z5xbusePWLcvUmj6MAx3ACZ+DBFVThDmrgAwMBz/AKb45yXpx352PeuuLkM0fwB87nD3nHjng=</latexit>
+
+QM
+
+k 
+
+> <latexit sha1_base64="bxw3ux9PBeducStuvM1MaR7bVh8=">AAAB6nicbVBNS8NAEJ3Ur1q/qh69LBbBU0lE1GPRi8cW7Qe0oWy2k3bpZhN2N0IJ/QlePCji1V/kzX/jts1BWx8MPN6bYWZekAiujet+O4W19Y3NreJ2aWd3b/+gfHjU0nGqGDZZLGLVCahGwSU2DTcCO4lCGgUC28H4bua3n1BpHstHM0nQj+hQ8pAzaqz00OiP++WKW3XnIKvEy0kFctT75a/eIGZphNIwQbXuem5i/Iwqw5nAaamXakwoG9Mhdi2VNELtZ/NTp+TMKgMSxsqWNGSu/p7IaKT1JApsZ0TNSC97M/E/r5ua8MbPuExSg5ItFoWpICYms7/JgCtkRkwsoUxxeythI6ooMzadkg3BW355lbQuqt5V1WtcVmq3eRxFOIFTOAcPrqEG91CHJjAYwjO8wpsjnBfn3flYtBacfOYY/sD5/AEqJo25</latexit>
+
+Qk 
+
+> <latexit sha1_base64="dzjC6zTBey7maEvFYK8Vsu5D1L8=">AAAB+3icbVDLSsNAFL2pr1pfsS7dBItQNyURUZdFN4KbCn1BE8pkOmmHTiZhZiKWkF9x40IRt/6IO//GSZuFth4YOJxzL/fM8WNGpbLtb6O0tr6xuVXeruzs7u0fmIfVrowSgUkHRywSfR9JwignHUUVI/1YEBT6jPT86W3u9x6JkDTibTWLiReiMacBxUhpaWhWpy7lbojUBCOWtrP6/dnQrNkNew5rlTgFqUGB1tD8ckcRTkLCFWZIyoFjx8pLkVAUM5JV3ESSGOEpGpOBphyFRHrpPHtmnWplZAWR0I8ra67+3khRKOUs9PVknlIue7n4nzdIVHDtpZTHiSIcLw4FCbNUZOVFWCMqCFZspgnCguqsFp4ggbDSdVV0Cc7yl1dJ97zhXDach4ta86aoowzHcAJ1cOAKmnAHLegAhid4hld4MzLjxXg3PhajJaPYOYI/MD5/AJGDlCE=</latexit>
+
+k 2 T (K) <latexit sha1_base64="jKmO79SQ9SoqRzUlbAdsUD/6yLI=">AAAB6HicbVBNS8NAEJ34WetX1aOXxSJ4KomIeix6Eby0YD+gDWWznbRrN5uwuxFK6C/w4kERr/4kb/4bt20O2vpg4PHeDDPzgkRwbVz321lZXVvf2CxsFbd3dvf2SweHTR2nimGDxSJW7YBqFFxiw3AjsJ0opFEgsBWMbqd+6wmV5rF8MOME/YgOJA85o8ZK9fteqexW3BnIMvFyUoYctV7pq9uPWRqhNExQrTuemxg/o8pwJnBS7KYaE8pGdIAdSyWNUPvZ7NAJObVKn4SxsiUNmam/JzIaaT2OAtsZUTPUi95U/M/rpCa89jMuk9SgZPNFYSqIicn0a9LnCpkRY0soU9zeStiQKsqMzaZoQ/AWX14mzfOKd1nx6hfl6k0eRwGO4QTOwIMrqMId1KABDBCe4RXenEfnxXl3PuatK04+cwR/4Hz+AKP9jNU=</latexit> 
+
+K 
+
+> <latexit sha1_base64="SvhELfo3OXLhszEJ7nGzzUnRMWk=">AAAB8XicbVBNSwMxEJ2tX7V+VT16CRbBQym7Iuqx6EXwUsF+YLuUbDbbhmaTJckKZem/8OJBEa/+G2/+G9N2D9r6YODx3gwz84KEM21c99sprKyurW8UN0tb2zu7e+X9g5aWqSK0SSSXqhNgTTkTtGmY4bSTKIrjgNN2MLqZ+u0nqjST4sGME+rHeCBYxAg2Vnr0qj0SSqOrd/1yxa25M6Bl4uWkAjka/fJXL5QkjakwhGOtu56bGD/DyjDC6aTUSzVNMBnhAe1aKnBMtZ/NLp6gE6uEKJLKljBopv6eyHCs9TgObGeMzVAvelPxP6+bmujKz5hIUkMFmS+KUo6MRNP3UcgUJYaPLcFEMXsrIkOsMDE2pJINwVt8eZm0zmreRc27P6/Ur/M4inAEx3AKHlxCHW6hAU0gIOAZXuHN0c6L8+58zFsLTj5zCH/gfP4AjbiQMQ==</latexit>
+
+1, · · · , K 
+
+…
+
+…
+
+Behavior policy Solutio n policy 
+
+Figure 1: FedLCB-Q with M agents and a central server. Each agent m performs local updates on its local Q-table 
+
+Qmk for each episode k in a local dataset Dm. When syn-chronization is scheduled, k ∈ T (K), the agents send their local Q-tables to the server and the server aggregates the Q-tables into a global Q-table and synchronizes local Q-tables. 
+
+Definition 2.2 (average single-policy clipped concentrabil-ity) . The average single-policy concentrability coefficient 
+
+C⋆
+
+avg ∈ [1 /S, ∞) of multiple behavior policies {μm}m∈[M ]
+
+is defined to be the smallest quantity that satisfies 
+
+max 
+
+(h,s,a )∈[H]×S×A 
+
+min {dπ⋆
+
+h (s, a ), 1/S }
+
+davg 
+
+h (s, a ) ≤ C⋆
+
+avg , (10) where we adopt the convention 0/0 = 0 .An important implication of the above definition is that, as long as the agents collaboratively cover the state-action pairs visited by the optimal policy, the average single-policy concentrability coefficient C⋆
+
+avg < ∞ is finite. Therefore, this is much weaker than the coverage requirement in the single-agent case. 
+
+3. Algorithm and theoretical guarantees 
+
+In this section, we first introduce the proposed model-free federated offline RL algorithm called FedLCB-Q , followed by its theoretical performance guarantees. 
+
+3.1. Algorithm description 
+
+We introduce a federated variant of Q-learning algorithm for offline RL, called FedLCB-Q , that learns a near-optimal Q-function without overestimation on unseen components of the state-action space. The complete description of 
+
+FedLCB-Q is provided in Appendix A. On a high level, 
+
+FedLCB-Q performs local Q-function updates at all the agents using its own local offline dataset, and occasion-ally, globally aggregates the local estimates in a pessimistic 5Federated Offline Reinforcement Learning 
+
+fashion at a central server. To facilitate flexible communica-tion patterns, we follow a synchronization schedule T (K),which contains the indices of episodes where communica-tion occurs between the agents and the server. To begin, FedLCB-Q initializes the local estimate ( Qm
+
+> 0,h
+
+and V m
+
+> 0,h
+
+) at each agent m ∈ [M ] and the global estimates (Q0,h and V0,h ) for all (s, a, h ) ∈ S × A × [H + 1] at the server as follows: 
+
+Qm
+
+> 0,h
+
+(s, a ) = 0 , V m
+
+> 0,h
+
+(s, a ) = 0 , (11a) 
+
+Q0,h (s, a ) = 0 , V0,h (s, a ) = 0 . (11b) Then, FedLCB-Q proceeds the following steps for each episode k ∈ [K].1. Local updates: Each agent m samples the kth trajectory 
+
+{(smk,h , a mk,h , r mk,h )}Hh=1 from its local offline datasets 
+
+Dm. For each step h ∈ [H], agent m updates its lo-cal Q-estimate Qmk,h for (s, a ) = ( smk,h , a mk,h ) as follows: 
+
+Qmk,h (s, a )= (1 − ηmk,h (s, a )) Qmk−1,h (s, a )+ ηmk,h (s, a )( rmk,h + V mk−1,h +1 (smk,h +1 )) , (12) where ηmk,h (s, a ) is the learning rate, whose schedule will be specified later, and V mk−1,h (s) is set as 
+
+V mk−1,h (s) = V mι(k),h (s) = Vι(k),h (s),
+
+where ι(k) denotes the most recent episode where aggre-gation occurs before the kth episode, i.e., 
+
+ι(k) := max  
+
+> k′
+
+{1 ≤ k′ < k : k′ ∈ T (K)} .
+
+2. Pessimistic aggregation: If synchronization is sched-uled at episode k, i.e., k ∈ T (K), each agent sends its local Q-estimate to a central server for aggregation after finishing the local update for the kth episode. Then, the server updates the global Q-estimate Qk,h by averaging the local Q-estimates and subtracting a penalty for all 
+
+(s, a ) ∈ S × A as follows: 
+
+Qk,h (s, a ) = 
+
+> M
+
+X
+
+> m=1
+
+αmk,h (s, a )Qmk,h (s, a )
+
+!
+
+− Bk,h (s, a ),
+
+(13) where αmk,h = [ αmk,h (s, a )] (s,a )∈S×A ∈ [0 , 1] SA is an entry-wise weight matrix assigned to agent m for each 
+
+h ∈ [H], and Bk,h (s, a ) is a penalty term (to be specified later below) that introduces the pessimism preventing the overestimation of unseen state-action pairs. Accordingly, for all (s, a ) ∈ S × A , the global value estimate is updated as 
+
+Vk,h (s) = max 
+
+
+
+Vι(k),h (s), max  
+
+> a∈A
+
+Qk,h (s, a )
+
+
+
+, (14) where the outer maximum ensures a monotonic up-date, as we explain later in the analysis. If 
+
+Vk,h (s) = max a∈A Qk,h (s, a ), the global policy is up-dated as πk,h (s) = arg max a∈A Qk,h (s, a ), otherwise 
+
+πk,h (s) = πι(k),h (s). After aggregation, the server sends the global Q-function and value estimates to ev-ery agent, where Qmk,h = Qk,h , V mk,h = Vk,h for all 
+
+(k, m ) ∈ T (K) × [M ].At the end of K episodes, FedLCB-Q outputs a global Q-estimate bQh(s, a ) = QK,h (s, a ) for all (s, a, h ) ∈ S × A × 
+
+[H] and a solution policy bπh(s) = πK,h (s) for all (s, h ) ∈S × [H]. For simplicity, we assume that the aggregation step always occurs after the last episode K, i.e., K ∈ T (K).
+
+3.2. Choices of key parameters 
+
+The success of FedLCB-Q relies on careful and judicious selections of key algorithmic parameters, in a data-driven manner, which we detail below. To begin, let us introduce the following useful notation, which pertains to the counters for visits of agents on each state-action pair (s, a ) ∈ S × A .For any (m, k, h ) ∈ [M ] × [K] × [H],• nmk,h (s, a ): the number of episodes in the interval 
+
+(ι(k), k ] during which agent m visits (s, a ) at step h, i.e., 
+
+nmk,h (s, a ) := |{ ι(k) < i ≤ k : ( smi,h , a mi,h ) = ( s, a )}| .• N mk,h (s, a ): the number of episodes in the interval 
+
+[1 , k ] during which agent m visits (s, a ) at step h, i.e., 
+
+N mk,h (s, a ) := |{ 1 ≤ i ≤ k : ( smi,h , a mi,h ) = ( s, a )}| .• nk,h (s, a ): the cumulative count of local episodes across all agents within the interval (ι(k), k ], wherein each agent visits (s, a ) at step h, i.e., nk,h (s, a ) := 
+
+PMm=1 nmk,h (s, a ) = PMm=1 |{ ι(k) < i ≤ k :(smi,h , a mi,h ) = ( s, a )}| .• Nk,h (s, a ): the cumulative count of local episodes across all agents within the interval [1 , k ], wherein each agent visits (s, a ) at step h, i.e., Nk,h (s, a ) := 
+
+PMm=1 N mk,h (s, a ) = PMm=1 |{ 1 ≤ i ≤ k : ( smi,h , a mi,h ) = (s, a )}| .
+
+Pessimism in the federated RL. In offline RL, pessimism is key to preventing the overestimation of Q-function on unseen state-action space. For a single-agent case, the pes-simism is implemented by subtracting a penalty term com-puted based on the visiting counter of an agent for each state-action pair, which makes the estimation highly depen-dent on the quality of agents’ datasets (Rashidinejad et al., 2021). For example, when an agent has non-expert data collected using a highly sub-optimal behavior policy, it is inevitable to subtract a large penalty for optimal actions that cannot be reached with the agent’s behavior policy, and this 6Federated Offline Reinforcement Learning 
+
+leads to slow convergence or convergence to a sub-optimal policy close to the behavior policy. In the federated set-ting, from the perspective of a server, as the aggregated information from multiple agents increases confidence, it is natural to be less pessimistic compared to an individual agent. Based on this intuition, given some prescribed prob-ability δ ∈ (0 , 1) , we suggest a global penalty computed with the aggregated counters of agents at k ∈ T (K):
+
+Bk,h (s, a ) := (H + 1) nk,h (s, a )
+
+Nk,h (s, a ) + Hn k,h (s, a )
+
+s
+
+cB ζ21 H4
+
+Nk,h (s, a ) ,
+
+(15) where Bk,h (s, a ) = 0 if Nk,h (s, a ) = 0, and ζ1 =log 
+
+ SAM K 2Hδ
+
+
+
+and cB is some positive constant. Here, the penalty for each state-action pair decreases as long as the agents collectively explore the state-action pair enough. This relaxes the dependency on an individual agent and pre-vents the estimated policy from being restricted to a local behavior policy. 
+
+Local update uncertainty. To guarantee that the pessimism introduced by the global penalty is enough to prevent over-estimation on rarely seen state-action pairs, the penalty should dominate the uncertainty of the Q-estimates. How-ever, when agents independently update their own local Q-estimates without frequent communication, the global penalty, which is subtracted only at the aggregation step, may fail to cover the increasing uncertainty of the local Q-estimates during local updates. To handle this, we propose a choice of key parameters (learning rates ηmk,h and averag-ing weights αmk,h ) that effectively controls the uncertainty arising from the local updates as follows. • Importance averaging. In the federated setting, agents have offline datasets with heterogeneous distributions in-duced by different behavior policies, leading to imbal-anced uncertainty of local Q-estimates.To minimize the uncertainty of the averaged estimate, we propose the fol-lowing entrywise weighting scheme for averaging: 
+
+αmk,h (s, a ) := Nι(k),h (s, a ) + ( H + 1) M n mk,h (s, a )
+
+M (Nk,h (s, a ) + Hn k,h (s, a )) ,
+
+(16) where αmk,h (s, a ) = 1 
+
+> M
+
+if nk,h (s, a ) = 0 . By assign-ing smaller weights to less frequently updated local Q-estimates with smaller nmk,h (s, a ), which has high uncer-tainty, the averaged Q-estimate can always maintain an un-certainty level low enough to be dominated by the global penalty, regardless of the heterogeneity in local data dis-tributions. The idea aligns with the notion of importance averaging introduced by Woo et al. (2023), which favors frequently updated local Q-values. Nevertheless, our ap-proach differs in that, unlike Woo et al. (2023), where the assigned weights are determined solely based on local counters nmk,h in a myopic manner, our weights, factoring in the global counter Nι(k),h , limit bias towards specific agents as the training of local Q-estimates stabilizes. The weighting scheme, mindful of the entire training progress, prevents some local values that have undergone intense updates recently from dominating the global learning of the Q-function, preserving the information accumulated through old updates. • Learning rates rescaling. Local updates without syn-chronization increase the deviation of local Q-estimates, and this increases the variance of the global Q-estimate at aggregation. However, requiring agents to communicate frequently may be too stringent for many applications in the federated setting. To address this issue, we propose a novel choice of learning rate that exhibits slower decay based on a global counter Nι(k),h , and faster decay during local updates according to the local counter nmk,h :
+
+ηmk,h (s, a ) := M (H + 1) 
+
+Nι(k),h (s, a ) + M (H + 1) nmk,h (s, a ) .
+
+(17) The rescaling of the learning rate is crucial to obtain linear speedup without frequent synchronizations. The grad-ual decay with a global counter allows more aggressive updates of the Q-estimates once collective information from all agents is aggregated, which enables convergence speedup. On the other hand, the fast decrease in learning rates during local updates ensures that agents adaptively slow down their drifts and maintain low variance of their local Q-estimates, without overly restricting the length of local updates. We will further discuss how this effectively reduces the variance of local estimates in Appendix B.1. The computation of the global penalty (15) and importance averaging (16) at a server requires local counters nmk,h (s, a )
+
+from every agent, and determining the learning rates (17) at each agent requires access to recently aggregated global counters Nι(k),h (s, a ). Therefore, for FedLCB-Q with the specified parameters choices, agents and a server addition-ally exchange the updated local and global counters at every aggregation step. 
+
+3.3. Theoretical guarantees 
+
+Given the parameters described above, we now give sample complexity guarantees on the performance of the proposed 
+
+FedLCB-Q algorithm. 
+
+Theorem 3.1. Consider δ ∈ (0 , 1) and let bπ be the solution policy of FedLCB-Q . If a synchronization schedule T (K)
+
+is independent of trajectories in datasets D and satisfies 
+
+τ1 ≤
+
+r H2SC ⋆
+
+> avg
+
+KM and τu+1 
+
+τu
+
+≤ 1 + 2
+
+H (18) 7Federated Offline Reinforcement Learning 
+
+for any u ≥ 1, where τu is the number of episodes between the (u − 1) -th and the u-th aggregations. Denoting the total number of samples per agent T = KH , the following holds: 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) ≤ c
+
+s
+
+H7SC ⋆
+
+> avg
+
+ζ21
+
+M T + H4SC ⋆
+
+> avg
+
+ζ1
+
+M T 
+
+
+
+(19) 
+
+at least with probability 1 − δ, where ζ1 = log 
+
+ SAM K 2Hδ
+
+
+
+and c > 0 is some universal constant. 
+
+Theorem 3.1 implies that as long as the initial synchroniza-tion occurs early and the synchronization intervals do not increase too rapidly (cf. (18) ), FedLCB-Q is guaranteed to find an ε-optimal policy, i.e., V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) ≤ ε, for any target accuracy ε ∈ (0 , H ], if the total number of samples per agent T exceeds 
+
+eO H7SC ⋆
+
+> avg
+
+M ε 2
+
+!
+
+.
+
+A few implications are in order. 
+
+Linear speedup without expert datasets. The value func-tion gap shows linear speedup with respect to the number of agents M , highlighting the benefit of collaboration. Notably, the guarantee holds even when every agent has low-quality datasets collected by some sub-optimal behavior policy, as long as agents’ local data distributions collectively cover the distribution of the optimal policy, where the average single-policy concentrability C⋆ 
+
+> avg
+
+(cf. (10) ) is finite. On the other end, when performing offline RL using a single agent, it requires that the behavior policy of the single agent individually cover the optimal policy, i.e., C⋆ < ∞ (cf. (8) ), which is much more stringent. Therefore, federated offline RL enables policy learning that otherwise will not be possible in the single-agent setting. Specializing to the case 
+
+M = 1 , our bound nearly matches the sample complexity bound eO
+
+ H6SC ⋆
+
+> ε2
+
+
+
+obtained for a single-agent pessimistic Q-learning algorithm with a similar Hoeffding-style penalty (Shi et al., 2022), up to a factor of H.
+
+Comparison with offline RL using shared datasets. To benchmark the tightness of our bound, let us consider the minimax lower bound of the sample complexity for single-agent offline RL (Li et al., 2024b), as if we collect all the agents’ datasets at a central location. Note that the effective single-policy concentrability coefficient (cf. (8) ) for the combined datasets Dall = ∪Mm=1 Dm becomes 
+
+max 
+
+> (h,s,a )∈[H]×S×A
+
+min {dπ⋆ 
+
+> h
+
+(s, a ), 1/S }
+
+PMm=1 dmh (s, a )Periodic sync. ( 𝜏 )         
+
+> Exponential sync. ( 𝛾 )
+> 𝜏
+> 𝐻 (1+𝛾 )𝐻 1+𝛾 !𝐻
+> Local updates Aggregation
+> 𝜏 𝜏
+
+Figure 2: Illustration of the periodic synchronization with constant period τ and the exponential synchronization with a rate γ.
+
+= max 
+
+> (h,s,a )∈[H]×S×A
+
+min {dπ⋆ 
+
+> h
+
+(s, a ), 1/S }
+
+M d avg  
+
+> h
+
+(s, a ) = C⋆
+
+> avg
+
+M ,
+
+leading to the minimax lower bound (Li et al., 2024b) 
+
+eΩ H4SC ⋆
+
+> avg
+
+M ε 2
+
+!
+
+.
+
+Comparing with the sample complexity bound of FedLCB-Q, obtained as eO
+
+ H7SC ⋆
+
+> avg
+> M ε 2
+
+
+
+, this suggests that the perfor-mance of FedLCB-Q is near-optimal up to polynomial factors of H3 even when compared with the single-agent counterpart assuming shared access to all agents’ datasets. 
+
+Communication efficiency. Theorem 3.1 suggests initiat-ing the first synchronization early and avoiding rapid in-creases in synchronization intervals (cf. (18) ) to ensure fast convergence. This is attributed to large deviations among agents in the early stages, arising due to coarse Q-estimates and large learning rates, which diminish as training proceeds. For communication efficiency, it is essential to design a syn-chronization schedule that meets the constraints with the least number of synchronizations. We investigate the follow-ing two specific synchronization schedules for FedLCB-Q :(a) Periodic synchronization: For a fixed period τ ≥ 1,communication between agents and a server occurs after every τ episodes, i.e., τi = τ for all i ≥ 1, and we denote the synchronization schedule as Tperiod (K, τ ).(b) Exponential synchronization: For a fixed ratio 
+
+γ > 0, initializing τ1 = H, set τi = ⌊(1 + γ)τi−1⌋
+
+for each i ≥ 2. Under this scheduling, agents com-municate frequently at initial iterations, but the period between aggregation steps increases exponentially with the rate of (1 + γ) and synchronization occurs rarely as training proceeds enough. We denote the synchro-nization schedule as Texp (K, γ ).
+
+8Federated Offline Reinforcement Learning 
+
+We now analyze the number of communication rounds re-quired to achieve a target accuracy for the above schedules. 
+
+Corollary 3.2. For any given δ ∈ (0 , 1) and target error 
+
+ε ∈ (0 , min {H, H3SC ⋆ 
+
+> avg
+> M
+
+}], suppose the total number of samples per agent T = KH satisfies 
+
+T ≍ H7SC ⋆
+
+> avg
+
+M ε 2 ,
+
+and FedLCB-Q performs under the periodic synchroniza-tion scheduling, i.e., T (K) = Tperiod (K, τ ), with τ ≍q HSC ⋆  
+
+> avg TM
+
+, or the exponential synchronization scheduling, i.e., T (K) = Texp (K, γ ), with γ = 2 
+
+> H
+
+. Then, each schedule requires the number of synchronizations at most 
+
+(Periodic ) |T period (K, τ )| ≲
+
+s
+
+M K H2SC ⋆
+
+> avg
+
+, (20a) 
+
+(Exponential ) |T exp (K, γ )| ≲ H, (20b) 
+
+respectively, and the solution policy bπ of FedLCB-Q is an 
+
+ε-optimal policy at least with probability 1 − δ.
+
+Corollary 3.2 implies that FedLCB-Q requires only eO(H)
+
+aggregations to achieve the target accuracy under appro-priate synchronization schedules, such as the exponential synchronization schedule. Notably, the number of commu-nication rounds is nearly independent of the size of the state-action space, the total number of episodes, or the number of agents, and this outperforms prior art (Woo et al., 2023). Furthermore, analysis suggests that exponential synchro-nization with a modest rate γ = 2 /H is a key to achieving such communication efficiency. With our strategic choices of learning rates, local Q-estimates stabilize as training pro-ceeds, and thus agents can perform more local updates than previous rounds without increasing uncertainty beyond the control of the global pessimism penalty. Exponential syn-chronization reduces the number of synchronizations by capturing the additional room for local updates arising from the stabilization of Q-estimates. On the other hand, periodic synchronization does not exploit this benefit, even if we set the period τ maximally under (18) due to which it necessi-tates more communication rounds, which increase with K
+
+and M .
+
+4. Discussions 
+
+We investigated federated offline RL, which enables multi-ple agents with history datasets to collaboratively learn an optimal policy, without sharing datasets. We proposed a federated offline Q-learning algorithm called FedLCB-Q ,which iteratively performs local updates with rescaled learn-ing rates at agents, and global aggregation with weighted averaging and global penalty at a server, which effectively controls the uncertainty in both local and global Q-estimates. Our sample complexity analysis demonstrates that FedLCB-Q achieves linear speedup in terms of the number of agents requiring only collective coverage of agents’ datasets over the distribution of the optimal policy, not restricted to the quality of individual datasets. Furthermore, we showed that FedLCB-Q is communication-efficient, requiring only 
+
+eO(H) synchronizations under the exponential synchroniza-tion scheduling. For future exploration, this work paves the way for many interesting directions, some of which are outlined below. • Tightening H dependency. Although our sample complex-ity bound is nearly optimal with respect to most salient problem parameters, such as state space size and single-policy concentrability coefficient, it falls short of optimal-ity in terms of horizon length compared to the minimax sample complexity lower bound in the single-agent set-ting (Xie et al., 2021b). Closing this gap and improving sample complexity with variance reduction techniques, as proposed by Shi et al. (2022), will be an interesting avenue for future exploration. • Beyond episodic tabular MDPs. Extending episodic tabu-lar MDPs, it would be interesting to broaden our analysis framework to encompass other RL settings, including, the infinite-horizon setting (Woo et al., 2023; Yan et al., 2023), infinite state-action space setting (Bose et al., 2024), and the integration of function approximation. • Improving robustness. Our work focuses on a scenario in which agents collect datasets from a common MDP without any disturbances. Yet, in real-world scenarios, some agents may possess datasets collected from per-turbed MDPs. This introduces the need for additional considerations regarding robustness, as discussed in Shi et al. (2023). Therefore, enhancing our work to effectively handle the variability or noisiness of MDPs would be a compelling avenue for improvement. • Multi-task RL. In many applications where various clients pursue different objectives, multi-task reinforcement learning holds a significant interest. It will be of great interest to extend our work to the multi-task RL setting (Yang et al., 2023; Jin et al., 2022; Zhou et al., 2024), which enables agents to learn their own optimal policies for their personalized goals while benefiting from collab-oration by sharing common features of tasks. 
+
+Acknowledgements 
+
+This work is supported in part by the grants NSF CCF-2007911, CCF-2106778, CNS-2148212, ONR N00014-19-1-2404 to Y. Chi, and NSF-CCF 2007834, CCF-2045694, CNS-2112471, ONR N00014-23-1-2149 to G. Joshi. 9Federated Offline Reinforcement Learning 
+
+Impact Statement 
+
+This paper presents work whose goal is to advance the field of Machine Learning. There are many potential societal consequences of our work, none which we feel must be specifically highlighted here. 
+
+References 
+
+Bai, Y., Xie, T., Jiang, N., and Wang, Y.-X. Provably effi-cient Q-learning with low switching cost. In Advances in Neural Information Processing Systems , volume 32, 2019. Beck, C. L. and Srikant, R. Error bounds for constant step-size Q-learning. Systems & control letters , 61(12): 1203–1208, 2012. Bertsekas, D. P. Dynamic programming and optimal control (4th edition) . Athena Scientific, 2017. Bose, A., Du, S. S., and Fazel, M. Offline multi-task trans-fer rl with representational penalization. arXiv preprint arXiv:2402.12570 , 2024. Chen, Z., Zhang, S., Doan, T. T., Maguluri, S. T., and Clarke, J.-P. Performance of Q-learning with linear function approximation: Stability and finite-time analysis. arXiv preprint arXiv:1905.11425 , 2019. Even-Dar, E. and Mansour, Y. Learning rates for Q-learning. 
+
+Journal of machine learning Research , 5(Dec):1–25, 2003. Fan, J., Wang, Z., Xie, Y., and Yang, Z. A theoretical analysis of deep Q-learning. In Learning for Dynamics and Control , pp. 486–489. PMLR, 2020. Fan, X., Ma, Y., Dai, Z., Jing, W., Tan, C., and Low, B. K. H. Fault-tolerant federated reinforcement learning with the-oretical guarantee. In Advances in Neural Information Processing Systems , pp. 1007–1021, 2021. Freedman, D. A. On tail probabilities for martingales. The Annals of Probability , 3(1):100–118, 1975. Fujimoto, S. and Gu, S. S. A minimalist approach to offline reinforcement learning. In Advances in Neural Informa-tion Processing Systems , pp. 20132–20145, 2021. Fujimoto, S., Meger, D., and Precup, D. Off-policy deep reinforcement learning without exploration. In Interna-tional Conference on Machine Learning , pp. 2052–2062. PMLR, 2019. Jin, C., Allen-Zhu, Z., Bubeck, S., and Jordan, M. I. Is Q-learning provably efficient? In Advances in Neural Information Processing Systems , volume 31, pp. 4863– 4873, 2018. Jin, H., Peng, Y., Yang, W., Wang, S., and Zhang, Z. Feder-ated reinforcement learning with environment heterogene-ity. In International Conference on Artificial Intelligence and Statistics , pp. 18–37, 2022. Jin, Y., Yang, Z., and Wang, Z. Is pessimism provably efficient for offline RL? In International Conference on Machine Learning , pp. 5084–5096, 2021. Khodadadian, S., Sharma, P., Joshi, G., and Maguluri, S. T. Federated reinforcement learning: Linear speedup under Markovian sampling. In International Conference on Machine Learning , pp. 10997–11057, 2022. Kidambi, R., Rajeswaran, A., Netrapalli, P., and Joachims, T. Morel: Model-based offline reinforcement learning. In 
+
+Advances in Neural Information Processing Systems , pp. 21810–21823, 2020. Kim, B. and Oh, M.-H. Model-based offline reinforce-ment learning with count-based conservatism. In Inter-national Conference on Machine Learning , pp. 16728– 16746, 2023. Kostrikov, I., Nair, A., and Levine, S. Offline reinforce-ment learning with implicit q-learning. In International Conference on Learning Representations , 2022. Kumar, A., Zhou, A., Tucker, G., and Levine, S. Conser-vative Q-learning for offline reinforcement learning. In 
+
+Advances in Neural Information Processing Systems , pp. 1179–1191, 2020. Levine, S., Kumar, A., Tucker, G., and Fu, J. Offline rein-forcement learning: Tutorial, review, and perspectives on open problems. arXiv preprint arXiv:2005.01643 , 2020. Li, G., Wei, Y., Chi, Y., Gu, Y., and Chen, Y. Sample com-plexity of asynchronous Q-learning: Sharper analysis and variance reduction. IEEE Transactions on Information Theory , 68(1):448–473, 2021. Li, G., Cai, C., Chen, Y., Wei, Y., and Chi, Y. Is Q-learning minimax optimal? a tight sample complexity analysis. 
+
+Operations Research , 72(1):222–236, 2024a. Li, G., Shi, L., Chen, Y., Chi, Y., and Wei, Y. Settling the sample complexity of model-based offline reinforcement learning. The Annals of Statistics , 52(1):233 – 260, 2024b. doi: 10.1214/23-AOS2342. Liu, Y., Swaminathan, A., Agarwal, A., and Brunskill, E. Provably good batch reinforcement learning without great exploration. In Advances in Neural Information Process-ing Systems , 2020. Mitzenmacher, M. and Upfal, E. Probability and computing .Cambridge University Press, 2005. 10 Federated Offline Reinforcement Learning 
+
+Puterman, M. L. Markov decision processes: discrete stochastic dynamic programming . John Wiley & Sons, 2014. Qu, G. and Wierman, A. Finite-time analysis of asyn-chronous stochastic approximation and Q-learning. In 
+
+Conference on Learning Theory , pp. 3185–3205. PMLR, 2020. Rashidinejad, P., Zhu, B., Ma, C., Jiao, J., and Russell, S. Bridging offline reinforcement learning and imita-tion learning: A tale of pessimism. Advances in Neural Information Processing Systems , 2021. Shen, H., Lu, S., Cui, X., and Chen, T. Distributed offline policy optimization over batch data. In Proceedings of The 26th International Conference on Artificial Intelli-gence and Statistics , pp. 4443–4472, 2023. Shi, C., Xiong, W., Shen, C., and Yang, J. Provably effi-cient offline reinforcement learning with perturbed data sources. In International Conference on Machine Learn-ing , pp. 31353–31388, 2023. Shi, L. and Chi, Y. Distributionally robust model-based offline reinforcement learning with near-optimal sample complexity. arXiv preprint arXiv:2208.05767 , 2022. Shi, L., Li, G., Wei, Y., Chen, Y., and Chi, Y. Pessimistic Q-learning for offline reinforcement learning: Towards optimal sample complexity. In International Conference on Machine Learning , pp. 19967–20025, 2022. Siegel, N., Springenberg, J. T., Berkenkamp, F., Abdol-maleki, A., Neunert, M., Lampe, T., Hafner, R., Heess, N., and Riedmiller, M. Keep doing what worked: Behav-ior modelling priors for offline reinforcement learning. In 
+
+International Conference on Learning Representations ,2020. Uehara, M., Kallus, N., Lee, J. D., and Sun, W. Offline minimax soft-q-learning under realizability and partial coverage. In Advances in Neural Information Processing Systems , volume 37, 2023. Wainwright, M. J. Stochastic approximation with cone-contractive operators: Sharp ℓ∞-bounds for Q-learning. 
+
+arXiv preprint arXiv:1905.06265 , 2019. Wang, H., Mitra, A., Hassani, H., Pappas, G. J., and Ander-son, J. Federated temporal difference learning with linear function approximation under environmental heterogene-ity. arXiv preprint arXiv:2302.02212 , 2023. Wang, Y., Dong, K., Chen, X., and Wang, L. Q-learning with UCB exploration is sample efficient for infinite-horizon MDP. In International Conference on Learning Repre-sentations , 2019. Watkins, C. J. and Dayan, P. Q-learning. Machine learning ,8(3-4):279–292, 1992. Woo, J., Joshi, G., and Chi, Y. The blessing of heterogene-ity in federated q-learning: Linear speedup and beyond. In International Conference on Machine Learning , pp. 37157–37216, 2023. Wu, Y., Tucker, G., and Nachum, O. Behavior regu-larized offline reinforcement learning. arXiv preprint arXiv:1911.11361 , 2019. Wu, Z., Shen, H., Chen, T., and Ling, Q. Byzantine-resilient decentralized policy evaluation with linear function ap-proximation. IEEE Transactions on Signal Processing ,69:3839–3853, 2021. Xie, T., Cheng, C.-A., Jiang, N., Mineiro, P., and Agar-wal, A. Bellman-consistent pessimism for offline rein-forcement learning. In Advances in Neural Information Processing Systems , 2021a. Xie, T., Jiang, N., Wang, H., Xiong, C., and Bai, Y. Policy finetuning: Bridging sample-efficient offline and online reinforcement learning. Advances in Neural Information Processing Systems , 2021b. Xu, P. and Gu, Q. A finite-time analysis of Q-learning with neural network function approximation. In Inter-national Conference on Machine Learning , pp. 10555– 10565. PMLR, 2020. Yan, Y., Li, G., Chen, Y., and Fan, J. The efficacy of pes-simism in asynchronous Q-learning. IEEE Transactions on Information Theory , 69(11):7185–7219, 2023. Yang, T., Cen, S., Wei, Y., Chen, Y., and Chi, Y. Federated natural policy gradient methods for multi-task reinforce-ment learning. arXiv preprint arXiv:2311.00201 , 2023. Yin, M. and Wang, Y.-X. Towards instance-optimal offline reinforcement learning with pessimism. In Advances in Neural Information Processing Systems , 2021. Yu, T., Thomas, G., Yu, L., Ermon, S., Zou, J. Y., Levine, S., Finn, C., and Ma, T. Mopo: Model-based offline policy optimization. In Advances in Neural Information Processing Systems , volume 33, pp. 14129–14142, 2020. Zanette, A., Wainwright, M. J., and Brunskill, E. Provable benefits of actor-critic methods for offline reinforcement learning. In Advances in Neural Information Processing Systems , volume 35, 2021. Zhang, C., Wang, H., Mitra, A., and Anderson, J. Finite-time analysis of on-policy heterogeneous federated rein-forcement learning. International Conference on Learn-ing Representations , 2024. 11 Federated Offline Reinforcement Learning 
+
+Zheng, Z., Gao, F., Xue, L., and Yang, J. Federated Q-learning: Linear regret speedup with low communication cost. International Conference on Learning Representa-tions , 2024. Zhou, D., Zhang, Y., Sonabend-W, A., Wang, Z., Lu, J., and Cai, T. Federated offline reinforcement learning. Journal of the American Statistical Association , 0(0):1–12, 2024. doi: 10.1080/01621459.2024.2310287. 12 Federated Offline Reinforcement Learning 
+
+A. Complete description of FedLCB-Q 
+
+We provide the complete description of FedLCB-Q in Algorithm 1, with its agent-end and server-end subroutines described in Algorithm 2 and Algorithm 3 respectively. 
+
+Algorithm 1 Federated pessimistic Q-learning ( FedLCB-Q )
+
+1: Parameters: horizon length H, number of agents M , total number of episodes per agent K, synchronization schedule 
+
+T (K), target error δ ∈ (0 , 1) , ζ1 = log 
+
+ SAK 2M H δ
+
+
+
+, cB > 0.
+
+2: Initialization: set Qm
+
+> 0,h
+
+(s, a ) = 0 , V m
+
+> 0,h
+
+(s) = 0 , N m
+
+> 0,h
+
+(s, a ) = 0 , nm
+
+> 0,h
+
+(s, a ) = 0 , N0,h (s, a ) = 0 , n0,h (s, a ) = 0 for all 
+
+(m, s, a, h ) ∈ [M ] × S × A × [H + 1] .
+
+3: for k = 1 , · · · , K do 
+
+4: // Update the local Q-estimate and visitation counts at each agent 
+
+5: (Qmk,h , n mk,h ) = Local-Q-learning() ;
+
+6: if k ∈ T (K) then 
+
+7: // Agent-to-server communication 
+
+8: Agents communicate Qmk,h and nmk,h to the server; 
+
+9: // Global pessimistic averaging in a server 
+
+10: (Qk,h , V k,h , π k,h ) = Global-pessimistic-averaging(); 
+
+11: // Server-to-agent communication 
+
+12: Server communication Qk,h , Vk,h and Nk,h to agents; 
+
+13: // Synchronize local Q-estimates 
+
+14: for (m, s, a, h ) ∈ [M ] × S × A × [H] do 
+
+15: Qmk,h (s, a ) = Qk,h (s, a ), V mk,h (s) = Vk,h (s)
+
+16: end for 
+
+17: end if 
+
+18: end for return: bQ = {QK,h }h∈[H] and bπ = {πK,h }h∈[H].
+
+Algorithm 2 Local-Q-learning (agents) 
+
+1: for m = 1 , · · · , M do 
+
+2: Sample the k-th trajectory {(smk,h , a mk,h , r mk,h , s mk,h +1 )}Hh=1 from Dm
+
+3: for h = 1 , · · · , H do 
+
+4: for (s, a ) ∈ S × A do 
+
+5: Qmk,h (s, a ) = Qmk−1,h (s, a ), V mk,h (s) = V mk−1,h (s)
+
+6: end for 
+
+7: // Update the local counters and learning rates 
+
+8: nmk,h (smk,h , a mk,h ) = nmk−1,h (smk,h , a mk,h ) + 1 
+
+9: ηmk,h (smk,h , a mk,h ) = M (H+1)  
+
+> Nι(k),h (smk,h ,a mk,h )+ M(H+1) nmk,h (smk,h ,a mk,h )
+
+10: // Update local Q-estimates 
+
+11: Qmk,h (smk,h , a mk,h ) =  1 − ηmk,h (smk,h , a mk,h )Qmk−1,h (smk,h , a mk,h ) + ηmk,h (s, a )( rmk,h + V mk−1,h +1 (smk,h +1 )) 
+
+12: end for 
+
+13: end for 
+
+13 Federated Offline Reinforcement Learning 
+
+Algorithm 3 Global-pessimistic-averaging (server) 
+
+1: for (s, a, h ) ∈ S × A × [H] do 
+
+2: // Update the average counter 
+
+3: nk,h (s, a ) = PMm=1 nmk,h (s, a ), Nk,h (s, a ) = Nι(k),h (s, a ) + nk,h (s, a )
+
+4: // Compute global penalty and averaging weights 
+
+5: Bk,h (s, a ) = (H+1) nk,h (s,a )
+
+> Nk,h (s,a )+ Hn k,h (s,a )
+
+q cB ζ21 H4 
+
+> Nk,h (s,a )
+
+if Nk,h (s, a ) > 0, otherwise, Bk,h (s, a ) = 0 
+
+6: for m = 1 · · · M do 
+
+7: αmk,h (s, a ) = 1  
+
+> MNι(k),h (s,a )+ M(H+1) nmk,h (s,a )
+> Nk,h (s,a )+ Hn k,h (s,a )
+
+if nmk,h (s, a ) > 0, otherwise, αmk,h (s, a ) = 1
+
+> M
+
+8: end for 
+
+9: // Update global Q-estimates 
+
+10: Qk,h (s, a ) = PMm=1 αmk,h (s, a )Qmk,h (s, a ) − Bk,h (s, a )
+
+11: Vk,h (s) = max Vι(k),h (s), max a∈A Qk,h (s, a )
+
+12: πk,h (s) = arg max a∈A Qk,h (s, a ) if Vk,h (s) = max a∈A Qk,h (s, a ), otherwise, πk,h (s) = πι(k),h (s)
+
+13: end for 
+
+B. Analysis 
+
+In this section, we will outline useful properties of FedLCB-Q and the key steps of the proof of Theorem 3.1, deferring the details, such as proofs of supporting lemmas, to Appendix C and D. Throughout the paper, we adopt the following shorthand notation 
+
+Ph,s,a := Ph(· | s, a ) ∈ [0 , 1] 1×S , (21) which represents the transition probability vector given the current state-action pair (s, a ) at step h. In addition, define 
+
+P mk,h ∈ { 0, 1}1×S as the empirical transition vector at step h of the k-th episode at agent m, namely 
+
+P mk,h (s) = I(s = smk,h +1 ), for all s ∈ S . (22) These are the notations pertaining to the counters for visits of agents on each state-action pair (s, a ) ∈ S × A . For any 
+
+(m, k, h ) ∈ [M ] × [K] × [H],• lmk,h (s, a ): a set of episodes in the interval (ι(k), k ] during which agent m visits (s, a ) at step h, i.e., lmk,h (s, a ) := 
+
+{ι(k) < i ≤ k : ( smi,h , a mi,h ) = ( s, a )}.• Lmk,h (s, a ): a set of episodes in the interval [1 , k ] during which agent m visits (s, a ) at step h, i.e. Lmk,h (s, a ) := {1 ≤
+
+i ≤ k : ( smi,h , a mi,h ) = ( s, a )}.We also introduce the following notation related to the synchronization schedule T (K). For any positive integer k and u,• tu: the index of episodes, after which the uth synchronization occurs. • τu: the number of local updates (episodes) taken between the (u − 1) th and the uth synchronizations. • ι(k): the most recent episode where the aggregation occurs before the kth episode. • ϕ(k): the minimum index of aggregation occurring after k-th episode. 
+
+B.1. Basic facts Error recursion of Q-estimates. We begin with the following key error decomposition of the Q-estimate at each synchronization, whose proof is provided in Appendix D.1. 14 Federated Offline Reinforcement Learning 
+
+Lemma B.1 (Q-estimation error decomposition) . Consider a Q-function Qπ = {Qπh (s, a )}[H]×S×A and value function 
+
+V π = {V πh (s)}[H]×S induced by a policy π. Then, for any [H] × S × A and k ∈ T (K), the error between Qπh and Qk,h is decomposed as follows: 
+
+Qπh (s, a ) − Qk,h (s, a ) = ω0,k,h (s, a )( Qπh (s, a ) − Q0,h (s, a )) 
+
+| {z }  
+
+> =: Dπ
+> 1(s,a,k,h ): initialization error
+
++
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmk,h (s,a )
+
+ωmi,k,h (s, a )( Ph,s,a − P mi,h )V mi−1,h +1 
+
+| {z } 
+
+> =: D2(s,a,k,h ): transition variance
+
++
+
+> ϕ(k)
+
+X
+
+> u=1
+
+Btu,h (s, a )
+
+> ϕ(k)
+
+Y
+
+> u′=u+1
+
+λu′,h (s, a )
+
+| {z } 
+
+> =: D3(s,a,k,h ): global penalty
+
++
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmk,h (s,a )
+
+ωmi,k,h (s, a )Ph,s,a (V πh+1 − V mi−1,h +1 )
+
+| {z }  
+
+> =: Dπ
+> 4(s,a,k,h ): recursion
+
+, (23) 
+
+where Lmk,h (s, a ) := {1 ≤ i ≤ k : ( smi,h , a mi,h ) = ( s, a )} and lmk,h (s, a ) := {ι(k) < i ≤ k : ( smi,h , a mi,h ) = ( s, a )}. And, for simplicity, we use the shortened notations defined as 
+
+λv,h (s, a ) = 
+
+(1 if Nk,h (s, a ) = 0  
+
+> Nι(k),h (s,a )
+> Nk,h (s,a )+ Hn k,h (s,a )
+
+otherwise , v = ϕ(k), (24a) 
+
+ωm
+
+> 0,k,h
+
+(s, a ) = 
+
+(
+
+1 if Nk,h (s, a ) = 0 0 otherwise , (24b) 
+
+ωmi,k,h (s, a ) = H + 1 
+
+Nk,h (s, a ) + Hn k,h (s, a )
+
+
+
+> ϕ(k)−1
+
+Y
+
+> x=ϕ(i)
+
+Ntx,h (s, a )
+
+Ntx,h (s, a ) + Hn tx,h (s, a )
+
+ , i ∈ Lmk,h (s, a ). (24c) 
+
+Equally favoring episodes within the same local update round. According to the decomposition (23) in Lemma B.1, for any (s, a, h ) ∈ S × A × [H], the Q-estimation error at episode k significantly depends on the weighted sum of transition difference for each episode where the local update occurs, namely D2(s, a, k, h ). Intuitively, the weight ωmi,k,h (s, a ) assigned to each episode i balances the accumulation of information from old and new updates. Our choice of learning rates, which decreases fast during local updates, as illustrated in Figure 3a, ensures that the weight ωmi,k,h (s, a ) within the same local update round is always equal for all episodes and agents, as shown in (24c) and Figure 3b. The uniform weights allow the transition information of each episode to be accumulated evenly, regardless of other transitions that occur in future episodes or other agents’ episodes. This is essential to keep variance arising from local updates low, especially when a synchronization period is long. Assigning equal weight to every episode allows to fully utilize transitions observed during local updates without forgetting old information, regardless of the length of the synchronization period. 
+
+Bounded visitation counters. We introduce the following lemma regarding the visitation counters, whose proof is provided in Appendix D.2. 
+
+Lemma B.2 (Concentration bound on the visitation counters) . Consider any δ ∈ (0 , 1) and some universal constant c1 > 0,and let 
+
+ζ0 := log 
+
+ 2|S||A| KH δ
+
+
+
+and K0(s, a, h ) := 4ζ0
+
+c1M d avg  
+
+> h
+
+(s, a ) . (25) 
+
+Then, for all (s, a, h ) ∈ S × A × [H], the following holds when k ≥ K0(s, a, h ) : 12 kM d avg  
+
+> h
+
+(s, a ) ≤ Nk,h (s, a ) ≤ 2kM d avg  
+
+> h
+
+(s, a ), (26a) 15 Federated Offline Reinforcement Learning 0 10 20 30 40 50 60 
+
+Episode ( i)
+
+> 0.00.20.40.60.81.0
+> Learning rates ( ηmi,h (s, a ))
+> η0
+> i,h (s, a ) ( d0
+> h(s, a ) = 0 .7)
+> η1
+> i,h (s, a ) ( d1
+> h(s, a ) = 0 .3)
+
+(a) Rescaled learning rates 0 10 20 30 40 50 60 
+
+Episode ( i) 
+
+> 0.00 0.02 0.04 0.06 0.08 0.10
+> Episode weights ( ωmi, 60 ,h (s, a ))  ω0
+> i, 60 ,h (s, a ) ( d0
+> h(s, a ) = 0 .7)
+> ω1
+> i, 60 ,h (s, a ) ( d1
+> h(s, a ) = 0 .3)
+
+(b) Episode weights 
+
+Figure 3: Illustration of the rescaled learning rates ( ηmi,h (s, a )) and the episode weights ( ωmi, 60 ,h (s, a )) induced by the learning rates of two agents m = 0 , 1 for episodes 1 ≤ i ≤ 60 , where H = 5 , the occupancy distribution of each agent on (s, a, h ) ∈ S × A × [5] is d0
+
+> h
+
+(s, a ) = 0 .7 and d1
+
+> h
+
+(s, a ) = 0 .3, respectively, and the synchronization schedule is 
+
+T (60) = {10 , 30 , 60 }.
+
+when k ≤ K0(s, a, h ) : Nk,h (s, a ) ≤ 8ζ0/c 1 (26b) 
+
+with probability at least 1 − δ.
+
+We denote the event that (26) holds as E0.
+
+Monotonic and pessimistic global value updates. Note that the global value estimate is always monotonically non-decreasing, i.e., for k′, k ∈ T (K) it holds 
+
+∀s ∈ S : Vk,h (s) ≥ Vk′,h (s) when k′ ≤ k, (27) which follows directly from the update rule (14) . Moreover, we have the following important lemma regarding the pessimistic property of the value estimate, whose proof is provided in Appendix D.3. 
+
+Lemma B.3 (Pessimistic global value) . Recall Qk,h , Vk,h , and πk,h in Algorithm 1. Let πk = {πk,h }h∈[H]. Given any 
+
+δ ∈ (0 , 1) , for all (k, h ) ∈ T (K) × [H], it holds with probability at least 1 − δ that 
+
+∀(s, a ) ∈ S × A : |D2(s, a, k, h )| ≤ D3(s, a, k, h ) ≤
+
+s
+
+4cB ζ21 H4
+
+max {Nk,h (s, a ), 1} , (28a) 
+
+∀(s, a ) ∈ S × A : Qk,h (s, a ) ≤ Qπk 
+
+> h
+
+(s, a ) ≤ Q⋆h(s, a ), (28b) 
+
+∀s ∈ S : Vk,h (s) ≤ V πk 
+
+> h
+
+(s) ≤ V ⋆h (s). (28c) In words, Lemma B.3 makes concrete the role of the penalty term in dominating the variability of the value estimates due to stochastic transitions, and ensures that the estimated value is a pessimistic estimate of the true optimal value function. 
+
+B.2. Proof of Theorem 3.1 
+
+Now we are ready to provide the proof of Theorem 3.1, which is divided into several key steps as follows. 
+
+Step 1: decomposition of the performance gap. The performance gap between the solution policy bπ of Algorithm 1 after 
+
+K episodes and the optimal policy π⋆ can be bounded as follows: 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) = Es1∼ρ [V ⋆ 
+
+> 1
+
+(s1)] − Es1∼ρ [V πK 
+
+> 1
+
+(s1)] 
+
+16 Federated Offline Reinforcement Learning 
+
+> (i)
+
+≤ Es1∼ρ [V ⋆ 
+
+> 1
+
+(s1)] − Es1∼ρ [VK, 1(s1)] 
+
+> (ii)
+
+≤ 1
+
+K
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+ Es1∼ρ [V ⋆ 
+
+> 1
+
+(s1)] − Es1∼ρ [Vtv ,1(s1)] 
+
+= 1
+
+K
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s)
+
+| {z } 
+
+> =ρ(s)
+
+(V ⋆ 
+
+> 1
+
+(s) − Vtv ,1(s)) 
+
+≤ 1
+
+K max 
+
+> h∈[H]
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s) ( V ⋆h (s) − Vtv ,h (s)) , (29) where (i) follows from Lemma B.3, and (ii) follows from the monotonicity property in (27) and Pϕ(K) 
+
+> v=1
+
+τv = K.Since π⋆ = {π⋆h}h∈[H] is deterministic, for any k ∈ T (K) and h ∈ [H], it follows that 
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s) ( V ⋆h (s) − Vk,h (s)) = X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) ( V ⋆h (s) − Vk,h (s)) 
+
+≤ X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s))  Q⋆h(s, π ⋆h(s)) − Qk,h (s, π ⋆h(s)) , (30) where the inequality holds because Qk,h (s, π ⋆h(s)) ≤ max a∈A Qk,h (s, a ) ≤ Vk,h (s) due to (14). To continue, applying Lemma B.1 by setting π = π⋆, the Q-estimate error after k episodes is decomposed as follows: 
+
+Q⋆h(s, a ) − Qk,h (s, a ) = Dπ⋆ 
+
+> 1
+
+(s, a, k, h ) + D2(s, a, k, h ) + D3(s, a, k, h ) + Dπ⋆ 
+
+> 4
+
+(s, a, k, h )
+
+≤ Dπ⋆ 
+
+> 1
+
+(s, a, k, h ) + Dπ⋆ 
+
+> 4
+
+(s, a, k, h ) + 2 D3(s, a, k, h ), (31) where the second line follows from Lemma B.3. Finally, inserting the decomposition (31) and (30) back into (29) , we control the performance gap with the following terms: 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ)
+
+≤ 1
+
+K max 
+
+> h∈[H]
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s)
+
+h
+
+Dπ⋆ 
+
+> 1
+
+(s, π ⋆h(s), t v , h ) + Dπ⋆ 
+
+> 4
+
+(s, π ⋆h(s), t v , h ) + 2 D3(s, π ⋆h(s), t v , h )
+
+i
+
+=: 1
+
+K max  
+
+> h∈[H]
+
+(D1,h + D4,h + D3,h ) , (32) for which we shall aim to bound each term individually, adopting the following short-hand notation: 
+
+Di,h := 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s)Dπ⋆ 
+
+> i
+
+(s, π ⋆h(s), t v , h ) for i ∈ { 1, 4},D3,h := 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s)D3(s, π ⋆h(s), t v , h ). (33) 
+
+Step 2: Bounding the decomposed terms. Here, we derive the bound of the decomposed terms separately as follows under the event E0, which holds with probability at least 1 − δ.• Bounding D1,h . Using the fact that 0 ≤ Q⋆h(s, π ⋆h(s)) − Q0,h (s, π ⋆h(s)) ≤ H, which follows from Lemma B.3, it follows 
+
+D1,h =
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) ω0,t v ,h (s, π ⋆h(s))( Q⋆h(s, π ⋆h(s)) − Q0,h (s, π ⋆h(s))) 
+
+17 Federated Offline Reinforcement Learning 
+
+≤
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) ω0,t v ,h (s, π ⋆h(s)) H
+
+= H X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv I{Ntv ,h (s, π ⋆h(s)) = 0 } (34) where the last line follows from (24b). To continue, note that 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv I{Ntv ,h (s, π ⋆h(s)) = 0 }
+
+= X 
+
+> v∈[ϕ(K)]: tv≤K0(s,π ⋆h(s),h )
+
+τv I{Ntv ,h (s, π ⋆h(s)) = 0 } + X 
+
+> v∈[ϕ(K)]: tv>K 0(s,π ⋆h(s),h )
+
+I{Ntv ,h (s, π ⋆h(s)) = 0 }≤ K0(s, π ⋆h(s), h ),
+
+where the last line follows since under the event E0, Ntv ,h (s, π ⋆h(s)) > 0 when tv > K 0(s, π ⋆h(s), h ). Plugging the above inequality and the definition of K0(s, π ⋆h(s), h ) back to (34) leads to 
+
+D1,h ≤ H X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) K0(s, π ⋆h(s), h )= H X
+
+> s∈S
+
+min {dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) , 1/S }
+
+davg  
+
+> h
+
+(s, π ⋆h(s)) 
+
+ 12 ζ0
+
+M
+
+ dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) min {dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) , 1/S }
+
+≲ HC ⋆
+
+> avg
+
+SM , (35) where the last line follows from the definition of C⋆ 
+
+> avg
+
+and the fact that 
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) min {dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) , 1/S } ≤ X
+
+> s∈S
+
+
+
+1 + dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) S
+
+
+
+= X
+
+> s∈S
+
+
+
+1 + dπ⋆ 
+
+> h
+
+(s)S
+
+
+
+= 2 S. 
+
+• Bounding D3,h . The range of D3(s, a, k, h ) is bounded as shown in the following Lemma, whose proof is provided in Appendix D.5. 
+
+Lemma B.4. For any (s, a, h ) ∈ S × A × [H] and k ∈ T (K), if Nk,h (s, a ) = 0 , D3(s, a, k, h ) = 0 , and if, 
+
+Nk,h (s, a ) > 0, the following holds: 
+
+D3(s, a, k, h ) ∈
+
+"s 
+
+cB ζ21 H4
+
+Nk,h (s, a ) ,
+
+s
+
+4cB ζ21 H4
+
+Nk,h (s, a )
+
+#
+
+. (36) With the above lemma in hand, recalling (33) gives 
+
+D3,h =
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s))(2 D3(s, π ⋆h(s), t v , h )) 
+
+≤ X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+2τv
+
+s
+
+4cB ζ21 H4
+
+max {Ntv ,h (s, π ⋆h(s)) , 1} (37) According to Lemma B.2, Ntv ,h (s, a ) ≥ 12 tv M d avg  
+
+> h
+
+(s, a ) holds if tv ≥ K0(s, a, h ) under the event E0. Therefore, 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+s
+
+H4
+
+max {Ntv ,h (s, a ), 1} ≲ X 
+
+> v:tv≤K0(s,a,h )
+
+τv H2 + X 
+
+> v:tv>K 0(s,a,h )
+
+τv
+
+s
+
+H4
+
+max {Ntv ,h (s, a ), 1}
+
+18 Federated Offline Reinforcement Learning 
+
+≲ H2K0(s, a, h ) + X 
+
+> v:tv>K 0(s,a,h )
+
+τv
+
+s
+
+H4
+
+max {Ntv ,h (s, a ), 1}
+
+≲ H2K0(s, a, h ) + 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+s
+
+H4
+
+M t v davg  
+
+> h
+
+(s, a ) . (38) Plugging the above inequality and the definitions of K0(s, π ⋆h(s), h ) and C⋆ 
+
+> avg
+
+to (37), we obtain 
+
+D3,h ≲ H2
+
+M
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) 
+
+davg  
+
+> h
+
+(s, π ⋆h(s)) +
+
+> ϕ(K)
+
+X
+
+> v=1
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) τv
+
+s
+
+H4
+
+M t v davg  
+
+> h
+
+(s, π ⋆h(s)) 
+
+≲ H2C⋆
+
+> avg
+
+M
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) min {dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) , 1/S } +
+
+> ϕ(K)
+
+X
+
+> v=1
+
+s
+
+H4C⋆
+
+> avg
+
+τ 2
+
+> v
+
+M t v
+
+X
+
+> s∈S
+
+s
+
+(dπ⋆ 
+
+> h
+
+(s, π ⋆h(s))) 2
+
+min {dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) , 1/S }
+
+> (i)
+
+≲ H2C⋆
+
+> avg
+
+SM +
+
+r H4C⋆
+
+> avg
+
+SM
+
+> ϕ(K)
+
+X
+
+> v=1
+
+√τv
+
+r τv
+
+tv
+
+> (ii )
+
+≲ H2C⋆
+
+> avg
+
+SM +
+
+r H4SKC ⋆
+
+> avg
+
+M , (39) where (i) holds due to Cauchy-Schwarz inequality and the fact that 
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) min {dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) , 1/S } ≤ X
+
+> s∈S
+
+
+
+1 + dπ⋆ 
+
+> h
+
+(s, π ⋆h(s)) S
+
+
+
+= X
+
+> s∈S
+
+
+
+1 + dπ⋆ 
+
+> h
+
+(s)S
+
+
+
+= 2 S, 
+
+and the last line (ii) follows from the Cauchy-Schwarz inequality and the fact that Pϕ(K) 
+
+> v=1
+
+τv = K and Pϕ(K) 
+
+> v=1
+> τv
+> tv
+
+≤
+
+1 + log K, with the latter following from Lemma C.2. • Bounding D4,h . In the following lemma, whose proof is provided in Section D.6, we extract the recursive formulation of D4,h as follows: 
+
+Lemma B.5. Consider any δ ∈ (0 , 1) . For any h ∈ [H], the following holds with probability at least 1 − δ:
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> (s,a )∈S×A
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmtv ,h (s,a )
+
+ωmi,t v ,h (s, a )Ph,s,a (V ⋆h+1 − Vι(i),h +1 )
+
+≲ σaux + (1 + 1
+
+H )
+
+> ϕ(K)
+
+X
+
+> u=1
+
+τu
+
+X
+
+> s∈S
+
+dπ⋆
+
+> h+1
+
+(s)( V ⋆h+1 (s) − Vtu−1,h +1 (s)) (40) 
+
+where 
+
+σaux =
+
+r H2KSC ⋆
+
+> avg
+
+M + H2SC ⋆
+
+> avg
+
+M . (41) 
+
+Step 3: Recursion. Combining the bounds of the decomposed errors ( (35) , (39) , and (40) ), for any h ∈ [H], we obtain the following recursive relation: 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s) ( V ⋆h (s) − Vtv ,h (s)) 
+
+≲ θK + (1 + 1
+
+H )
+
+> ϕ(K)
+
+X
+
+> u=1
+
+τu
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s)  V ⋆h+1 (s) − Vtu−1,h +1 (s)
+
+19 Federated Offline Reinforcement Learning 
+
+> (i)
+
+≲ (θK + Hτ 1) + (1 + 1
+
+H )
+
+> ϕ(K)−1
+
+X
+
+> u=1
+
+τu+1 
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s)  V ⋆h+1 (s) − Vtu,h +1 (s)
+
+> (ii )
+
+≲ (θK + Hτ 1) + (1 + 2
+
+H )2
+
+> ϕ(K)−1
+
+X
+
+> u=1
+
+τu
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s)  V ⋆h+1 (s) − Vtu,h +1 (s) (42) where (i) holds because V ⋆h+1 (s) − Vtu,h +1 (s) ≤ H and (ii) holds due to the condition τu+1  
+
+> τu
+
+≤ 1 + 2 
+
+> H
+
+for all 1 ≤ u ≤ ϕ(K)
+
+and the fact that V ⋆h+1 (s) ≥ Vtu,h +1 (s) shown in Lemma B.3, and we denote 
+
+θK := HC ⋆
+
+> avg
+
+SM + H2C⋆
+
+> avg
+
+SM +
+
+r H4SC ⋆
+
+> avg
+
+KM +
+
+r H2KSC ⋆
+
+> avg
+
+M + H2SC ⋆
+
+> avg
+
+M . (43) Then, by invoking the recursion (H − h + 1) times, it follows that 
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s) ( V ⋆h (s) − Vtv ,h (s)) 
+
+≲ (θK + Hτ 1) + (1 + 2
+
+H )2(θtϕ(K)−1 + Hτ 1) + (1 + 2
+
+H )4
+
+> ϕ(K)−2
+
+X
+
+> u=1
+
+τu
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> 1
+
+(s)  V ⋆h+2 (s) − Vtu,h +2 (s)
+
+≲ (θK + Hτ 1) + (1 + 2
+
+H )2(θtϕ(K)−1 + Hτ 1) + · · · + (1 + 2
+
+H )2( H−h+1) (θtϕ(K)−H+h−1 + Hτ 1)
+
+≲ Hθ K + H2τ1 (44) where the second line follows from the fact that V ⋆H+1 (s) − Vk,H +1 (s) = 0 for any k ∈ [K], and the last line holds because 
+
+θk ≤ θK for any k ≤ K and (1 + 1 
+
+> H
+
+)2( H−h+1) ≤ (1 + 2 
+
+> H
+
+)2H ≤ e4.Finally, by plugging the above bound into (29), we obtain the bound of the performance gap as follows: 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) ≤ 1
+
+K max 
+
+> h∈[H]
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> s∈S
+
+dπ⋆ 
+
+> h
+
+(s) ( V ⋆h (s) − Vtv ,h (s)) 
+
+≲ 1
+
+K (Hθ K + H2τ1)
+
+≲ H3SC ⋆
+
+> avg
+
+M K +
+
+r H6SC ⋆
+
+> avg
+
+M K + H2τ1
+
+K 
+
+> T=HK
+
+≲
+
+r H7SC ⋆
+
+> avg
+
+M T + H4SC ⋆
+
+> avg
+
+M T , (45) where the last line holds if τ1 ≤
+
+q HSC ⋆  
+
+> avg TM
+
+, and this completes the proof. 
+
+C. Technical lemmas 
+
+Freedman’s inequality. We provide a user-friendly version of Freedman’s inequality (Freedman, 1975). See Li et al. (2024a, Theorem 6) for more details. 
+
+Theorem C.1 (Li et al. (2024a, Theorem 6)) . Consider a filtration F0 ⊂ F 1 ⊂ F 2 ⊂ · · · , and let Ek stand for the expectation conditioned on Fk. Suppose that Yn = Pnk=1 Xk ∈ R, where {Xk} is a real-valued scalar sequence obeying 
+
+|Xk| ≤ R and Ek−1
+
+Xk
+
+ = 0 for all k ≥ 1
+
+for some quantity R < ∞. We also define 
+
+Wn := 
+
+> n
+
+X
+
+> k=1
+
+Ek−1
+
+X2
+
+> k
+
+ .
+
+20 Federated Offline Reinforcement Learning 
+
+In addition, suppose that Wn ≤ σ2 holds deterministically for some given quantity σ2 < ∞. Then for any positive integer 
+
+m ≥ 1, with probability at least 1 − δ one has 
+
+|Yn| ≤ 
+
+r
+
+8 max 
+
+n
+
+Wn, σ2
+
+2m
+
+o
+
+log 2mδ + 43 R log 2mδ . (46) We next present a basic analytical result that is useful in the proof. 
+
+Lemma C.2. Consider any sequence {xz }z=1 ,··· ,Z where xz ≥ 1 for all z and let Xz = Pzz′=1 xz′ . Then, for any Z ≥ 1,it follows that 
+
+X(Z) = 
+
+> Z
+
+X
+
+> z=1
+
+xz
+
+Xz
+
+≤ 1 + log XZ .
+
+Proof. For Z = 1 , X(1) = x1 
+
+> x1
+
+= 1 . For Z > 1, suppose the claim holds for Z − 1. Then, it holds for Z as follows: 
+
+X(Z) = X(Z − 1) + xZ
+
+XZ
+
+≤ 1 + log XZ−1 + 1 − XZ−1
+
+XZ
+
+≤ 1 + log XZ−1 − log 
+
+ XZ−1
+
+XZ
+
+
+
+= 1 + log XZ , (47) where the first inequality follows from the induction hypothesis and xZ = XZ − XZ−1, the second inequality follows from 
+
+log y ≤ y − 1 for any y > 0. By induction, this completes the proof. Last but not least, we have the following useful properties regarding the parameters introduced in (24c). 
+
+Lemma C.3. For any (s, a, h ) ∈ S × A × [H], k′ ≤ k ∈ T (K), where we denote u = ϕ(k), and i ∈ Lmk,h (s, a ). Then, it follows that: 
+
+ωmi,k,h (s, a ) ≤ 2HNk,h (s, a ) + Hn k,h (s, a ) , (48a) 
+
+> M
+
+X
+
+> m=1
+
+X
+
+> j∈Lmk,h (s,a )
+
+ωmj,k,h (s, a ) ≤ 1, (48b) 
+
+> M
+
+X
+
+> m=1
+
+X
+
+> j∈lmk′,h (s,a )
+
+ωmj,k,h (s, a ) ≤ (H + 1) nk′,h 
+
+Nk,h + Hn k,h 
+
+, (48c) 
+
+> M
+
+X
+
+> m=1
+
+X
+
+> j∈Lmk,h (s,a )
+
+(ωmi,k,h (s, a )) 2 ≤ 2HNk,h (s, a ) + Hn k,h (s, a ) , (48d) 
+
+> ∞
+
+X
+
+> v≥u
+
+ntv ,h (s, a )
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmk,h (s,a )
+
+ωmi,t v ,h (s, a ) ≤ nk,h (s, a )
+
+
+
+1 + 1
+
+H
+
+
+
+. (48e) 
+
+Proof. For notation simplicity, we will omit (s, a ) for the following proofs. Moreover, u = ϕ(k) and tu = k.
+
+Proof of (48a) . Recalling the definition of ωmi,k,h in (24c) and using the fact that H ≥ 1,
+
+ωmi,k,h = H + 1 
+
+Nk,h + Hn k,h 
+
+
+
+> ϕ(k)−1
+
+Y
+
+> x=ϕ(i)
+
+Ntx,h 
+
+Ntx,h + Hn tx,h 
+
+ ≤ 2HNk,h + Hn k,h 
+
+. (49) 
+
+Proof of (48b) . By rearranging the terms, 
+
+> M
+
+X
+
+> m=1
+
+X
+
+> j∈Lmk,h (s,a )
+
+ωmj,k,h =
+
+> ϕ(k)
+
+X
+
+> v=1
+> M
+
+X
+
+> m=1
+
+X
+
+> j∈lmtv ,h
+
+H + 1 
+
+Ntv ,h + Hn tv ,h 
+
+
+
+> ϕ(k)
+
+Y
+
+> x=v+1
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+21 Federated Offline Reinforcement Learning 
+
+=
+
+ϕ(k)
+
+X
+
+v=1 
+
+(H + 1) ntv ,h 
+
+Ntv ,h + Hn tv ,h 
+
+
+
+ϕ(k)
+
+Y
+
+x=v+1 
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+=
+
+ϕ(k)
+
+X
+
+v=1 
+
+
+
+1 − Ntv−1,h 
+
+Ntv ,h + Hn tv ,h 
+
+ 
+
+ϕ(k)
+
+Y
+
+x=v+1 
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+=
+
+ϕ(k)
+
+X
+
+v=1 
+
+
+
+ϕ(k)
+
+Y
+
+x=v+1 
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+−
+
+ϕ(k)
+
+Y
+
+x=v
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+= 1 −
+
+ϕ(k)
+
+Y
+
+x=1 
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+≤ 1. (50) 
+
+Proof of (48c) . Let v = ϕ(k′), i.e., k′ = tv . Similarly to the proof of (48b) , by arranging some terms, we obtain the upper bound as follows: 
+
+MX
+
+m=1 
+
+X
+
+j∈lmk′,h (s,a )
+
+ωmj,k,h (s, a ) = 
+
+MX
+
+m=1 
+
+X
+
+j∈lmtv ,h (s,a )
+
+H + 1 
+
+Ntv ,h + Hn tv ,h 
+
+
+
+ϕ(k)
+
+Y
+
+x=v+1 
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+= (H + 1) ntv ,h 
+
+Ntv ,h + Hn tv ,h 
+
+
+
+ϕ(k)
+
+Y
+
+x=v+1 
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+= (H + 1) ntv ,h 
+
+Nk,h + Hn k,h 
+
+
+
+ϕ(k)−1
+
+Y
+
+x=v
+
+Ntx,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+≤ (H + 1) nk′,h 
+
+Nk,h + Hn k,h 
+
+. (51) 
+
+Proof of (48d) . Using the bound in (48a) and (48b), 
+
+MX
+
+m=1 
+
+X
+
+j∈Lmk,h 
+
+(ωmj,k,h )2 = max 
+
+m∈[M ],j ∈Lmk,h 
+
+ωmj,k,h 
+
+! MX
+
+m=1 
+
+X
+
+j∈Lmk,h 
+
+ωmj,k,h ≤ max 
+
+m∈[M ],j ∈Lmk,h 
+
+ωmj,k,h ≤ 2HNk,h + Hn k,h 
+
+. (52) 
+
+Proof of (48e) . Recall that k = tu. Then, reusing the intermediate result derived in (51), 
+
+∞X
+
+v≥u
+
+ntv ,h (s, a )
+
+MX
+
+m=1 
+
+X
+
+i∈lmtu,h (s,a )
+
+ωmi,t v ,h (s, a ) = 
+
+∞X
+
+v≥u
+
+ntv ,h 
+
+(H + 1) ntu,h 
+
+Ntv ,h + Hn tv ,h 
+
+
+
+v−1Y
+
+x=u
+
+Ntx,h 
+
+Ntx,h + Hn tx,h 
+
+| {z }
+
+:= βx,h 
+
+
+
+= ( H + 1) ntu,h 
+
+∞X
+
+v≥u
+
+ntv ,h 
+
+Ntv ,h + Hn tv ,h 
+
+v−1Y
+
+x=u
+
+βx,h 
+
+!
+
+= ( H + 1) ntu,h 
+
+∞X
+
+v≥u
+
+1
+
+H (1 − βv,h )
+
+v−1Y
+
+x=u
+
+βx,h 
+
+!
+
+≤ nk,h (1 + 1
+
+H ). (53) 22 Federated Offline Reinforcement Learning 
+
+D. Proofs for main results 
+
+D.1. Proof of Lemma B.1 
+
+For any (h, s, a ) ∈ [H] × S × A and k ∈ T (K), according to the pessimistic aggregation update rule in (13) , the estimate error of Q function at the k-th iteration can be written as follows: 
+
+Qπh (s, a ) − Qk,h (s, a ) = Qπh (s, a ) −
+
+> M
+
+X
+
+> m=1
+
+αmk,h (s, a )Qmk,h (s, a )
+
+!
+
++ Bk,h (s, a )=
+
+> M
+
+X
+
+> m=1
+
+αmk,h (s, a )  Qπh (s, a ) − Qmk,h (s, a ) + Bk,h (s, a ), (54) where the last equality holds by the fact PMm=1 αmk,h (s, a ) = 1 .Then, invoking the local update rule in (12) , for any i such that (smi,h , a mi,h ) = ( s, a ), the local Q-estimate error at each agent 
+
+m can be written as follows: 
+
+Qπh (s, a ) − Qmi,h (s, a )= (1 − ηmi,h (s, a ))( Qπh (s, a ) − Qmi−1,h (s, a )) + ηmi,h (s, a )( Qπh (s, a ) − rh(s, a ) − P mi,h V mi−1,h +1 )= (1 − ηmi,h (s, a ))( Qπh (s, a ) − Qmi−1,h (s, a )) + ηmi,h (s, a )( rh(s, a ) + Ph,s,a V πh+1 − rh(s, a ) − P mi,h V mi−1,h +1 )= (1 − ηmi,h (s, a ))( Qπh (s, a ) − Qmi−1,h (s, a )) + ηmi,h (s, a )Ph,s,a (V πh+1 − V mi−1,h +1 ) + ηmi,h (s, a )( Ph,s,a − P mi,h )V mi−1,h +1 , (55) where the second line follows from the Bellman’s equation. Then, by invoking the relation recursively, the local Q-estimate error at each agent m obeys the following relation: 
+
+Qπh (s, a ) − Qmk,h (s, a ) = Y
+
+> i∈lmk,h (s,a )
+
+(1 − ηmi,h (s, a ))  Qπh (s, a ) − Qι(k),h (s, a )
+
++ X
+
+> i∈lmk,h (s,a )
+
+ηmi,h (s, a ) Y
+
+> {j>i :j∈lmk,h (s,a )}
+
+(1 − ηmj,h (s, a )) Ph,s,a (V πh+1 − V mi−1,h +1 )+ X
+
+> i∈lmk,h (s,a )
+
+ηmi,h (s, a ) Y
+
+> {j>i :j∈lmk,h (s,a )}
+
+(1 − ηmj,h (s, a ))( Ph,s,a − P mi,h )V mi−1,h +1 , (56) where lmk,h (s, a ) denotes a set of episodes where agent m has visited (s, a ) at step h within (ι(k), k ].By inserting (56) to (54) and letting v = ϕ(k), we obtain the following recursive relation for u-th local updates: 
+
+Qπh (s, a ) − Qk,h (s, a )=
+
+
+
+> M
+
+X
+
+> m=1
+
+αmk,h (s, a ) Y
+
+> i∈lmk,h (s,a )
+
+(1 − ηmi,h (s, a )) 
+
+| {z }
+
+> := λv,h (s,a )
+
+ Qπh (s, a ) − Qι(k),h (s, a ) + Bk,h (s, a )+
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmk,h (s,a )
+
+αmk,h (s, a )ηmi,h (s, a ) Y
+
+> {j>i :j∈lmk,h (s,a )}
+
+(1 − ηmj,h (s, a )) 
+
+ Ph,s,a (V πh+1 − V mi−1,h +1 )+
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmk,h (s,a )
+
+αmk,h (s, a )ηmi,h (s, a ) Y
+
+> {j>i :j∈lmk,h (s,a )}
+
+(1 − ηmj,h (s, a )) 
+
+ (Ph,s,a − P mi,h )V mi−1,h +1 
+
+= λv,h (s, a )  Qπh (s, a ) − Qι(k),h (s, a ) + Bk,h (s, a )+ (H + 1) 
+
+Ntv ,h (s, a ) + Hn tv ,h (s, a )
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmk,h (s,a )
+
+Ph,s,a (V πh+1 − V mi−1,h +1 )
+
+23 Federated Offline Reinforcement Learning 
+
++ (H + 1) 
+
+Ntv ,h (s, a ) + Hn tv ,h (s, a )
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmk,h (s,a )
+
+(Ph,s,a − P mi,h )V mi−1,h +1 . (57) Here, the last line holds by invoking the definitions in (16) and (17) and observing with abuse of notation (omit (s, a ) when it is clear) 
+
+αmk,h (s, a )ηmi,h (s, a ) Y
+
+> {j>i :j∈lmk,h (s,a )}
+
+(1 − ηmj,h (s, a )) = 1
+
+MNι(k),h + M (H + 1) nmk,h 
+
+Nk,h + Hn k,h 
+
+M (H + 1) 
+
+Nι(i),h + M (H + 1) nmi,h 
+
+
+
+> nmk,h −nmi,h
+
+Y
+
+> j=1
+
+ Nι(i),h + M (H + 1)( nmi,h + j − 1) 
+
+Nι(i),h + M (H + 1)( nmi,h + j)
+
+
+
+= 1
+
+MNι(k),h + M (H + 1) nmk,h 
+
+Nk,h + Hn k,h 
+
+M (H + 1) 
+
+Nι(i),h + M (H + 1) nmi,h 
+
+Nι(i),h + M (H + 1) nmi,h 
+
+Nι(i),h + M (H + 1) nmk,h 
+
+= (H + 1) 
+
+Nk,h + Hn k,h 
+
+= (H + 1) 
+
+Ntv ,h + Hn tv ,h 
+
+(58) where the last line holds since ι(i) = ι(k) for i ∈ lmk,h (s, a ) and k ∈ T (K) leads to k = tϕ(k) = tv .Then, by invoking the above recursive relation for each aggregation, the Q-estimate error after k episodes is decomposed as follows: 
+
+Qπh (s, a ) − Qk,h (s, a )=
+
+> ϕ(k)
+
+Y
+
+> u=1
+
+λu,h (s, a )
+
+| {z }
+
+> := ω0,k,h (s,a )
+
+(Qπh (s, a ) − Q0,h (s, a )) + 
+
+> ϕ(k)
+
+X
+
+> u=1
+
+Btu,h (s, a )
+
+> ϕ(k)
+
+Y
+
+> x=u+1
+
+λx,h (s, a )+
+
+> ϕ(k)
+
+X
+
+> u=1
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmtu,h (s,a )
+
+ H + 1 
+
+Ntu,h + Hn tu,h ϕ(k)
+
+Y
+
+> x=u+1
+
+λx,h (s, a )
+
+| {z }
+
+> := ωi,k,h (s,a )
+
+(Ph,s,a − P mi,h )V mi−1,h +1 
+
++
+
+> ϕ(k)
+
+X
+
+> u=1
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmtu,h (s,a )
+
+ H + 1 
+
+Ntu,h + Hn tu,h ϕ(k)
+
+Y
+
+> x=u+1
+
+λx,h (s, a )
+
+ Ph,s,a (V πh+1 − V mi−1,h +1 )= ω0,k,h (s, a )( Qπh (s, a ) − Q0,h (s, a )) +
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmk,h (s,a )
+
+ωmi,k,h (s, a )( Ph,s,a − P mi,h )V mi−1,h +1 
+
++
+
+> ϕ(k)
+
+X
+
+> u=1
+
+Btu,h (s, a )
+
+> ϕ(k)
+
+Y
+
+> x=u+1
+
+λx,h (s, a )+
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmk,h (s,a )
+
+ωmi,k,h (s, a )Ph,s,a (V πh+1 − V mi−1,h +1 ). (59) Here, λu,h (s, a ), ω0,k,h (s, a ), and ωi,k,h (s, a ) can be simply written as described in (24a) , (24b) , and (24c) , respectively, which will be proved momentarily. For notational simplicity, we omit (s, a ) in the derivations. 
+
+Proof of (24a) . Consider k = tv . First, consider a case that Nι(k),h = 0 . If nk,h = 0 , λv,h = PMm=1 αmk,h = 1 . Otherwise, if nk,h > 0, where there exists at least one agent m ∈ [M ] that visits the state-action at least once until k-th episode, it follows that 
+
+λv,h =
+
+> M
+
+X
+
+> m=1
+
+1
+
+M
+
+(H + 1) M n mk,h 
+
+(H + 1) nk,h nmk,h 
+
+Y
+
+> j=1
+
+ M (H + 1)( j − 1) 
+
+M (H + 1) j
+
+
+
+24 Federated Offline Reinforcement Learning 
+
+=
+
+> M
+
+X 
+
+> m∈[M]: nmk,h =0
+
+nmk,h 
+
+nk,h 
+
+| {z } 
+
+> =0
+
++
+
+> M
+
+X 
+
+> m∈[M]: nmk,h >0
+
+nmk,h 
+
+nk,h nmk,h 
+
+Y
+
+> j=1
+
+ (H + 1)( j − 1) (H + 1) j
+
+| {z }
+
+> =0
+
+= 0 . (60) On the other hand, when Nι(k),h > 0,
+
+λv,h =
+
+> M
+
+X
+
+> m=1
+
+1
+
+MNι(k),h + M (H + 1) nmk,h 
+
+Nι(k),h + ( H + 1) nk,h nmk,h 
+
+Y
+
+> j=1
+
+ Nι(k),h + M (H + 1)( j − 1) 
+
+Nι(k),h + M (H + 1) j
+
+
+
+=
+
+> M
+
+X
+
+> m=1
+
+1
+
+MNι(k),h + M (H + 1) nmk,h 
+
+Nι(k),h + ( H + 1) nk,h 
+
+Nι(k),h 
+
+Nι(k),h + M (H + 1) nmk,h 
+
+= Nι(k),h 
+
+Nk,h + Hn k,h 
+
+. (61) 
+
+Proof of (24b) . According to (24a) , if Nk,h (s, a ) = 0 , then λu,h (s, a ) = 1 for all 1 ≤ u ≤ ϕ(k). Thus, ω0,k,h (s, a ) = 1 .Otherwise, let the epsiode when (s, a ) is visited at step h by any of the agents for the first time be j. Then, λϕ(j),h = 0 
+
+because Nι(j),h (s, a ) = 0 . Thus, if Nk,h (s, a ) > 0, it always holds that ω0,k,h (s, a ) = Qϕ(k) 
+
+> u=1
+
+λu,h (s, a ) = 0 .
+
+Proof of (24c) . For i such that ϕ(i) = u, by rearranging terms and applying (24a), 
+
+ωmi,k,h = (H + 1) 
+
+Ntu,h + Hn tu,h 
+
+
+
+> ϕ(k)
+
+Y
+
+> x=u+1
+
+Ntx−1,h 
+
+Ntx,h + Hn tx,h 
+
+
+
+= H + 1 
+
+Nk,h + Hn k,h 
+
+
+
+> ϕ(k)−1
+
+Y
+
+> x=u
+
+Ntx,h 
+
+Ntx,h + Hn tx,h 
+
+ . (62) 
+
+D.2. Proof of Lemma B.2 
+
+Consider any given δ ∈ (0 , 1) and (k, s, a, h ) ∈ [K] × S × A × [H]. Note that N mk,h (s, a ) ∼ Binomial (k, d mh (s, a )) for all 
+
+m ∈ [M ]. Then recall the definition of Nk,h (s, a ) in Section 3.2, we can view Nk,h (s, a ) = PMm=1 N mk,h (s, a ) as a sum of 
+
+kM independent Bernoulli variables with expectation ν := E[Nk,h (s, a )] = kM d avg  
+
+> h
+
+(s, a ). Therefore, applying Chernoff bound (see Mitzenmacher & Upfal (2005, Theorem 4.4)) yields: 
+
+∀t ∈ [0 , 1] : P( N mk,h (s, a ) − ν ≥ νt ) ≤ exp  −c1νt 2 , (63a) 
+
+∀t ≥ 1 : P(N mk,h (s, a ) − ν ≥ tν ) ≤ exp ( −c1νt ) , (63b) for some universal constant c1 > 0.Armed with above facts and notations, now we are ready to prove (26). First, applying (63a) with t = 12 , we arrive at: 
+
+P( N mk,h (s, a ) − ν ≥ ν
+
+2 ≤ exp( − c1ν
+
+4 ) ≤ δ, (64) where the last line follows from the condition that ν = kM d avg  
+
+> h
+
+(s, a ) ≥ 4 
+
+> c1
+
+log ( 1 
+
+> δ
+
+).To continue, when ν = kM d avg  
+
+> h
+
+(s, a ) ≤ 4 
+
+> c1
+
+log (1 /δ ), applying (63b) with t = 4 log (1 /δ ) 
+
+> νc 1
+
+≥ 1 gives: 
+
+P(N mk,h (s, a ) − ν ≥ 4 log (1 /δ )
+
+c1
+
+) ≤ exp( −4 log (1 /δ )) ≤ δ. (65) Summing up (64) and (65) and taking the union bound over (k, s, a, h ) ∈ [K] × S × A × [H] complete the proof by showing that: when k ≥ 4 log( |S||A| KH δ )
+
+c1M d avg 
+
+> h
+
+: kM d avg 
+
+> h
+
+2 = ν
+
+2 ≤ N mk,h (s, a ) ≤ 3ν
+
+2 ≤ 2kM d avg  
+
+> h
+
+(66) when k ≤ 4 log( |S||A| KH δ )
+
+c1M d avg 
+
+> h
+
+: N mk,h (s, a ) ≤ 8
+
+c1
+
+log( |S||A| KH δ ) (67) holds with probability at least 1 − 2δ.25 Federated Offline Reinforcement Learning 
+
+D.3. Proof of Lemma B.3 
+
+D.3.1. P ROOF OF (28a). Noticing that the (28a) involves two terms of interest, we start from the first one D2(s, a, k, h ). For any (s, a, h ) ∈S × A × [H] and any k ∈ T (K), we can rewrite D2(s, a, k, h ) as 
+
+D2(s, a, k, h ) = 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+Xmi,k,h (s, a ), (68) where Xmi,k,h (s, a ) = ωmi,k,h (s, a )( Ph,s,a − P mi,h )V mi−1,h +1 I{(smi,h , a mi,h ) = (s, a )}. To further control 
+
+Pki=1 
+
+PMm=1 Xmi,k,h (s, a ), we first introduce the following Lemma D.1, whose proof is provided in Appendix D.4, with 
+
+Nk,h (s, a ) = N .
+
+Lemma D.1. For any (k, s, a, h ) ∈ S × A × [H] and N ∈ [1 , M K ], let 
+
+eXmi,k,h (s, a ; N ) = eωmi,k,h (s, a ; N )( Ph,s,a − P mi,h )V mi−1,h +1 I{(smi,h , a mi,h ) = ( s, a )}, (69) 
+
+where 
+
+eωmi,k,h (s, a ; N ) := H + 1 
+
+N + Hn k,h (s, a )
+
+
+
+> ϕ(k)−1
+
+Y
+
+> x=ϕ(i)
+
+Ntx,h (s, a )
+
+Ntx,h (s, a ) + Hn tx,h (s, a )
+
+ Imi,h (s, a ; N ), (70) 
+
+and Imi,h (s, a ; N ) := I{PMm′=1 N m′
+
+> i−1,h
+
+(s, a ) + Pmm′=1 I{(sm′
+
+> i,h
+
+, a m′
+
+> i,h
+
+) = ( s, a )} ≤ N }. Then, for any δ ∈ (0 , 1) , the following holds: 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+eXmi,k,h (s, a ; N ) ≤
+
+r 81 H4ζ21
+
+N (71) 
+
+at least with probability 1 − δ, where we denote ζ1 = log 
+
+ |S||A| M K 2Hδ
+
+
+
+.
+
+Armed with above lemma, for any (s, a, k, h ) ∈ S × A × [K] × [H] where k ∈ T (K), the following holds: when Nk,h (s, a ) > 0 : |D2(s, a, k, h )| ≤ 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+eXmi,k,h (s, a ; Nk,h (s, a )) ≤
+
+s
+
+81 H4ζ21
+
+Nk,h (s, a ) (72) with probability at least 1 − δ. As it is obvious that D2(s, a, k, h ) = 0 when Nk,h (s, a ) = 0 from the definition of 
+
+D2(s, a, k, h ), we arrive at 
+
+|D2(s, a, k, h )| ≤ 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+eXmi,k,h (s, a ; Nk,h (s, a )) ≤
+
+s
+
+81 H4ζ21
+
+Nk,h (s, a ) . (73) Finally, combining the results for D2(s, a, k, h ) (cf. (73) ) and D3(s, a, k, h ) (cf. (36) in Lemma B.4), we conclude that for any (s, a, k, h ) ∈ S × A × [K] × [H] with k ∈ T (K), it holds with probability at least 1 − δ that 
+
+|D2(s, a, k, h )| ≤ 
+
+s
+
+81 H4ζ21
+
+Nk,h (s, a ) =
+
+s
+
+cB ζ21 H4
+
+Nk,h (s, a ) ≤ D3(s, a, k, h ). (74) D.3.2. P ROOF OF (28b) AND (28c). For all (h, s, a, k ) ∈ [H] × S × A × T (K), it is clear that Qπk 
+
+> h
+
+(s, a ) ≤ Q⋆h(s, a ) and V πk 
+
+> h
+
+(s) ≤ V ⋆h (s) due to the definition. So it suffices to show that 
+
+Qk,h (s, a ) ≤ Qπk 
+
+> h
+
+(s, a ) and Vk,h (s) ≤ V πk 
+
+> h
+
+(s)
+
+for all (h, s, a, k ) ∈ [H] × S × A × T (K), which we will prove by an induction argument as below. 26 Federated Offline Reinforcement Learning 
+
+• Base case. When h = H + 1 , for all (s, a, k ) ∈ S × A × T (K), the relation always holds since Qk,H +1 (s, a ) = 0 ≤
+
+Qπk
+
+> H+1
+
+(s, a ) and Vk,H +1 (s) = 0 ≤ V πk
+
+> H+1
+
+(s) according to the definition of Qk,H +1 and Vk,H +1 , respectively. • Induction. When h ∈ [H], suppose the relation holds for h + 1 , i.e., Qk,h +1 (s, a ) ≤ Qπk
+
+> h+1
+
+(s, a ) and Vk,h +1 (s) ≤
+
+V πk
+
+> h+1
+
+(s) for all (s, a, k ) ∈ S × A × T (K). First, we will verify Q-estimates at step h are pessimistic. For any 
+
+(s, a, k ) ∈ S × A × T (K), applying Lemma B.1, 
+
+Qπk 
+
+> h
+
+(s, a ) − Qk,h (s, a ) = ω0,k,h (s, a )( Qπk 
+
+> h
+
+(s, a ) − Q0,h (s, a )) 
+
+| {z } 
+
+> Dπk
+> 1(s,a,k,h )
+
++
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmk,h (s,a )
+
+ωmi,k,h (s, a )( Ph,s,a − P mi,h )V mi−1,h +1 
+
+| {z }
+
+> D2(s,a,k,h )
+
++
+
+> ϕ(k)
+
+X
+
+> u=1
+
+Btu,h (s, a )
+
+> ϕ(k)
+
+Y
+
+> u′=u+1
+
+λu′,h (s, a )
+
+| {z }
+
+> D3(s,a,k,h )
+
++
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmk,h (s,a )
+
+ωmi,k,h (s, a )Ph,s,a (V πk 
+
+> h+1
+
+− Vι(i),h +1 )
+
+| {z } 
+
+> Dπk
+> 4(s,a,k,h )
+
+. (75) Then we control the above four terms one at a time. Here, Dπk 
+
+> 1
+
+(s, a, k, h ) ≥ 0 since Qπk 
+
+> h
+
+(s, a ) ≥ Q0,h (s, a ) = 0 . In addition, according to the fact (28a) in Lemma B.3, |D2(s, a, k, h )| ≤ D3(s, a, k, h ). And it is clear that D4 ≥ 0 due to 
+
+V πk 
+
+> h+1
+
+≥ Vk,h +1 ≥ Vι(i),h +1 , (76) where the first inequality holds by the induction assumption, and the last inequality arises from the monotonicity guarantee of the global update in (14) . Therefore, it is clear that for any (s, a, k ) ∈ S × A × T (K), Q-estimates at step h are pessimistic, i.e., 
+
+Qπk 
+
+> h
+
+(s, a ) − Qk,h (s, a ) ≥ 0. (77) Next, to show that value estimates at step h are pessimistic, recalling the global update in (14), 
+
+V πk 
+
+> h
+
+(s) − Vk,h (s) = Qπk 
+
+> h
+
+(s, π k,h (s)) − max {max  
+
+> a
+
+Qk,h (s, a ), V ι(k),h (s)}
+
+= Qπk 
+
+> h
+
+(s, π k,h (s)) − max  
+
+> a
+
+Qk0,h (s, a )= Qπk 
+
+> h
+
+(s, π k0,h (s)) − Qk0,h (s, π k0,h (s)) ≥ 0, (78) where k0 denotes the most recent episode satisfying Vk,h (s) = max a Qk0,h (s, a ) and k ≥ k0 ∈ T (K), and the last inequality holds because πk,h (s) = πk0,h (s) and Qπk 
+
+> h
+
+(s, a ) − Qk0,h (s, a ) ≥ 0 can be similarly verified using (75) and (76) for k0. Now, we verify that Qπk 
+
+> h
+
+(s, a ) ≥ Qk,h (s, a ) and V πk 
+
+> h
+
+(s) ≥ Vk,h (s) holds at step h for any 
+
+(s, a, k ) ∈ S × A × T (K), and this directly completes the induction argument. 
+
+D.4. Proof of Lemma D.1 
+
+To begin with, for any time step h ∈ [H], we denote the expectation conditioned on the trajectories j ≤ i of all agent as 
+
+∀(i, m ) ∈ [k] × [M ] : E(i,m )[·] = E · | sm′
+
+> j,h
+
+, a m′
+
+> j,h
+
+, V mj,h +1 j<i,m ′∈[M ], sm′
+
+> i,h
+
+, a m′ 
+
+> i,h m′≤m
+
+. (79) Armed with this notation, fixing N , it is easily verified that E(i,m )[ eXmi,k (s, a ; N )] = 0 since then V mi−1,h +1 can be regarded as fixed and (Ph,s,a − P mi,h ) is independent from eωmi,k,h (s, a ; N ).27 Federated Offline Reinforcement Learning 
+
+Consequently, we can apply Freedman’s inequality (see the user-friendly version of Freedman’s inequality provided in Theorem C.1) and control the term of interest for any (s, a, k, h ) ∈ S × A × [K] × [H] and N ∈ [1 , M K ] as below: 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+eXmi,k,h (s, a ; N ) (i) 
+
+≤ p8B1ζ1 + 43 B2ζ1(ii) 
+
+≤
+
+r 32 H4ζ1
+
+N + 3H2ζ1
+
+N ≤
+
+r 81 H4ζ21
+
+N (80) at least with probability 1 − δ. Here, (i) and (ii) arises from the following definition and facts about B1 and B2:
+
+B1 := 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+E(i,m )
+
+ eXmi,k,h (s, a ; N )
+
+2
+
+≤ 4H4
+
+N , (81) 
+
+B2 := max  
+
+> (i,m )∈[k]×[M]
+
+eXmi,k,h (s, a ; N ) ≤ 2H2
+
+N (82) where the proofs of (82) and (81) are provided as below, respectively. 
+
+Proof of (81) . In view of that the events happen at any time step h is independent from the transitions in later time steps including P mi,h , we have eωmi,k,h (s, a ; N ) is independent from (Ph,s,a − P mi,h )V mi−1,h +1 , which yields 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+E(i,m )[( eXmi,k,h (s, a ; N )) 2] = 
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+E(i,m )[( eωmi,k,h (s, a ; N )) 2]Var Ph,s,a (V mi−1,h +1 )
+
+≤ H2
+
+> k
+
+X
+
+> i=1
+> M
+
+X
+
+> m=1
+
+E(i,m )[( eωmi,k,h (s, a ; N )) 2]
+
+≤ H2N
+
+ 2HN
+
+2
+
+= 4H4
+
+N . (83) where the penultimate inequality holds by the fact that |eωmi,k,h (s, a ; N )| ≤ 2HN .
+
+Proof of (82) . For any (i, m, h ) ∈ [k] × [M ] × [H] and fixed N ∈ [1 , M K ], it is observed that 
+
+eXmi,k,h (s, a ; N ) = eωmi,k,h (s, a ; N )( Ph,s,a − P mi,h )V mi−1,h +1 I{(smi,h , a mi,h ) = ( s, a )}
+
+≤ | eωmi,k,h (s, a ; N )|∥ Ph,s,a − P mi,h ∥1∥V mi−1,h +1 ∥∞ ≤ 2H2
+
+N (84) where the last inequality follows from the facts ∥V mi−1,h +1 ∥∞ ≤ H, ∥Ph,s,a − P mi,h ∥1 ≤ 1, and |eωmi,k,h (s, a ; N )| ≤ H+1  
+
+> N
+
+≤ 
+
+> 2HN
+
+.
+
+D.5. Proof of Lemma B.4 
+
+With slightly abuse of notation, we will omit (s, a ) from some notations when it is clear for simplicity throughout this section. Recall the definition of D3(s, a, k, h ) in (23) and the global penalty defined in (15) . When Nk,h (s, a ) = 0 , the global penalties are all 0, which yields D3(s, a, k, h ) = 0 . Therefore, now it suffices to focus on the cases when Nk,h (s, a ) > 0
+
+and show that for cB = 81 , cu = 4 and cl = 1 ,
+
+D3(s, a, k, h ) = 
+
+> ϕ(k)
+
+X
+
+> u=1
+
+Btu,h (s, a )
+
+> ϕ(k)
+
+Y
+
+> u′=u+1
+
+λu′,h (s, a ) ∈
+
+"s 
+
+clcB ζ21 H4
+
+Nk,h (s, a ) ,
+
+s
+
+cucB ζ21 H4
+
+Nk,h (s, a )
+
+#
+
+. (85) Towards this, for any (s, a ) ∈ S × A , we consider a more general term as below: for any integer z ≥ 1,
+
+> z
+
+X
+
+> u=1
+
+Btu,h zY
+
+> u′=u+1
+
+λu′,h =
+
+> z
+
+X
+
+> u=1
+
+(H + 1) ntu,h 
+
+Nk,h + Hn tu,h 
+
+s
+
+cB ζ21 H4
+
+Ntu,h zY
+
+> u′=u+1
+
+λu′,h 
+
+28 Federated Offline Reinforcement Learning 
+
+=
+
+q
+
+cB ζ21 H4
+
+> z
+
+X
+
+> u=1
+
+s
+
+1
+
+Ntu,h 
+
+(1 − λu,h )
+
+> z
+
+Y
+
+> u′=u+1
+
+λu′,h 
+
+=
+
+q
+
+cB ζ21 H4Y (z) (86) where the penultimate equality follows from (H+1) ntu,h (s,a ) 
+
+> Ntu,h +Hn tu,h (s,a )
+
+= (1 − λu,h (s, a )) for all (s, a ) ∈ S × A , and the last equality arises by defining 
+
+Y (z) := 
+
+> z
+
+X
+
+> u=1
+
+s
+
+1
+
+Ntu,h 
+
+(1 − λu,h )
+
+> z
+
+Y
+
+> u′=u+1
+
+λu′,h . (87) As a result, to show (85), it suffices to verify that 
+
+Y (z) ∈
+
+r cl
+
+Ntz ,h (s, a ) ,
+
+r cu
+
+Ntz ,h (s, a )
+
+
+
+. (88) 
+
+Proof of (88) by induction. We will verify (88) by a induction argument. To begin with, for the basic case z = 1 , it is easily verified that 
+
+Y (1) = 
+
+(q 1 
+
+> Nt1,h
+
+if nt1,h > 00 if nt1,h = 0 , (89) since when nt1,h > 0 we have λ1,h (s, a ) = 0 , and otherwise λ1,h (s, a ) = 1 . Then suppose (88) holds for z − 1, namely, 
+
+Y (z − 1) ∈
+
+r cl
+
+Ntz−1,h 
+
+,
+
+r cu
+
+Ntz−1,h 
+
+
+
+(90) we hope to show (88) holds for z. Towards this, we first show the upper bound in (88) holds for z as follows: 
+
+Y (z) = Y (z − 1) λz,h +
+
+s
+
+1
+
+Ntz ,h 
+
+(1 − λz,h )
+
+> (i)
+
+≤
+
+r cu
+
+Ntz−1,h 
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
++
+
+s
+
+1
+
+Ntz ,h 
+
+(H + 1) ntz ,h 
+
+Ntz ,h + Hn tz ,h 
+
+≤
+
+r cu
+
+Ntz ,h 
+
+s
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
++
+
+s
+
+1
+
+Ntz ,h 
+
+(H + 1) ntz ,h 
+
+Ntz ,h + Hn tz ,h 
+
+=
+
+r cu
+
+Ntz ,h 
+
+s
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
++
+
+r 1
+
+cu
+
+(H + 1) ntz ,h 
+
+Ntz ,h + Hn tz ,h 
+
+!
+
+=
+
+r cu
+
+Ntz ,h 
+
+s
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
++
+
+r 1
+
+cu
+
+1 −
+
+s
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
+!
+
+1 + 
+
+s
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
+!! 
+
+≤
+
+r cu
+
+Ntz ,h 
+
+, (91) where (i) follows from the induction assumption and (H+1) ntz ,h (s,a ) 
+
+> Ntz ,h +Hn tz ,h (s,a )
+
+= (1 − λz,h (s, a )) for all (s, a ) ∈ S × A , the penultimate equality holds by 1 − Ntz−1,h  
+
+> Ntz ,h +Hn tz ,h
+
+= Ntz ,h −Ntz−1,h +Hn tz ,h  
+
+> Ntz ,h +Hn tz ,h
+
+= (H+1) ntz ,h  
+
+> Ntz ,h +Hn tz ,h
+
+, and the last inequality arises from 
+
+q 1
+
+> cu
+
+
+
+1 + 
+
+q Ntz−1,h 
+
+> Ntz ,h +Hn tz ,h
+
+
+
+≤ 1 as long as cu ≥ 4.Analogous to (91), the lower bound of Y (z) is derived as below: 
+
+Y (z) = Y (z − 1) λz,h +
+
+s
+
+1
+
+Ntz ,h 
+
+(1 − λz,h )
+
+29 Federated Offline Reinforcement Learning 
+
+≥
+
+r cl
+
+Ntz−1,h 
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
++
+
+s
+
+1
+
+Ntz ,h 
+
+(H + 1) ntz ,h 
+
+Ntz ,h + Hn tz ,h 
+
+≥
+
+r cl
+
+Ntz ,h 
+
+Ntz−1,h 
+
+Ntz ,h + Hn tz ,h 
+
++
+
+s
+
+1
+
+Ntz ,h 
+
+(H + 1) ntz ,h 
+
+Ntz ,h + Hn tz ,h 
+
+≥
+
+r cl
+
+Ntz ,h 
+
+, (92) where the first inequality follows from the induction assumption and (H+1) ntz ,h (s,a ) 
+
+> Ntz ,h +Hn tz ,h (s,a )
+
+= (1 − λz,h (s, a )) for all (s, a ) ∈S × A , and the last equality holds when 1 ≥ cl. Finally, by induction arguments, (88) holds for any z ∈ ϕ(K), and this completes the proof. 
+
+D.6. Proof of Lemma B.5 
+
+Recall the definition of D4,h (see (33) and (23)), D4,h can be rewritten as follows: 
+
+D4,h ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> (s,a )∈S×A
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈Lmtv ,h (s,a )
+
+ωmi,t v ,h (s, a )Ph,s,a (V ⋆h+1 − Vι(i),h +1 )
+
+> (i)
+
+=
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> (s,a )∈S×A
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )
+
+> M
+
+X
+
+> m=1
+
+ X
+
+> i∈lmtu,h (s,a )
+
+ωmi,t v ,h (s, a )
+
+| {z }
+
+> := ψu,v,h (s,a )
+
+=
+
+> ϕ(K)
+
+X
+
+> v=1
+
+τv
+
+X
+
+> (s,a )∈S×A
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a )= 1
+
+M
+
+X
+
+> (s,a )∈S×A
+> M
+
+X
+
+> m′=1
+> ϕ(K)
+
+X
+
+> v=1
+
+X
+
+> tv−1<j ≤tv
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a ) (93) where (i) holds by rewriting the sum as P 
+
+> i∈Lmtv ,h (s,a )
+
+= Pvu=1 
+
+P 
+
+> i∈lmtu,h (s,a )
+
+and the last equality holds by the definition of 
+
+τν .To further control (93) , we introduce the following lemma that bound the expectation form (93) by an empirical version; the proof is postponed to Appendix D.7. 
+
+Lemma D.2. Consider any δ ∈ (0 , 1) . For any h ∈ [H], the following holds: 
+
+X
+
+> (s,a )∈S×A
+> M
+
+X
+
+> m′=1
+> ϕ(K)
+
+X
+
+> v=1
+
+X
+
+> tv−1<j ≤tv
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a )
+
+≲ X
+
+> (s,a )∈S×A
+> ϕ(K)
+
+X
+
+> v=1
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) ntv ,h (s, a )
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a ) + M σ aux ,1 (94) 
+
+at least with probability 1 − δ, where 
+
+σaux ,1 ≲
+
+r H2KSC ⋆
+
+> avg
+
+M + H2SC ⋆
+
+> avg
+
+M (95) Then, applying concentration bounds, D4 is bounded as follows: 
+
+D4(i)
+
+≲ 1
+
+M
+
+X
+
+> (s,a )∈S×A
+> ϕ(K)
+
+X
+
+> v=1
+> v
+
+X
+
+> u=1
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) ntv ,h (s, a )Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a ) + σaux ,1
+
+30 Federated Offline Reinforcement Learning 
+
+= 1
+
+M
+
+X
+
+> (s,a )∈S×A
+> ϕ(K)
+
+X
+
+> u=1
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )
+
+> ϕ(K)
+
+X
+
+> v=u
+
+ntv ,h (s, a )ψu,v,h (s, a ) + σaux ,1(ii )
+
+≤ 1
+
+M
+
+X
+
+> (s,a )∈S×A
+> ϕ(K)
+
+X
+
+> u=1
+
+dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ntu,h (s, a )(1 + 1
+
+H ) + σaux ,1 (96) where (i) follows from Lemma D.2, and (ii) holds because 
+
+> ∞
+
+X
+
+> v≥u
+
+ntv ,h (s, a )
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmtu,h (s,a )
+
+ωmi,t v ,h (s, a ) ≤ ntu,h (s, a )(1 + 1
+
+H ) (97) according (48e) in Lemma C.3. To continue, we introduce the following lemma that transfer the distribution at time step h to the distribution of h + 1 ; the proof is provided in Appendix D.8. 
+
+Lemma D.3. Consider any δ ∈ (0 , 1) . For any h ∈ [H], the following holds: 
+
+> ϕ(K)
+
+X
+
+> u=1
+
+X
+
+> (s,a )∈S×A
+
+ntu,h (s, a )
+
+M d avg  
+
+> h
+
+(s, a ) dπ⋆ 
+
+> h
+
+(s, a )Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )
+
+≲
+
+> ϕ(K)
+
+X
+
+> u=1
+
+τu
+
+X
+
+> s∈S
+
+dπ⋆
+
+> h+1
+
+(s)( V ⋆h+1 (s) − Vtu−1,h +1 (s)) + σaux ,2 (98) 
+
+at least with probability 1 − δ, where 
+
+σaux ,2 =
+
+r H2KSC ⋆
+
+> avg
+
+M + HSC ⋆
+
+> avg
+
+M . (99) Armed with above lemma, rearranging the terms in (96) and applying Lemma D.3, 
+
+D4 ≲ (1 + 1
+
+H )
+
+> ϕ(K)
+
+X
+
+> u=1
+
+X
+
+> (s,a )∈S×A
+
+ntu,h (s, a )
+
+M d avg  
+
+> h
+
+(s, a ) dπ⋆ 
+
+> h
+
+(s, a )Ph,s,a (V ⋆h+1 − Vtu−1,h +1 ) + σaux ,1
+
+≲ (1 + 1
+
+H )
+
+> ϕ(K)
+
+X
+
+> u=1
+
+τu
+
+X
+
+> s∈S
+
+dπ⋆
+
+> h+1
+
+(s)( V ⋆h+1 (s) − Vtu−1,h +1 (s)) + σaux ,1 + σaux ,2
+
+| {z }
+
+> =: σaux
+
+, (100) and this completes the proof. 
+
+D.7. Proof of Lemma D.2 
+
+Consider any given (s, a ) ∈ S × A and v ∈ [1 , ϕ (K)] . Before proceeding, we introduce some notations and auxiliary terms. Let 
+
+Gv,h (s, a ) := 
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a ). (101) Then, for any tv−1 < j ≤ tv , we introduce the following auxiliary variables: 
+
+Y mj,h := X
+
+> (s,a )∈S×A
+
+ davg  
+
+> h
+
+(s, a ) − I{(s, a ) = ( smj,h , a mj,h )} dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) Gv,h (s, a ) (102) 
+
+eY mj,h := X
+
+> (s,a )∈S×A
+
+ dmh (s, a ) − I{(s, a ) = ( smj,h , a mj,h )} dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) eG−j,m v,h (s, a ), (103) 31 Federated Offline Reinforcement Learning 
+
+where we define 
+
+eG−j,m v,h (s, a ) := 
+
+( eψ−j,m v,v,h (s, a )Ph,s,a (V ⋆h+1 − Vtv−1,h +1 ) + (1 − eψ−j,m v,v,h (s, a )) Gv−1,h (s, a ) if v > 1
+
+Ph,s,a (V ⋆h+1 − V0,h +1 ) if v = 1 (104) and 
+
+eψ−j,m v,v,h (s, a ) := (H + 1)( ntv ,h (s, a ) − I{(s, a ) = ( smj,h , a mj,h )})
+
+Ntv−1,h (s, a ) + ( H + 1)( ntv ,h (s, a ) − I{(s, a ) = ( smj,h , a mj,h )})= (H + 1)( P   
+
+> (m′,j ′)∈[M]×(tv−1,t v]\{ (j,m )}
+
+I{(s, a ) = ( sm′
+
+> j′,h
+
+, a m′
+
+> j′,h
+
+)})
+
+Ntv−1,h (s, a ) + ( H + 1)( P   
+
+> (m′,j ′)∈[M]×(tv−1,t v]\{ (j,m )}
+
+I{(s, a ) = ( sm′
+
+> j′,h
+
+, a m′
+
+> j′,h
+
+)}) . (105) We replaced Gv,h (s, a ) with an approximate eG−j,m v,h (s, a ), where the visits of agent m on (s, a ) at the j-th episode are masked regardless of the actual visits of agent m on (s, a ). The approximate is carefully designed to remove the dependency on the event I{(s, a ) = ( smj,h , a mj,h )} from Gv,h (s, a ) while maintaining close distance to the original value Gv,h (s, a ).Before continuing, we introduce some useful properties of above defined auxiliary terms whose proofs are provided in Section D.7.1:for any v ∈ [ϕ(K)] ,
+
+Gv,h (s, a ) = 
+
+(
+
+ψv,v,h (s, a )Ph,s,a (V ⋆h+1 − Vtv−1,h +1 ) + (1 − ψv,v,h (s, a )) Gv−1,h (s, a ) if v > 1
+
+Ph,s,a (V ⋆h+1 − V0,h +1 ) if v = 1 , (106a) 
+
+0 ≤ eG−j,m v,h (s, a ), G v,h (s, a ) ≤ H, (106b) 
+
+| eG−j,m v,h (s, a ) − Gv,h (s, a )| ≤ min 
+
+
+
+H, 2H2
+
+Ntv ,h (s, a )
+
+
+
+. (106c) Now, we are ready to prove (94) . Towards this, we first observe that putting the first term in the right hand side of (94) to the left hand side yields 
+
+X
+
+> (s,a )∈S×A
+> ϕ(K)
+
+X
+
+> v=1
+
+
+
+> M
+
+X
+
+> m=1
+
+X
+
+> tv−1<j ≤tv
+
+dπ⋆ 
+
+> h
+
+(s, a ) − dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) ntv ,h (s, a )
+
+
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a )
+
+> (i)
+
+= X
+
+> (s,a )∈S×A
+> ϕ(K)
+
+X
+
+> v=1
+
+
+
+> M
+
+X
+
+> m=1
+
+X
+
+> tv−1<j ≤tv
+
+davg  
+
+> h
+
+(s, a ) −
+
+> M
+
+X
+
+> m=1
+
+nmtv ,h (s, a )
+
+ dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) Gv,h (s, a )
+
+> (ii)
+
+= X
+
+> (s,a )∈S×A
+> M
+
+X
+
+> m=1
+
+
+
+> K
+
+X
+
+> j=1
+
+davg  
+
+> h
+
+(s, a ) −
+
+> K
+
+X
+
+> j=1
+
+I{(s, a ) = ( smj,h , a mj,h )}
+
+ dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) Gv,h (s, a )=
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+X
+
+> (s,a )∈S×A
+
+ davg  
+
+> h
+
+(s, a ) − I{(s, a ) = ( smj,h , a mj,h )} dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) Gv,h (s, a ) = 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+Y mj,h (107) where (i) holds by plugging in (101) , (ii) follows from Pϕ(K)
+
+> v=1
+
+P 
+
+> tv−1<j ≤tv
+
+1 = K and Pϕ(K) 
+
+> v=1
+
+nmtv ,h (s, a ) =
+
+PKj=1 I{(s, a ) = ( smj,h , a mj,h )}, and the last equality arise from the definition of Y mj,h in (D.7). Therefore, the above fact shows that to prove (94), it is suffices to show: 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+Y mj,h ≤
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+eY mj,h +
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+
+
+Y mj,h − eY mj,h 
+
+
+
+≲ M σ aux ,1. (108) We will control the two essential terms separately as below: • Controlling PKj=1 
+
+PMm=1 eY mj,h . To begin with, we observe that the approximate eG−j,m v,h (s, a ) (defined in (104) ) is independent of agent m’s visits on (s, a ) at j-th episode since Vtv−1,h +1 , Gv−1,h (s, a ) are independent of the j-th episode and eψ−j,m v,v,h (s, a ) is independent from agent m’s visits on (s, a ) at the j-th episode (see (105)). 32 Federated Offline Reinforcement Learning 
+
+Ej−1[ eY mj,h ] = 0 , where we denote 
+
+Ej−1[·] = E
+
+h
+
+· | { (sm′
+
+> i,h
+
+, a m′
+
+> i,h
+
+), V m′
+
+> i,h +1
+
+}i<j,m ′∈[M ]
+
+i
+
+.
+
+Thus, applying the Freedman’s inequality for each h ∈ [H], we can show that the following holds: 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+eY mj,h ≤
+
+r
+
+8W log 2Hδ + 83 B log 2Hδ
+
+≲
+
+q
+
+H2M KSC ⋆ 
+
+> avg
+
++ HSC ⋆ 
+
+> avg
+
+(109) at least with probability 1 − δ, where B and W is obtained as follows: 
+
+eY mj,h ≤ 2C⋆
+
+> avg
+
+(1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S) max 
+
+> s∈S
+
+eG−j,m ϕ(j),h (s, π ⋆(s)) ≤ 4SC ⋆
+
+> avg
+
+H =: B (110) 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+Ej−1
+
+ eY mj,h 
+
+2
+
+≤
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+E(smj,h ,a mj,h )∼dmh
+
+ dπ⋆ 
+
+> h
+
+(smj,h , a mj,h )
+
+davg  
+
+> h
+
+(smj,h , a mj,h ) eG−j,m ϕ(j),h (smj,h , a mj,h )
+
+!2
+
+≤
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+X
+
+> s∈S
+
+dmh (s, π ⋆(s)) 
+
+ dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) 
+
+davg  
+
+> h
+
+(s, π ⋆(s)) eG−j,m ϕ(j),h (s, π ⋆(s)) 
+
+2
+
+≤ H2C⋆
+
+> avg
+> K
+
+X
+
+> j=1
+
+X
+
+> s∈S
+> M
+
+X
+
+> m=1
+
+dmh (s, π ⋆(s)) dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) 
+
+davg  
+
+> h
+
+(s, π ⋆(s)) (1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S)
+
+≤ H2C⋆
+
+> avg
+> K
+
+X
+
+> j=1
+
+X
+
+> s∈S
+
+M d π⋆ 
+
+> h
+
+(s, π ⋆(s))(1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S)
+
+≤ 2H2SC ⋆
+
+> avg
+
+M K =: W (111) using the fact that | eG−j,m ϕ(j),h (smj,h , a mj,h )| ≤ H shown in (106b) and dπ⋆h (s,π ⋆(s)) min {dπ⋆h (s,π ⋆(s)) ,1/S } ≤ 1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S.• Bound on the approximation gap of eY mj,h . The approximation gap of eY mj,h is bounded as follows: 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+ eY mj,h − Y mj,h 
+
+
+
+=
+
+> ϕ(K)
+
+X
+
+> v=1
+> M
+
+X
+
+> m=1
+
+X
+
+> tv−1<j ≤tv
+
+X
+
+> (s,a )∈S×A
+
+ dmh (s, a ) − I{(s, a ) = ( smj,h , a mj,h )} dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) ( eG−j,m v,h (s, a ) − Gv,h (s, a )) 
+
+> (i)
+
+=
+
+> ϕ(K)
+
+X
+
+> v=1
+> M
+
+X
+
+> m=1
+
+X
+
+> tv−1<j ≤tv
+
+X
+
+> (s,a )∈S×A
+
+I{(s, a ) = ( smj,h , a mj,h )} (1 − dmh (s, a )) dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) eG−j,m v,h (s, a ) − Gv,h (s, a )
+
+> (ii )
+
+≤
+
+> ϕ(K)
+
+X
+
+> v=1
+> M
+
+X
+
+> m=1
+
+X
+
+> tv−1<j ≤tv
+
+X
+
+> (s,a )∈S×A
+
+I{(s, a ) = ( smj,h , a mj,h )} dπ⋆ 
+
+> h
+
+(s, a )
+
+davg  
+
+> h
+
+(s, a ) min 
+
+ 2H2
+
+Ntv ,h (s, a ) , H 
+
+
+
+> (iii )
+
+≤ C⋆
+
+> avg
+
+X
+
+> s∈S
+> ϕ(K)
+
+X
+
+> v=1
+
+ntv ,h (s, π ⋆(s)) dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) min {dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) , 1/S } min 
+
+ 2H2
+
+Ntv ,h (s, π ⋆(s)) , H 
+
+
+
+> (iv )
+
+≤ 2H2C⋆
+
+> avg
+
+X
+
+> s∈S
+
+(1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S)
+
+> ϕ(K)
+
+X
+
+> v=1
+
+min 
+
+ ntv ,h (s, π ⋆(s)) 
+
+Ntv ,h (s, π ⋆(s)) , n tv ,h (s, π ⋆(s)) 
+
+
+
+> (v)
+
+≲ C⋆
+
+> avg
+
+H2S (112) 33 Federated Offline Reinforcement Learning 
+
+where (i) holds because eψ−j,m v,v,h (s, a ) = ψ−j,m v,v,h (s, a ) if (smj,h , a mj,h )̸ = ( s, a ) and eG−j,m v,h (s, a ) = Gv,h (s, a ) according to (106a) , (ii) follows from (106c) , (iii) naturally holds according to the definition of C⋆
+
+> avg
+
+, (iv) holds because    
+
+> dπ⋆h(s,π ⋆(s)) min {dπ⋆h(s,π ⋆(s)) ,1/S }
+
+≤ 1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S, and (v) holds because for any z ∈ [ϕ(K)] ,
+
+> z
+
+X
+
+> v=1
+
+ntv ,h (s, π ⋆(s)) 
+
+Ntv ,h (s, π ⋆(s)) ≤ 1 + log ( Ntz ,h (s, π ⋆(s))) , (113) according to Lemma C.2. Now, combining the bounds obtained above ((109) and (112)) into (108), we conclude that 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+Y mj,h ≲
+
+q
+
+H2M KSC ⋆ 
+
+> avg
+
++ H2SC ⋆ 
+
+> avg
+
+= M
+
+r H2KSC ⋆
+
+> avg
+
+M + H2SC ⋆
+
+> avg
+
+M
+
+!
+
+(114) which completes the proof. D.7.1. P ROOF OF (106) 
+
+Proof of (106a) . We will proof (106a) by considering different cases separately. When v = 1 , we have 
+
+Gv,h (s, a ) = Ph,s,a (V ⋆h+1 − Vtv−1,h +1 )ψ1,1,h (s, a )= Ph,s,a (V ⋆h+1 − V0,h +1 )
+
+> M
+
+X
+
+> m=1
+
+ X
+
+> i∈lmt1,h (s,a )
+
+ωmi,t 1,h (s, a )
+
+ = Ph,s,a (V ⋆h+1 − V0,h +1 ) (115) where the second equality follows from the definition of ψu,v,h (s, a ) in (93), and the last equality holds since 
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmt1,h (s,a )
+
+ωmi,t 1,h (s, a ) = (H + 1) nt1,h 
+
+Nt1,h + Hn t1,h 
+
+= (H + 1) nt1,h 
+
+(H + 1) nt1,h 
+
+= 1 .
+
+When v > 1, invoking the definition of ωmi,t v ,h in (24c) yields that for any u < v ,
+
+ψu,v,h (s, a ) = 
+
+> M
+
+X
+
+> m=1
+
+X
+
+> i∈lmtu,h (s,a )
+
+ωmi,t v ,h (s, a )= (H + 1) ntu,h 
+
+Ntv ,h + Hn tv ,h 
+
+> v−1
+
+Y
+
+> x=u
+
+Ntx,h 
+
+Ntx,h + Hn tx,h 
+
+!
+
+= (H + 1) ntu,h 
+
+Ntv−1,h + Hn tv−1,h 
+
+> v−2
+
+Y
+
+> x=u
+
+Ntx,h 
+
+Ntx,h + Hn tx,h 
+
+! Ntv−1,h 
+
+Ntv ,h + Hn tv ,h 
+
+= ψu,v −1,h (s, a )(1 − ψv,v,h (s, a )) . (116) where the second equality holds by ϕ(i) = u for all i ∈ lmtu,h (s, a ) and the fact PMm=1 
+
+P 
+
+> i∈lmtu,h (s,a )
+
+1 = ntu,h , and the last equality holds by 1 − ψv,v,h (s, a ) = 1 − (H+1) ntv ,h  
+
+> Ntv ,h +Hn tv ,h
+
+= Ntv−1,h +( H+1) ntv ,h −(H+1) ntv ,h  
+
+> Ntv ,h +Hn tv ,h
+
+= Ntv−1,h  
+
+> Ntv ,h +Hn tv ,h
+
+.Consequently, inserting above fact back into (101) complete the proof by showing that 
+
+Gv,h (s, a ) = 
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a )= Ph,s,a (V ⋆h+1 − Vtv−1,h +1 )ψv,v,h (s, a ) + 
+
+> v−1
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a )
+
+34 Federated Offline Reinforcement Learning 
+
+= Ph,s,a (V ⋆h+1 − Vtv−1,h +1 )ψv,v,h (s, a ) + (1 − ψv,v,h (s, a )) 
+
+> v−1
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v −1,h (s, a )= Ph,s,a (V ⋆h+1 − Vtv−1,h +1 )ψv,v,h (s, a ) + (1 − ψv,v,h (s, a )) Gv−1,h (s, a ). (117) 
+
+Proof of (106b) . First, applying (28c) in Lemma B.3 gives Gv,h (s, a ) ≥ 0. Then we focus on deriving the upper bound 
+
+Gv,h (s, a ). Towards this, we observe that 
+
+Gv,h (s, a ) = 
+
+> v
+
+X
+
+> u=1
+
+Ph,s,a (V ⋆h+1 − Vtu−1,h +1 )ψu,v,h (s, a )
+
+≤ Ph,s,a (V ⋆h+1 − V0,h +1 )
+
+> v
+
+X
+
+> u=1
+
+ψu,v,h (s, a )
+
+≤ H
+
+> v
+
+X
+
+> u=1
+
+ψu,v,h (s, a )= H
+
+> v
+
+X
+
+> u=1
+> M
+
+X
+
+> m=1
+
+ X
+
+> i∈lmtu,h (s,a )
+
+ωmi,t v ,h (s, a )
+
+ ≤ H, (118) where the first and second inequalities hold by the fact Ph,s,a (V ⋆h+1 − Vtx,h +1 ) ≤ Ph,s,a (V ⋆h+1 − V0,h +1 ) ≤ H for any 
+
+x ∈ [ϕ(K)] (see the monotonicity of the value estimates in (14) and the basic bound ∥V ⋆h+1 ∥∞ ≤ H), the last equality arises from the definition of ψu,v,h (s, a ) in (93), and the last inequality follows from (48b) in Lemma C.3. Similarly, the same facts holds for eG−j,m v,h (s, a ), which can be derived in the same manner. We omit it for conciseness. 
+
+Proof of (106c) . Consider v = ϕ(j). If v = 1 , combing (106a) and (104) directly gives eG−j,m v,h (s, a ) = Gv,h (s, a ). Then we turn to the case when v > 1 and bound the term of interest in two different cases, respectively. • When (smj,h , a mj,h )̸ = ( s, a ). In this case, invoking the definition in (105) gives 
+
+eψ−j,m v,v,h (s, a ) = (H + 1) ntv ,h (s, a )
+
+Ntv−1,h (s, a ) + ( H + 1) ntv ,h (s, a ) = ψ−j,m v,v,h (s, a ), (119) which indicates (see the definition in (104)) 
+
+eG−j,m v,h (s, a ) = Gv,h (s, a ) (120) • When (smj,h , a mj,h ) = ( s, a ). In view of (106a) and (104), it holds that: 
+
+| eG−j,m v,h (s, a ) − Gv,h (s, a )|
+
+= ( eψ−j,m v,v,h (s, a ) − ψv,v,h (s, a )) Ph,s,a (V ⋆h+1 − Vtv−1,h +1 ) + ( ψv,v,h (s, a ) − eψ−j,m v,v,h (s, a )) Gv−1,h (s, a )
+
+= (ψv,v,h (s, a ) − eψ−j,m v,v,h (s, a ))( Gv−1,h (s, a ) − Ph,s,a (V ⋆h+1 − Vtv−1,h +1 )
+
+≤ ψv,v,h (s, a ) − eψ−j,m v,v,h (s, a ) max Gv−1,h (s, a ), ∥Ph,s,a ∥1 V ⋆h+1 − Vtv−1,h +1 ∞
+
+> (i)
+
+≤ H ψv,v,h (s, a ) − eψ−j,m v,v,h (s, a )
+
+> (ii )
+
+≤ min 
+
+
+
+H, 2H2
+
+Ntv ,h (s, a )
+
+
+
+, (121) where (i) holds by (106b), ∥Ph,s,a ∥1 = 1 , and V ⋆h+1 − Vtv−1,h +1 ∞ ≤ H. Here, (ii) can be verified by 
+
+0 (iii )
+
+≤ ψv,v,h (s, a ) − eψ−j,m v,v,h (s, a )
+
+35 Federated Offline Reinforcement Learning 
+
+= (H + 1) ntv ,h (s, a )
+
+Ntv−1,h (s, a ) + ( H + 1) ntv ,h (s, a ) − (H + 1)( ntv ,h (s, a ) − I{(s, a ) = ( smj,h , a mj,h )})
+
+Ntv−1,h (s, a ) + ( H + 1)( ntv ,h (s, a ) − I{(s, a ) = ( smj,h , a mj,h )})= (H + 1) ntv ,h (s, a )
+
+Ntv−1,h (s, a ) + ( H + 1) ntv ,h (s, a ) − (H + 1)( ntv ,h (s, a ) − 1) 
+
+Ntv−1,h (s, a ) + ( H + 1)( ntv ,h (s, a ) − 1) 
+
+≤ (H + 1) 
+
+Ntv−1,h (s, a ) + ( H + 1) ntv ,h (s, a )
+
+≤ min 
+
+
+
+1, 2HNtv ,h (s, a )
+
+
+
+. (122) where (iii) holds by the fact that xa+x is monotone increasing with x when a, x > 0.
+
+D.8. Proof of Lemma D.3 
+
+For each j ∈ [K], let 
+
+Zmj,h := X
+
+> (s,a )∈S×A
+
+ I{(s, a ) = ( smj,h , a mj,h )} − dmh (s, a ) dπ⋆ 
+
+> h
+
+(s, a )
+
+M d avg  
+
+> h
+
+(s, a ) Ph,s,a (V ⋆h+1 − Vtϕ(j)−1,h +1 ). (123) Then, to prove Lemma D.3, it suffices to show PKj=1 
+
+PMm=1 Zmj,h ≲ σaux ,2.
+
+Since Vtϕ(j)−1,h +1 is fully determined by the events before j-th episode, Ej−1[Zmj,h ] = 0 , where we denote 
+
+Ej−1[·] = E[·|{ (sm′
+
+> i,h
+
+, a m′
+
+> i,h
+
+), V m′
+
+> i,h +1
+
+}i<j,m ′∈[M ]].
+
+Thus, we can apply the Freedman’s inequality as follows: 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+Zmj,h ≤
+
+r
+
+8W log 2Hδ + 83 B log 2Hδ ≲
+
+r H2KSC ⋆
+
+> avg
+
+M + HSC ⋆
+
+> avg
+
+M (124) using the following properties: 
+
+|Zmj,h | ≤ 2C⋆
+
+> avg
+
+HM
+
+X
+
+> s∈S
+
+(1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S)
+
+!
+
+≤ 4HSC ⋆
+
+> avg
+
+M =: B (125) 
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+Ej−1[( Zmj,h )2] ≤
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+E(smj,h ,a mj,h )∼dmh
+
+ dπ⋆ 
+
+> h
+
+(smj,h , a mj,h )
+
+M d avg  
+
+> h
+
+(smj,h , a mj,h ) Ph,s,a (V ⋆h+1 − Vtϕ(j)−1,h +1 )
+
+!2
+
+≤ H2
+
+> K
+
+X
+
+> j=1
+> M
+
+X
+
+> m=1
+
+X
+
+> s∈S
+
+dmh (s, π ⋆(s)) 
+
+ dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) 
+
+M d avg  
+
+> h
+
+(s, π ⋆(s)) 
+
+2
+
+≤ H2C⋆
+
+> avg
+
+M
+
+X
+
+> s∈S
+> K
+
+X
+
+> j=1
+
+ dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) 
+
+M d avg  
+
+> h
+
+(s, π ⋆(s)) 
+
+
+
+(1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S)
+
+> M
+
+X
+
+> m=1
+
+dmh (s, π ⋆(s)) = H2C⋆
+
+> avg
+
+M
+
+X
+
+> s∈S
+> K
+
+X
+
+> j=1
+
+dπ⋆ 
+
+> h
+
+(s, π ⋆(s))(1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S)= 2H2KSC ⋆
+
+> avg
+
+M =: W, (126) which follows from that fact 0 ≤ ∥ V ⋆h+1 − Vtϕ(j)−1,h +1 ∥∞ ≤ H and dπ⋆h (s,π ⋆(s)) min {dπ⋆h (s,π ⋆(s)) ,1/S } ≤ 1 + dπ⋆ 
+
+> h
+
+(s, π ⋆(s)) S.36 Federated Offline Reinforcement Learning 
+
+D.9. Proof of Corollary 3.2 
+
+Note that if T ≍ H7SC ⋆ 
+
+> avg
+> M ε 2
+
+, it always holds that 
+
+M T ≳ H5SC ⋆ 
+
+> avg
+
+and H ≤
+
+r HSC ⋆
+
+> avg
+
+TM , (127) as long as ε ≤ H and ε ≤ H3SC ⋆ 
+
+> avg
+> M
+
+. Now, we obtain the number of communication rounds of the specified schedules, periodic and exponential synchronization. 
+
+Periodic synchronization. Consider τ ≍
+
+q HSC ⋆  
+
+> avg TM
+
+. Then, since M T ≳ HSC ⋆
+
+> avg
+
+, the value gap is bounded as 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) ≲ H4SC ⋆
+
+> avg
+
+M T +
+
+r H7SC ⋆
+
+> avg
+
+M T + H3
+
+T
+
+r HSC ⋆
+
+> avg
+
+TM ≲
+
+r H7SC ⋆
+
+> avg
+
+M T . (128) In this case, the number of synchronizations ϕ(K) = |T period (K, τ )| is 
+
+ϕ(K) = 
+
+l Kτ
+
+m
+
+≲
+
+s
+
+M K H2SC ⋆
+
+> avg
+
+≍
+
+s
+
+M T H3SC ⋆
+
+> avg
+
+≍ H2
+
+ε .
+
+Exponential synchronization. Using the fact that M T ≳ HSC ⋆ 
+
+> avg
+
+and τ1 = H ≤
+
+q HSC ⋆  
+
+> avg TM
+
+when ε ≤ H3SC ⋆ 
+
+> avg
+> M
+
+, the value gap is bounded as 
+
+V ⋆ 
+
+> 1
+
+(ρ) − V bπ 
+
+> 1
+
+(ρ) ≲ H4SC ⋆
+
+> avg
+
+M T +
+
+r H7SC ⋆
+
+> avg
+
+M T + H3
+
+T
+
+r HSC ⋆
+
+> avg
+
+TM ≲
+
+r H7SC ⋆
+
+> avg
+
+M T . (129) To continue, note that if γ = 2 
+
+> H
+
+and τ1 = H, for any u ≥ 1, τu is bounded as 
+
+(1 + 1
+
+H )u−1H ≤ τu ≤ (1 + 2
+
+H )u−1H. 
+
+since 
+
+(1 + 1
+
+H )τi ≤ (1 + 2
+
+H )τi − 1 ≤ τi+1 = ⌊(1 + 2
+
+H )τi⌋ ≤ (1 + 2
+
+H )τi
+
+given the fact that τi ≥ H for any i ≥ 1. Then, computing the minimum number of synchronizations ϕ(K) = |T exp (K, γ )|
+
+satisfying ϕ(K)
+
+X
+
+> u=1
+
+τu ≥ H
+
+> ϕ(K)
+
+X
+
+> u=1
+
+(1 + 1
+
+H )u−1 = H2((1 + 1
+
+H )ϕ(K) − 1) ≥ K, 
+
+we obtain 
+
+ϕ(K) = 
+
+& log ( KH2 + 1) log (1 + 1 
+
+> H
+
+)
+
+'
+
+≤ 1 + (1 + H) log 
+
+ KH2 + 1 
+
+
+
+≲ H (130) because xx+1 ≤ log(1 + x) for any x > −1.37

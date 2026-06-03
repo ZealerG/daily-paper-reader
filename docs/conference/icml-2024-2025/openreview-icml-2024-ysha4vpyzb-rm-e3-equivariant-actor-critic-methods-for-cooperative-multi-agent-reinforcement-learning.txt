@@ -1,0 +1,1332 @@
+Title: E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning
+
+URL Source: https://openreview.net/pdf?id=yShA4VPYZB
+
+Number of Pages: 27
+
+Markdown Content:
+# E(3) -Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+Dingyang Chen 1 Qi Zhang 1
+
+## Abstract 
+
+Identification and analysis of symmetrical pat-terns in the natural world have led to significant discoveries across various scientific fields, such as the formulation of gravitational laws in physics and advancements in the study of chemical struc-tures. In this paper, we focus on exploiting Eu-clidean symmetries inherent in certain coopera-tive multi-agent reinforcement learning (MARL) problems and prevalent in many applications. We begin by formally characterizing a subclass of Markov games with a general notion of symme-tries that admits the existence of symmetric op-timal values and policies. Motivated by these properties, we design neural network architec-tures with symmetric constraints embedded as an inductive bias for multi-agent actor-critic meth-ods. This inductive bias results in superior perfor-mance in various cooperative MARL benchmarks and impressive generalization capabilities such as zero-shot learning and transfer learning in unseen scenarios with repeated symmetric patterns. 
+
+## 1. Introduction 
+
+It is widely believed by scientists that the organization and operation of our universe follow certain symmetry patterns and principles. These symmetry structures in physics lead to profound implications, such as the existence of conserva-tion laws. When done properly, artificial intelligence (AI) can and has already benefited tremendously from exploit-ing these symmetries, with perhaps the most well-known example of convolutional neural networks (CNNs) being translation invariant to the input images (Goodfellow et al., 2016). Symmetries have also been identified and exploited for single-agent reinforcement learning (RL), where sym-    
+
+> 1Artificial Intelligence Institute, University of South Car-olina, Columbia, SC, USA. Correspondence to: Dingyang Chen
+> <dingyang@email.sc.edu >, Qi Zhang <qz5@cse.sc.edu >.
+> Proceedings of the 41 st International Conference on Machine Learning , Vienna, Austria. PMLR 235, 2024. Copyright 2024 by the author(s).
+
+metric state-action pairs essentially define a homomorphism from the original Markov decision process (MDP) to a smaller abstract MDP (Ravindran & Barto, 2001), which has been recently shown to be effective for deep single-agent RL (Van der Pol et al., 2020; Wang et al., 2022a; Zhao et al., 2022b; Mondal et al., 2022; Nguyen et al., 2023). In this paper, we are interested in cooperative multi-agent reinforcement learning (MARL) problems, where symmetry structures are also prevalent and often exist in two forms. The first form is permutation invariance which exists if agents are homogenous in terms of their effects on state dynamics and reward function, which has been well-studied in prior works, including both formalisms (Nguyen et al., 2017; Yang et al., 2018; Chen et al., 2022) and algorithmic techniques such as actor parameter sharing (Lowe et al., 2017; Rashid et al., 2020b; Chen et al., 2022), permutation-invariant centralized critics (Liu et al., 2020), and mean-filed approximation (Yang et al., 2018). We focus on the second form of Euclidean symmetries, including transfor-mations of translation, rotation, and reflection, which exist if the MARL problem is situated in an Euclidean space. Intuitively, MARL problems exhibit Euclidean symmetries whenever coordinate frames are used to provide references for the agents and their environment, because Euclidean transformations can be simply viewed as being applied to the reference frames, without changing the essence of the agents and environment. We are particularly dealing with 3D Euclidean, i.e., E(3) , multi-agent symmetries, which are prevalent in applications grounded in the physical world. Although prevalent, multi-agent Euclidean symmetries are relatively underexplored, including only van der Pol et al. (2022) and Yu et al. (2023) as the prior work we know of. Although sharing the same motivation, prior work falls short of providing “genuine” E(3) multi-agent symmetries in the sense that their Euclidean equivariance is only preserved for rotations of discrete angles in {k ∗ 360 ◦/n }n−1 
+
+> k=0
+
+, which degenerates to the cyclic symmetries of Cn, a subgroup of E(2) that is only 2D. We identify challenges that have prevented prior work from exploiting continuous E(3) multi-agent symmetries and highlight our solutions as the three-fold contribution of this work: 
+
+(i) The first challenge is to find problem representations that 1E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+are suitable to describe E(3) -symmetries that are distributed among multiple agents. We first rigorously formulate a subclass of Markov games (MGs) (Shapley, 1953), group-symmetric MGs, that describes multi-agent symmetries by mathematical group transformations performed on states, actions, and agents’ observations. With E(3) being the spe-cial case, we use 3D point clouds to represent states, actions, and observations in a way that conveniently accommodates all transformations in E(3) .
+
+(ii) The second challenge is to develop architectures that are capable of exploiting continuous E(3) -symmetries. We prove several main properties of group-symmetric MGs, including symmetries in the value functions of symmetric policies and the existence of an optimal policy/value that is group-symmetric. As a key difference from prior work, we exploit those properties by leveraging steerable message passing neural networks (Thomas et al., 2018; Geiger & Smidt, 2022; Brandstetter et al., 2022) as the actor-critic architecture for MARL under the centralized training and de-centralized execution (CTDE) paradigm, which are capable of preserving equivariance under all E(3) transformations. 
+
+(iii) As a result, our method achieves superior sample effi-ciency and generalization performance in a range of bench-mark MARL tasks that exhibit continuous E(3) -symmetries but were not accommodated by prior work. 
+
+## 2. Related Work 
+
+In single-agent RL, the exploitation of symmetries has been originally formulated by Ravindran & Barto (2001) to re-duce the redundancies in state and action spaces. Recent work mostly focuses on the combination of symmetries and deep RL. Some works (Laskin et al., 2020; Yarats et al., 2021) utilize data augmentation, where an image-based ob-servation undergoes transformation such as rotation and translation, to improve data efficiency. This approach mostly focuses on the invariant value functions with respect to the transformed input. Instead of generating more data through symmetric transformations which increases computation time, Van der Pol et al. (2020) build equivariant neural policies that directly support Cn symmetries of discrete ro-tations. Wang et al. (2022b) extend Cn symmetries to more general continuous SO (2) symmetries that support equivari-ancy in translation and rotation in 2D. A recent work (Chen et al., 2023) considers a more general continuous E(3) sym-metries in 3D space that additional supports equivariancy in reflection. Multi-agent symmetries are currently underexplored. Some work (Liu et al., 2020; Chen et al., 2022) focus on the permutation invariance of homogeneous agents, and build permutation invariant value functions for better sample and computation efficiency. The work by Li et al. (2021) consid-ers symmetries specific to multi-agent pathfinding problems to reduce the search space. A recent work by van der Pol et al. (2022) considers Cn symmetries in MARL by extend-ing the framework in the single-agent counterpart. However, it does not provide motivation as to why such symmetries result in equivariant actors and critics, and implementation-wise, their homomorphism network has an input size that scales with |Cn|. Instead, our work focuses on continuous 
+
+E(3) multi-agent symmetries, and the implementation has the input size of the original observation dimension and still preserves equivariance for any continuous angle. Yu et al. (2023) share the same motivation of exploiting Euclidean symmetries for cooperative MARL. Our key dif-ferences lie in methodology and theoretical results. Our work uses point cloud representations to characterize contin-uous E(3) symmetries, which facilitates the incorporation of E(3) -equivariant neural networks, while Yu et al. (2023) use traditional flat vector representations, which are not compatible with equivariant neural networks and they turn to data augmentation which is a less principled method. Our theoretic results state the main properties of symmetric MGs. Besides the optimal value equivalence property included in Yu et al. (2023), we include theoretical results pertaining to observation-based policies, which are unique to multi-agent settings and provide theoretical justification for equivariant multi-agent actor-critic methods. This work focuses on Euclidean symmetries commonly seen in practice, e.g., position and velocity in 3D space. Special neural architectures have been proposed to directly incorpo-rate geometric inductive bias. Some works (Satorras et al., 2021; Sch ¨utt et al., 2021; Jing et al., 2020; Le et al., 2022) preserve equivariancy by equivariant operations in the orig-inal 3D Euclidean space. In contrast, other works lift the physical quantities from 3D space to higher-dimensional spaces for more expressive power, either through Lie al-gebra (Finzi et al., 2020) or spherical harmonics (Thomas et al., 2018) and message passing (Brandstetter et al., 2022), which we adopt for actor-critic architectures. 
+
+## 3. Preliminaries 
+
+3.1. Cooperative Markov Games 
+
+We use the framework of cooperative Markov game (MG) (Shapley, 1953) to formulate our cooperative multi-agent setting, which consists of N agents indexed by i ∈ N := 
+
+{1, ..., N }, state space S, joint action space A = A1 ×· · ·× AN factored into local action spaces, transition function 
+
+P : S ×A → ∆( S), (team) reward function r : S ×A → R,and initial state distribution μ ∈ ∆( S), where we use ∆( X )
+
+to denote the set of probability distributions over X . The MG evolves in discrete time steps: at each time step t,all agents are in some state st ∈ S and each agent i ∈ N 
+
+2E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+chooses its local action ait ∈ A i, forming a joint action at =(a1 
+
+> t
+
+, ..., a Nt ) ∈ A that induces a transition to a new state at the next time step according to the transition function, i.e., st+1 ∼ P (·| st, a t), and the team reward signal rt := 
+
+r(st, a t). The state s0 ∼ μ at time step 0 is drawn from the initial state distribution. 
+
+Full and partial observability. For ease of exposition, we will assume the agents can fully observe the states until Section 4, and our methods (Section 5) and experiments (Section 6) accommodate the partial observability setting. We shall consider a more general notion of full observ-ability than directly observing the raw state: each agent 
+
+i ∈ N has access to a function oi : S → O i that maps the state space to its local observation space Oi. The agents effectively fully observe the state if and only if oi is bijec-tive. We will use the notion of o = {oi}i∈N and write 
+
+o(s) :=  o1(s), ..., o N (s) ∈ O := ×i∈N ∆( Oi). The MG is therefore defined by tuple ⟨N , S, A, P, r, o ⟩.
+
+Policies and values. The general, state-based joint policy, 
+
+π : S → ∆( A), maps from the state space to distributions over the joint action space. As the size of action space 
+
+A grows exponentially with N , the commonly used joint policy subclass is the product policy , π = ( π1, · · · , π N ) : 
+
+S → × i∈N ∆( Ai), which is factored as the product of lo-cal policies πi : S → ∆( Ai), π(a|s) = Q 
+
+> i∈N
+
+πi(ai|s),each mapping the state space only to the action space of an individual agent. Define the discounted return from time step t as Rt = P∞ 
+
+> l=0
+
+γlrt+l. For agent i, product pol-icy π = ( π1, ..., π N ) induces a value function defined as 
+
+Vπ (st) = Est+1: ∞,a t:∞∼π [Rt|st], and action-value function 
+
+Qπ (st, a t) = Est+1: ∞,a t+1: ∞∼π [Rt|st, a t]. Following pol-icy π, agent i’s cumulative reward starting from s0 ∼ μ is denoted as Vπ (μ) := Es0∼μ[Vπ (s0)] . Under full observabil-ity, a state-based local policy can translate from and to an observation-based policy with νi(oi(s)) = πi(s) and the corresponding observation-based product policy and its val-ues are denoted as ν(o(s)) = ( ν1(o1(s)) , ..., ν N (oN (s))) ,
+
+Qν , Vν , respectively. 
+
+3.2. Groups and Transformations 
+
+Mathematical symmetry means a type of invariance: a prop-erty of an object remaining unchanged after some trans-formation. This notion of symmetry can be formally de-scribed by invariant functions. A function f : X → Y 
+
+is invariant under transformation operator T : X → X if 
+
+f (T [x]) = f (x) for any x ∈ X . More generally, function 
+
+f : X → Y is equivariant under transformation operators 
+
+T : X → X and T ′ : Y → Y if f (T [x]) = T ′ [f (x)] for any x ∈ X . Most often, a symmetric object is invariant to not only one transformation but a set of transformations. Such a set of symmetry transformations often forms a (math-ematical) group G, which is a set of elements equipped with a binary operator satisfying the group axioms of clo-sure, associativity, identity, and inverse (Dummit & Foote, 1991). For function f to be equivariant to group G, there exists transformation operators Tg and T ′ 
+
+> g
+
+, called group ac-tions , associated with each group element g ∈ G, such that 
+
+f (Tg [x]) = T ′ 
+
+> g
+
+[f (x)] for any x ∈ X .
+
+The Euclidean group E(3) . We are mostly interested in group E(3) that comprises the group actions of translations, rotations, reflections, and finite combinations of them in 3D. Therefore, it has as its subgroups the 3D translation group 
+
+T(3) , and the orthogonal group O(3) for 3D rotations and reflections. The group actions of O(3) can implemented by multiplying square matrices, called representation matrices .For example, for the group element of g = ( α, β, γ ) that rotates a 3D vector x = x ∈ R3 by α, β, and γ, about x-, y-, and z- axes respectively, the rotation can be represented by matrix multiplication as Tg [x] = Rα,β,γ x, where Rα,β,γ ∈
+
+R3×3 is the 3D rotation matrix. 
+
+## 4. Markov Games with Euclidean Symmetries 
+
+With the notions introduced, we are ready to define group-symmetric MGs by asking the transition, reward, and obser-vations functions to be equivariant under group actions, as stated in Definition 4.1. 
+
+Definition 4.1 (G-symmetric MG) . Consider MG 
+
+⟨N , S, A, P, r, o ⟩ and a (mathematical) group G equipped with group actions {Lg : S → S , K sg : A → A , I s,a g :
+
+R → R, H sg : O → O} g∈G. The MG is G-symmetric if, for any s, s ′ ∈ S , a ∈ A , and g ∈ G, we have 
+
+P (s′|s, a ) = P  Lg [s′] | Lg [s], K sg [a] ,r  Lg [s], K sg [a] = Is,a g [r(s, a )] , o (Lg [s]) = Hsg [o(s)] 
+
+i.e., P , r, and o are equivariant to the group actions. Definition 4.1 is general enough to accommodate arbitrary symmetries in MGs. For example, choosing the group ac-tions to be permutations of N (i.e., G = S( N )) can describe permutation invariance between homogenous agents (Liu et al., 2020; Chen et al., 2022). Moreover, these group actions in general are allowed to depend on the state and/or the action. In this work, we focus on the special case of 3D Euclidean symmetries in MGs, i.e., G = E(3) , where the group actions are Euclidean transformations and do not depend on the state or the action. For ease of exposition, we will ground our discussion with a running example of Cooperative Navigation, a popular cooperative multi-agent benchmark task (Lowe et al., 2017). 
+
+MPE’s Cooperative Navigation and its symmetries. In Cooperative Navigation of Multi-Agent Particle Environ-ment (MPE) (Lowe et al., 2017), a popular MARL bench-mark, N agents move as a team to cover N landmarks in a 3E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning !! 
+
+> !!
+> "
+> !"
+> ""
+> !
+> position
+> velocity
+> "!
+> coordinate
+> system
+> coordinate
+> system after #
+
+!
+
+"
+
+#
+
+$ 
+
+> agent landmark
+
+%
+
+&
+
+> ""
+
+!
+
+"
+
+#
+
+$
+
+%
+
+&
+
+!
+
+"
+
+#
+
+$
+
+%
+
+&         
+
+> Rotation by $clockwise Translation by %Reflection against both &-and '-axes
+
+' (
+
+> agent’s local
+> coordinate system
+
+Figure 1: Illustration of Cooperative Navigation ( N = 3 ) and its Euclidean symmetries. 2D space. The landmarks are randomly initialized at the be-ginning of an episode and fixed throughout the episode. The reward functions determine the reward for all agents accord-ing to the distances between all agents and the landmarks to encourage coverage, as well as penalties to discourage collisions if any. Under full observability, the observation of an agent contains its own absolute location and velocity, the relative locations and velocities of all other agents, and the relative locations of all the nearest landmarks. Figure 1 (left) shows the case where N = 3 and illustrates the rotational symmetry therein. The states and actions can be represented as 2D vectors under a global reference frame (e.g., agent i’s position, xi), whereas each agent’s observa-tion is 2D vectors referenced to its local frame (e.g., agent 
+
+i’s velocity relative to agent j, vji = vi − vj ). Upon a rotation of all entities, which is shown in Figure 1 (left) as a rotation of the reference frames, the states, actions, and observations are rotated accordingly, yet the essence of the entities remain unchanged, and therefore the transition, re-ward, and observation functions are equivariant/invariant. Similarly, it is easy to see that Cooperative Navigation also exhibits translational and reflectional symmetries, as shown in Figure 1 (middle and right, respectively). Further, it is straightforward to extend these symmetries from 2D to 3D, thus making Cooperative Navigation E(3) -symmetric. With the intuition from Cooperative Navigation, we now for-mally define E(3) -symmetric MGs in Definition 4.2, where we will represent states and observations as 3D point clouds and specify the corresponding group actions applied to them. 
+
+Definition 4.2 (E(3) -symmetric MGs) . MG 
+
+⟨N , S, A, P, r, o ⟩ is E(3) -symmetric if the following conditions hold. (i) A state is a 3D point cloud consisting of agents N and other uncontrollable entities M, i.e., s = {(xv , fv )}v∈V ,where V = N ∪ M is the set of all entities, xv ∈ R3 is the 3D position vector of entity v with feature vector fv ∈ Rdv .(ii) The local action spaces are Euclidean spaces, i.e., ai ∈Ai = Rdai , ∀i ∈ N .(iii) Agent i’s observation is represented by a 3D point cloud consisting of the entities in its own view, oi(s) = 
+
+{(xiv , f iv )}v∈V where xiv ∈ R3 is the 3D position vector of entity v with feature vector f iv ∈ Rdf iv , both relative to i.The MG’s P and o are equivariant and r is invariant to the 
+
+E(3) group actions in Definition 4.1 that are specified as follows: (iv) Under translation, the state is transformed with only the entities’ positions being translated, i.e., s =
+
+{(xv , fv )}v∈V →g s = {(xv +tg , fv )}v∈V where tg ∈ R3
+
+is the 3D translation for g ∈ T(3) , while actions and obser-vations remain unchanged. (v) Under rotations or reflections, all vectors in states, lo-cal actions, and observations are transformed according to their respective group representations. For example, the state transforms as s = {(xv , fv )}v∈V →g s =
+
+{(Dx 
+
+> g
+
+xv , Df 
+
+> g
+
+fv )}v∈V where Dx 
+
+> g
+
+and Df 
+
+> g
+
+are the representa-tion matrices of g ∈ O(3) for the vector spaces of xv and 
+
+fv , respectively. In essence, Definition 4.2 requires the states and observa-tions to be represented as 3D point clouds with the entities being the points with corresponding features, which are transformed according to Euclidean symmetries that are in-tuitively just changes of the reference frames. The actions can be understood as features associated with the subset of agents that also are transformed accordingly. In the example of Cooperative Navigation, the point feature vector for an entity v ∈ V includes its entity type to differentiate from agent vs landmark, which in our experiments is represented by a one-hot vector of two classes, fv ∈ R2; the action of agent i ∈ N includes its velocity, ai = vi ∈ A i = R3 with dummy z values. 
+
+Examples of E(3) -symmetric MGs. Besides Cooperative Navigation, all other scenarios in MPE are E(3) -symmetric. 4E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+Further, by Definition 4.2, any MG involving multiple enti-ties interacting in a 2D/3D space is E(3) -symmetric, which includes many real-world applications that are grounded in physical words, such as multi-robot systems, video games, materials design, etc. Two other domains in our experiments that exhibit E(3) -symmetric are the continuous control tasks in DeepMind Control Suite and game scenarios in StarCraft Multi-Agent Challenge, both being popular MARL bench-marks, with more details presented with our experiments. We give more examples of E(3) -symmetric MGs in the appendix. We would like to remark that, in Definition 4.2 that applies to the MARL benchmarks, an agent’s observation uses a local reference frame with the agent’s position as the origin and with its orientation aligned with the global reference frame. So the agent’s own reference frame is the same as the global one up to a position shift, and that is the fundamental reason why observations, just like states, are transformed under rotations/reflections. It is also straightforward to ex-tend this definition (and the method) to the case where local reference frames have orientations different from the global reference frame, with several key points in doing so: 1) An agent’s local orientation should be part of its features and therefore part of the global state. Precisely, in Definition 4.2, the orientation should be included in feature vector fv ,where v is the vertex in the state Euclidean graph corre-sponding to the agent; 2) Upon a rotation, this orientation in feature vector fv should be rotated accordingly; and 3) If the observation is represented using the local reference frame, then it is often invariant to rotations, since the local reference frame is also rotated. We are now ready to derive the main properties of group symmetric MGs: since the transition, reward, and obser-vation functions are group-symmetric, if the policy is also group-symmetric, then we can expect its value functions are invariant under the group actions. For example, under a rotation angle α if all agents in Cooperative Navigation always choose their velocities with the same rotation angle 
+
+α, then the policy value remains unchanged. Definition 4.3 formally states this requirement in general G-symmetric MGs for both state-based and observation-based policies. 
+
+Definition 4.3 (G-invariant MG policies) . Let π : S → 
+
+∆( A) be a state-based policy in a G-symmetric MG. We say π is G-invariant if it is invariant to the group ac-tions of G, i.e., for any s ∈ S , a ∈ A , and g ∈ G,
+
+π(a|s) = π(Ksg [a] | Lg [s]) . Similarly, an observation-based policy ν : O → ×i∈N ∆( Ai) is G-invariant if 
+
+ν(a|o(s)) = ν(Ksg [a] | Hsg [o(s)]) for any s ∈ S , a ∈ A ,and g ∈ G.Under the CTDE paradigm and bijective observation func-tions, the value functions of an observation-based product policy ν can directly condition on states, i.e., Vν (s) and 
+
+Qν (s, a ). We list the properties for observation-based G-invariant product policies and their state(-action) value func-tions in Theorem 4.4 below, which justifies how our method will exploit these properties under the CTDE paradigm. 
+
+Theorem 4.4 (Main properties of G-symmetric MGs, proof in the appendix) . For a G-symmetric MG, (i) The optimal values are G-invariant, V∗(s) = V∗(Lg [s]) ,
+
+Q∗(s, a ) = Q∗(Lg [s], K sg [a]) .(ii) There exists an observation-based policy ν that are 
+
+G-invariant and optimal, Vν (s) = V∗(s), Q ν (s, a ) =
+
+Q∗(s, a ).Further, for a G-invariant observation-based policy ν,(iii) Its value function is G-invariant: for any s ∈ S,
+
+a ∈ A, and g ∈ G, Vν (s) = Vν (Lg [s]) , Q ν (s, a ) =
+
+Qν (Lg [s], K sg [a]) .(iv) Similarly, if ν is parameterized by θ as νθ and differen-tialble, then ∇θ νθ (a|o(s)) = ∇θ νθ (Ksg [a] | o(Lg [s])) .
+
+Theorem 4.4 extends prior works on properties in single-agent symmetric MDPs (Ravindran & Barto, 2001; Rezaei-Shoshtari et al., 2022), and we are the first to take care of the distributed nature of the symmetries in MGs to make a rigorous proof. Theorem 4.4 establishes the properties our method will exploit next. 
+
+## 5. E(3) -Equivariant Multi-Agent Actor-Critic 
+
+The properties stated in Theorem 4.4 naturally prompt us with the idea of adopting group-invariant architectures for cooperative MARL. In this work, we consider multi-agent actor-critic methods, such as MADDPG (Lowe et al., 2017) and MAPPO (Yu et al., 2022). Specifically, properties (i) and (ii) in Theorem 4.4 suggests that we can reduce the search of optimality within group-invariant functions for ac-tors and critics. Moreover, properties (iii) and (iv) imply that group-invariant actors enjoy symmetric policy gradients: 
+
+∇θ πθ (a|s) · Qπθ (s, a )=∇θ πθ (Ksg [a] | Lg [s]) · Qπθ (Lg [s], K sg [a]) 
+
+which suggests that the optimization landscape is symmetric and therefore can be more efficiently optimized via gradient-based search (Zhao et al., 2022a; 2023). This idea is further motivated by our empirical analysis that finds emergence of group-invariancy in traditional actor-critic architectures that have no guaranteed invariancy. Specifically, we train the agents in Cooperative Navigation (N = 3 ) via MADDPG with MLP-based actors and critics. Figure 2 plots the degree of the (observation-based) actors, 5E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+{νi}i∈N , being invariant to rotations and translations, re-spectively, during training. For rotations, we select a finite set of angles, A = {30 ◦, 60 ◦, · · · , 330 ◦}, and quantify the corresponding invariancy measure in state s as 
+
+> 1
+> |A|N
+
+P 
+
+> i,α ∈A
+
+cos  rot α[νi(oi(s)] , ν i(oi(rot α[s]))  (1) where rot α[·] performs the rotation by α and cos( ·, ·) mea-sures the cosine similarity. We measure the translation invariancy similarly. 
+
+5.1. E(3) -Equivariant Message Passing 
+
+In this work, we implement E(3) -equivariant/invariant actor-critic architectures with E(3) -equivariant message passing neural networks (E3-MPNNs) (Thomas et al., 2018; Geiger & Smidt, 2022; Brandstetter et al., 2022), a type of graph neural networks that process 3D Euclidean graphs , graphs where vertices are located at 3D positions, as an E(3) -equivariant function. Formally, an input Euclidean graph is represented as a tuple Gin = ( V, E, x, f in ) where V is a set of vertices with 3D positions xv ∈ R3, E ⊆ V × V 
+
+is a set of edges, and f in is a set of feature vectors, each associated with a vertex or an edge. The backbone of E3-MPNNs is E(3) -equivariant message passing layers, de-noted as E3-MP (·), maps the input Euclidean graph to an output Euclidean graph by updating only the feature set, Gout = ( V, E, x, f out ), in an E(3) -equivariant man-ner, E3-MP (T in  
+
+> g
+
+[Gin ]) = T out  
+
+> g
+
+[E3-MP (Gin )] for g ∈ E(3) ,where T in  
+
+> g
+
+and T out  
+
+> g
+
+include Euclidean transformations (i.e., translation, rotation, etc.) applied to the vertices and fea-tures in the input and output graph, respectively. After the message passing layers, E3-MPNNs produce the final output 
+
+y ∈ Y using a graph readout layer, E3-Readout (·), which is also E(3) -equivariant, E3-Readout (T out  
+
+> g
+
+[Gout ]) =
+
+T Y 
+
+> g
+
+[E3-Readout (Gout )] for g ∈ E(3) . This ensures over-all equivariancy from the input graph to the final output. 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.0 
+
+0.5 
+
+1.0 
+
+> Invariancy Measure
+
+Rotation 
+
+Translation 
+
+Figure 2: Emergence of rotation- and translation-invariancy in MLP actors trained on 3-agent Cooperative Navigation. 
+
+5.2. Integration Into Multi-Agent Actor-Critic Methods 
+
+In order to use E3-MPNNs for multi-agent actor-critic archi-tectures, we need to first represent state s, state-action pair 
+
+(s, a ), and observation oi(s) as Euclidean graphs for cen-tralized state-value critic V (s), action-value critic Q(s, a ),and observation-based actor νi(oi(s)) , respectively. This is straightforward for E(3) -symmetric MGs, because by Defi-nition 4.2 the states and observations are represented as 3D point clouds which can be directly cast into 3D Euclidean graphs if edges are added. In our experiments, we use some heuristics to add edges, e.g., each vertex is connected with all others as a complete graph or with a fixed number of its nearest neighbors. For a state-action pair, we simply treat the actions as additional feature vectors of individual agent vertices. Figure 3 illustrates the E(3) -equivariant action-value critic and observation-based actor for MADDPG. We below highlight several implementation considerations. More details are provided in the appendix. 
+
+SEGNN. For our actor-critic architecture, we employ steer-able E(3) equivariant GNNs (SEGNNs), a recently devel-oped E3-MPNN architecture that has superior performance on supervised learning tasks in computational physics and chemistry (Brandstetter et al., 2022). SEGNNs split the input set of feature vectors into vertex feature vectors and edge feature vectors, f in = ( f node , f edge ), which comprises so-called steerable feature vectors concatenated by (2 l + 1) -dimensional vectors with l = 0 , 1, ... , often representing properties of the nodes (i.e., vertices) and edges. For exam-ple, in Cooperative Navigation, the node feature vector of agent i is f node  
+
+> i
+
+= [ vi, ∥vi∥ , ai, ∥ai∥ , node type] , which is the concatenation of (2 l + 1) -dimensional vectors with 
+
+l ∈ { 0, 1}.
+
+Observability. We adopt the paradigm of centralized train-ing and decentralized execution, where the centralized critic can fully observe the state, while the local actors are observation-based with partial observability in general. For instance, in Cooperative Navigation, the velocities of other agents are not observable. Our method and experiments are restricted to memory-less, Action -value E3 critic ' ⋅,⋅            
+
+> E3 -MP #!,#⋅,⋅
+> $,)E3 Readout '($,))
+> *$($)
+> Observation -based E3 actor +$⋅
+> E3 -MP E3− Readout
+> +$*$$
+> #%⋅
+
+Figure 3: Architectures for E(3) -equivariant MADDPG. 6E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+non-recurrent actor-critic architectures even under partial observability. This is because realizing group-equivariancy in recurrent neural networks needs further technical treat-ments, which is left for future work. To enforce uniform dimensionality required by SEGNN, we handle missing quantities for certain nodes due to partial observability by padding dummy vectors of zeros. 
+
+## 6. Experiments 
+
+Environments. We choose the popular cooperative MARL benchmarks of MPE, MuJoCo continuous control tasks (MuJoCo tasks), including the 2D ones from Tassa et al. (2018) and 3D ones from Chen et al. (2023) with single-and multi-agent variations, and StarCraft Multi-Agent Chal-lenge (SMAC) (Samvelyan et al., 2019) to evaluate the ef-fectiveness of our E(3) -equivariant multi-agent actor-critic methods described in Section 5. Specifically, there are three task scenarios chosen in MPE, Cooperative Navigation, Co-operative Push, and Predator and Prey, where the collective goals of the controllable agents are to navigate the land-marks, push a ball to a target location, and catch all the preys, respectively. In MuJoCo tasks, we consider the repre-sentative tasks of cartpole, single- and multi-agent reacher, single- and multi-agent swimmer, multi-agent 3D hopper, and multi-agent 3D walker. The tasks vary in the degree of E(3) symmetries. In SMAC, the selected scenarios are 8m vs 9m with hard difficulty and 6h vs 8z with super hard difficulty. These tasks exhibit different levels of E(3) -symmetries. All MPE and MuJoCo tasks exhibit perfect 
+
+E(3) -symmetries. SMAC, however, only exhibits imperfect 
+
+E(3) -symmetries due to two reasons: 1) the uncontrollable enemies in SMAC tasks might be E(3) -symmetric, which might break the symmetries for the overall MG, and 2) an-other reason is that the navigation actions are categorical in four Cartesian directions, which limit the actions’ expres-siveness for E(3) -symmetries. 
+
+Baselines. In MPE, we choose MADDPG as the framework of the algorithms. We consider the classic implementation of both actor and critic by MLPs as the baseline. Another baseline (Liu et al., 2020) achieving state-of-the-art perfor-mance in MPE implements the critic by a graph convolu-tional neural network (GCN) that has no guarantee of being 
+
+E(3) -invariant. Our algorithms incorporate E(3) -invariancy in critic and/or actor by SEGNN-based implementations. We denote the algorithms in the format of [critic type, ac-tor type], with the baselines being [MLP, MLP] and [GCN, MLP], and our algorithms [SEGNN, SEGNN] and [SEGNN, MLP]. In MuJoCo tasks, we also apply MADDPG as the un-derlying framework of our algorithms. Similar to the case in MPE, the baselines are denoted as [MLP, MLP] and [GCN, MLP], and ours is denoted as [SEGNN, SEGNN]. For fair comparison, the input graph for the GCN-based critic is the same as that of the SEGNN-based one. In SMAC, the framework of the algorithms is MAPPO, where both actor and critic are commonly implemented by recurrent neural networks (RNNs) to incorporate trajectory-level informa-tion. However, group-equivariancy in RNNs needs further technical treatments so here we focus on non-recurrent MLP-based baselines, denoted as MAPPO-[MLP, MLP]. Another popular baseline we consider is QMIX (Rashid et al., 2020a) with recurrency, i.e., the value function is implemented by an RNN. Due to the categorical nature of SMAC’s action space, our algorithm only incorporates E(3) -invariancy in the critic, denoted as MAPPO-[SEGNN, MLP]. For fair comparison, all the algorithms have comparable amounts of parameters than those of the baselines, with the details in Appendix G. Our code is publicly available at 
+
+https://github.com/dchen48/E3AC .
+
+Results overview. The MPE results show that the SEGNN-based critic and/or actor outperforms the baselines by a significant margin. Further, since the SEGNN-based archi-tecture can deal with point clouds with an arbitrary number of points, the capability of zero-shot learning and transfer learning is empirically verified in MPE. Moreover, the emer-gence of invariancy of the baselines is found in all scenarios of MPE. In the MuJoCo tasks, the SEGNN-based archi-tecture performs similarly to the MLP-based baseline in cartpole, consistent with the fact that the symmetries therein are relatively sparse. In all the other selected tasks with inherently heavier E(3) -symmetries, SEGNN-based archi-tectures achieve noticeable improvements over the baseline. In SMAC, the experiments show that even the environment only partially satisfies the requirements of E(3) -symmetric MGs, our SEGNN-based architecture can still be better performed in 6h vs 8z. However, in SMAC, there is no ob-vious emergence of invariancy in MLP-based architectures, consistent with its limited E(3) -symmetries. 
+
+6.1. Results on MPE Performance. In MPE, Figure 4 shows the learning curves comparing our SEGNN-based architecture described in Sec-tion 5 against the baselines of MLP- and GCN-based archi-tecture. The result clearly illustrates the effectiveness of the SEGNN-based algorithm. Specifically, by only using the SEGNN-based critic, i.e., [SEGNN, MLP] shown in the green curve, the learned architecture has already out-performed the baselines [GCN, MLP] and [MLP, MLP], shown in the blue and orange curves, respectively, in all scenarios in MPE. There is further performance boosting in Push N3, Prey N3, Navigation N6, and Prey N6 if we also use SEGNN-based actor, i.e., [SEGNN, SEGNN] shown with the red curves. 
+
+Zero-shot/transfer learning. Since SEGNN-based archi-tectures can deal with point clouds of variable numbers of 7E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 0.0 0.5 1.0 1.5                      
+
+> Training Step (1e6)
+> 2.00
+> 1.50
+> 1.00
+> 0.50
+> Episode Rewards
+> ×10 2Navigation_N3
+> [MLP,MLP]
+> [GCN,MLP]
+> [SEGNN,MLP]
+> [SEGNN,SEGNN]
+> 0.0 0.5 1.0 1.5
+> 5.00
+> 4.00
+> 3.00
+> 2.00
+> ×10 3Navigation_N6 0.0 0.5 1.0 1.5
+> 1.80
+> 1.60
+> 1.40
+> 1.20
+> ×10 2Push_N3
+> 0.0 0.5 1.0 1.5
+> 3.50
+> 3.00
+> 2.50
+> ×10 2Push_N6 0.0 0.5 1.0 1.5
+> 0.00
+> 1.00
+> 2.00
+> ×10 2Prey_N3
+> 0.0 0.5 1.0 1.5
+> 0.00
+> 0.50
+> 1.00
+> ×10 3Prey_N6
+
+Figure 4: Performance comparison on MPE. points, it is a natural question if they can perform well in different scenarios with similar setups, i.e., zero-shot learn-ing. To answer this question, we test the performance of the SEGNN-based actors learned in 3-agent tasks for the corre-sponding 6-agent tasks. The performance is normalized by linear mapping according to the performance of [SEGNN, SEGNN], whose initial performance is set to 0, and the final performance is set to 1. The result is averaged across all seeds and scenarios, plotted in Figure 5. At step 0, the performance of SEGNN-based architecture learned in the 3 agents’ scenarios (black curve) is close to the final perfor-mance of [MLP, MLP] and that of [GCN, MLP] after train-ing 0.75e6 steps. This empirically proves its good capability of zero-shot learning. Further, we can continue training the SEGNN-based architecture learned in 3 agents’ scenarios in the corresponding 6 agents’ scenarios to show its capability 0.0 0.5 1.0 1.5 
+
+> Training Step (1e6)
+> 0.2
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Normalized Performance
+> [MLP,MLP]
+> [GCN,MLP]
+> [SEGNN,SEGNN]
+> [SEGNN,SEGNN]-Zero-shot/Transfer
+
+Figure 5: Performance of zero-shot and transfer learning. of transfer learning. Its effectiveness of transfer learning is empirically verified by the transferred architecture’s faster convergence rate than the non-transferred counterpart. 
+
+Emergence of Euclidean invariancy. The GCN- and MLP-based architectures are by construction neither invariant to rotations nor translations with arbitrary weights. However, they may gradually adapt to have such abilities after training with a large number of data with invariant transformation, as shown in some previous works on data augmentation (Perez & Wang, 2017) and contrastive learning (Chen et al., 2020). The measurements of Euclidean invariancy are defined simi-larly to Equation (1), with details in Appendix E.1 for MPE and E.3 for SMAC. As illustrated in Figure 9 in the appendix, the actor trained with a SEGNN-based critic demonstrates the highest in-crease of rotation- and translation-invariancy, followed by those trained with GCN- and MLP-based critics. In con-trast, there is no improvement in rotation- and translation-invariancy for both GCN- and MLP-based critics. This underscores the necessity of a SEGNN-based critic with inherent invariancy. 
+
+6.2. Results on (Multi-Agent) MuJoCo Tasks Point cloud representations. MuJoCo tasks have Eu-clidean symmetries since they involve 3D robotic control. Here we choose several representative ones: cartpole (bal-ance, sparse), single- and multi-agent reacher (hard), single-and multi-agent swimmer with two links, and 3D variants of multi-agent hopper and walker modified from the single-agent counterparts from Chen et al. (2023). Note our method subsumes the single-agent setting as the special case of 
+
+N = 1 : we treat the single-agent tasks just like the multi-agent tasks, except that only one vertex in the point cloud has an action space to be controllable (because it’s single-agent), while all other vertices are non-controllable entities. This is contrastively different from standard methods for these single-agent tasks (i.e., [MLP, MLP] baseline) where all state variables are cluttered into a single vector. The goals and the levels of E(3) -symmetries of the selected scenarios are described in detail in Appendix C.2. The state contains physical attributes in R3, e.g., Cartesian coordi-nates, velocities, and angles of the robots’ sub-components. The corresponding state-based point cloud in each task is described in detail in Appendix D.2. 
+
+Performance. The performance of the algorithms in Mu-JoCo tasks are shown in Figure 6. The selected tasks have different levels of symmetry, ranging from 2D (cartpole, reacher, and swimmer) to 3D (hopper and walker). The task cartpole (balance, sparse) only has rotation equivariancy of 
+
+rot 180 ◦ with respect to the z axis. Due to the lack of sym-metries, we do not see much difference for SEGNN-based 8E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 0.0 0.5 1.0                        
+
+> Training Step (1e6)
+> 0.0
+> 0.5
+> 1.0
+> Episode Rewards
+> ×10 3Cartpole
+> [MLP,MLP]
+> [GCN,MLP]
+> [SEGNN,SEGNN] 0.0 0.5 1.0
+> 0.0
+> 0.5
+> 1.0 ×10 3Single-agent reacher
+> 0.0 0.5 1.0
+> 0.0
+> 0.5
+> 1.0 ×10 3Multi-agent reacher 0.0 0.5 1.0
+> 0.5
+> 0.7
+> 0.9 ×10 3Single-agent swimmer
+> 0.0 0.5 1.0
+> 0.5
+> 0.7
+> 0.9 ×10 3Multi-agent swimmer 0.0 0.5 1.0
+> 0.1
+> 0.2
+> 0.3
+> ×10 3Multi-agent Hopper 3D
+> 0.0 0.5 1.0
+> 0.1
+> 0.2
+> 0.3
+> ×10 3Multi-agent Walker 3D
+
+Figure 6: Performance comparison on MuJoCo tasks. architectures against the baseline of [MLP, MLP]. The other 2D tasks, single- and multi-agent reacher, and single- and multi-agent swimmer inherently have stronger 2D rotation and translation equivariancy. Compared to the baseline of [MLP, MLP], our method [SEGNN, SEGNN] shows both faster convergence rate and better performance in single-and multi-agent reacher, and a faster convergence rate in single- and multi-agent swimmer. Due to gravity, which always points in the negative direction of the z axis, the 3D tasks, multi-agent hopper and walker, also have 2D ro-tation and translation equivariancy in the xy plane which is utilized by our method [SEGNN, SEGNN] to have supe-rior performance compared to the baseline of [MLP, MLP]. In all the selected tasks, the baseline of [GCN, MLP] per-forms the worst, even if it uses the same input graph as the [SEGNN, SEGNN]. This illustrates the benefit of exploiting the inductive bias of Euclidean symmetries to reduce the search space of the neural networks’ parameters. 
+
+6.3. Results on SMAC Performance. The scenarios in SMAC (Samvelyan et al., 2019) are competitive in nature, so the invariancy of the 0.0 0.5 1.0 1.5 2.0      
+
+> Training Step (1e7)
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Win Rate
+> 6h_vs_8z
+> MAPPO-[MLP,MLP]
+> MAPPO-[SEGNN,MLP]
+> QMIX
+> 0.0 0.5 1.0 1.5 2.0
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0 8m_vs_9m
+
+Figure 7: Performance comparison on SMAC. game breaks due to the non-invariant behaviors of the un-controllable enemies. Another possible reason for breaking invariancy is that the categorical actions in SMAC are not Euclidean spaces, as required by E(3) -symmetric Markov game. Therefore, we may not observe the big increase in performance as the ones shown in MPE, especially in the non-competing ones navigation and push. We indeed see a mixed of performance in Figure 7 that the SEGNN-based critic helps learn a better-performing actor in 6h vs 8z but not in 8m vs 9m. 
+
+Emergence of Euclidean invariancy. As illustrated in Fig-ure 10 in the appendix, there is no obvious emergence of the rotation-invariancy for both actor and critic. This can be caused by the competitive nature of the scenarios, where we also see a decrease in actors’ translation-invariancy in competitive scenarios Prey N3 and Prey N6. Another possi-ble reason is the categorical nature of the actions, e.g., the move directions {north, south, east, west } are only rotation-equivariant to multiples of 90 ◦ instead of arbitrary angles. 
+
+## 7. Conclusion 
+
+We have developed formalisms and methods for exploiting symmetric structures in cooperative multi-agent reinforce-ment learning, with a focus on 3D Euclidean symmetries. Specifically, we have formulated the novel notion of group-symmetric Markov games and derived its key properties that admit group-symmetric optimal values and policies. Consistent with these properties, we have discovered the emergence of Euclidean symmetries in vanilla MLP-based multi-agent actor-critic architectures. Then, we have devel-oped E(3) -equivariant message passing actor-critic architec-tures that specifically suit group-symmetric Markov games, which results in superior sample efficiency and generaliza-tion capabilities in most benchmark MARL tasks. We observe two limitations of this work. First, the proposed method requires knowledge and annotation of strict sym-metries inherent in the multi-agent task, which might not be easily available. This prompts future work of automatic discovery of symmetries, which can even be approximate. Second, we are restricted to memory-less, non-recurrent architectures in this work even under partial observability. 9E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+## Acknowledgements 
+
+Dingyang Chen acknowledges funding support from NSF award IIS-2154904. Qi Zhang acknowledges funding sup-port from NSF award IIS-2154904 and NSF CAREER award 2237963. Any opinions, findings, conclusions, or recommendations expressed here are those of the authors and do not necessarily reflect the views of the sponsors. The authors thank the anonymous reviewers for their insightful and constructive reviews. 
+
+## Impact Statement 
+
+This paper presents work whose goal is to make the learning process of multi-agent reinforcement learning more efficient. There are many potential societal consequences of our work, none of which we feel must be specifically highlighted here. 
+
+## References 
+
+Brandstetter, J., Hesselink, R., van der Pol, E., Bekkers, E. J., and Welling, M. Geometric and physical quan-tities improve e(3) equivariant message passing. In 
+
+International Conference on Learning Representations ,2022. URL https://openreview.net/forum? id=_xwr8gOBeV1 .Chen, D., Li, Y., and Zhang, Q. Communication-efficient actor-critic methods for homogeneous markov games. In 
+
+International Conference on Learning Representations ,2022. URL https://openreview.net/forum? id=xy_2w3J3kH .Chen, R., Han, J., Sun, F., and Huang, W. Sube-quivariant graph reinforcement learning in 3D environ-ments. In Krause, A., Brunskill, E., Cho, K., En-gelhardt, B., Sabato, S., and Scarlett, J. (eds.), Pro-ceedings of the 40th International Conference on Ma-chine Learning , volume 202 of Proceedings of Machine Learning Research , pp. 4545–4565. PMLR, 23–29 Jul 2023. URL https://proceedings.mlr.press/ v202/chen23i.html .Chen, T., Kornblith, S., Norouzi, M., and Hinton, G. Asimple framework for contrastive learning of visual rep-resentations. In International conference on machine learning , pp. 1597–1607. PMLR, 2020. Dummit, D. S. and Foote, R. M. Abstract algebra , volume 1999. Prentice Hall Englewood Cliffs, NJ, 1991. Finzi, M., Stanton, S., Izmailov, P., and Wilson, A. G. Generalizing convolutional neural networks for equiv-ariance to lie groups on arbitrary continuous data. In III, H. D. and Singh, A. (eds.), Proceedings of the 37th International Conference on Machine Learn-ing , volume 119 of Proceedings of Machine Learn-ing Research , pp. 3165–3176. PMLR, 13–18 Jul 2020. URL https://proceedings.mlr.press/ v119/finzi20a.html .Geiger, M. and Smidt, T. e3nn: Euclidean neural net-works, 2022. URL https://arxiv.org/abs/ 2207.09453 .Goodfellow, I., Bengio, Y., and Courville, A. Deep Learning . MIT Press, 2016. http://www. deeplearningbook.org .Jing, B., Eismann, S., Suriana, P., Townshend, R. J., and Dror, R. Learning from protein structure with geometric vector perceptrons. arXiv preprint arXiv:2009.01411 ,2020. Laskin, M., Lee, K., Stooke, A., Pinto, L., Abbeel, P., and Srinivas, A. Reinforcement learning with augmented data. 
+
+Advances in neural information processing systems , 33: 19884–19895, 2020. Le, T., Noe, F., and Clevert, D.-A. Representation learn-ing on biomolecular structures using equivariant graph attention. In The First Learning on Graphs Conference ,2022. URL https://openreview.net/forum? id=kv4xUo5Pu6 .Li, J., Harabor, D., Stuckey, P. J., Ma, H., Gange, G., and Koenig, S. Pairwise symmetry reasoning for multi-agent path finding search. Artificial Intelligence , 301:103574, 2021. Liu, I.-J., Yeh, R. A., and Schwing, A. G. Pic: permuta-tion invariant critic for multi-agent deep reinforcement learning. In Conference on Robot Learning , pp. 590–602. PMLR, 2020. Lowe, R., Wu, Y. I., Tamar, A., Harb, J., Abbeel, O. P., and Mordatch, I. Multi-agent actor-critic for mixed cooperative-competitive environments. In Advances in neural information processing systems , pp. 6379–6390, 2017. Mondal, A. K., Jain, V., Siddiqi, K., and Ravanbakhsh, S. Eqr: Equivariant representations for data-efficient reinforcement learning. In International Conference on Machine Learning , pp. 15908–15926. PMLR, 2022. Nguyen, D. T., Kumar, A., and Lau, H. C. Policy gradient with value function approximation for collective multia-gent planning. Advances in neural information processing systems , 30, 2017. Nguyen, H. H., Baisero, A., Klee, D., Wang, D., Platt, R., and Amato, C. Equivariant reinforcement learning under 10 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+partial observability. In 7th Annual Conference on Robot Learning , 2023. Perez, L. and Wang, J. The effectiveness of data augmenta-tion in image classification using deep learning, 2017. Rashid, T., Farquhar, G., Peng, B., and Whiteson, S. Weighted qmix: Expanding monotonic value function factorisation for deep multi-agent reinforcement learning. 
+
+Advances in neural information processing systems , 33: 10199–10210, 2020a. Rashid, T., Samvelyan, M., De Witt, C. S., Farquhar, G., Foerster, J., and Whiteson, S. Monotonic value function factorisation for deep multi-agent reinforcement learning. 
+
+The Journal of Machine Learning Research , 21(1):7234– 7284, 2020b. Ravindran, B. and Barto, A. G. Symmetries and model minimization in markov decision processes, 2001. Rezaei-Shoshtari, S., Zhao, R., Panangaden, P., Meger, D., and Precup, D. Continuous mdp homomorphisms and homomorphic policy gradient. Advances in Neural Infor-mation Processing Systems , 35:20189–20204, 2022. Samvelyan, M., Rashid, T., de Witt, C. S., Farquhar, G., Nardelli, N., Rudner, T. G. J., Hung, C.-M., Torr, P. H. S., Foerster, J., and Whiteson, S. The starcraft multi-agent challenge, 2019. Satorras, V. G., Hoogeboom, E., and Welling, M. E(n) equiv-ariant graph neural networks. In Meila, M. and Zhang, T. (eds.), Proceedings of the 38th International Confer-ence on Machine Learning , volume 139 of Proceedings of Machine Learning Research , pp. 9323–9332. PMLR, 18–24 Jul 2021. URL https://proceedings.mlr. press/v139/satorras21a.html .Sch ¨utt, K., Unke, O., and Gastegger, M. Equivariant mes-sage passing for the prediction of tensorial properties and molecular spectra. In International Conference on Machine Learning , pp. 9377–9388. PMLR, 2021. Shapley, L. S. Stochastic games. Proceedings of the national academy of sciences , 39(10):1095–1100, 1953. Tassa, Y., Doron, Y., Muldal, A., Erez, T., Li, Y., Casas, D. d. L., Budden, D., Abdolmaleki, A., Merel, J., Lefrancq, A., et al. Deepmind control suite. arXiv preprint arXiv:1801.00690 , 2018. Thomas, N., Smidt, T., Kearnes, S., Yang, L., Li, L., Kohlhoff, K., and Riley, P. Tensor field networks: Rotation-and translation-equivariant neural networks for 3d point clouds. arXiv preprint arXiv:1802.08219 , 2018. Van der Pol, E., Worrall, D., van Hoof, H., Oliehoek, F., and Welling, M. Mdp homomorphic networks: Group sym-metries in reinforcement learning. Advances in Neural Information Processing Systems , 33:4199–4210, 2020. van der Pol, E., van Hoof, H., Oliehoek, F. A., and Welling, M. Multi-agent MDP homomorphic networks. In In-ternational Conference on Learning Representations ,2022. URL https://openreview.net/forum? id=H7HDG--DJF0 .Wang, D., Walters, R., and Platt, R. So (2)-equivariant reinforcement learning. In International Conference on Learning Representations , 2022a. Wang, D., Walters, R., and Platt, R. SO(2) -equivariant reinforcement learning. In International Conference on Learning Representations , 2022b. URL https: //openreview.net/forum?id=7F9cOhdvfk_ .Yang, Y., Luo, R., Li, M., Zhou, M., Zhang, W., and Wang, J. Mean field multi-agent reinforcement learning. In 
+
+International Conference on Machine Learning , pp. 5571– 5580. PMLR, 2018. Yarats, D., Kostrikov, I., and Fergus, R. Image augmentation is all you need: Regularizing deep reinforcement learning from pixels. In International Conference on Learning Representations , 2021. URL https://openreview. net/forum?id=GY6-6sTvGaf .Yu, C., Velu, A., Vinitsky, E., Gao, J., Wang, Y., Bayen, A., and Wu, Y. The surprising effectiveness of ppo in cooper-ative multi-agent games. Advances in Neural Information Processing Systems , 35:24611–24624, 2022. Yu, X., Shi, R., Feng, P., Tian, Y., Luo, J., and Wu, W. Esp: Exploiting symmetry prior for multi-agent reinforcement learning. In ECAI 2023 , pp. 2946–2953. IOS Press, 2023. Zhao, B., Dehmamy, N., Walters, R., and Yu, R. Sym-metry teleportation for accelerated optimization. In Oh, A. H., Agarwal, A., Belgrave, D., and Cho, K. (eds.), 
+
+Advances in Neural Information Processing Systems ,2022a. URL https://openreview.net/forum? id=MHjxpvMzf2x .Zhao, B., Ganev, I., Walters, R., Yu, R., and Dehmamy, N. Symmetries, flat minima, and the conserved quantities of gradient flow. In The Eleventh International Conference on Learning Representations , 2023. URL https:// openreview.net/forum?id=9ZpciCOunFb .Zhao, L., Zhu, X., Kong, L., Walters, R., and Wong, L. L. Integrating symmetry into differentiable planning with steerable convolutions. In The Eleventh International Conference on Learning Representations , 2022b. 11 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+## A. Proof of Theorem 4.4 
+
+We first prove property (iv) in Section A.1 and then properties (i), (ii), and (iii) in Section A.2. 
+
+A.1. Proof of Property (iv) 
+
+This property can be directly derived by the definition of G-invariant MG policies. For state-based G-invariant policy π:
+
+∇θ πθ (a|s) = lim 
+
+> ∆θ→0
+
+πθ+∆ θ (a|s) − πθ (a|s)∆ = lim 
+
+> ∆θ→0
+
+πθ+∆ θ (Ksg [a] | Lg [s]) − πθ (Ksg [a] | Lg [s]) ∆ = ∇θ πθ (Ksg [a] | Lg [s]) 
+
+where the second equality holds because we assume πθ is G-invariant for any θ. The similar statement holds for observation-based G-invariant policy ν.
+
+A.2. Proof of Properties (i), (ii), and (iii) 
+
+These properties can be established by extending the notion of single-agent MDP homomorphism and its properties to MGs. 
+
+Definition A.1 (MG homomorphism) . An MG homomorphism (l, k s, h s) is a surjective map from an MG ⟨N , S, A, P, r, o ⟩
+
+onto an abstract MG ⟨N , S, A, P , r, o ⟩ by surjective maps l : S → S , ks : A → A , and hs : O → O = O1 × · · · × O N ,such that 
+
+r(s, a ) = r(l(s), k s(a)) ∀s ∈ S , a ∈ A (2) 
+
+P ([ s′]l|s, a ) = P (l(s′)|l(s), k s(a)) ∀s, s ′ ∈ S , a ∈ A (3) 
+
+o(l(s)) = hs(o(s)) ∀s ∈ S . (4) 
+
+Definition A.2 (Policy lifting in MG homomorphisms) . We define policy lifting for state-based and observation-based policies separately, assuming full observability: • State-based MG policy lifting. Let π↑ : S → ∆( A) and π : S → ∆( A) be two state-based policies in the actual and abstract MGs, respectively. We say π↑ is a lift of π, denoted as π↑ = lift (π), if P  
+
+> a∈k−1
+> s(a)
+
+π↑(a|s) = π(a|l(s)) for any s ∈ S and a ∈ A .• Observation-based MG policy lifting. Let ν↑ = {νi 
+
+> ↑
+
+: Oi → ∆( Ai)}i∈N and ν = {νi : Oi → ∆( Ai)}i∈N be two observation-based policies in the actual and abstract MGs, respectively. We say ν↑ is a lift of ν, denoted as 
+
+ν↑ = lift (ν), if P  
+
+> a∈k−1
+> s(a)
+
+ν↑(a|o(s)) = ν(a|hs(o(s))) for any s ∈ S and a ∈ A .
+
+Theorem A.3 (Value equivalence in MG homomorphisms) . Consider an MG homomorphism (l, k s, h s) from MG M =
+
+⟨N , S, A, P, r, o ⟩ with bijective observation functions to abstract MG M = ⟨N , S, A, P , r, o ⟩. We have 
+
+V∗(s) = V ∗(l(s)) , Q∗(s, a ) = Q∗(l(s), k s(a)) for any s ∈ S , a ∈ A . (5) 
+
+For a state-based abstract policy π with its lift π↑, we have 
+
+Vπ↑ (s) = V π (l(s)) , Qπ↑ (s, a ) = Qπ (l(s), k s(a)) for any s ∈ S , a ∈ A . (6) 
+
+For an observation-based abstract policy ν with its lift ν↑, we have 
+
+Vν↑ (o(s)) = V ν (hs(o(s))) , Qν↑ (s, a ) = Qν (hs(o(s)) , k s(a)) for any s ∈ S , a ∈ A . (7) 
+
+Proof of Theorem A.3. For state-based policies, we use similar proof techniques for single-agent MDP homomorphisms (Ravindran & Barto, 2001; Rezaei-Shoshtari et al., 2022). Under bijective observation functions, we can prove (7) by first translating them into state-based policies and then applying (6). 
+
+Proof of properties (i) and (iii). We first establish that a G-symmetric MG induces a MG homomorphism, where G-invariant MG policy can be viewed as lifted from the induced abstract MG. Then, properties (i) and (iii) directly follow from Theorem A.3. 12 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+Specifically, consider a G-symmetric MG as defined in Definition 4.1. Define maps (l, k s, h s) as follows, such that the state-action-observation tuples in the same orbit under G map to the same abstraction: 
+
+l(s) = l(Lg [s]) , ks(a) = kLg [s](Ksg [a]) , hs(o(s)) = hLg [s](o(Lg [s])) = hLg [s](Hsg [o(s)]) 
+
+for any s ∈ S , a ∈ A , g ∈ G. It is easy to verify that maps (l, k s, h s) are surjective and satisfy conditions (2) , (3) , and (4) in Definition A.1, and therefore maps (l, k s, h s) induce an MG homomorphism. Property (i) then directly follows from (5) and the assumption that observation functions are bijective. Under this an MG homomorphism, a state-based G-invariant policy induces an abstract policy, π(a|s) = π(Ksg [a] | Lg [s]) = 
+
+π(a|s), where (s, a ) = ( l(s), k s(a)) = ( l(Lg [s]) , k Lg [s](Ksg [a])) . Because Ksg [·] is reversible via Ksg−1 [·], ks is actually bijective. To see this, we can pick an arbitrary state-action pair in every state-action orbit as the canonical state-action pair for that orbit, then the mapping of any state-action pair can be done via two steps, from the state-action pair to the canonical state-action pair and then to the abstraction, with both steps being bijective. Thus, we have P  
+
+> a′∈k−1
+> s(a)
+
+π(a′|s) = π(a|s) = 
+
+π(a|s), and therefore π is a lift policy from π. Property (iii) for π then directly follows from (6) . Under bijective observation functions, we can similarly derive property (iii) for state-based G-invariant policy ν from (7). 
+
+Proof of property (ii). Such a state-based policy π can be induced from the optimal G-invariant value function. Letting Q∗
+
+be the optimal action-value function that is G-invariant, the existence of which has been proved as property (i), which induces a deterministic optimal state-based policy π∗ as the greedy policy with respect to Q∗, i.e., π∗(s) = arg max a Q∗(s, a )
+
+for any s ∈ S . Since Q∗ is G-invariant, it is easy to see that π∗ is also G-invariant, Ksg [π∗(s)] = π∗(Lg [s]) . Such an observation-based policy ν can be similarly derived. 
+
+## B. Examples of Group-Symmetric MGs 
+
+B.1. E(3) -Symmetric MGs 
+
+It is quite common that in the 3D physical world, entities’ positions and some other physical quantities are described with respect to an arbitrary reference whose change has no impact on the behaviors of the entities. Such scenarios can be described as an E(3) -symmetric MGs. Examples include traffic with vehicles, team sports, surveillance with drones, and games such as SMAC and MPE. Below we highlight three MARL benchmark games to show the generality of E(3) -symmetric MGs. 
+
+Multi-Agent MuJoCo Tasks. In a Multi-Agent MuJoCo task, a given single robotic agent is split into several sub-parts (agents). Each (sub-part) agent can be viewed as a point in the 3D point cloud, with the its centroid as the 3D position. The 
+
+E(3) -equivariant features can be velocities, forces, etc, and the E(3) -intvariant features can be id, unit type, etc. The actions are the forces applied to each sub-parts. 
+
+Google Research Football (GRF) In GRF, each unit in the field, such as a player and a ball can be viewed as a point in the 3D point cloud, with E(3) -equivariant features such as the velocity and E(3) -invariant features such as the unit type. The actions are categorical, with movement actions and some other non-movement actions such as shooting and passing. The non-movement actions are E(3) -invariant. If the player can move to any direction, i.e., the movement actions are continuous, then the game satisfies the requirement of the action space in (ii). The scenarios in GRF are competitive where the (uncontrollable) enemies are viewed as part of the environment. The game is an E(3) -symmetric MGs if the enemies’ policies are E(3) -invariant. 
+
+SMAC In SMAC, each unit in the combat can be view as a point in the 3D point cloud, with dummy z coordinate. There are some competitive scenarios in SMAC, where the controllable agents are fighting against some (uncontrollable) enemies which are viewed as part of the environment. Therefore, similar to GRF, whether the game is an E(3) -symmetric MGs or not depends on the E(3) -invariancy of the uncontrollable enemies’ policies. The actions are also categorical including movement actions and some other E(3) -invariant non-movement actions such as attacking. 
+
+B.2. SN -Symmetric MGs 
+
+Besides the Euclidean transformation, the permutation is another common transformation in the physical world. Intuitively, for homogeneous entities with the same exact behaviors, permute them will have no impact. Such multi-agent symmetries can be captured by the symmetric group SN with permutations as the group actions. The Homogeneous MGs, which is SN -symmetric MGs under our definition, is formallly defined by the work (Chen et al., 2022) with the permutation 13 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+transformation defined on state, action, observation, and the transition and the reward function. Enforcing permutation-invariancy has been found beneficial by (Chen et al., 2022; Liu et al., 2020). Our definition of the G-symmetric MGs is general enough to cover it. The examples include MPE tasks with homogeneous agents, SMAC scenarios with homogeneous ally units, team sports with homogeneous players (assume players have the same capabilities), traffic with homogeneous vehicles, and surveillance with homogeneous drones. 
+
+## C. Experiment Details 
+
+Below we describe in general notation of states and observations in scenarios in MPE and SMAC. 
+
+C.1. MPE 
+
+Multi-Agent Particle Environment (MPE) with the efficient implementation by (Liu et al., 2020) is a classical benchmark with homogeneous agents for multi-agent reinforcement learning, each of which has versions with N = 3 , 6 agents, respectively. These MPE environments can be cast as E(3) -Symmetric MGs, where we have dummy z coordinate. Below we describe the general form of state and observation in all scenarios of MPE, and the corresponding state-action based point cloud and observation-based point cloud which are processed by SEGNN-based critic and actor, respectively, and also the details of each scenarios in MPE. 
+
+Notation We denote the set of agents, landmarks, and preys, which are basic units in scenarios of MPE, as N a = {1, ..., N a},
+
+N l = {N a + 1 , ..., N l}, and N p = {N a + N l + 1 , ..., N + N l + N p}, where N a, N l, and N p are the number of agents, landmarks and preys, respectively. Here only the agents are controllable so N a = N . We have the set of nodes 
+
+V = N a ∪ N l ∪ N p. The absolute positions associated with N a, N l and N p are {xi}i∈N a , {xv }v∈N l and {xv }v∈N p ,respectively. The absolute velocities associated with N a and N p are V a = {vi}i∈N a and V p = {vv }v∈N p , respectively. The landmarks are fixed, so the associate velocities is V l = {0}i∈N l . Let V = V a ∪ V l ∪ V p, which is the set of velocities associated with the set of nodes V.
+
+State The state consists of the positions x of the set of entities N , with the associated features f = {fv = vv }v∈V . The state is therefore a point cloud {(xv , fv )}v∈V , which satisfies the requirement (i) of E(3) -symmetric MGs. 
+
+Observation The agent i’s local observation consists of the relative positions xi = {xii = xi} ∪ { xiv = xv − xi}v∈N \{ i}
+
+of the set of entities N , with the associated (relative) features f i = {f ii = vi} ∪ { f iv = 0}v∈V\{ i}. (Other agents’ velocities are not observable). The agent i’s local observation is therefore a point cloud {(xiv , f iv )}v∈V from agent i’s perspective, which satisfies the requirement (iii) of E(3) -symmetric MGs. 
+
+Action The local action spaces are absolute velocities, and are therefore Euclidean spaces which satisfies the requirement of (ii). Denote the set of actions for the controllable agents as Aa = {ai}i∈N a .The details of each scenarios in MPE is as the following. Cooperative Navigation: The collective goal of agents is to cover all the landmarks. There are two versions with N l = 3 , 6
+
+landmarks for N = 3 , 6 agents, respectively. There are no preys so N p = 0 .Cooperative Push: The collective goal of agents is to push a large ball to a target position. There are two versions with 
+
+N l = 2 , 2 landmarks for N = 3 , 6 agents, respectively. There are no preys so N p = 0 .Predator-and-Prey: The collective goal of slowly moving agents (predators) is to capture some fast moving preys. The preys are pre-trained and controlled by the environment. There are N p = 1 , 2 preys and N l = 2 , 3 landmarks (blocks) for 
+
+N = 3 , 6 agents (predators), respectively. 
+
+C.2. MuJoCo Continuous Control Tasks 
+
+We choose several representative tasks with different levels of symmetries from the MuJoCo continuous control tasks, including the 2D ones from (Tassa et al., 2018) and 3D ones from (Chen et al., 2023) with single- and multi-agent variations: cartpole (balance, sparse), single- and multi-agent reacher (hard), single- and multi-agent swimmer with two links, and multi-agent variants of 3D hopper and walker. The details of the state, observation, and action in the selected scenarios are as the following. 14 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+Cartpole (balance, sparse): the goal of cartpole is to balance a pole connecting to cart moving in the x axis. It has rotation-equivariancy of rot 180 ◦ with respect to the z axis and no translation-invariancy along the x axis because the agent is tasked to balance the cart and the pole around the origin ( x = 0 ), not around some arbitrary position. The state contains the position of the cart, pole, and the origin, and the velocity of the cart and the pole. This task is fully observable, so the observation is the same as the state. The action is the 1D force acted on the cart on the x (horizontal) axis. Single-agent reacher (hard): the goal of single-agent reacher is to control a robot with two links to reach a target. The second link (root, arm) can move around a hinge fixed at the root (origin), and the first link (hand, finger) can move around a hinge at the end of the second link. This task has rotation-equivariancy in the x, y plane, and no translation-invariancy due to the hinge fixed at the origin. The state contains the positions of the target, finger, hand, arm, and root, and the velocities of the finger, hand, arm, and root. This task is fully observable, so the observation is the same as the state. The action is the torques applied to the two links. The target is generated randomly between circles whose centers are located at the origin with radius 0.05 and 0.2, respectively. Multi-agent reacher: the multi-agent reacher has the same goal as the single-agent reacher. The state is the same as the single-agent reacher. This task is partially observable. Agent 1 controlling the the first link can observe its own id, and the positions of the target, finger, and hand, and the velocities of the finger and hand. Agent 2 controlling the second link can observe its own id, and the positions of the target, arm, and root, and the velocities of the arm and root. The actions are the torques applied on the two links for agent 1 and agent 2, respectively. Single-agent swimmer: the goal of single-agent swimmer is to control a robot with two controllable links to move to a target. It is similar to the single-agent reacher, except that the second link is not fixed at the origin. This task has both rotation- and translation-invariancy in the xy plane. The state is the positions of the target, nose (in the front of the swimmer’s head), and the first joint, the velocities and the angular velocities of the swimmer’s bodies, and the joint angles. This task is fully observable, so the observation is the same as the state. The actions are the torques applied on the two controllable links. The target is generated randomly inside a square box whose center is located at the origin with width=height=0.3. Multi-agent swimmer: the multi-agent swimmer has the same goal as the single-agent swimmer. The state is the same as the single-agent swimmer. We split the robot into two agents, with agent 1 controlling the first link, and agent 2 controlling the second link. This task is fully observable, so the observation is the same as the state, except that each agent can also observe their own ids. The actions are the torques applied on the two links for agent 1 and agent 2, respectively. Multi-agent hopper 3D (3 shin): the goal of multi-agent hopper is to control a robot with 3 body parts (torso, thigh, foot) to reach a target position. This task has both rotation- and translation-invariancy in the xy plane. The state contains the positions of the target, torso, thigh, and foot, the velocities of the torso, thigh, foot, the rotation axes of the thigh and foot, and the gravity which is a constant (0,0,-9.81). Agent 1 control the thigh, and agent 2 control the foot. This task is fully observable, so the local observation is the same as the state, except that each agent can also observe their own ids. The actions are the torques applied on thigh for agent 1 and the torques applied on foot for agent 2, respectively. Multi-agent walker 3D (3 left leg right foot): the goal of multi-agent walker is to control a robot with 5 body parts (torso, right thigh, right shin, left thigh, left shin) to reach a target position. This task has both rotation- and translation-invariancy in the xy plane. The state contains the positions of the target, torso, right thigh, right shin, left thigh, and left shin, the velocities of the torso, right thigh, right shin, left thigh, and left shin, the rotation axes of the right thigh, right shin, left thigh, and left shin, and the gravity which is a constant (0,0,-9.81). Agent 1 control the right thigh, and agent 2 control the right shin. This task is fully observable, so the local observation is the same as the state, except that each agent can also observe their own ids. The actions are the torques applied on the right thigh for agent 1 and the torques applied on right shin for agent 2, respectively. 
+
+C.3. SMAC 
+
+The StarCraft Multi-Agent Challenge (SMAC) (Samvelyan et al., 2019) has become one of the most popular MARL benchmarks. All scenarios in SMAC can be described by E(3) -symmetric Markov games in a similar way to MPE. We choose the Hard scenario 8m vs 9m and Super Hard scenario 6h vs 8z to evaluate our proposed algorithm, which has 8 agents and 6 agents, respectively. 
+
+Notation We denote the set of controllable ally agents and uncontrollable enemies, which are basic units in scenarios of SMAC, as N a = {N + 1 , ..., N a} and N e = {N a + 1 , ..., N a + N e}, where N a and N e are the number of agents and enemies, respectively. Here only agents are controllable and so N a = N . We have the set of nodes V = N a ∪ N e. The 15 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+absolute positions associated with N a and N e are {xi}i∈N a and {xv }v∈N e , respectively. The local action spaces of the controllable ally agents are categorical, which is the union of the set of move directions, attack enemies, stop and no operation, i.e., Ai = {north, south, east, west } ∪ { attack[enemy id] }enemy id ∈N e ∪ { stop, no-op }.The health associated with N a and N e are Ha = {hi}i∈N and He = {hv }v∈N e , respectively. The cooldown of the weapons associated with N a and N e which is not applicable are CD a = {cd i}i∈N and CD e = {0}v∈N e , respectively. The shield associated with N a and N e are SH a = {sh i}i∈N and SH e = {sh v }v∈N e , respectively. Let H = Ha ∪ He,
+
+CD = CD a ∪ CD e, SH = SH a ∪ SH e, which are the sets of health, cooldown, and shield of the allies’ and enemies’ agents associated with the set of nodes V.
+
+State The state consists of the positions x of the set of entities N , with the associated features f = {fv = ( hv , cd v , sh v )}v∈V .The state is therefore a point cloud {(xv , fv )}v∈V , which satisfies the requirement (i) of E(3) -symmetric MGs. 
+
+Observation Agent i’s observation oi(s) only contains information of itself and some other observable entities, denoted as Vi ⊆ V . The information of the non-observable entities are padded as 0. From agent i’s perspective, denote the visibility of the entities as V I i = {vi v = 1 }v∈V i ∪ { vi v = 0 }v∈V\V i , and denote the set of (one-hot) move directions 
+
+∈ { north, south, east, west } as M D i = {md i} ∪ { 0}v∈V\{ i}. (only its own move direction is observable). Then, oi(s)
+
+consists of the relative positions xi = {xii = 0} ∪ { xiv = xv − xi}v∈N \{ i} of the set of entities N , with the associated (relative) features f i = {f ii = ( agent id = i, md i, vi i = 1 , ∥xii∥ = 0 , xii = 0, hi, sh i} ∪ { f iv = ( agent id = 0 , md v =
+
+0, vi v , ∥xiv ∥, xiv , hv , sh v )}v∈V\{ i}. (Other entities’ ids are not observable, so padded as 0). The agent i’s local observation is therefore a point cloud {(xiv , f iv )}v∈V from agent i’s perspective, which satisfies the requirement (iii) of E(3) -symmetric MGs. 
+
+Action Each agent i’s action space is categorical, which is the union of the sets of move directions, attack enemies, stop and no operation, i.e., Ai = {north, south, east, west } ∪ { attack[enemy id] }enemy id ∈N e ∪ { stop, no-op }. Obviously, Ai is not a Euclidean space and therefore does not satisfy the requirement of (ii). The details of the two scenarios in SMAC we test our algorithm is as the following. 8m vs 9m: 8 controllable ally agents of type Marines are fighting against 9 uncontrollable enemies of type Marines. Shield is not applicable for Marines so both SH a and SH e are ∅.6h vs 8z: 6 controllable ally agents of type Hydralisks are fighting against 9 uncontrollable enemies of type Zealots. Shield is not applicable for Hydralisks so SH a = ∅.
+
+## D. Implementation Details 
+
+As described in 5.1, the input to SEGNN is an input Euclidean graph is represented as a tuple Gin = ( V, E, x, f in ) where V
+
+is a set of vertices with 3D positions xv ∈ R3, E ⊆ V × V is a set of edges, and f in is a set of feature vectors, each associated with a vertex or an edge. Precisely, the input feature f in can be further decomposed into node feature, node attribute, and edge attribute, i.e., f in = ( f node feature , f node attribute , f edge attribute ). Note that in MPE and SMAC, entities are in a 2D world, so we pad the dummy z coordinate of 0 for them to be in a 3D space whenever applicable, e.g. velocities, positions, etc. Below we describe in details, whichever applicable, how to represent state s, state-action pair (s, a ), and observation oi(s) as Euclidean graphs for centralized state-value critic V (s), action-value critic Q(s, a ), and observation-based actor νi(oi(s)) ,respectively, in MPE, MuJoCo tasks, and SMAC. 
+
+D.1. MPE 
+
+In MPE, we build our architecture based on MADDPG, where the critic is based on state and action pair and therefore we construct state-action based Euclidean graph processed by E(3) -invariant critic. We also construct an observation-based Euclidean graph processed by an E(3) -equivariant actor. 
+
+State-action based Euclidean graph Based on the information in the state s = {(xv , fv )}v∈V , V and x have already been well-defined. The graph E is densely connected, i.e., E = {(v1, v 2) : v1 ∈ V , v 2 ∈ V , v 1̸ = v2}. We can pad the dummy 0 action for non-controllable entities, i.e., landmarks and preys, to have actions for all entities: A =
+
+{ai}i∈N a ∪ { 0}v∈N l ∪ { 0}v∈N p . We can then design the node feature f node feature , node attribute f node attribute , and edge attribute 
+
+f edge attribute based on the information in the input features f in = f = {vv }v∈V and actions A. The node feature of each node consists of its own absolute velocity, the l2 norm of its own absolute velocity, its own action, and l2 norm of its own action. 16 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 𝑙 
+
+𝑗 
+
+𝑖 x!
+
+x"
+
+x#
+
+𝑣 $
+
+a$      
+
+> f!""#$%&"'
+> '()' 𝑖 ,𝑗 =[x*−x+]
+
+𝑚            
+
+> f,'!"&#'
+> -.(' =[v*,∥v*∥,a*,∥a*∥]
+
+𝑙 
+
+𝑗 
+
+𝑖 
+
+x$
+
+x!
+
+x"
+
+x#
+
+𝑣 $
+
+𝑚 
+
+State -action based Euclidean graph Observation -based Euclidean graph 
+
+agent landmark prey position velocity zero velocity action zero action edge attribute 
+
+𝑦 
+
+𝑥 
+
+𝑦 
+
+𝑥 
+
+x$                
+
+> f!""#$%&"'
+> -.(' 𝑖 =[1,0,0]
+> f!""#$%&"'
+> -.(' 𝑚 =[0,0,1]
+> f!""#$%&"'
+> -.(' 𝑙 =[0,1,0]
+> f!""#$%&"'
+> -.(' 𝑖
+> f,'!"&#'
+> -.(' =[v*,∥v*∥]
+
+a$  
+
+> f!""#$%&"'
+> '()' 𝑖 ,𝑗
+
+Figure 8: Illustration of state-action based point cloud and observation-based point cloud for a scenario in MPE with agent, landmark and prey. Specifically, f node feature = {[vv , ∥vv ∥ , av , ∥av ∥]}v∈V . We can specify the E(3) -equivariancy of both absolute velocities and actions, and E(3) -invariancy of the associated l2 norms in SEGNN to preserve physical constraints. The node attribute is the set of node types ∈ { agent, landmark, prey }, i.e., f node attribute = {[node type (v)] }v∈V . The node types are E(3) -invariant. The edge attribute is the set of relative positions, i.e., f edge attribute = {[xv1 − xv2 ]}(v1,v 2)∈E , which is E(3) -equivariant. 
+
+Observation-based Euclidean graph The relative positions in the observation can be restored to the absolute location, i.e., 
+
+xi = {xii = xi}∪{ xv −xi}v∈N \{ i} −→ { xii = xi}∪{ xv −xi +xi}v∈N \{ i}. Then we can generate the observation-based point cloud in almost the same way, with two differences. The first difference is that due to partial observability, the velocities of other agents and preys are not available, so we have V a = {vi} ∪ { 0}j∈N \{ i} and V p = {0}N p . Another difference is that the observation-based point cloud does not condition on actions, so correspondingly the node features do not contain action related elements and is only velocity related, i.e., f node feature = {[vv , ∥vv ∥]}v∈V .
+
+D.2. MuJoCo Continuous Control Tasks 
+
+In MuJoCo continuous control tasks, we build our architecture based on MADDPG, where the critic is based on state and action pair and therefore we construct state-action based Euclidean graph processed by E(3) -invariant critic. We also construct an observation-based Euclidean graph processed by an E(3) -equivariant actor. Note that the input to both our architecture and the MLP-based baselines contains the same information. Below we specify the state-action based Euclidean graph and the observation-based Euclidean graph for all the selected tasks. For all the point sets defined below, the graph E
+
+is densely connected, i.e., E = {(v1, v 2) : v1 ∈ V , v 2 ∈ V , v 1̸ = v2}. The node attribute is the set of node types, where each point in the point set has its own node type in all the selected MuJoCo tasks. The node types are E(3) -invariant. The edge attribute is the set of relative positions, i.e., f edge attribute = {[xv1 − xv2 ]}(v1,v 2)∈E , which is E(3) -equivariant. 
+
+cartpole (Balance Sparse) State-action based Euclidean graph: the point set V = {origin , cart }. For point cart , the node feature f node ,cart feature = {[vj , ∥vj ∥]}j∈{ cart ,pole } ∪ { [xpole , ∥xpole ∥]} ∪ { a, ∥a∥} . For point origin , the node feature 
+
+f node ,origin feature = {0}. The node attribute is the node type: ∀i ∈ V , f node attribute = [ node type (i)] . Observation based Euclidean graph: it is the same as the state-action based Euclidean graph, except that action is not included in the node feature. 
+
+Single-agent reacher (hard) State-action based Euclidean graph: the point set V = {target , finger }. For point finger , the node feature f node ,finger feature = {[vj , ∥vj ∥]}j∈{ finger ,hand ,arm ,root } ∪{ [xj , ∥xj ∥]}j∈{ hand ,arm ,root }}∪{ a, ∥a∥} . For point target ,the node feature f node ,target feature = {0}. The node attribute is the node type: ∀i ∈ V , f node attribute = [ node type (i)] . Observation based Euclidean graph: it is the same as the state-action based Euclidean graph, except that action is not included in the node feature. 
+
+Multi-agent reacher (hard) The state-action based Euclidean graph is the same as the single-agent reacher. For agent 1 controlling the green part in reacher in Figure 6, the point set is V = {target , finger }. The node feature f node ,finger feature =
+
+17 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+{id agent 1 } ∪ { [vj, ∥vj∥]}j∈{ finger ,hand } ∪ { [xj, ∥xhand ∥]}} ∪ { a1, ∥a1∥} . For point target , the node feature f node ,target feature =
+
+{0}. For agent 2 controlling the yellow part in reacher in Figure 6, the point set is v = {target , arm }. The node feature 
+
+f node ,arm feature = {id agent 2 } ∪ { [vj, ∥vj∥]}j∈{ arm ,root } ∪ { [xj, ∥xroot ∥]}} ∪ { a2, ∥a2∥} . For point target , the node feature 
+
+f node ,target feature = {0}.
+
+Single-agent swimmer State-action based Euclidean graph: the point set V = {target , nose , first joint }. For point nose , the node feature f node ,nose feature = {[vj , ∥vj ∥ , ω j , ∥ωj ∥]}j∈{ bodies } ∪ { [θj ]}j∈{ joints } ∪ { a, ∥a∥} . For point target and point first link ,the node features are {0}. The node attribute is the node type: ∀i ∈ V , f node attribute = [ node type (i)] . Observation based Euclidean graph: it is the same as the state-action based Euclidean graph, except that action is not included in the node feature. 
+
+Multi-agent swimmer The state-action based Euclidean graph is the same as the single-agent swimmer. The observation-based Euclidean graphs for both agents are the same as the state-action based Euclidean graph, except that action is not included in the node feature and their own ids are included in the node feature which are E(3) -invariant. 
+
+Multi-agent hopper State-action based Euclidean graph: the point set V = {target , torso , thigh , foot }. For the for noncontrollable components target and torso, we set the dummy action of {0}. For i ∈ V, the node fea-ture f node ,ifeature = [ vi, ∥vi∥ , xi, ∥xi∥ , , rotation axis i , ∥rotation axis i ∥ , ai, ∥ai∥]. The node attribute is the node type: 
+
+∀i ∈ V , f node attribute = [ node type (i)] . Observation based Euclidean graph: it is the same as the state-action based Euclidean graph, except that action is not included in the node feature and their own ids are included in the node feature which are 
+
+E(3) -invariant. 
+
+Multi-agent walker State-action based Euclidean graph: the point set V = {target, torso, right thigh, right shin, left thigh, left shin }. For the for noncontrollable components {target, torso, left thigh, left shin }, we set the dummy action of {0}. For 
+
+i ∈ V , the node feature f node ,ifeature = [ vi, ∥vi∥ , xi, ∥xi∥ , , rotation axis i , ∥rotation axis i ∥ , ai, ∥ai∥]. The node attribute is the node type: ∀i ∈ V , f node attribute = [ node type (i)] . Observation based Euclidean graph: it is the same as the state-action based Euclidean graph, except that action is not included in the node feature and their own ids are included in the node feature which are E(3) -invariant. 
+
+D.3. SMAC 
+
+In SMAC, we build our architecture based on MAPPO, where the critic is based on state only and therefore we construct state based Euclidean graph processed by E(3) -invariant critic. The action space in SMAC is categorical and therefore we use a traditional MLP-based actor to process the observation. 
+
+State based Euclidean graph Based on the information in the state s = {(xv , fv )}v∈V , V and x have already been well-defined. The graph E is a nearest neighbor graph degree k, i.e., E = {(v1, v 2) : v1 ∈ V , v 2 ∈ V , v 1 ∈ neighbor (v2, k )}.We can then design the node feature f node feature , node attribute f node attribute , and edge attribute f edge attribute based on the information in the input features f in = f = {vv }v∈V . The node feature of each node consists of its health, cooldown, and shield. Specifically, f node feature = {[hv , cd v , sh v ]}v∈V . All quantities in node features are E(3) -invariant. The node attribute is the set of node types ∈ { [Team,Type] }Team ∈{ ally, enemy },Type ∈{ Marines, Hydralisks, Zealots }, i.e., f node attribute = {[node type (v)] }v∈V . The node types are E(3) -invariant. The edge attribute is the set of relative positions, i.e., f edge attribute = {[xv1 − xv2 ]}(v1,v 2)∈E ,which is E(3) -equivariant. 18 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+## E. Supplementary Results 
+
+E.1. Invariancy Measure in MPE 
+
+In MPE, the metrics for measuring invariancy for actor and critic in terms of rotation and translation are defined in the following: 
+
+Invariancy rot Q = − 1
+
+> |A|
+
+P 
+
+> α∈A
+
+|Q(s, a ) − Q(rot α[s], rot α[a]) | (8) 
+
+Invariancy transl Q = − 1
+
+> |L|
+
+P 
+
+> l∈L
+
+|Q(s, a ) − Q(transl l[s], transl l[a]) | (9) 
+
+Invariancy rot  
+
+> ν
+
+= 1
+
+> |A|N
+
+P
+
+> i∈N
+
+P 
+
+> α∈A
+
+cos  rot α[νi(oi(s)] , ν i(oi(rot α[s]))  (10) 
+
+Invariancy transl  
+
+> ν
+
+= 1
+
+> |L|N
+
+P
+
+> i∈N
+
+P 
+
+> l∈L
+
+cos  transl l[νi(oi(s)] , ν i(oi(transl l[s]))  (11) ,where rot α[·] and transl l[·] performs the rotation by α and translation by l, respectively, and cos( ·, ·) measures the cosine similarity. A is the list of angles which we use [30 ◦, 60 ◦ · · · , 330 ◦], L is the list of translations which we use 
+
+[( −lx, 0) , (−0.5lx, 0) , (0 .5lx, 0) , (lx, 0)] for translations along x axis and [(0 , −ly ), (0 , −0.5ly ), (0 , 0.5ly ), (0 , l y )] for trans-lations along y axis (the size of the map is lx by ly , where lx = ly = 1 , 1.5, 1 for the scenarios of push, navigation, and prey, respectively). We calculate these four metrics by averaging over state and observation collected in different time steps in 200 episodes. The ranges of those metrics are not important. By construction, the larger the values of 
+
+Invariancy rot Q , Invariancy transl Q , Invariancy rot  
+
+> ν
+
+, and Invariancy transl  
+
+> ν
+
+are, the closer the behaviors the non-SEGNN-based architecture are compared to those of the SEGNN-based architecture, which has the largest possible values for those metrics, in terms of their invariancy to the corresponding transformations. 19 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+E.2. The Emergence of Invariancy in MPE. 
+
+As illustrated in Figure 9, the GCN-based critic with permutation invariancy has better rotation- and translation-invariancy than the MLP-based one for the whole training process. One possible reason is that for certain configurations of the state, permutation invariancy is a special type of Euclidean invariancy, e.g., 6 agents whose positions are in a circle with 60 ◦
+
+between adjacent ones, which displays a rotation-invariancy of rot 60 ◦ . However, there is no increase in rotation- and translation-invariancy for both GCN- and MLP-based critics, which may explain why actors learned with SEGNN-based critics have better performance. On the other hand, the actor learned with a SEGNN-based critic emerges better rotation-and translation-invariancy than the MLP and GCN baselines. The actor learned with a GCN-based critic achieves similar rotation-invariancy but worse translation-invariancy than the one learned with an MLP-based critic. Note that the translation-invariancy for actors is initially high, because in the observation only the agent’s own position is absolute and can be modified by translation, whereas all other values are relative and translation-invariant. The randomly initialized actors will therefore output similar actions. 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.00 
+
+0.25 
+
+0.50 
+
+0.75 
+
+> Invariancy Measure  Actor,Rotation
+
+[MLP,MLP] 
+
+[GCN,MLP] 
+
+[SEGNN,MLP] 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 Actor,Translation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+7.5 
+
+5.0 
+
+2.5 
+
+1e 3 Critic,Rotation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+2
+
+1
+
+1e 3 Critic,Translation 
+
+Navigation_N3 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.00 
+
+0.25 
+
+0.50 
+
+0.75 
+
+> Invariancy Measure  Actor,Rotation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.25 
+
+0.50 
+
+0.75 
+
+1.00 Actor,Translation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+7.5 
+
+5.0 
+
+2.5 
+
+0.0 1e 3 Critic,Rotation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+1.5 
+
+1.0 
+
+0.5 
+
+0.0 1e 3 Critic,Translation 
+
+Navigation_N6 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.0 
+
+0.5 
+
+> Invariancy Measure  Actor,Rotation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.25 
+
+0.50 
+
+0.75 
+
+1.00 Actor,Translation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+4
+
+2
+
+1e 3 Critic,Rotation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+1.5 
+
+1.0 
+
+0.5 
+
+1e 3 Critic,Translation 
+
+Push_N3 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.0 
+
+0.5 
+
+> Invariancy Measure  Actor,Rotation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> Actor,Translation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+4
+
+2
+
+0 1e 3 Critic,Rotation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+1.0 
+
+0.5 
+
+0.0 1e 3 Critic,Translation 
+
+Push_N6 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.0 
+
+0.5 
+
+> Invariancy Measure  Actor,Rotation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.6 
+
+0.8 
+
+1.0 Actor,Translation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+4
+
+2
+
+1e 3 Critic,Rotation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+1.5 
+
+1.0 
+
+0.5 
+
+1e 3 Critic,Translation 
+
+Prey_N3 0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.00 
+
+0.25 
+
+0.50 
+
+0.75 
+
+> Invariancy Measure  Actor,Rotation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+0.4 
+
+0.6 
+
+0.8 
+
+1.0 
+
+> Actor,Translation
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+7.5 
+
+5.0 
+
+2.5 
+
+0.0 1e 3 Critic,Rotation 
+
+0.0 0.5 1.0 1.5 
+
+Training Step (1e6) 
+
+1.0 
+
+0.5 
+
+0.0 1e 3 Critic,Translation 
+
+Prey_N6 
+
+Figure 9: The emergence of invariancy and equivariancy in non-SEGNN-based critic and actor, respectively, in MPE. 20 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+E.3. Invariancy Measure in SMAC 
+
+The critic used by MAPPO is a value function, so the invariancy for critic is defined in terms of V instead of Q. The action of controllable ally agents in SMAC is categorical, so we use KL divergence instead of cosine similarity to measure the difference between two probability distributions. The action is the union of the set of move directions, attack enemies, stop and no operation, i.e., Aa = {north, south, east, west } ∪ { attack[enemy id] }enemy id ∈N e ∪ { stop, no-op }. Under rotation, only move directions will be changed. Its hard to measure how the move direction will change for an arbitrary rotation angle, so we only consider (counter clockwise) rotation angles of [90 ◦, 180 ◦, 270 ◦], which will roll the move direction accordingly. For example, for a (counter clockwise) rotation angle of 90 ◦, move to the north will change to move to the west. The translation for actor is already achieved in scenarios in SMAC due to the missing of absolute positions in the observation, so it is not included here. 
+
+Invariancy rot V = − 1
+
+> |A|
+
+P 
+
+> α∈A
+
+|V (s) − V (rot α[s]) | (12) 
+
+Invariancy transl V = − 1
+
+> |L|
+
+P 
+
+> l∈L
+
+|V (s) − V (transl l[s]) | (13) 
+
+Invariancy rot  
+
+> ν
+
+= 1
+
+> |A|N
+
+P
+
+> i∈N
+
+P 
+
+> α∈A
+
+KL  rot α[νi(·| oi(s)] , ν i(·| oi(rot α[s]))  (14) , where rot α[·] and transl l[·] performs the rotation by α and translation by l, respectively, and KL( ·, ·) measures the KL divergence. A is the list of angles which we use [90 ◦, 180 ◦, 270 ◦], L is the list of translations which we use 
+
+[( −lx, 0) , (−0.5lx, 0) , (0 .5lx, 0) , (lx, 0)] for translations along x axis and [(0 , −ly ), (0 , −0.5ly ), (0 , 0.5ly ), (0 , l y )] for trans-lations along y axis (the normalized size of the map is lx by ly , where lx = ly = 1 for the scenarios in SMAC. We calculate these four metrics by averaging over state and observation collected in different time steps in 32 episodes. The ranges of those metrics are not important. By construction, the larger the values of Invariancy rot V , Invariancy transl V , and Invariancy rot 
+
+> ν
+
+are, the closer the behaviors the non-SEGNN-based architecture are compared to those of the SEGNN-based architecture, which has the largest possible values for those metrics, in terms of their invariancy to the corresponding transformations. 21 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+E.4. The Emergence of Invariancy and Equivariancy in SMAC. 
+
+As illustrated in Figure 10, there is no obvious emergence of the rotation-invariancy for both actor and critic. This can be caused by the competitive nature of the scenarios in SMAC, where we also see a decrease in actors’ translation-invariancy in competitive scenarios Prey N3 and Prey N6, as shown in the appendix. Another possible reason is that some of the categorical actions, the move directions {north, south, east, west }, are only rotation-equivariant to multiples of 90 ◦ instead of arbitrary angles and therefore break the overall invariancy of the game. 0.0 0.5 1.0 1.5 2.0           
+
+> Training Step (1e7)
+> 7.5
+> 5.0
+> 2.5
+> 0.0
+> Invariancy Measure  Actor,Rotation
+> MAPPO-[SEGNN,MLP]
+> MAPPO-[MLP,MLP]
+> 0.0 0.5 1.0 1.5 2.0
+> 7.5
+> 5.0
+> 2.5
+> 1e 1Critic,Rotation
+> 0.0 0.5 1.0 1.5 2.0
+> 1.0
+> 0.8
+> 0.6
+> Critic,Translation
+
+6h_vs_8z 0.0 0.5 1.0 1.5 2.0           
+
+> 2
+> 1
+> 0
+> Actor,Rotation
+> 0.0 0.5 1.0 1.5 2.0
+> 1.0
+> 0.5
+> Critic,Rotation
+> 0.0 0.5 1.0 1.5 2.0
+> 8
+> 6
+> 1e 1Critic,Translation
+
+8m_vs_9m 
+
+Figure 10: The emergence of invariancy and equivariancy in non-SEGNN-based critic and actor, respectively, in SMAC. 22 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+## F. Hyperparameters 
+
+F.1. MPE 
+
+Table 1: Hyperparameters for MPE Hyperparameter Value Episode length 25 Number of training episodes 60000 Discount factor 0.95 Batch size from replay buffer for [MLP, MLP] and [GCN, MLP] 1024 Batch size from replay buffer for [SEGNN, MLP] and [SEGNN, SEGNN] 128 Actor’s learning rate for [MLP, MLP] and [GCN, MLP] 1e-4 Acror’s learning rate for [SEGNN, MLP] in ordered scenarios 3e-4,3e-4,1e-4,3e-4,3e-4,3e-4 Acror’s learning rate for [SEGNN, SEGNN] in ordered scenarios 1e-4,3e-4,3e-5,3e-5,3e-4,3e-4 Critic’s learning rate for [MLP, MLP] and [GCN, MLP] 1e-3 Critic’s learning rate for [SEGNN, MLP] in ordered scenarios 1e-3,3e-4,1e-3,1e-3,1e-3,1e-3 Critic’s learning rate for [SEGNN, SEGNN] in ordered scenarios 1e-3,1e-3,1e-3,1e-3,1e-3,1e-3 Actor’s and critic’s learning rates for transfer learning in Navigation 2e-4,1e-3 Actor’s and critic’s learning rates for transfer learning in Push 3e-5,1e-3 Actor’s and critic’s learning rates for transfer learning in Prey 3e-4,1e-3 Graph used by SEGNN for 6h vs 8z complete graph #episodes per evaluation 200 #seeds 5The ordered scenarios are: Navigation N3, Navigation N6, Push N3, Push N6, Tag N3, Tag N6. Unless specified, the mentioned hyperparameter is applied to all scenarios in MPE. Actors’ learning rates are searched in [1e-4, 3e-5, 1e-5]. Critics’ learning rates are searched in [1e-3, 3e-4, 1e-4]. 
+
+F.2. The MuJoCo Continuous Control Tasks 
+
+Table 2: Hyperparameters for 2D tasks (cartpole, reacher, swimmer) in the MuJoCo tasks Hyperparameter Value Episode length 1000 Number of training steps 1.1e6 Discount factor 0.99 Batch size 256 Acror’s learning rate for [MLP, MLP] and [GCN, MLP] 1e-4 Acror’s learning rate for [SEGNN, SEGNN] 5e-5 Critic’s learning rate for [MLP, MLP] and [GCN, MLP] 1e-4 Critic’s learning rate for [SEGNN, SEGNN] 5e-5 Graph used by SEGNN in all 2D tasks complete graph #episodes per evaluation for cartpole (balance, sparse) 20 #episodes per evaluation for single- and multi-agent reacher 10 #episodes per evaluation for single- and multi-agent swimmer 100 #seeds for cartpole (balance, sparse), single-agent reacher, and single-agent swimmer 5#seeds for multi-agent reacher, and multi-agent swimmer 10 Unless specified, the mentioned hyperparameter is applied to all the tasks and the algorithms. The hyperparameters except SEGNN’s learning rates are the default ones used by (Rezaei-Shoshtari et al., 2022) 23 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+Table 3: Hyperparameters for 3D tasks (hopper, walker) in the MuJoCo tasks Hyperparameter Value Episode length 1000 Number of training steps 1.1e6 Discount factor 0.99 Batch size 256 Acror’s learning rate 3e-4 Critic’s learning rate 3e-4 Graph used by SEGNN in all 3D tasks complete graph #episodes per evaluation 10 #seeds 5Unless specified, the mentioned hyperparameter is applied to all the tasks and the algorithms. The hyperparameters are the default ones used by (Chen et al., 2023) 24 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+F.3. SMAC 
+
+Table 4: Hyperparameters for SMAC Hyperparameter Value Episode length 400 Number of training steps 2e7 Discount factor 0.99 #Rollout threads 8#Training threads 1PPO epoch for 8m vs 9m, 6h vs 8z 5,10 # mini-batch for 8m vs 9m, 6h vs 8z 1,4 The degree of nearest neighbor graph used by SEGNN for 8m vs 9m 4The degree of nearest neighbor graph used by SEGNN for 6h vs 8z 13 (complete graph) Acror’s learning rate for all algorithms 5e-4 Critic’s learning rate for all algorithms 5e-4 #episodes per evaluation 32 #seeds 5Unless specified, the mentioned hyperparameter is applied to both 6h vs 8z and 8m vs 9m. The hyperparameters are the default ones used by the original MAPPO (Yu et al., 2022) 25 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+## G. Number of Parameters in Neural Networks 
+
+G.1. MPE 
+
+MPE Alg/Env Navigation N3 Navigation N6 Push N3 Push N6 Prey N3 Prey N6 MLP (critic) 22913 38273 22145 32129 23681 39809 GCN (critic) 37505 40577 36993 38529 38017 41089 SEGNN (critic) 33791 33791 42344 42344 42344 42344 MLP (actor) 18690 20226 18434 19202 18946 20482 SEGNN (actor) 40553 40553 48532 48532 48532 48532 
+
+G.2. The MuJoCo 2D Continuous Control Tasks 
+
+The MuJoCo 2D continuous control tasks Alg/Env Cartpole Reacher Multi-agent Reacher Swimmer Multi-agent Swimmer MLP (critic) 70401 74497 74497 71937 71937 GCN (critic) 37505 40065 40065 38529 38529 SEGNN (critic) 33911 34169 34169 43193 43193 MLP (actor) 70145 74242 71425 71682 71937 GCN (actor) 36993 39426 38273 37890 38273 SEGNN (actor) 32694 39234 34003 48971 43124 
+
+G.3. The MuJoCo 3D Continuous Control Tasks 
+
+The MuJoCo 3D continuous control tasks Alg/Env Hopper Walker MLP (critic) 81665 90881 GCN (critic) 72705 73217 SEGNN (critic) 51781 69329 MLP (actor) 80387 88838 GCN (actor) 72963 74246 SEGNN (actor) 67511 134508 
+
+G.4. SMAC 
+
+SMAC Alg/Env 6h vs 8z 8m vs 9m MLP (critic) 12529 12727 SEGNN (critic) 33811 33765 26 E(3)-Equivariant Actor-Critic Methods for Cooperative Multi-Agent Reinforcement Learning 
+
+## H. Computing Resources 
+
+The code is implemented by PyTorch, and runs on NVIDIA Tesla V100 GPUs with 32 CPU cores. For MPE, a single run with [MLP, MLP], [GCN, MLP], [SEGNN, MLP], [SEGNN, SEGNN] takes approximately 2 hours, 3 hours, 7 hours, 10 hours to run, respectively. For the MuJoCo continuous control tasks, [MLP, MLP] takes approximately 3 hours to run, [GCN, MLP] takes approximately 5 hours to run, and [SEGNN, SEGNN] takes approximately 4 days to run. For SMAC, [MLP, MLP] and [SEGNN, MLP] takes approximately 8 hours and 4 days to run, respectively. 27
