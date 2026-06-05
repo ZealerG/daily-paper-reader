@@ -1,0 +1,134 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-05T21:58:18.316012+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 2,
+    "deep_divecandidates": 2,
+    "deep_cap": 7,
+    "deep_selected": 2,
+    "quick_candidates": 1,
+    "quick_skim_target": 12,
+    "quick_selected": 1
+  },
+  "deep_dive": [
+    {
+      "id": "2605.30824v1",
+      "source": "arxiv",
+      "title": "Planner-Centric Reinforcement Learning for Deep Research with Structure-Aware Reward",
+      "abstract": "Deep research tasks require LLMs to plan what to investigate, retrieve evidence, and synthesize long-form answers across multiple branches of inquiry. Existing training paradigms either rely on short-form verifiable QA as a proxy or optimize monolithic long trajectories, which makes planning and execution difficult to disentangle and yields weak credit assignment for the planning process. We propose DecomposeR, a planner-centric deep research framework that represents research plans as typed directed acyclic graphs (DAGs), allowing planning to be made explicit, structured, and rewardable. We train a Qwen3-8B model in two stages: planner reinforcement learning (RL) first learns graph structure and query decomposition to improve research planning, and answerer reinforcement learning (RL) then learns branch-level execution and final synthesis conditioned on the learned plan. By assigning rewards to explicit planner tokens and structured components rather than to a flat trajectory, DecomposeR enables finer-grained optimization of planning while reducing the ambiguity of end-to-end training. Experiments show that DecomposeR-8B improves over strong comparable open baselines by 5.1-8.0 points on popular long-form benchmarks due to improved planning and answering capabilities.",
+      "authors": [
+        "Mustafa Anis Hussain",
+        "Xinle Wu",
+        "Yao Lu"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-29T04:18:55+00:00",
+      "link": "https://arxiv.org/pdf/2605.30824v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "RL for planning with graph structure",
+      "llm_evidence_cn": "使用图结构的规划强化学习",
+      "llm_evidence": "使用图结构的规划强化学习",
+      "canonical_evidence": "使用图结构的规划强化学习",
+      "llm_tldr_en": "DecomposeR uses planner RL to train LLMs to plan explicit research DAGs, improving credit assignment and planning quality.",
+      "llm_tldr_cn": "该论文提出DecomposeR框架，针对深度研究任务中LLM规划与执行难以解耦且信用分配弱的问题，将研究计划表示为有向无环图（DAG），并通过两阶段训练：先用规划器强化学习学习图结构和查询分解，再用结构感知奖励优化。实验表明该方法有效提升规划质量和最终答案性能，为强化学习在图结构规划中的应用提供了新思路。",
+      "llm_tldr": "该论文提出DecomposeR框架，针对深度研究任务中LLM规划与执行难以解耦且信用分配弱的问题，将研究计划表示为有向无环图（DAG），并通过两阶段训练：先用规划器强化学习学习图结构和查询分解，再用结构感知奖励优化。实验表明该方法有效提升规划质量和最终答案性能，为强化学习在图结构规划中的应用提供了新思路。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.00561v1",
+      "source": "arxiv",
+      "title": "Interpretable Policy Distillation for Power Grid Topology Control",
+      "abstract": "Deep reinforcement learning (RL) offers a promising route to real-time power grid operation, yet large neural policies are costly to evaluate, hard to deploy on constrained hardware, and opaque to operators. We ask whether a Proximal Policy Optimization (PPO) agent for grid topology control can be compressed into compact tree-based surrogates without losing operational performance. A PPO teacher is trained on Grid2Op's standard 14-bus environment with a stability-oriented reward, using stress-focused data collection on critical, high-loading states. The policy is then distilled into a decision tree and a random forest. Across held-out validation episodes, both surrogates exceed the teacher in mean reward and survival length at a fraction of the inference cost. The decision tree shows high exact-action agreement with the PPO argmax and near-complete agreement within its top-ranked actions, while remaining small enough to be inspected directly. Feature-importance analysis reveals a representational shift: the PPO policy relies mainly on line-loading signals, while the distilled tree is driven primarily by bus-topology variables. These results suggest that stress-focused distillation can convert a black-box neural controller into a lightweight, auditable rule-like surrogate suited for real-time deployment, while also surfacing risks tied to deterministic actions and topology-specific generalization.",
+      "authors": [
+        "Aleksandra Dmitruka",
+        "Karlis Freivalds"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-30T06:32:55+00:00",
+      "link": "https://arxiv.org/pdf/2606.00561v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "uses PPO reinforcement learning for power grid topology control",
+      "llm_evidence_cn": "使用PPO强化学习进行电网拓扑控制",
+      "llm_evidence": "使用PPO强化学习进行电网拓扑控制",
+      "canonical_evidence": "使用PPO强化学习进行电网拓扑控制",
+      "llm_tldr_en": "Proposes distilling a PPO agent for grid topology control into compact tree-based surrogates that exceed teacher in reward and survival length.",
+      "llm_tldr_cn": "该论文研究深度强化学习在电网拓扑控制中的应用，提出将PPO智能体蒸馏为决策树和随机森林替代模型，在保持性能的同时降低推理成本。实验表明，蒸馏后的代理在平均奖励和存活时长上甚至优于教师模型。这展示了强化学习在实际系统控制中的有效应用，与用户对强化学习算法的需求相关。",
+      "llm_tldr": "该论文研究深度强化学习在电网拓扑控制中的应用，提出将PPO智能体蒸馏为决策树和随机森林替代模型，在保持性能的同时降低推理成本。实验表明，蒸馏后的代理在平均奖励和存活时长上甚至优于教师模型。这展示了强化学习在实际系统控制中的有效应用，与用户对强化学习算法的需求相关。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2606.05867v1",
+      "source": "arxiv",
+      "title": "Exploring cooperation mechanisms via reinforcement learning in network common-pool resource games",
+      "abstract": "Sustaining cooperation in resource-constrained populations requires allocation mechanisms that balance individual incentives, resource sustainability, and distributional fairness. This paper proposes a network common-pool resource game in which individuals are embedded in complex networks, participate in multiple overlapping local resource pools, and face endogenous resource constraints during strategy evolution. Within this framework, we first examine two representative allocation mechanisms, equal allocation and proportional allocation. The results show that equal allocation produces fair but inefficient outcomes by weakening contribution incentives, whereas proportional allocation can temporarily promote cooperation but amplifies accumulated advantages and leads to severe inequality. To overcome these limitations, we develop a graph neural network-based reinforcement learning framework in which a learned social planner allocates local pool resources without directly controlling individual strategies. Simulation results under four representative network topologies show that the learned planner sustains higher cooperation levels and average accumulated resources, and reduces inequality compared with the baselines. Furthermore, we interpret the learned policy and distill it into two simpler mechanisms: a resource-dependent mixture mechanism for regular networks and a degree-conditioned mixture mechanism for heterogeneous networks. These mechanisms reveal that effective allocation should adapt to both local resource states and structural positions, providing an interpretable route from reinforcement learning policy search to mechanism design in networked resource-sharing systems.",
+      "authors": [
+        "Yihang Qin",
+        "Lin Wang"
+      ],
+      "primary_category": "cs.GT",
+      "categories": [
+        "cs.GT",
+        "math.DS",
+        "physics.soc-ph"
+      ],
+      "published": "2026-06-04T08:44:01+00:00",
+      "link": "https://arxiv.org/pdf/2606.05867v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "reinforcement learning for cooperation in network common-pool resource games",
+      "llm_evidence_cn": "强化学习用于网络公共池资源游戏中的合作",
+      "llm_evidence": "强化学习用于网络公共池资源游戏中的合作",
+      "canonical_evidence": "强化学习用于网络公共池资源游戏中的合作",
+      "llm_tldr_en": "Explores cooperation mechanisms via reinforcement learning in network common-pool resource games, analyzing allocation mechanisms on complex networks.",
+      "llm_tldr_cn": "为了分析复杂网络中资源分配对合作的影响，本文构建了网络公共池资源博弈模型，个体嵌入网络并参与多个重叠资源池。通过强化学习演化策略，发现平等分配导致低效但公平，而比例分配可暂时促进合作但后期衰减。工作揭示了网络结构对合作演化的关键作用。",
+      "llm_tldr": "为了分析复杂网络中资源分配对合作的影响，本文构建了网络公共池资源博弈模型，个体嵌入网络并参与多个重叠资源池。通过强化学习演化策略，发现平等分配导致低效但公平，而比例分配可暂时促进合作但后期衰减。工作揭示了网络结构对合作演化的关键作用。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}
