@@ -1,0 +1,69 @@
+{
+  "label": "2026-06-06",
+  "date": "2026-06-06",
+  "generated_at": "2026-06-06T20:13:14",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202606/06/2606.00268v1-social-learning-community-detection-with-nonlinear-interaction",
+      "section": "deep",
+      "title_en": "Social learning community detection with nonlinear interaction",
+      "authors": "Anthony Couthures, Athira Varma Jayakumar, Vineeth Satheeskumar Varma, Irinel-Constantin Morarescu, Samson Lasaulce, Antoine Girard",
+      "date": "2026-05-29",
+      "pdf": "https://arxiv.org/pdf/2606.00268v1",
+      "score": "9.0",
+      "evidence": "图分区通过社会学习涌现",
+      "tldr": "传统社区检测需要集中式网络数据，不适用于分布式或隐私保护场景。本文提出基于社交学习的去中心化方法，将社区检测重构为非线性观点动力学中的对称破缺过程，通过交换饱和状态依赖信号使网络沿稀疏切割自然断裂。基于此机制设计Score-based Edge Reliability（SER）框架，利用多个独立话题评估网络连接的可靠性，避免传统贪婪二分法的错误并识别结构模糊的边界节点。在ABCD基准和真实黑猩猩社会网络上，SER完全去中心化的精度匹配Louvain、Leiden等全局优化方法，达到可检测图的理论极限。",
+      "tags": "query:graph-part",
+      "abstract_en": "Conventional community detection requires centralized network data, making it unsuitable for distributed or privacy-preserving systems. In this paper, we demonstrate that macroscopic graph partitioning can emerge purely from strictly local, privacy preserving interactions driven by social learning. By reframing clustering as a symmetry-breaking process within nonlinear opinion dynamics, we show that exchanging saturated state dependent signal (like public actions) forces a network to naturally fracture along its sparsest cuts. We mathematically establish the spectral conditions under which dense core communities lock into stable, polarized states, robustly resisting external influence. To apply this mechanism, we propose three decentralized algorithms, leading up to the Score-based Edge Reliability (SER) framework. By evaluating network ties across multiple independent discussion topics, SER statistically bypasses the errors of traditional greedy bisections and naturally isolates structurally ambiguous frontier nodes. Validations on the ABCD benchmark and the real-world Ngogo chimpanzee network confirm that our fully decentralized approach matches the accuracy of globally optimized heuristics (e.g., Louvain, Leiden) up to a theoretical limit of detectable graphs.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202606/06/2606.04335v2-policy-gradient-for-continuous-time-robust-markov-decision-processes",
+      "section": "deep",
+      "title_en": "Policy Gradient for Continuous-Time Robust Markov Decision Processes",
+      "authors": "Tanya Veeravalli, David M. Bossens, Atsushi Nitanda",
+      "date": "2026-06-03",
+      "pdf": "https://arxiv.org/pdf/2606.04335v2",
+      "score": "8.0",
+      "evidence": "开发了连续时间鲁棒MDP的策略梯度算法",
+      "tldr": "现有鲁棒MDP局限于离散时间，连续时间下的高效策略梯度算法尚属空白。本文基于随机/常微分方程推导策略与对抗梯度，提出双循环优化器实现线性收敛与O(1/ε^2)样本复杂度，以及均场优化器达到O(1/K)Oracle收敛和O(N^2/ε)样本复杂度。同时为无折扣总成本MDP提供新分析工具。实验在神经ODE动力学上验证有效性，拓展了鲁棒强化学习边界。",
+      "tags": "query:graph-part",
+      "abstract_en": "The framework of robust Markov decision processes (RMDPs) allows the design of reinforcement learning agents that satisfy performance guarantees under worst-case transition dynamics. Traditional RMDPs consider discrete-time dynamics and recently, sample-efficient policy gradient algorithms have been considered in this context. This paper investigates policy gradient algorithms within a continuous-time RMDP framework. Policy gradients and adversarial gradients are derived using pathwise and adjoint-based formulas for stochastic and ordinary differential equations. We propose double-loop optimisers to obtain linear convergence in the oracle-based setting and an $\\tilde{\\mathcal{O}}(\\frac{1}{ε^2})$ sample complexity in the sample-based setting in an analysis which also derives novel tools for the framework of undiscounted total cost MDPs. Additionally, we propose mean-field optimisers as distributional optimisers with an $\\tilde{\\mathcal{O}}(\\frac{1}{K})$ oracle-based convergence rate and an $\\tilde{\\mathcal{O}}(\\frac{N^2}ε)$ sample complexity under $N$-particle approximation. The effectiveness of continuous-time policy gradient algorithms is confirmed for both optimisers on continuous-time RMDPs with neural ordinary differential equation dynamics.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202606/06/2606.05555v1-representation-learning-enables-scalable-multitask-deep-reinforcement-learning",
+      "section": "quick",
+      "title_en": "Representation Learning Enables Scalable Multitask Deep Reinforcement Learning",
+      "authors": "Johan Obando-Ceron, Lu Li, Scott Fujimoto, Pierre-Luc Bacon, Aaron Courville, Pablo Samuel Castro",
+      "date": "2026-06-04",
+      "pdf": "https://arxiv.org/pdf/2606.05555v1",
+      "score": "7.0",
+      "evidence": "表示学习实现可扩展的多任务深度强化学习",
+      "tldr": "多任务强化学习扩展性面临挑战。本文发现可扩展性的关键不是基于模型的规划，而是表示学习。提出无模型算法MR.Q，结合预测性辅助目标与actor-critic架构，无需规划即可超越基于世界模型的方法。在连续控制任务上性能提升且计算开销更低，表明预测性表示学习是核心驱动因素。",
+      "tags": "query:graph-part",
+      "abstract_en": "Scaling reinforcement learning (RL) to diverse multitask settings remains a central challenge. While recent advances in model-based RL achieve strong performance, they rely on planning and complex training pipelines, making it unclear which components are essential for scalability. We revisit this question and argue that the primary driver of scalable multitask RL is not model-based control, but \\emph{representation learning}. In particular, we show that combining predictive, model-based representations with high-capacity value function approximation is sufficient to achieve strong performance, even without planning. We evaluate a simple model-free algorithm, MR.Q, coupled with auxiliary predictive objectives into a scalable actor-critic architecture. This approach outperforms a recent world-model-based method and a range of deep RL baselines across a diverse suite of multitask continuous control tasks, while significantly reducing computational overhead and improving wall-clock efficiency. We observe consistent improvements with increased model capacity and show through ablations that predictive representation learning is critical for performance.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202606/06/2606.06053v1-online-kl-regularized-reinforcement-learning-with-function-approximation-under-misspecification",
+      "section": "quick",
+      "title_en": "Online KL-Regularized Reinforcement Learning with Function Approximation under Misspecification",
+      "authors": "Haoyang Hong, Zichen Wang, Quanquan Gu, Huazheng Wang",
+      "date": "2026-06-04",
+      "pdf": "https://arxiv.org/pdf/2606.06053v1",
+      "score": "6.0",
+      "evidence": "在模型错误设定下使用函数近似的KL正则化强化学习",
+      "tldr": "本文研究KL正则化的上下文赌博机和情节强化学习在函数近似存在模型错误设定时的理论保证。现有算法依赖可实现性假设，无法处理错误设定。作者提出KL错误设定框架，采用基于回归的算法和Gibbs策略更新，推导出包含显式错误设定项的高概率KL遗憾界，恢复标准可实现情形。",
+      "tags": "query:graph-part",
+      "abstract_en": "We study KL-regularized contextual bandits and episodic reinforcement learning (RL) under general function approximation with model misspecification. Existing guarantees rely on realizability and therefore do not extend to misspecified models, where classical regret bounds may fail. This work introduces KL misspecification formulations for contextual bandits and episodic RL and analyzes regression-based algorithms with Gibbs policy updates. High-probability KL-regret guarantees with explicit misspecification terms are established, recovering the standard realizable KL-regularized setting as a special case.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
