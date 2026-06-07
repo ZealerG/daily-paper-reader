@@ -1,0 +1,296 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-07T20:27:04.925968+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 2,
+    "deep_divecandidates": 6,
+    "deep_cap": 7,
+    "deep_selected": 6,
+    "quick_candidates": 1,
+    "quick_skim_target": 12,
+    "quick_selected": 1
+  },
+  "deep_dive": [
+    {
+      "id": "2606.01123v1",
+      "source": "arxiv",
+      "title": "From Reward-Free Representations to Preferences: Rethinking Offline Preference-Based Reinforcement Learning",
+      "abstract": "Preference-based reinforcement learning (PbRL) avoids explicit reward engineering by learning from pairwise human preference feedback. Existing offline PbRL methods typically follow a two-stage pipeline, first learning a reward or preference model from labeled preferences and then performing offline RL on unlabeled data. We revisit offline PbRL through the lens of reward-free representation learning (RFRL) from the zero-shot RL literature, and propose a new training framework that first learns latent successor-measure representations from reward-free offline data, followed by contrastive search and fine-tuning using preference data. Through extensive experiments and ablations, we show that our method achieves superior preference efficiency over offline PbRL baselines. This work is the first to connect RFRL with PbRL, highlighting its potential as a feedback-efficient solution. Our code is publicly available at https://github.com/rl-bandits-lab/FB-PbRL.",
+      "authors": [
+        "Jun-Jie Yang",
+        "Chia-Heng Hsu",
+        "Kui-Yuan Chen",
+        "Ping-Chun Hsieh"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-05-31T09:46:53+00:00",
+      "link": "https://arxiv.org/pdf/2606.01123v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Pref-based RL algorithm using reward-free representations",
+      "llm_evidence_cn": "基于奖励自由表示的偏好强化学习算法",
+      "llm_evidence": "基于奖励自由表示的偏好强化学习算法",
+      "canonical_evidence": "基于奖励自由表示的偏好强化学习算法",
+      "llm_tldr_en": "Proposes a new framework for offline preference-based RL that learns latent successor-measure representations from reward-free data, enabling contrastive search and fine-tuning with preferences.",
+      "llm_tldr_cn": "离线偏好强化学习（PbRL）常需人工设计奖励，本文从零样本RL中的奖励自由表示学习出发，提出先离线学习潜后继度量表示，再通过偏好数据进行对比搜索与微调的新框架。实验表明该方法在多个基准上优于现有两阶段方法，简化了奖励工程并提升了样本效率。该工作为偏好RL提供了新的表示学习视角，具有方法上的简洁性和泛化性。",
+      "llm_tldr": "离线偏好强化学习（PbRL）常需人工设计奖励，本文从零样本RL中的奖励自由表示学习出发，提出先离线学习潜后继度量表示，再通过偏好数据进行对比搜索与微调的新框架。实验表明该方法在多个基准上优于现有两阶段方法，简化了奖励工程并提升了样本效率。该工作为偏好RL提供了新的表示学习视角，具有方法上的简洁性和泛化性。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.03923v1",
+      "source": "arxiv",
+      "title": "Contrastive Neural Algorithmic Reasoning for Graph Coloring",
+      "abstract": "Graph coloring seeks to assigns colors to a graph's nodes so that adjacent nodes receive different colors, using as few colors as possible. Here, we study approximate $k$-coloring, where the goal is to use at most $k$ colors while minimizing the number of monochromatic edges. This problem is central to graph theory and has applications in areas such as scheduling and resource allocation. Recent unsupervised GNN approaches optimize each instance directly, precluding generalization across graph sizes and distributions. We instead propose a contrastive learning framework that learns transferable coloring geometry where the embeddings of same-color nodes align, while adjacent nodes' representations are pushed toward distinct directions. We analyze the resulting population objective over bounded-size graphs. For unit-norm embeddings, we show that its optima have a line-prototype structure: Representations of nodes of the same color collapse to a shared one-dimensional subspace, and edges connect orthogonal subspaces. This geometry yields stationarity conditions in the supervised setting and is preserved by projected subgradient dynamics under a balanced-coloring assumption. In an unnormalized variant, gradient descent has a max-margin bias governed by a quotient-graph hard-margin problem. Experiments on synthetic and real-world graphs show that contrastive GNN encoders generalize effectively and produce low-conflict colorings, matching and sometimes improving on greedy approaches.",
+      "authors": [
+        "Thien Le",
+        "Tianyu Zhao",
+        "Melanie Weber"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-06-02T17:14:28+00:00",
+      "link": "https://arxiv.org/pdf/2606.03923v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "approximate graph coloring as a partitioning problem",
+      "llm_evidence_cn": "近似图着色作为一个分区问题",
+      "llm_evidence": "近似图着色作为一个分区问题",
+      "canonical_evidence": "近似图着色作为一个分区问题",
+      "llm_tldr_en": "Proposes contrastive learning framework for approximate graph coloring, learning transferable coloring geometry.",
+      "llm_tldr_cn": "图着色问题旨在相邻节点不同色且用色最少。本文研究近似k-着色，提出对比学习框架学习可迁移的着色几何，使同色节点嵌入对齐，邻接节点嵌入分离。该方法优于现有无监督方法，并具备跨图大小和分布的泛化能力。",
+      "llm_tldr": "图着色问题旨在相邻节点不同色且用色最少。本文研究近似k-着色，提出对比学习框架学习可迁移的着色几何，使同色节点嵌入对齐，邻接节点嵌入分离。该方法优于现有无监督方法，并具备跨图大小和分布的泛化能力。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "graph partitioning",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.00840v1",
+      "source": "arxiv",
+      "title": "Certificate-Guided Evaluation of Reinforcement Learning Generalization",
+      "abstract": "This work presents a logic-driven framework to evaluate the performance of reinforcement learning (RL) algorithms in their ability to generalize to unseen tasks. Our framework defines a family of inductive reach-avoid tasks, characterized by structural similarities in task dynamics, enabling evaluation of generalization capabilities. We introduce a neural certificate function that validates trajectories generated by RL algorithms by enforcing key conditions, thereby serving as a litmus test for RL generalization. We empirically demonstrate our method's capability in certifying generalization for several state-of-the-art generalizable RL algorithms on challenging continuous environments.   Our results show that a lower percentage of certificate function violations correlates with a higher number of test tasks successfully solved, highlighting the effectiveness of our framework in evaluating and distinguishing generalization capabilities of RL algorithms. This work provides a principled approach for benchmarking RL generalization.",
+      "authors": [
+        "Vignesh Subramanian",
+        "Đorđe Žikelić",
+        "Suguman Bansal"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-30T18:31:57+00:00",
+      "link": "https://arxiv.org/pdf/2606.00840v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "evaluates generalization of reinforcement learning algorithms",
+      "llm_evidence_cn": "评估强化学习算法的泛化能力",
+      "llm_evidence": "评估强化学习算法的泛化能力",
+      "canonical_evidence": "评估强化学习算法的泛化能力",
+      "llm_tldr_en": "Introduces a logic-driven framework with neural certificate functions to evaluate RL generalization to unseen tasks.",
+      "llm_tldr_cn": "强化学习算法在未见任务上的泛化评估面临挑战。本文提出逻辑驱动的评估框架，定义归纳可达避让任务族，并引入神经证书函数验证轨迹。实验表明该方法能有效认证多种泛化RL算法在连续环境中的表现，证书函数百分比低表明泛化好。",
+      "llm_tldr": "强化学习算法在未见任务上的泛化评估面临挑战。本文提出逻辑驱动的评估框架，定义归纳可达避让任务族，并引入神经证书函数验证轨迹。实验表明该方法能有效认证多种泛化RL算法在连续环境中的表现，证书函数百分比低表明泛化好。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.00880v1",
+      "source": "arxiv",
+      "title": "Task diversity produces systematic transfer but inhibits continual reinforcement learning",
+      "abstract": "Continual reinforcement learning aims to produce agents that learn not only to improve at their current tasks but also to adapt as task distributions change. Training an agent on many diverse tasks can induce zero-shot generalization, but previous work generally evaluates this generalization after training -- with frozen weights. Whether task diversity also improves an agent's ability to continue learning across distribution shifts remains unclear. We introduce Banyan, a GPU-accelerated continual RL domain in which task diversity factors into three independently controllable axes: the map layouts an agent must navigate, the objects it must interact with, and the hierarchical structures of sub-goal dependencies. Across individual distribution shifts, increasing diversity along each axis causes agents to begin training on the new tasks near the performance attained on the previous one, even when the shift changes the structure of the optimal policy. However, as the number of shifts increases, this local transfer does not by itself yield sustained continual learning: longer-horizon tasks plateau, and earlier task distributions are forgotten after later training. Banyan is a benchmark for studying when controlled task diversity produces transferable learning, when that transfer persists, and where it falls short of proper continual learning.",
+      "authors": [
+        "Purab Seth",
+        "Neil Shah",
+        "Kunal Jha",
+        "Samuel J. Gershman",
+        "Max Kleiman-Weiner",
+        "Wilka Carvalho"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-05-30T20:31:25+00:00",
+      "link": "https://arxiv.org/pdf/2606.00880v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "continual reinforcement learning study on task diversity",
+      "llm_evidence_cn": "关于任务多样性的持续强化学习研究",
+      "llm_evidence": "关于任务多样性的持续强化学习研究",
+      "canonical_evidence": "关于任务多样性的持续强化学习研究",
+      "llm_tldr_en": "Introduces Banyan, a GPU-accelerated continual RL domain, and finds that task diversity improves zero-shot transfer but hinders ongoing learning after distribution shifts.",
+      "llm_tldr_cn": "该论文构建了GPU加速的持续强化学习测试平台Banyan，通过独立控制地图、物体和子目标依赖三个轴的任务多样性，发现多样化任务虽然能提升零样本迁移能力，却抑制了模型在分布偏移后的持续学习能力。实验结果揭示了任务多样性与持续学习之间的权衡，为设计更好的持续强化学习算法提供了重要启示。",
+      "llm_tldr": "该论文构建了GPU加速的持续强化学习测试平台Banyan，通过独立控制地图、物体和子目标依赖三个轴的任务多样性，发现多样化任务虽然能提升零样本迁移能力，却抑制了模型在分布偏移后的持续学习能力。实验结果揭示了任务多样性与持续学习之间的权衡，为设计更好的持续强化学习算法提供了重要启示。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.01249v2",
+      "source": "arxiv",
+      "title": "Trust Region On-Policy Distillation",
+      "abstract": "On-Policy Distillation (OPD) is a fundamental technique for efficient post-training of large language models (LLMs), with broad applications in agent learning, multi-task enhancement, and model compression. However, OPD training becomes unstable when the teacher and student distributions differ substantially, as teacher supervision on student-generated tokens may yield unreliable policy gradients and even cause optimization failure. This work addresses reliable on-policy token-level supervision through credit assignment strategies, and proposes Trust Region On-Policy Distillation, TrOPD. It features the following characteristics: 1) Trust-Region On-Policy Learning: TrOPD performs OPD only in regions where the teacher provides reliable supervision, mitigating the optimization difficulty of the K1 reverse-KL estimator under distribution mismatch. 2) Outlier Estimation: For outlier regions, we explore gradient clipping, masking, and forward-KL estimation to reduce the adverse effects of unreliable supervision. 3) Off-Policy Guidance: The student continues generation from teacher prefixes and uses forward KL to imitate off-policy guidance, encouraging on-policy exploration toward reliable regions. Experiments show that TrOPD consistently outperforms SoTA OPD baselines, including OPD, EOPD, and REOPOLD, across mathematical reasoning, code generation, and general-domain benchmarks.",
+      "authors": [
+        "Xingrun Xing",
+        "Haoqing Wang",
+        "Boyan Gao",
+        "Ziheng Li",
+        "Yehui Tang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CL"
+      ],
+      "published": "2026-05-31T14:04:51+00:00",
+      "link": "https://arxiv.org/pdf/2606.01249v2",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "on-policy reinforcement learning with trust region",
+      "llm_evidence_cn": "在线策略蒸馏与信任域优化",
+      "llm_evidence": "在线策略蒸馏与信任域优化",
+      "canonical_evidence": "在线策略蒸馏与信任域优化",
+      "llm_tldr_en": "Proposes Trust Region On-Policy Distillation for stable teacher-student LLM policy transfer.",
+      "llm_tldr_cn": "本文针对在线策略蒸馏中师生分布差异导致的训练不稳定问题，提出信任域在线策略蒸馏（TrOPD）。该方法通过在教师提供可靠监督的区域进行在线策略学习，利用信用分配策略实现稳定的token级监督，有效缓解优化困难。该工作为大规模语言模型的高效后训练提供了稳健的在线策略蒸馏方法。",
+      "llm_tldr": "本文针对在线策略蒸馏中师生分布差异导致的训练不稳定问题，提出信任域在线策略蒸馏（TrOPD）。该方法通过在教师提供可靠监督的区域进行在线策略学习，利用信用分配策略实现稳定的token级监督，有效缓解优化困难。该工作为大规模语言模型的高效后训练提供了稳健的在线策略蒸馏方法。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.03017v1",
+      "source": "arxiv",
+      "title": "ConTraIRL: Factorized Contrastive Abstractions for Transferable IRL",
+      "abstract": "Reward transfer in Inverse Reinforcement Learning (IRL) is unreliable when policies must generalize to unseen combinations of environment dynamics and task goals. We propose Factorized Contrastive Abstractions for Transferable IRL (ConTraIRL), a framework that enables compositional reward transfer by learning decoupled latent representations of these two factors. ConTraIRL uses a dual-encoder architecture that maps observations into separate dynamics and goal latent spaces, trained with a dual contrastive objective. Temporal alignment encourages the dynamics encoder to learn goal-invariant structure, while the goal encoder captures dynamics-invariant features. This factorization supports reward inference under recombined dynamics-goal settings. Experiments on continuous control benchmarks demonstrate effective few-shot transfer to unseen dynamics-goal pairings, improving sample efficiency and reward recovery over transfer IRL baselines.",
+      "authors": [
+        "Yikang Gui",
+        "Bikramjit Banerjee",
+        "Prashant Doshi"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "cs.RO"
+      ],
+      "published": "2026-06-02T01:47:19+00:00",
+      "link": "https://arxiv.org/pdf/2606.03017v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Factorized IRL for compositional reward transfer",
+      "llm_evidence_cn": "用于组合奖励迁移的分解逆强化学习",
+      "llm_evidence": "用于组合奖励迁移的分解逆强化学习",
+      "canonical_evidence": "用于组合奖励迁移的分解逆强化学习",
+      "llm_tldr_en": "ConTraIRL factorizes dynamics and goal representations for transferable IRL using dual contrastive learning.",
+      "llm_tldr_cn": "该论文提出ConTraIRL，通过双编码器架构和对比学习将环境动力学与任务目标解耦，实现组合奖励迁移。方法在动态和目标重组场景下提升了逆强化学习的泛化能力，解决了奖励迁移中因子组合的挑战。",
+      "llm_tldr": "该论文提出ConTraIRL，通过双编码器架构和对比学习将环境动力学与任务目标解耦，实现组合奖励迁移。方法在动态和目标重组场景下提升了逆强化学习的泛化能力，解决了奖励迁移中因子组合的挑战。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2606.03152v1",
+      "source": "arxiv",
+      "title": "Cost-Aware Optimization for Agentic Query Execution",
+      "abstract": "Classical query optimization searches over algebraically equivalent plans that differ only in cost. This assumption breaks once LLM-backed operators enter the picture: their placement, ordering, and granularity jointly determine both dollar cost and answer quality, and the right choice among the alternatives is often revealed only at runtime. We formalize this setting as agentic query execution, a query execution paradigm in which agent-based planning is interleaved with execution, and agent workflow optimization becomes the analogue of classical query optimization. We then present EnumGRPO, a self-improving optimizer for this setting. During a learning stage, EnumGRPO enumerates query plans over decisions such as execution paradigm, operator type, operator placement, selectivity scope, and projection width, then distills quality-cost feedback into reusable planning heuristics via in-context reinforcement learning. Across four databases in SWAN, EnumGRPO achieves 35.4% execution accuracy at $0.011 per query in LLM-operator cost, a ~317x cost reduction over the hybrid query baseline with an 18% relative improvement in answer accuracy.",
+      "authors": [
+        "Lunyiu Nie",
+        "Yilin Xia",
+        "Yiren Liu",
+        "Christopher Jermaine",
+        "Swarat Chaudhuri"
+      ],
+      "primary_category": "cs.DB",
+      "categories": [
+        "cs.DB"
+      ],
+      "published": "2026-06-02T04:52:26+00:00",
+      "link": "https://arxiv.org/pdf/2606.03152v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "RL optimization for agentic queries",
+      "llm_evidence_cn": "基于强化学习的智能查询执行优化",
+      "llm_evidence": "基于强化学习的智能查询执行优化",
+      "canonical_evidence": "基于强化学习的智能查询执行优化",
+      "llm_tldr_en": "EnumGRPO uses reinforcement learning to optimize agentic query execution plans for cost and quality.",
+      "llm_tldr_cn": "该论文提出EnumGRPO，一种自改进的强化学习优化器，用于智能查询执行中的计划枚举。方法在运行时根据成本和质量优化执行范式、算子类型等决策，提升了查询执行的效率和效果。",
+      "llm_tldr": "该论文提出EnumGRPO，一种自改进的强化学习优化器，用于智能查询执行中的计划枚举。方法在运行时根据成本和质量优化执行范式、算子类型等决策，提升了查询执行的效率和效果。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}

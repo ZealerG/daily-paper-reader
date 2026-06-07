@@ -6,34 +6,41 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-06
-- 运行时间：2026-06-06 20:13:06 UTC
+- 最新运行日期：2026-06-07
+- 运行时间：2026-06-07 20:33:31 UTC
 - 运行状态：成功
-- 本次总论文数：4
-- 精读区：2
-- 速读区：2
+- 本次总论文数：7
+- 精读区：6
+- 速读区：1
 
 ### 今日简报（AI）
-今日精读两篇高分论文，涵盖社交网络非线性交互检测与连续时间鲁棒强化学习。  
-最值得关注的是《Social learning community detection with nonlinear interaction》（9.0分）提出的社会学习社区检测新机制，以及《Policy Gradient for Continuous-Time Robust Markov Decision Processes》（8.0分）在鲁棒策略梯度上的理论突破。  
-如果对社交网络分析或强化学习基础感兴趣，建议优先从这两篇精读入手。
-- 详情：[/202606/06/README](/202606/06/README)
+今天精读两篇9分论文，聚焦离线偏好强化学习的表征新思路与图着色对比算法推理。最值得关注的是《From Reward-Free Representations to Preferences》和《Contrastive Neural Algorithmic Reasoning for Graph Coloring》，分别突破偏好学习机制与图着色推理效率。建议优先精读这两篇，尤其适合强化学习或图算法方向研究者。
+- 详情：[/202606/07/README](/202606/07/README)
 
 ### 精读区论文标签
-1. [Social learning community detection with nonlinear interaction](/202606/06/2606.00268v1-social-learning-community-detection-with-nonlinear-interaction)  
+1. [From Reward-Free Representations to Preferences: Rethinking Offline Preference-Based Reinforcement Learning](/202606/07/2606.01123v1-from-reward-free-representations-to-preferences-rethinking-offline-preference-based-reinforcement-learning)  
    标签：评分：9.0/10、query:graph-part
-   evidence：图分区通过社会学习涌现
-2. [Policy Gradient for Continuous-Time Robust Markov Decision Processes](/202606/06/2606.04335v2-policy-gradient-for-continuous-time-robust-markov-decision-processes)  
+   evidence：基于奖励自由表示的偏好强化学习算法
+2. [Contrastive Neural Algorithmic Reasoning for Graph Coloring](/202606/07/2606.03923v1-contrastive-neural-algorithmic-reasoning-for-graph-coloring)  
+   标签：评分：9.0/10、query:graph-part
+   evidence：近似图着色作为一个分区问题
+3. [Certificate-Guided Evaluation of Reinforcement Learning Generalization](/202606/07/2606.00840v1-certificate-guided-evaluation-of-reinforcement-learning-generalization)  
    标签：评分：8.0/10、query:graph-part
-   evidence：开发了连续时间鲁棒MDP的策略梯度算法
+   evidence：评估强化学习算法的泛化能力
+4. [Task diversity produces systematic transfer but inhibits continual reinforcement learning](/202606/07/2606.00880v1-task-diversity-produces-systematic-transfer-but-inhibits-continual-reinforcement-learning)  
+   标签：评分：8.0/10、query:graph-part
+   evidence：关于任务多样性的持续强化学习研究
+5. [Trust Region On-Policy Distillation](/202606/07/2606.01249v2-trust-region-on-policy-distillation)  
+   标签：评分：8.0/10、query:graph-part
+   evidence：在线策略蒸馏与信任域优化
+6. [ConTraIRL: Factorized Contrastive Abstractions for Transferable IRL](/202606/07/2606.03017v1-contrairl-factorized-contrastive-abstractions-for-transferable-irl)  
+   标签：评分：8.0/10、query:graph-part
+   evidence：用于组合奖励迁移的分解逆强化学习
 
 ### 速读区论文标签
-1. [Representation Learning Enables Scalable Multitask Deep Reinforcement Learning](/202606/06/2606.05555v1-representation-learning-enables-scalable-multitask-deep-reinforcement-learning)  
+1. [Cost-Aware Optimization for Agentic Query Execution](/202606/07/2606.03152v1-cost-aware-optimization-for-agentic-query-execution)  
    标签：评分：7.0/10、query:graph-part
-   evidence：表示学习实现可扩展的多任务深度强化学习
-2. [Online KL-Regularized Reinforcement Learning with Function Approximation under Misspecification](/202606/06/2606.06053v1-online-kl-regularized-reinforcement-learning-with-function-approximation-under-misspecification)  
-   标签：评分：6.0/10、query:graph-part
-   evidence：在模型错误设定下使用函数近似的KL正则化强化学习
+   evidence：基于强化学习的智能查询执行优化
 
 
 <div class="dpr-home-promo-card">
