@@ -1,0 +1,560 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-08T21:58:18.775005+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 2,
+    "deep_divecandidates": 5,
+    "deep_cap": 7,
+    "deep_selected": 5,
+    "quick_candidates": 8,
+    "quick_skim_target": 12,
+    "quick_selected": 8
+  },
+  "deep_dive": [
+    {
+      "id": "2606.02055v1",
+      "source": "arxiv",
+      "title": "Query-Limited Community Recovery in Stochastic Block Models",
+      "abstract": "We study exact community recovery in the two-community stochastic block model on $n$ vertices under limited and noisy access to network data. The learner may query a noisy neighborhood oracle that reveals each true neighbor of a queried vertex independently with fixed probability and never returns non-neighbors, subject to a finite query budget. We consider both oracle-only access and a combined model where the learner also observes a single subsampled copy of the underlying graph. For oracle-only access, balanced uniform querying gives a sharp non-adaptive benchmark: when each vertex is queried the same integer number of times, the observations reduce to an SBM with attenuated edge probabilities and the Abbe-Bandeira-Hall exact-recovery threshold applies. We show that this benchmark is not adaptively optimal: a two-stage adaptive strategy succeeds with $n+o(n)$ queries in a regime where balanced uniform querying requires $m n$ queries for some $m>1$. With an additional subsampled graph, we prove a sublinear-query adaptivity gap: balanced data-independent uniform querying with a sublinear budget does not improve over the subsampled graph alone, whereas adaptive querying can target a small set of uncertain vertices and achieve exact recovery. Thus adaptive data acquisition can strictly improve the information-theoretic limits of exact recovery.",
+      "authors": [
+        "Sabyasachi Basu",
+        "Manuj Mukherjee",
+        "Lutz Oettershagen",
+        "Suhas Thejaswi"
+      ],
+      "primary_category": "cs.IT",
+      "categories": [
+        "cs.IT",
+        "cs.LG",
+        "cs.SI",
+        "stat.ML"
+      ],
+      "published": "2026-06-01T10:44:00+00:00",
+      "link": "https://arxiv.org/pdf/2606.02055v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "community recovery in stochastic block models (graph partitioning)",
+      "llm_evidence_cn": "随机块模型中的社区恢复（图划分）",
+      "llm_evidence": "随机块模型中的社区恢复（图划分）",
+      "canonical_evidence": "随机块模型中的社区恢复（图划分）",
+      "llm_tldr_en": "Studies exact community recovery under limited queries to a noisy neighborhood oracle, characterizing sharp thresholds and adaptive strategies.",
+      "llm_tldr_cn": "本文研究随机块模型中的精确社区恢复问题，在有限查询预算下访问有噪声的邻居预言机。平衡均匀查询提供了非自适应基准，并推导出精确恢复阈值。进一步考虑组合模型（加入图子样本），提出自适应查询策略在低预算区域超越非自适应方法。该工作为图划分中的查询高效算法提供了理论指导。",
+      "llm_tldr": "本文研究随机块模型中的精确社区恢复问题，在有限查询预算下访问有噪声的邻居预言机。平衡均匀查询提供了非自适应基准，并推导出精确恢复阈值。进一步考虑组合模型（加入图子样本），提出自适应查询策略在低预算区域超越非自适应方法。该工作为图划分中的查询高效算法提供了理论指导。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "graph partitioning",
+      "matched_requirement_id": "req-2",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.02218v1",
+      "source": "arxiv",
+      "title": "Faster Synchronous On-Policy RL via Straggler-Aware Group Sizing",
+      "abstract": "Synchronous reinforcement learning methods such as Group Relative Policy Optimization (GRPO) provide stable and reproducible on-policy training, but they are highly vulnerable to stragglers, a single unusually long rollout can delay reward computation and parameter updates for the entire group. This problem becomes more severe as group size increases, creating a tension between the benefits of larger groups and the wall-clock cost of synchronization stalls. We propose Straggler-Aware Group Control (SAGC), a dynamic group-size controller that adapts the training group online based on observed rollout behavior. SAGC formulates group-size selection as an online constrained optimization problem, seeking to retain the benefits of larger groups while controlling the long-term rate of straggler events. Across synchronous GRPO and DAPO training, and on top of both vanilla and strong engineered baselines, SAGC consistently reduces straggler incidence and improves wall-clock efficiency while achieving competitive or better training reward. We further show that these gains transfer to final model quality: SAGC is competitive with or better than the strongest static group-size baseline on downstream reasoning benchmarks, and often produces shorter outputs without any explicit length penalty. These results position dynamic group control as a practical way to make synchronous on-policy RL more efficient and robust.",
+      "authors": [
+        "Azal Ahmad Khan",
+        "Ammar Ahmed",
+        "Zeshan Fayyaz",
+        "Sheng Di",
+        "Mingyi Hong",
+        "Ali Anwar"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-06-01T13:20:00+00:00",
+      "link": "https://arxiv.org/pdf/2606.02218v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "straggler-aware group sizing for synchronous on-policy RL",
+      "llm_evidence_cn": "针对同步在线强化学习的落后感知组大小控制",
+      "llm_evidence": "针对同步在线强化学习的落后感知组大小控制",
+      "canonical_evidence": "针对同步在线强化学习的落后感知组大小控制",
+      "llm_tldr_en": "Proposes SAGC, a dynamic group-size controller that adapts the training group online to mitigate stragglers in synchronous on-policy RL, formulated as online constrained optimization.",
+      "llm_tldr_cn": "该论文针对同步在线强化学习中落后节点导致的训练延迟问题，提出动态组大小控制器SAGC。SAGC将组大小选择建模为在线约束优化问题，根据实际运行行为动态调整组大小，在保持较大组规模优势的同时减少同步等待时间。实验表明该方法显著提高了训练效率和稳定性，为大规模强化学习训练提供了实用方案。",
+      "llm_tldr": "该论文针对同步在线强化学习中落后节点导致的训练延迟问题，提出动态组大小控制器SAGC。SAGC将组大小选择建模为在线约束优化问题，根据实际运行行为动态调整组大小，在保持较大组规模优势的同时减少同步等待时间。实验表明该方法显著提高了训练效率和稳定性，为大规模强化学习训练提供了实用方案。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "parallel decision making in reinforcement learning",
+      "matched_requirement_id": "req-5",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.06673v1",
+      "source": "arxiv",
+      "title": "Uncertainty-Aware LLM-Guided Policy Shaping for Sparse-Reward Reinforcement Learning",
+      "abstract": "Sparse rewards and heterogeneous task sequences remain persistent challenges in Reinforcement Learning (RL), often resulting in slow convergence, weak generalization, and inefficient exploration. We propose Uncertainty-Aware LLM-Guided Policy Shaping (ULPS), a novel framework that integrates a calibrated Large Language Model (LLM) into the RL training loop to provide structured, uncertainty-modulated behavioral guidance. ULPS employs an A*-based oracle to synthesize optimal symbolic trajectories, which are used to fine-tune a BERT-based language model. During training, this model supplies action suggestions whose influence is conditioned on epistemic uncertainty estimated via Monte Carlo (MC) dropout. An entropy-based blending mechanism adaptively balances LLM guidance and the learned policy (via Proximal Policy Optimization, PPO), allowing the agent to prioritize reliable priors while preserving adaptability. We evaluate ULPS on the MiniGridUnlockPickup benchmark and observe consistent improvements in success rate, reward efficiency, and sample complexity over unguided, uncalibrated, and standard RL baselines. ULPS achieves more than 9% improvement in execution accuracy after fine-tuning, requires fewer environment interactions, and yields higher reward AUC. Our results demonstrate that integrating symbolic A* trajectories, pretrained language priors, and uncertainty-aware control offers a principled and effective approach to multi-task reinforcement learning in sparse-reward domains, with potential extensibility to partially observable and multi-agent settings.",
+      "authors": [
+        "Ujjwal Bhatta",
+        "Utsabi Dangol",
+        "Sumaly Bajracharya",
+        "Rodrigue Rizk",
+        "KC Santosh"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-06-04T19:46:45+00:00",
+      "link": "https://arxiv.org/pdf/2606.06673v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "LLM-guided policy shaping for sparse-reward RL",
+      "llm_evidence_cn": "大语言模型引导的策略塑形用于稀疏奖励强化学习",
+      "llm_evidence": "大语言模型引导的策略塑形用于稀疏奖励强化学习",
+      "canonical_evidence": "大语言模型引导的策略塑形用于稀疏奖励强化学习",
+      "llm_tldr_en": "Proposes ULPS framework integrating calibrated LLM into RL loop to provide uncertainty-modulated action suggestions via A* oracle and BERT fine-tuning.",
+      "llm_tldr_cn": "稀疏奖励和异质任务序列是强化学习的长期挑战。本文提出不确定性感知的LLM引导策略塑形（ULPS）框架，用A*合成最优符号轨迹微调BERT语言模型，训练时通过MC dropout估计认知不确定性，以熵咬合机制调节LLM建议的影响力。实验证明ULPS在稀疏奖励任务上显著加速收敛并提升泛化能力，为RL算法应用开辟了新途径。",
+      "llm_tldr": "稀疏奖励和异质任务序列是强化学习的长期挑战。本文提出不确定性感知的LLM引导策略塑形（ULPS）框架，用A*合成最优符号轨迹微调BERT语言模型，训练时通过MC dropout估计认知不确定性，以熵咬合机制调节LLM建议的影响力。实验证明ULPS在稀疏奖励任务上显著加速收敛并提升泛化能力，为RL算法应用开辟了新途径。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.06272v1",
+      "source": "arxiv",
+      "title": "Your GFlowNet Secretly Learns an Optimal Transport Plan",
+      "abstract": "Generative Flow Networks (GFlowNets) are a framework for sampling structured objects via stochastic trajectories in a directed graph. In this work, we establish a theoretical connection between non-acyclic GFlowNets and optimal transport (OT). We show that fixing the initial flow distribution in a minimum-flow GFlowNet reduces its objective to a Kantorovich OT problem with graph-induced shortest path costs. At the optimum, the learned GFlowNet policy therefore encodes an optimal transport plan from the source distribution to the target distribution: we show that sampling trajectories from the minimum-flow GFlowNet recovers the corresponding optimal coupling. Our formulation enables applying the GFlowNet learning framework to OT problems on large graphs via edge flows and neural parameterization. Experiments confirm agreement with exact OT solvers and demonstrate that GFlowNets can learn high-quality transport plans.",
+      "authors": [
+        "Ian Maksimov",
+        "Nikita Morozov",
+        "Denis Belomestny",
+        "Sergey Samsonov"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-06-04T15:14:24+00:00",
+      "link": "https://arxiv.org/pdf/2606.06272v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "generative flow networks as reinforcement learning",
+      "llm_evidence_cn": "生成流网络作为强化学习方法",
+      "llm_evidence": "生成流网络作为强化学习方法",
+      "canonical_evidence": "生成流网络作为强化学习方法",
+      "llm_tldr_en": "Establishes theoretical connection between non-acyclic GFlowNets and optimal transport, showing GFlowNet learns an optimal transport plan via edge flows.",
+      "llm_tldr_cn": "生成流网络（GFlowNet）通常被用于从有向图上的随机轨迹采样。本文证明了非无环GFlowNet与最优传输之间的理论联系：固定初始流后，最小流GFlowNet的目标等价于Kantorovich最优传输问题。其最优策略编码了最优传输计划，采样轨迹恢复最优耦合。这为GFlowNet应用于大规模图上的最优传输问题提供了理论基础。",
+      "llm_tldr": "生成流网络（GFlowNet）通常被用于从有向图上的随机轨迹采样。本文证明了非无环GFlowNet与最优传输之间的理论联系：固定初始流后，最小流GFlowNet的目标等价于Kantorovich最优传输问题。其最优策略编码了最优传输计划，采样轨迹恢复最优耦合。这为GFlowNet应用于大规模图上的最优传输问题提供了理论基础。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.06820v1",
+      "source": "arxiv",
+      "title": "SCALE: Scalable Cross-Attention Learning with Extrapolation for Agentic Workflow Scheduling",
+      "abstract": "Agentic Large Language Model (LLM) systems decompose complex tasks into workflow Directed Acyclic Graphs (DAGs) whose primitives must be scheduled on heterogeneous clusters. Existing deep reinforcement learning (DRL) schedulers are tied to a fixed cluster size and require retraining whenever the number of servers changes. We propose SCALE (Scalable Cross-Attention Learning with Extrapolation), a DRL scheduler that generalizes to unseen cluster scales without fine-tuning. SCALE employs a cross-attention pointer network where task features query against server features, so the architecture accepts any number of servers by construction. We observe, however, that permutation-invariant architecture alone does not guarantee good performance at new scales - the attention feature undergoes distribution shift as the server count grows. To counter this, we introduce Structured Representation Regularization (SRR): a decorrelation loss combined with a KL penalty toward the standard normal, which keeps feature statistics stable regardless of input size. Trained on 16 nodes and tested directly on 32 and 48 nodes, SCALE reduces average response time by 8.9% at N=48 relative to the same architecture without SRR, confirming that explicit regularization is necessary to close the scale-generalization gap.",
+      "authors": [
+        "Zhifei Xu",
+        "Jierui Lan",
+        "Zixuan Liang",
+        "Aiji Liang",
+        "Jinxi He"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-06-05T01:45:02+00:00",
+      "link": "https://arxiv.org/pdf/2606.06820v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "deep reinforcement learning scheduler for workflow DAGs",
+      "llm_evidence_cn": "用于工作流DAG调度的深度强化学习调度器",
+      "llm_evidence": "用于工作流DAG调度的深度强化学习调度器",
+      "canonical_evidence": "用于工作流DAG调度的深度强化学习调度器",
+      "llm_tldr_en": "SCALE proposes a cross-attention DRL scheduler for agentic workflow DAGs that generalizes to unseen cluster scales without retraining.",
+      "llm_tldr_cn": "针对现有深度强化学习调度器无法适应不同规模集群的问题，本文提出SCALE，一种基于交叉注意力指针网络的深度强化学习调度器，通过任务特征对服务器特征的查询实现任意规模集群的泛化。实验表明，SCALE无需微调即可在新规模下达到与重训练基线相当的性能，显著提升了调度系统的可扩展性。",
+      "llm_tldr": "针对现有深度强化学习调度器无法适应不同规模集群的问题，本文提出SCALE，一种基于交叉注意力指针网络的深度强化学习调度器，通过任务特征对服务器特征的查询实现任意规模集群的泛化。实验表明，SCALE无需微调即可在新规模下达到与重训练基线相当的性能，显著提升了调度系统的可扩展性。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2606.01066v1",
+      "source": "arxiv",
+      "title": "Before the Model Learns the Bug:Fuzzing RLVR Verifiers",
+      "abstract": "Reinforcement learning with verifiable rewards (RLVR) replaces human preference labels with executable reward functions such as math answer checkers, JSON tool-call validators, and code unit-test harnesses. That makes the reward partly a software artifact: if the verifier is wrong, optimization can learn the bug. We study this failure mode with a lightweight verifier-fuzzing framework that generates adversarial completions, compares buggy and stricter reference verifiers, logs paired decisions, and reports false-positive, false-negative, disagreement, exploit, and uncertainty metrics.",
+      "authors": [
+        "Jaideep Ray"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-05-31T07:18:07+00:00",
+      "link": "https://arxiv.org/pdf/2606.01066v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "RL with verifiable rewards verifier fuzzing",
+      "llm_evidence_cn": "可验证奖励强化学习的验证器fuzzing框架",
+      "llm_evidence": "可验证奖励强化学习的验证器fuzzing框架",
+      "canonical_evidence": "可验证奖励强化学习的验证器fuzzing框架",
+      "llm_tldr_en": "This paper studies a failure mode in RL with verifiable rewards where buggy verifiers can be exploited, and proposes a lightweight fuzzing framework to detect such issues.",
+      "llm_tldr_cn": "可验证奖励强化学习（RLVR）使用执行式奖励函数，但若验证器存在错误，优化过程可能学习到错误行为。本文提出轻量级验证器fuzzing框架，通过生成对抗性完成，比较有错误和严格的参考验证器，报告误报、漏报、分歧、利用和不确定性指标。该工作揭示了RLVR中验证器正确性的重要影响。",
+      "llm_tldr": "可验证奖励强化学习（RLVR）使用执行式奖励函数，但若验证器存在错误，优化过程可能学习到错误行为。本文提出轻量级验证器fuzzing框架，通过生成对抗性完成，比较有错误和严格的参考验证器，报告误报、漏报、分歧、利用和不确定性指标。该工作揭示了RLVR中验证器正确性的重要影响。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.01249v1",
+      "source": "arxiv",
+      "title": "Trust Region On-Policy Distillation",
+      "abstract": "On-Policy Distillation (OPD) is a fundamental technique for efficient post-training of large language models (LLMs), with broad applications in agent learning, multi-task enhancement, and model compression. However, OPD training becomes unstable when the teacher and student distributions differ substantially, as teacher supervision on student-generated tokens may yield unreliable policy gradients and even cause optimization failure. This work addresses reliable on-policy token-level supervision through credit assignment strategies, and proposes Trust Region On-Policy Distillation, TrOPD. It features the following characteristics: 1) Trust-Region On-Policy Learning: TrOPD performs OPD only in regions where the teacher provides reliable supervision, mitigating the optimization difficulty of the K1 reverse-KL estimator under distribution mismatch. 2) Outlier Estimation: For outlier regions, we explore gradient clipping, masking, and forward-KL estimation to reduce the adverse effects of unreliable supervision. 3) Off-Policy Guidance: The student continues generation from teacher prefixes and uses forward KL to imitate off-policy guidance, encouraging on-policy exploration toward reliable regions. Experiments show that TrOPD consistently outperforms SoTA OPD baselines, including OPD, EOPD, and REOPOLD, across mathematical reasoning, code generation, and general-domain benchmarks.",
+      "authors": [
+        "Xingrun Xing",
+        "Haoqing Wang",
+        "Boyan Gao",
+        "Ziheng Li",
+        "Yehui Tang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CL"
+      ],
+      "published": "2026-05-31T14:04:51+00:00",
+      "link": "https://arxiv.org/pdf/2606.01249v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "on-policy distillation with trust region for RL",
+      "llm_evidence_cn": "基于信任区域的在线策略蒸馏强化学习",
+      "llm_evidence": "基于信任区域的在线策略蒸馏强化学习",
+      "canonical_evidence": "基于信任区域的在线策略蒸馏强化学习",
+      "llm_tldr_en": "TrOPD proposes trust-region on-policy distillation for LLMs, improving stability when teacher and student distributions differ.",
+      "llm_tldr_cn": "针对在线策略蒸馏中教师与学生分布差异导致训练不稳定的问题，本文提出TrOPD，通过信任区域仅在有可靠监督的区域进行蒸馏。该方法解决了策略梯度不可靠的问题，在多个LLM任务上提升了蒸馏效率。",
+      "llm_tldr": "针对在线策略蒸馏中教师与学生分布差异导致训练不稳定的问题，本文提出TrOPD，通过信任区域仅在有可靠监督的区域进行蒸馏。该方法解决了策略梯度不可靠的问题，在多个LLM任务上提升了蒸馏效率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.03239v1",
+      "source": "arxiv",
+      "title": "ARBOR: Online Process Rewards via a Reusable Rubric Buffer for Search Agents",
+      "abstract": "LLM-based search agents are trained predominantly with outcome-only reward, leaving the search process itself unsupervised. This signal degenerates on outcome-homogeneous groups where all sampled trajectories share the same correctness, yielding zero within-group advantage and no gradient. Existing process supervision either trains a costly verifier or generates per-query rubrics that are inconsistent across queries and discarded after one use. We propose ARBOR (Adaptive Rubric Buffer for Online Reward), a reusable process-reward framework that maintains a rubric memory shared across queries. Query-local drafts induced from contrastive trajectories are admitted, consolidated into cross-query common rubrics, and retired as the policy evolves. A small active subset of common rubrics scores trajectories via sparse pairwise judging, and the resulting scores are added to the base reward, providing process-level gradient even when outcome reward is uniform. ARBOR consistently outperforms GRPO and DAPO baselines on four multi-hop QA benchmarks, raising average LLM-judge accuracy by up to 4.2 points and converting up to 42% of otherwise-zero-gradient training groups into informative ones.",
+      "authors": [
+        "Zheng Liu",
+        "Longxiang Zhang",
+        "Xintong Wang",
+        "Zhiang Xu",
+        "Shaoxiong Zhan",
+        "Xin Shan",
+        "Wen Huang",
+        "Tao Dai",
+        "Shu-Tao Xia",
+        "Chengfu Huo",
+        "Liang Ding"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-06-02T06:58:54+00:00",
+      "link": "https://arxiv.org/pdf/2606.03239v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "RL process reward framework for search agents",
+      "llm_evidence_cn": "面向搜索智能体的强化学习过程奖励框架",
+      "llm_evidence": "面向搜索智能体的强化学习过程奖励框架",
+      "canonical_evidence": "面向搜索智能体的强化学习过程奖励框架",
+      "llm_tldr_en": "ARBOR proposes a reusable process-reward framework for LLM search agents with a rubric buffer to address outcome-only reward limitations.",
+      "llm_tldr_cn": "基于LLM的搜索智能体通常仅以最终结果奖励进行训练，导致过程缺乏监督。本文提出ARBOR框架，通过维护一个可复用的规则缓冲池，从对比轨迹中提取并合并跨查询的通用评分标准，实现了过程奖励的可复用性。实验表明该方法有效提升了搜索智能体的训练效率和鲁棒性。",
+      "llm_tldr": "基于LLM的搜索智能体通常仅以最终结果奖励进行训练，导致过程缺乏监督。本文提出ARBOR框架，通过维护一个可复用的规则缓冲池，从对比轨迹中提取并合并跨查询的通用评分标准，实现了过程奖励的可复用性。实验表明该方法有效提升了搜索智能体的训练效率和鲁棒性。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.06746v1",
+      "source": "arxiv",
+      "title": "Performance Variation in Deep Reinforcement Learning",
+      "abstract": "Deep reinforcement learning (RL) algorithms often suffer from low run-to-run robustness, manifesting as significant performance variation across independent runs of identically configured agents. Although this issue poses a spectrum of challenges across research and practice, relatively few studies develop methods to evaluate it; RL research instead often reports uncertainty in the estimated mean performance. In this paper, we outline the limitations of conventional uncertainty and variation estimates, particularly their misalignment with purpose and the risk of underreporting. We then propose an alternative percentile-based statistic and visualization method, min-max IPR and run-wise percentile highlighting, respectively. These percentile-based tools are easy to interpret and rely on standard properties of sample percentiles, providing rich information about run-to-run performance variation. We demonstrate this through three case studies. First, we show that LayerNorm and penultimate-layer normalizations narrow performance variation in PPO, whereas the variation is mostly unchanged in SAC. Second, we compare PPO, SAC, TD-MPC, and TD-MPC2, and show TD-MPC exhibits the least variation while being the most data efficient among the four. Finally, in a comparison of DQN and Rainbow on five Atari environments, we show that both algorithms exhibit similar levels of performance variation.",
+      "authors": [
+        "Haruto Tanaka",
+        "A. Rupam Mahmood"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-06-04T21:59:47+00:00",
+      "link": "https://arxiv.org/pdf/2606.06746v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "analysis of performance variation in deep RL",
+      "llm_evidence_cn": "深度强化学习性能变化分析",
+      "llm_evidence": "深度强化学习性能变化分析",
+      "canonical_evidence": "深度强化学习性能变化分析",
+      "llm_tldr_en": "This paper proposes percentile-based statistics and visualization for evaluating run-to-run robustness of deep RL algorithms, addressing limitations of conventional uncertainty estimates.",
+      "llm_tldr_cn": "本文针对深度强化学习算法运行间稳定性差的问题，提出基于百分位数的统计量（Min-Max IPR）和可视化方法（逐运行百分位突出显示），弥补了传统不确定性估计的不足，有助于更全面地评估RL算法。",
+      "llm_tldr": "本文针对深度强化学习算法运行间稳定性差的问题，提出基于百分位数的统计量（Min-Max IPR）和可视化方法（逐运行百分位突出显示），弥补了传统不确定性估计的不足，有助于更全面地评估RL算法。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.05859v1",
+      "source": "arxiv",
+      "title": "TARPO: Token-Wise Latent-Explicit Reasoning via Action-Routing Policy Optimization",
+      "abstract": "Latent reasoning has emerged as a promising alternative to discrete Chain-of-Thought (CoT) in large language models (LLMs), enabling more expressive reasoning by operating over continuous representations. However, the inherently deterministic nature of continuous representations limits policy exploration in reinforcement learning (RL). To address this, we propose TARPO (Token-Wise Latent-Explicit Reasoning via Action-Routing Policy Optimization), a pure RL framework that adaptively switches between discrete token generation and continuous latent reasoning at each step. TARPO introduces a lightweight action head router that observes the current hidden state and samples a routing decision from a binary mode-selection space, preserving the stochasticity of discrete token sampling from the vocabulary. The LLM backbone and router are jointly optimized end-to-end with a shared group-relative advantage signal. Extensive experiments across Qwen2.5 (from 1.5B to 7B) and Llama-3.1-8B backbones demonstrate that TARPO consistently outperforms existing explicit and latent reasoning RL baselines across diverse benchmarks. Further analysis shows that TARPO learns adaptive token-wise switching behaviors while maintaining stable training dynamics. Our code is available at https://github.com/NKU-LITI/TARPO-master.",
+      "authors": [
+        "Liting Zhang",
+        "Shiwan Zhao",
+        "Xuyang Zhao",
+        "Zichen Xu",
+        "Jianye Wang",
+        "Qicheng Li"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL"
+      ],
+      "published": "2026-06-04T08:30:53+00:00",
+      "link": "https://arxiv.org/pdf/2606.05859v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "policy optimization for latent-explicit reasoning in LLMs",
+      "llm_evidence_cn": "面向LLM潜在-显式推理的策略优化",
+      "llm_evidence": "面向LLM潜在-显式推理的策略优化",
+      "canonical_evidence": "面向LLM潜在-显式推理的策略优化",
+      "llm_tldr_en": "TARPO uses a pure RL framework with action routing to switch between discrete and continuous reasoning, improving policy exploration.",
+      "llm_tldr_cn": "针对连续潜在表示限制强化学习策略探索的问题，本文提出TARPO，一种纯强化学习框架，通过轻量动作头路由器在离散令牌生成和连续潜在推理间自适应切换。实验表明TARPO提高了策略探索效率。",
+      "llm_tldr": "针对连续潜在表示限制强化学习策略探索的问题，本文提出TARPO，一种纯强化学习框架，通过轻量动作头路由器在离散令牌生成和连续潜在推理间自适应切换。实验表明TARPO提高了策略探索效率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.06976v1",
+      "source": "arxiv",
+      "title": "Exploring Agentic Tool-Calling Decisions via Uncertainty-Aligned Reinforcement Learning",
+      "abstract": "Large language model (LLM)-based agents often make suboptimal tool-use decisions, including unsupported tool invocation and hallucinated direct responses, which may accumulate errors throughout multi-step interactions. Existing approaches mainly improve these behaviors through inference-time correction or coarse-grained reward signals based on decision outcomes and structured checklists, leaving the uncertainty characteristics of agent decisions underexplored. We observe that decision-oriented reinforcement learning tends to weaken the uncertainty separation between correct and incorrect actions, resulting in overconfident mistakes and weaker exploration signals. Therefore, we propose TRUST, which incorporates uncertainty quantification into reward design as a repulsive force for maintaining uncertainty separation, and labels lightweight key-turn annotations for unified post-training of multi-turn trajectories. Experimental results across diverse tool-use benchmarks show that TRUST consistently enhances both decision quality and agent performance while maintaining more reliable uncertainty estimates during optimization.",
+      "authors": [
+        "Yijin Zhou",
+        "Linqian Zeng",
+        "Xiaoya Lu",
+        "Wenyuan Xie",
+        "Dongrui Liu",
+        "Junchi Yan",
+        "Jing Shao"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-06-05T07:08:34+00:00",
+      "link": "https://arxiv.org/pdf/2606.06976v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "uncertainty-aligned reinforcement learning for LLM agent tool calling",
+      "llm_evidence_cn": "用于LLM智能体工具调用的不确定性对齐强化学习",
+      "llm_evidence": "用于LLM智能体工具调用的不确定性对齐强化学习",
+      "canonical_evidence": "用于LLM智能体工具调用的不确定性对齐强化学习",
+      "llm_tldr_en": "TRUST incorporates uncertainty quantification into RL rewards to improve tool-use decisions, reducing overconfident mistakes and preserving exploration signals.",
+      "llm_tldr_cn": "LLM智能体在工具调用时经常出现错误，现有方法通过推理时修正或粗粒度奖励处理。本文发现决策导向RL会削弱不确定性分离，导致过度自信错误。提出TRUST，将不确定性量化融入RL奖励，保留不确定性信息。实验表明TRUST减少了错误工具调用，并在多步交互中保留探索信号。",
+      "llm_tldr": "LLM智能体在工具调用时经常出现错误，现有方法通过推理时修正或粗粒度奖励处理。本文发现决策导向RL会削弱不确定性分离，导致过度自信错误。提出TRUST，将不确定性量化融入RL奖励，保留不确定性信息。实验表明TRUST减少了错误工具调用，并在多步交互中保留探索信号。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.07074v1",
+      "source": "arxiv",
+      "title": "SlimSearcher: Training Efficiency-Aware Web Agents via Adaptive Reward Gating",
+      "abstract": "Deep research agents have demonstrated remarkable capabilities in complex information-seeking tasks, yet this power comes at a steep computational cost. Driven by accuracy-focused training paradigms, current models adopt brute-force strategies characterized by blind tool dependency and performative reasoning-generating long, redundant trajectories that are far from necessary for resolving these tasks, leading to wasteful tool calls and excessive token consumption. To overcome this efficiency trap, we propose SlimSearcher, a principled framework that pushes the Pareto frontier between accuracy and computational cost across both Supervised Fine-Tuning (SFT) and Reinforcement Learning (RL). In the SFT stage, SlimSearcher employs Pareto-efficient filtration to distill trajectories that are both successful and economical, guiding the model toward inherently efficiency-aware search behaviors. During RL, we introduce Adaptive Reward Gating, a dynamic reward-shaping mechanism that evaluates relative tool and token efficiency within a sampled cohort. By cascading these adaptive efficiency metrics with a strict correctness gate, our approach effectively avoids the brevity bias associated with absolute penalties and mitigates reward hacking. Extensive experiments on long-horizon benchmarks, including GAIA, BrowseComp, and XBenchDeepSearch, demonstrate that SlimSearcher reduces average tool-call rounds by 17%-58% while maintaining or improving accuracy.",
+      "authors": [
+        "Zequn Xie",
+        "Junjie Wang",
+        "Dan Yang",
+        "Jie Feng",
+        "Yue Shen",
+        "Jian Wang",
+        "Jinjie Gu"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-06-05T09:10:50+00:00",
+      "link": "https://arxiv.org/pdf/2606.07074v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "RL with reward gating for efficient web agents",
+      "llm_evidence_cn": "基于奖励门控的高效网络智能体强化学习",
+      "llm_evidence": "基于奖励门控的高效网络智能体强化学习",
+      "canonical_evidence": "基于奖励门控的高效网络智能体强化学习",
+      "llm_tldr_en": "SlimSearcher uses adaptive reward gating to improve efficiency in web agents trained with RL, pushing the Pareto frontier between accuracy and computational cost.",
+      "llm_tldr_cn": "现有深度研究智能体在信息检索任务中采用暴力策略，导致大量无效工具调用和令牌消耗。本文提出SlimSearcher框架，在监督微调和强化学习阶段采用Pareto高效过滤和自适应奖励门控，平衡准确率和计算成本。实验表明，该方法在保持性能的同时显著降低了推理开销。",
+      "llm_tldr": "现有深度研究智能体在信息检索任务中采用暴力策略，导致大量无效工具调用和令牌消耗。本文提出SlimSearcher框架，在监督微调和强化学习阶段采用Pareto高效过滤和自适应奖励门控，平衡准确率和计算成本。实验表明，该方法在保持性能的同时显著降低了推理开销。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.07027v1",
+      "source": "arxiv",
+      "title": "StainFlow: Entity-Stain Tracking and Evidence Linking for Process Rewards in GUI Agents",
+      "abstract": "Reinforcement Learning (RL) has become a promising approach for improving GUI Agents in long-horizon, stochastic digital environments, but trajectory-level success feedback is too sparse to provide reliable credit assignment for intermediate exploration steps. To mitigate this issue, recent studies introduce Process Reward Models (PRMs), which provide finer-grained training feedback through global milestone verification or local step-level evaluation. However, these methods still suffer from two level-specific limitations: global milestone decomposition is subjective and singular, making it difficult to accommodate the multiple valid execution paths in real GUI tasks, while fixed local judging windows may miss long-range key evidence or dilute the decision signal with irrelevant frames. Inspired by stain-tracing mechanisms in network flow analysis, we propose StainFlow, an entity-stain-flow process reward model for GUI Agents. To reduce the subjectivity of global partitioning, we introduce the Global Entity Stain Tracking module, which extracts visually verifiable task entities and tracks how their stain concentrations and states evolve along the trajectory, allowing task phases to be objectively separated by changes in the entity evidence flow. To improve the accuracy of local verification, we introduce the Local Stain Evidence Linking module. Centered on the triggering entities of each candidate key node, it retrieves relevant steps based on their stain concentrations and state changes, and dynamically constructs high-density evidence windows for verifying true key nodes. Extensive experiments on AndroidWorld and OGRBench show that StainFlow relatively improves online RL success by 3.2% and trajectory completion judgment accuracy by 1.8%.",
+      "authors": [
+        "Haojie Hao",
+        "Longkun Hao",
+        "Yihang Lou",
+        "Yan Bai",
+        "Zhenyang Li",
+        "Zhichao Yang",
+        "Dongshuo Huang",
+        "Hongyu Lin",
+        "Lanqing Hong",
+        "Jiakai Wang",
+        "Xianglong Liu"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-06-05T08:17:28+00:00",
+      "link": "https://arxiv.org/pdf/2606.07027v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "Reinforcement Learning for GUI agents with process reward models",
+      "llm_evidence_cn": "强化学习用于GUI代理，提出过程奖励模型",
+      "llm_evidence": "强化学习用于GUI代理，提出过程奖励模型",
+      "canonical_evidence": "强化学习用于GUI代理，提出过程奖励模型",
+      "llm_tldr_en": "StainFlow improves credit assignment in RL-based GUI agents by linking entity-stain tracking and evidence to provide fine-grained process rewards.",
+      "llm_tldr_cn": "StainFlow针对GUI代理中强化学习奖励稀疏的问题，提出实体-痕迹跟踪与证据链接方法，以提供细粒度的过程奖励信号，从而改善信用分配，提高长程任务的成功率。",
+      "llm_tldr": "StainFlow针对GUI代理中强化学习奖励稀疏的问题，提出实体-痕迹跟踪与证据链接方法，以提供细粒度的过程奖励信号，从而改善信用分配，提高长程任务的成功率。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    }
+  ]
+}

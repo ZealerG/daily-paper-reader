@@ -1,0 +1,2001 @@
+Title: Query-Limited Community Recovery in Stochastic Block Models
+
+URL Source: https://arxiv.org/pdf/2606.02055v1
+
+Published Time: Tue, 02 Jun 2026 02:31:05 GMT
+
+Number of Pages: 34
+
+Markdown Content:
+# Query-Limited Community Recovery in Stochastic Block Models 
+
+# Sabyasachi Basu 1, Manuj Mukherjee 2, Lutz Oettershagen 3, and Suhas Thejaswi 41Microsoft Research, India 
+
+# firstname.lastname@microsoft.com 
+
+> 2
+
+# Indraprastha Institute of Information Technology, India 
+
+# firstname@iiitd.ac.in 
+
+> 3
+
+# University of Liverpool, United Kingdom 
+
+# firstname.lastname@liverpool.ac.uk 
+
+> 4
+
+# Aalto University, Finland 
+
+# firstname.lastname@aalto.fi 
+
+Abstract 
+
+We study exact community recovery in the two-community stochastic block model on n vertices under limited and noisy access to network data. The learner may query a noisy neighborhood oracle that reveals each true neighbor of a queried vertex independently with fixed probability and never returns non-neighbors, subject to a finite query budget. We consider both oracle-only access and a combined model where the learner also observes a single subsampled copy of the underlying graph. For oracle-only access, balanced uniform querying gives a sharp non-adaptive benchmark: when each vertex is queried the same integer number of times, the observations reduce to an SBM with attenuated edge probabilities and the Abbe-Bandeira-Hall exact-recovery threshold applies. We show that this benchmark is not adaptively optimal: a two-stage adaptive strategy succeeds with n + o(n) queries in a regime where balanced uniform querying requires mn queries for some m > 1. With an additional subsampled graph, we prove a sublinear-query adaptivity gap: balanced data-independent uniform querying with a sublinear budget does not improve over the subsampled graph alone, whereas adaptive querying can target a small set of uncertain vertices and achieve exact recovery. Thus adaptive data acquisition can strictly improve the information-theoretic limits of exact recovery. 
+
+Keywords. Stochastic block model, Community detection, Adaptive querying, Query complexity 
+
+# 1 Introduction 
+
+Recovering latent community structure from network data is a fundamental problem in machine learning, statistics, and network science, with applications ranging from social and communication networks to bio-logical and information systems [20]. The stochastic block model (SBM) is a canonical random-graph model for this task: in its simplest two-community form each vertex (among n vertices) belongs to one of two communities, an edge between two vertices is present with probability p if they are in the same community and with probability q otherwise. This model, introduced by Holland, Laskey, and Leinhardt [19], and widely studied since, has become a standard framework for understanding the statistical and algorithmic limits of community detection. A central task here is exact recovery : reconstructing all community labels, 
+
+> 0Authors are listed in alphabetical order.
+
+1
+
+> arXiv:2606.02055v1 [cs.IT] 1 Jun 2026
+
+up to a global label flip, from the observed graph. In the sparse logarithmic-degree regime, where p = α log nn
+
+and q = β log nn , exact recovery exhibits a sharp phase transition governed by the quantity (√α − √β)2: in particular, recovery is information-theoretically possible precisely above the classical Abbe–Bandeira–Hall threshold [3]. In many applications, however, the full graph is not directly observable. Edges may be missing because of subsampling, privacy restrictions, incomplete crawls, or noisy measurements, and additional information may be available only through local probes such as API queries, experiments, or surveys [18, 24, 30]. Motivated by such settings, prior work has investigated how additional imperfect observations—such as multiple correlated or subsampled graphs—can change the information-theoretic limits of exact recovery [17, 28]. In these models, the observation mechanism is exogenous: it is specified ex ante by a fixed probabilistic model, independent of the procedure for exact recovery [1, 17, 28, 29]. In this paper, we study a complementary source of information. Concretely, we introduce a query-limited model with access to a noisy neighborhood oracle: when queried at a vertex, the oracle reveals each true neighbor independently with probability w and never returns non-neighbors. Subject to a total budget of k queries, the learner must decide which vertices to query and how to allocate its queries. This model is closely related to edge subsampling, since both mechanisms introduce one-sided observation noise. But the key difference is operational: in a subsampled graph, the observation pattern is fixed independently of the learner, whereas in the oracle model the learner chooses where information is acquired, possibly non-uniformly and adaptively. This leads to a natural question: when can adaptive oracle querying improve exact recovery over uniform querying, and what initial information is required for such an improvement? We investigate this question in two models. In the oracle-only model, the learner has no initial graph observation and only has access to a noisy-neighborhood oracle. In the subsampled-graph-plus-oracle model, the learner first observes a subsampled graph Gsub and may then use oracle queries to refine the recovery. This two-part formulation separates the case in which adaptivity can only improve constants from the case in which even coarse side information enables a sublinear-query adaptivity gap. Our work connects exact recovery to adaptive data acquisition for network inference. When local mea-surements are expensive, the learner must decide not only how to infer communities from partial observations, but also how to allocate a limited budget to enable exact recovery. Such measurements may come from API calls, experiments, surveys, or other procedures that reveal incomplete local neighborhood information. In this case, one can start with uniform querying as a natural baseline, but it need not be the most efficient strategy once a coarse global estimate can identify vertices that remain difficult to classify. Our results identify regimes in which adaptive querying can selectively target these “difficult” vertices and thereby im-prove the information-theoretic limits of exact recovery. In this sense, our work extends beyond exogenous observation settings studied in the literature on exact-recovery in the SBM with correlated side information, i.e., where the observation mechanism is fixed in advance, by making (adaptive) data acquisition itself part of the inference problem. 
+
+Our contributions are as follows: 1
+
+(i) A budgeted noisy-neighborhood oracle model. We introduce a query-limited noisy-neighborhood-oracle model for the logarithmic-degree two-community SBM. The oracle gives local observations with one-sided error, but unlike passive subsampling, the learner controls where those observations are made and may allocate queries adaptively. Thus exact recovery depends not only on how much information is available, but also on how it is acquired. 
+
+(ii ) Oracle-only access: a linear-regime adaptivity gap. We first analyze the oracle-only setting. For balanced uniform querying, where each vertex is queried the same (integer) number of times, the observed graph is again an SBM with attenuated edge probabilities. This gives a sharp threshold for uniform sampling via the Abbe-Bandeira-Hall criterion, with effective edge-retention factor θunif = 1−(1−w)2k/n. We then show that uniform querying is not necessarily optimal. For an explicit choice of parameters, a two-stage adaptive strategy first constructs a rough global sketch, identifies a sublinear set of uncertain vertices, and then spends additional queries only on that set. This strategy succeeds with n + o(n) queries, whereas balanced uniform 
+
+> 1Omitted details and full proofs are available in the appendix.
+
+2Table 1: Summary of passive baselines and our query-limited results. The Acquisition column indicates whether the observation pattern is fixed in advance (Exogenous), chosen uniformly independently of the data (Uniform), chosen adaptively from previous observations (Adaptive), or arbitrary (Any). Here ∆ 2 =
+
+(√α − √β)2, x is the number of queries per vertex, w is the oracle reliability, and θ(x, w ) = 1 − (1 − w)2x is the induced edge-retention probability.                                        
+
+> Setting Acquisition #Queries Exact-recovery condition Ref./Result
+> Standard SBM Exogenous –∆2>2[3] Correlated graph(s) Exogenous –Modified threshold [17, 28, 29] Oracle only Uniform xn θ(x, w )∆2>2Prop. 1 Oracle only Adaptive n+o(n)Below uniform threshold in Ex. 1 Thm. 3 (Ex.1) Oracle only Any o(n)Impossible Thm. 5 Correlated graph + oracle Uniform o(n)Fails in the gap regime Thm. 8 Correlated graph + oracle Adaptive o(n)Succeeds in the gap regime Thm. 8
+
+querying requires x⋆n queries for some x⋆ > 1. We also show that every successful oracle-only strategy requires Ω (n) queries, so the adaptive construction matches the optimal query order while improving the uniform constant. 
+
+(iii ) Subsampled graph plus oracle access: a sublinear adaptivity gap. We next consider the setting in which the learner is also given a subsampled copy of the graph. In this case, the subsampled graph provides an initial global sketch before any oracle queries are made. We show that, with a sublinear budget k = o(n), uniform oracle querying does not improve the exact-recovery threshold beyond that of the subsampled graph alone. In contrast, a two-stage adaptive strategy can use Gsub to identify a small set of uncertain vertices and spend the sublinear query budget exclusively on them. For suitable parameters, this achieves exact recovery in a regime where uniform querying with the same budget fails, yielding a genuine adaptivity gap. Table 1 summarizes the passive baselines and the query-limited results proved in this paper. 
+
+Technical challenges. The main technical difficulty is that adaptive querying breaks the homogeneous observation structure used in standard exact recovery analyses for the SBM. In the adaptive setting, the probability that an edge is observed may depend on non-uniform, random, and transcript-dependent query counts. Moreover, targeted querying creates a selection effect: a vertex is selected for additional queries precisely because the observations already available around that vertex look ambiguous. Those same obser-vations therefore cannot be reused as unbiased evidence in the final local test. 
+
+Leave-one-out-screening. We overcome these challenges through a leave-one-out screening framework, which plays a fundamentally different role from similar arguments used in prior SBM and random-matrix analyses [4, 13, 16, 34]. In those works, leave-one-out is primarily a device for controlling dependencies in passive observation models. In our setting, it is the mechanism that makes adaptive data acquisition analyzable. For each vertex v, we compute a reference labeling ˆ σ(−v) using observations that exclude edges incident to v, use one comparison set to decide whether v should be selected for refinement, and reserve a disjoint comparison set for the final likelihood test with fresh oracle observations. A key step in our analysis is to prove that the resulting screened set is sublinear, so that only a vanishing fraction of vertices require refinement. This separation decouples adaptive selection from local refinement and makes it possible to concentrate the oracle budget on the sublinear vertex subset responsible for the remaining recovery errors and turns leave-one-out from a technical dependence-control tool into a structural ingredient of the adaptive recovery procedure. 
+
+Related Work. SBMs are a central model for studying community recovery, following the formulation of Holland et al. [19] and the exact-recovery theory developed in subsequent work [1, 3, 5, 12, 22]. The SBM literature spans sharp recovery thresholds, optimal algorithms, and numerous model extensions, including general multi-community limits, spectral and belief-propagation methods, degree-corrected and hierarchical models, attributed graphs, and active querying, e.g., [2, 7, 11, 15, 21, 25, 27]. We focus here on the 3lines of work most closely related to partial observation and adaptive data acquisition. Recovery from incomplete network data has been studied in settings with sampled vertices, missing edges, and non-random missingness [18, 30]. These models motivate partial observability, but the sampling mechanism is typically fixed independently of the learner. Our setting differs by making observation itself a decision: the learner allocates a finite budget of noisy neighborhood queries. The closest adaptive-observation work is Yun and Proutiere [33], who studied random and adaptive sam-pling for community detection and showed that adaptivity can reduce sample complexity in some regimes. Related active-learning approaches for graph clustering and community detection also emphasize query de-sign [6, 23, 31]. These works do not characterize exact recovery in the logarithmic-degree SBM under a one-sided noisy neighborhood oracle. Our model is also related to correlated SBMs and multiple graph ob-servations, where additional correlated networks can alter exact-recovery thresholds [17, 28, 29]. Recent com-putational work further shows that correlated observations introduce new algorithmic phenomena [9, 10, 14]. In these settings, however, the observations are fixed in advance; in ours, the learner chooses where to acquire additional local information. Other SBM extensions, including bipartite, attributed, multiplex, and testing problems, show how richer observation structures affect inference [26, 32]. None address the query-limited noisy-oracle setting studied here. Our contribution is to distinguish regimes where adaptive querying gives no information-theoretic benefit from regimes where coarse side information enables a genuine adaptivity gap. 
+
+# 2 Preliminaries 
+
+We consider a stochastic block model (SBM) on n vertices with two communities. Throughout the paper, we assume that n is even, as is standard practice in the SBM literature (see e.g. , [3, 25]). A random graph 
+
+G = (V, E ) with ∣V ∣ = n is said to be an SBM (n, p, q ), for some p, q ∈ [0, 1], if there exists a partition 
+
+V = V + ∪ V −, with ∣V +∣ = ∣V −∣ = n/2, such that, conditional on the partition, edges are generated indepen-dently and (i, j ) is present with probability p if i and j belong to the same community, and with probability 
+
+q if i and j belong to different communities. The partition is generated uniformly at random among all balanced bipartitions of V . We denote the ground-truth community labeling by σ∗ ∈ {±1}n, where σ∗ 
+
+> i
+
+= +1 if 
+
+i ∈ V + and σ∗ 
+
+> i
+
+= −1 if i ∈ V −. Thus ∑i∈V σ∗ 
+
+> i
+
+= 0. Exact recovery is always understood up to a global sign flip. Let A denote the adjacency matrix of G, where Aij = 1 ( Aij = 0 resp.) indicate that (i, j ) ∈ E ((i, j ) ∉ E
+
+resp.). Following the notation, we say G ∼ SBM (n, p, q ) if, for all i ≠ j, Pr (Aij = 1∣σ∗ 
+
+> i
+
+= σ∗ 
+
+> j
+
+) = p and Pr (Aij = 1∣σ∗ 
+
+> i
+
+≠ σ∗ 
+
+> j
+
+) = q. For a positive integer k ∈ N, we denote [k] ∶= {1, . . . , k }, and for convenience, we consider the vertex set to be V = [n]. For α, β ≥ 0, we use ∆ 2(α, β ) ∶= (√α−√β)2, and D+(α, β ) ∶= 12 ∆2(α, β ).The ABH exact-recovery threshold for the balanced two-community SBM with edge probabilities α log nn and 
+
+β log nn is D+(α, β ) > 1, or equivalently ∆ 2(α, β ) > 2. When the ambient SBM parameters are α, β , we use ∆2 ∶= ∆2(α, β ).A community recovery algorithm takes a graph G as input and outputs an estimate ˜ σ ∈ {±1}n of the community labels, without the knowledge of the ground truth σ∗. The success of the algorithm is measured by the overlap between ˜ σ and σ∗. And it is the normalized difference between the number of correctly and incorrectly labeled vertices. Formally, the overlap is expressed as ov (σ∗, ˜σ) ∶= 1
+
+n ∣∑
+
+> i∈V
+
+σ∗ 
+
+> i
+
+˜σi∣ . (1) Note that, ov (σ∗, ˜σ) ∈ [0, 1] and larger values of ov (σ∗, ˜σ) indicate better estimate. The exact recovery 
+
+occurs when ˜ σ = σ∗ which is equivalent to ov (σ∗, ˜σ) = 1. 
+
+Observation models: We study exact recovery under two related observation models. Both are based on the same underlying graph G ∼ SBM (n, α log nn , β log nn ), but they differ in what information is available before the learner starts querying the oracle. 
+
+Model 1 (Oracle-only access) . Consider a two-community stochastic block model SBM (n, α log nn , β log nn ). The learner does not observe the graph directly, but may make at most k queries to a noisy neighborhood oracle. 4When queried at a vertex, the oracle reveals each true neighbor independently with probability w and never reports non-neighbors. The learner may choose queries non-adaptively or adaptively as a function of previous oracle responses. The goal is exact recovery of the community labels from the oracle transcript. 
+
+Model 2 (Subsampled graph plus oracle access) . Consider the same underlying SBM, but suppose the learner first observes a subsampled graph Gsub , obtained by retaining each edge independently with probability 
+
+s ∈ [0, 1]. After observing Gsub , the learner may make at most k queries to the noisy neighborhood oracle that reveals each true neighbor from the underlying graph G with probability w. The goal is exact recovery from the combined observation (Gsub , oracle transcript ).The main question is how the query allocation affects the exact-recovery threshold. We compare balanced uniform querying, in which the budget is spread evenly over all vertices, with adaptive or non-uniform querying, in which the allocation may depend on the information observed so far. 
+
+# 3 Community Recovery with Oracle Only Information 
+
+In this section, we investigate Model 1, where the learner has no initial graph observation and must rely entirely on the noisy neighborhood oracle. In Section 3.1, we start with balanced uniform querying, which provides the natural (non-adaptive) benchmark and yields a sharp exact-recovery threshold. In Section 3.2, we turn to strategies where the learner may choose to adapt the querying strategy based on the information revealed during the querying process. This comparison isolates the role of adaptivity in the oracle-only model. Our results show that a linear query budget is necessary for exact recovery even under adaptive querying. At the same time, adaptivity can still be strictly beneficial at the level of constants: for suitable SBM parameters, a two-stage adaptive strategy succeeds with fewer linear-order queries than balanced uniform querying. 
+
+# 3.1 Uniform Oracle Access 
+
+For a sharp-homogeneous SBM benchmark, we impose a divisibility convention k/n ∈ N0 and each vertex is queried exactly m ∶= k/n times. Under this policy, the revealed graph is again an SBM with attenuated edge probabilities, so the classical Abbe-Bandeira-Hall threshold for exact recovery applies directly. More precisely, an existing edge {i, j } is missed by all oracle queries at both endpoints with probability (1−w)2m =
+
+(1−w)2k/n, and is therefore revealed with probability θunif (k, w ) ∶= 1−(1−w)2k/n. Consequently, the observed graph is exactly an SBM with effective parameters ˜ α = α ⋅ θunif (k, w ) and ˜β = β ⋅ θunif (k, w ). Applying the classical exact-recovery threshold gives the following benchmark. 
+
+Proposition 1 (Uniform oracle access benchmark) . Let G ∼ SBM (n, α log n/n, β log n/n). Suppose k/n ∈ N0
+
+and the learner uses the uniform non-adaptive oracle policy with reliability w ∈ [0, 1]. Then exact recovery from the observed graph is possible w.h.p. if and only if 
+
+θunif (k, w )( √α − √β)2 > 2, θunif (k, w ) ∶= 1 − (1 − w)2k/n.
+
+Thus balanced uniform querying succeeds exactly when the attenuated graph satisfies the threshold 
+
+θunif (k, w )( √α − √β)2 > 2. The proposition immediately yields the corresponding requirement for the query budget. Next, in Corollary 2, we show that whenever balanced uniform querying succeeds, it requires a 
+
+linear number of queries for exact recovery. 
+
+Corollary 2. Assume w ∈ (0, 1) and ∆2 > 2. Under the divisibility convention k = mn , exact recovery under uniform oracle access is possible if and only if 1 − (1 − w)2m > 2∆2 . Equivalently, the minimum number of queries per vertex is 
+
+mmin ∶= min {m ∈ N0 ∶ 1 − (1 − w)2m > 2∆2 } ,
+
+and the corresponding minimum budget is kmin = nm min . In the continuous relaxation, the threshold corre-sponds to m > log (1− 2∆2 ) 
+
+> 2 log (1−w)
+
+. In particular, kmin = Ω(n).
+
+5Algorithm 1: Two-stage adaptive screening strategy                                              
+
+> Input: Oracle access with reliability w, first-stage budget k0, refinement parameter L
+> Output: Community labels ̂σ
+> // Stage 1
+> 1Query vertices according to a uniform first-stage allocation using budget k0.
+> 2From first-stage transcript, compute preliminary labeling ̂σ(0)and confidence scores ∀v∈V.
+> // Screening
+> 3Let Abe the set of vertices whose first-stage local margin is too small.
+> 4Keep the labels ̂σ(0)
+> vfor vertices v∉A.
+> // Stage 2
+> 5foreach v∈Ado
+> 6Query van additional Ltimes.
+> 7Compare the fresh neighbors of vagainst a leave-one-out reference labeling.
+> 8Assign vby the resulting local likelihood test.
+> 9return the combined labeling: first-stage labels on Acand refined labels on A.
+
+Remark (non-divisible budgets): If k/n ∉ N0, a balanced allocation queries each vertex either ⌊k/n⌋ or 
+
+⌈k/n⌉ times. The resulting observation is not exactly homogeneous, but it is bracketed by the two neighboring homogeneous allocations. Thus Proposition 1 remains the correct benchmark up to a one-query-per-vertex rounding window. See Section A for precise arguments. 
+
+# 3.2 Adaptive Oracle Access 
+
+We now turn to adaptive querying for exact-recovery in Model 1. Here the main idea, summarized in Algorithm 1, is to separate recovery into two stages. In the first stage, the learner uses part of the query budget to construct a coarse global sketch of the communities, and, based on this estimate, produces a preliminary labeling and identifies a small subset of vertices whose labels remain uncertain. In the second stage, the learner spends the remaining queries only on this uncertain set and uses the fresh observations to repair the remaining mistakes. In this section, we formalize when such a two-stage strategy succeeds and show that, for suitable parameters, it can achieve exact recovery with fewer linear-order queries than balanced uniform querying. 
+
+A screened-initialization condition. In this first stage, fix x0 > 0 and perform k0 = x0n + o(n) uniform non-adaptive oracle queries. The resulting transcript is said to admit a leave-one-out screened initialization if it produces these global and local per-vertex auxiliary objects as follows. Globally, it outputs a preliminary labeling ̂ σ(0) and a screened set A ⊆ [n] whose labels need to be repaired. Locally, for each vertex v ∈ [n], it produces a leave-one-out reference labeling ̂ σ(−v) together with two disjoint comparison sets Bv ⊆ [n] ∖ {v}
+
+and Cv ⊆ [n] ∖ {Bv ∪ {v}} . The labeling ̂ σ(−v) is computed without using the first-stage (edge) observations incident to v, and it is used only when classifying that same vertex v in the second stage. The screening set Cv
+
+is used only to decide whether v ∈ A, while the reference set Bv is reserved for the second-stage likelihood test for v. This separation between Bv and Cv is imposed to avoid reusing the same incident observations from v
+
+both for initial screening and for final refinement: the event {v ∈ A} may depend on first-stage observations incident to v only through pairs {u, v } with u ∈ Cv and not through pairs with u ∈ Bv . Thus the edges from 
+
+v to Bv are not conditioned on when deciding whether v is screened and remain as uncontaminated evidence for the refinement step. We further require Bv , Cv , and the labels ̂ σ(−v)  
+
+> Bv∪Cv
+
+(i.e., the collection of leave-one-out labels assigned to vertices in Bv ∪ Cv ) to be functions only of first-stage observations not incident to v. We formalize these aspects in the following. 
+
+Definition 1 (Leave-one-out screened initialization) . For γ ∈ (0, 1) and ζ ∈ (0, 1], we say that a leave-one-out screened initialization is γ-screening with reference parameter ζ if with probability 1 − o(1), there exists a 6common global sign s ∈ {±1} such that 
+
+∣A∣ ≤ nγ ,̂ σ(0) 
+
+> u
+
+= sσ ∗ 
+
+> u
+
+for all u ∉ A, (2) and, for every v ∈ A,
+
+∣{ u ∈ Bv ∶̂ σ(−v) 
+
+> u
+
+≠ sσ ∗
+
+> u
+
+}∣ = o(n/ log n),
+
+∣Bv ∩ {u ∶ σ∗ 
+
+> u
+
+= +1}∣ = ζn 
+
+2 + o(n),
+
+∣Bv ∩ {u ∶ σ∗ 
+
+> u
+
+= −1}∣ = ζn 
+
+2 + o(n). (3) In other words, Definition 1 conveys that after the first stage, vertices that may still be mislabeled are confined to a sublinear set A, while every screened vertex v ∈ A comes with a large reference set Bv whose labels are almost correct and can therefore be used to classify v in the second stage. The parameter ζ measures how large this reference set is. The screening set Cv is kept separate from Bv so that the information used to decide whether v needs further refinement is different from the information used to determine its final label. The next result, in Theorem 3, shows that any first-stage transcript satisfying Definition 1 can be extended to achieve exact-recovery by querying only the screened vertices in A.
+
+Theorem 3 (Adaptive labeling from a screened initialization) . Assume ∆2 > 2 and w ∈ (0, 1]. Suppose the first-stage oracle transcript admits a γ-screening initialization with reference parameter ζ for some γ ∈ (0, 1)
+
+and ζ ∈ (0, 1]. Choose a fixed integer L ≥ 1 such that 
+
+ζ
+
+2 (1 − (1 − w)L)∆2 > γ. (4) 
+
+Then there is an adaptive second-stage strategy using at most L ∣A∣ additional oracle queries that recovers all labels in A correctly with probability 1 − o(1). Consequently, the total query budget is 
+
+k = k0 + L ∣A∣ = x0 n + o(n)
+
+on the event (2) –(3) , and exact recovery succeeds w.h.p. Proof sketch. On the high-probability screening event, all vertices outside A are already correctly labeled, so it remains only to repair the vertices in A. In the second stage, fix v ∈ A, query v an additional L times and use only these fresh oracle observations from v to the reserved reference set Bv . For each u ∈ Bv , let 
+
+Yu = 1 if u is revealed at least once among these L fresh queries to v, and Yu = 0 otherwise. We then classify v by a likelihood-ratio test based on the variables (Yu)u∈Bv , using the leave-one-out reference labels ̂
+
+σ(−v) 
+
+> Bv
+
+. Intuitively, the test compares whether the fresh observations from v are more consistent with v
+
+belonging to the +1 side of the reference population or the −1 side. Since L fresh queries reveal an existing edge with probability aL ∶= 1 − (1 − w)L, this local experiment is a one-vertex SBM test against an almost-correct reference population of size ∣Bv ∣ = ζn + o(n), with approximately ζn /2 vertices from each community. Therefore, the Bhattacharyya error exponent for one screened vertex is ζ 
+
+> 2
+
+aL ∆2 + o(1) = ζ 
+
+> 2
+
+(1 − (1 − w)L)∆2 +
+
+o(1). Hence the error probability for a single screened vertex is at most n− ζ 
+
+> 2(1−(1−w)L)∆2+o(1)
+
+. Since ∣A∣ ≤ nγ
+
+and the exponent is strictly larger than γ, a union bound implies that all vertices in A are recovered correctly w.h.p. The additional second-stage budget is L ∣A∣ = O(nγ ) = o(n), because L is fixed and γ < 1. A remaining question is whether the screened initialization can be obtained using fewer queries than balanced uniform exact-recovery requires. The answer is yes whenever the first-stage budget is below the uniform threshold but still large enough to produce a screened initialization. Indeed, let x⋆ be the uniform exact-recovery threshold, i.e., θ(x⋆, w )∆2 = 2. If, for some x0 < x⋆, the first-stage uniform oracle graph generated using x0n + o(n) queries admits a γ-screening initialization with reference parameter ζ for some 7γ < 1, and if L satisfies (4), then Theorem 3 gives exact recovery with x0n + L∣A∣ = x0n + o(n) queries. Since 
+
+x0 < x⋆, this is below the balanced-uniform exact-recovery threshold by a linear margin (x⋆ − x0)n − o(n).
+
+Achieving screening below the uniform threshold. Next, we show that the screened-initialization condition can actually be achieved and it is not merely a formal abstraction. For an explicit parameter choice, a first-stage uniform query budget that is still below the balanced-uniform exact-recovery threshold already provides two things: a leave-one-out labeling that is accurate up to only n1/4+o(1) errors, and a small screened set containing the remaining vertices with uncertain labels. An important aspect is that, although this first-stage budget is not large enough for exact recovery by itself, it is still large enough for a standard maximum-likelihood argument to produce a sufficiently accurate coarse estimate, and that weaker guarantee is enough for the second-stage repair step. Recall that for parameters a, b > 0, we write 
+
+D+(α, β ) ∶= 12 ∆2(α, β ) = 12 (√α − √β)2 = α + β
+
+2 − √αβ. 
+
+For each v ∈ [n], let G(−v) be the graph obtained by deleting all edges incident to v, and let 
+
+B−v ∶= {τ ∈ {±1}[n]∖{v} ∶ ∣ ∑
+
+> u≠v
+
+τu∣ = 1}.
+
+Here, B−v is the set of balanced labelings for the leave-one-out graph. The balanced leave-one-out MLE ̂
+
+σ(−v) is any maximum-likelihood estimator for G(−v) over B−v . Its two global signs are fixed by the following deterministic anchor convention. Let Dn = {1, . . . , ⌈n3/4⌉} . For each v, orient ̂ σ(−v) so that ∑u∈Dn∖{v}̂ σ(−v) 
+
+> u
+
+≥
+
+0, breaking ties arbitrarily. 
+
+Lemma 4 (Screening estimate for the concrete first stage) . Consider the oracle-only model with α = 16 and 
+
+β = 1. Let θ0 ∶= 1 − 2−1/3, and w0 ∶= 1 − √1 − θ0. If the first stage queries every vertex exactly once with oracle reliability w0, then the first-stage transcript admits a 0.88 -screening initialization with reference parameter 
+
+1/2, in the sense of (2) –(3) .
+
+Combining Lemma 4 with Theorem 3 gives the following concrete parameter choice, where the first-stage budget is below the balanced-uniform threshold and the adaptive two-stage repair still succeeds. Example 1 provides a concrete parameter regime to demonstrate that adaptivity can improve the constant in the linear query budget. 
+
+Example 1. Let α = 16, β = 1 and set the oracle reliability parameter to w = 1 − 2−1/6. In the first stage, we query every vertex exactly once, so we use k0 = n queries. The edge-retention factor of the corresponding uniform subsampled graph is θ0 = 1 − (1 − w)2 = 1 − 2−1/3 and the graph is a homogeneous SBM with effective parameters a = 16 (1 − 2−1/3) and b = 1 − 2−1/3. Applying Lemma 4 on this graph, we obtain a 0 .88-screening initialization with reference parameter ζ = 1/2. The relaxed balanced-uniform exact-recovery threshold is determined by θ(x, w )∆2 = 2, where θ(x, w ) =
+
+1 − (1 − w)2x and ∆ 2 = (√α − √β)2 = 9. Thus x⋆ is the solution of 9 (1 − (1 − w)2 x⋆ ) = 2, precisely 
+
+x⋆ = 3 log 2(9/7) > 1. Since the first stage uses x0 = 1 query per vertex, it operates strictly below the balanced-uniform exact-recovery threshold. Now take L = 5. Using ζ = 1/2 and ∆ 2 = 9, we obtain ζ 
+
+> 2
+
+(1 − (1 − w)L)∆2 = 14 (1 − 2−5/6) ⋅ 9 > 0.88. The adaptive strategy succeeds with the query budget k = n + 5n0.88 +o(1) = n + o(n). In contrast, balanced uniform querying requires x⋆n = 3 log 2(9/7)n ≈ 1.087 n queries. Thus, for this parameter choice and for sufficiently large n, adaptive querying achieves exact recovery with strictly fewer linear-order queries than uniform querying. ◇
+
+Next, we establish a stronger result that this is the strongest possible type of separation in the oracle-only model, i.e., any adaptive strategy still requires a linear number of queries for exact recovery. 
+
+Theorem 5. In Model 1 every oracle-only exact-recovery strategy requires k = Ω(n) queries. 
+
+8Proof sketch. We prove the contrapositive. If an oracle-only strategy uses k = o(n) queries, then only o(n)
+
+vertices are ever queried. Since the underlying SBM has maximum degree O(log n) with high probability, the total number of vertex appearances in all oracle responses is only o(n log n). Hence there are n − o(n)
+
+vertices that are never queried and appear only o(log n) times in the transcript; by exact balance, this set contains linearly many vertices from each community. For any such +-vertex i and −-vertex j, compare the truth with the balanced labeling obtained by swapping i and j. Since neither vertex is queried and both appear rarely, this swap changes the transcript likelihood by only a small polynomial factor, while preserving the balance constraint. Thus there are linearly many distinct balanced swapped labelings with likelihood comparable to that of the truth, so the posterior mass of the true labeling is o(1). Consequently even the MAP estimator fails with probability tending to one, and exact recovery is impossible when k = o(n).Therefore every successful oracle-only strategy requires k = Ω(n).
+
+# 4 Community Recovery with Additional Correlated Information 
+
+We now turn to Model 2, where the learner first observes a subsampled graph Gsub and then uses the noisy neighborhood oracle for refinement. The main question is whether this additional correlated side information 
+
+Gsub makes adaptive querying more effective than uniform querying, and how this contrasts with the oracle-only setting. We show that, under a sublinear budget, uniform querying cannot improve the exact-recovery threshold beyond that of Gsub alone. In contrast, under the same sublinear budget, an adaptive strategy can use Gsub to identify uncertain vertices and concentrate the oracle budget on them, leading to exact recovery. Thus, unlike in the oracle-only model where the adaptivity gap is in linear order, the presence of correlated side information results in a genuine sublinear adaptivity gap. 
+
+# 4.1 Why does Uniform Querying Under a Sublinear Budget Fail? 
+
+The non-adaptive baseline spreads the oracle budget as uniformly as possible, independently of the observed graph. In the sublinear regime this should be interpreted in the integer balanced sense: only k = o(n) vertices receive an oracle query, while n − o(n) vertices receive no oracle information at all. Thus the combined observation is not exactly a homogeneous SBM with a new edge-retention parameter. Nevertheless, the conclusion is the same as the homogeneous heuristic would suggest. Since the queried set is data-independent and contains only o(n) vertices, uniform querying cannot target the vertices that are ambiguous under Gsub .Hence it cannot change the exact-recovery threshold determined by the subsampled graph alone. The following lemma formalizes this statement. 
+
+Lemma 6 (Uniform querying fails) . Consider Model 2 with subsampling rate s ∈ (0, 1), oracle reliability 
+
+w ∈ (0, 1], and query budget k = o(n). Suppose the learner uses a data-independent balanced uniform querying strategy: the queried set is fixed in advance, or chosen independently of Gsub and the oracle responses. Then, in the sublinear-budget regime, uniform querying does not improve the exact-recovery threshold beyond that of Gsub alone. In particular, exact recovery under uniform querying is impossible w.h.p. whenever s ∆2 < 2.Proof sketch. With k = o(n), a balanced uniform strategy queries only o(n) vertices, independently of Gsub 
+
+and of the labels. Hence n − o(n) vertices receive no oracle information at all. For any two unqueried vertices of opposite communities, the oracle can affect their comparison to only the o(n) queried vertices; their evidence from the remaining n − o(n) vertices is exactly the evidence available in Gsub . Thus the local exact-recovery exponent for a balanced swap of two unqueried opposite-community vertices is the same as for the subsampled graph alone, namely s∆2. If s∆2 < 2, the usual ABH second-moment converse gives, with high probability, at least one likelihood-competitive balanced swap among unqueried vertices. Therefore the posterior cannot concentrate on the true balanced labeling, and uniform sublinear querying cannot achieve exact recovery. 94.2 Adaptive Targeting Succeeds Under a Sublinear Budget 
+
+The failure in Lemma 6 is not necessarily due to the oracle being too weak; rather, it may stem from the fact that uniform querying ignores where the subsampled graph remains (un)certain. Once the querying strategy can exploit the correlated information from Gsub , this limitation disappears. 
+
+Lemma 7. Consider Model 2, a subsampling rate s ∈ (0, 1), and oracle reliability w ∈ (0, 1]. There exist constants (α, β, s, w ) and a budget k = o(n) such that a two-stage strategy that uses Gsub to target queries succeeds at exact recovery w.h.p. Proof sketch. Take, for example, α = 16, β = 1, w = 1/2, and choose s = 2(1 − ϵ)/ 9 for a sufficiently small constant ϵ > 0. Then Gsub is below the exact-recovery threshold, but it still gives a leave-one-out preliminary labeling with only nϵ+o(1) errors. Using this preliminary labeling, compute for each vertex a local likelihood score from a reserved part of its subsampled incident edges, and screen only vertices whose score has small margin. Large-deviation bounds show that the screened set has size at most n0.77 w.h.p., while every un-screened vertex is already correctly labeled. Query each screened vertex once and classify it using fresh oracle observations against a disjoint reference set. The oracle likelihood test has error probability n−0.7875 +o(1)
+
+per screened vertex, so a union bound over n0.77 screened vertices succeeds. Thus k = ⌈n0.78 ⌉ = o(n) queries suffice for exact recovery w.h.p. Combining the uniform-querying lower bound with the adaptive construction yields the main separation of this section: with the same sublinear oracle budget, data-independent querying cannot improve on the subsampled graph, whereas adaptive querying achieves exact recovery. 
+
+Theorem 8. In Model 2, there exist SBM parameters α, β > 0, a subsampling rate s ∈ (0, 1), an oracle reliability w ∈ (0, 1] and a query budget k = o(n) such that simultaneously: 1. Every data-independent uniform querying strategy fails to achieve exact recovery w.h.p. 2. There exists a two-stage adaptive querying strategy that uses Gsub to target queries and achieves exact recovery with high probability. 
+
+# 5 Conclusion 
+
+We studied exact community recovery in the two-community SBM under budgeted noisy-neighborhood-oracle access. Our models make data acquisition part of the inference problem: the learner must decide not only how to recover communities from partial observations, but also where to acquire those observations. In Model 1, balanced uniform querying gives a sharp non-adaptive benchmark, but a two-stage adaptive strategy can succeed with n + o(n) queries in regimes where uniform querying requires mn queries for some 
+
+m > 1. In Model 2, a subsampled graph can identify locally ambiguous vertices, allowing adaptive querying to focus a sublinear budget and yielding a genuine adaptivity gap. Thus, under the same observation budget, different acquisition rules can lead to fundamentally different exact-recovery behavior. 
+
+Scope and Limitations. Our results are asymptotic and apply to the canonical balanced two-community logarithmic-degree SBM with independent one-sided oracle noise. In this context, we isolate the role of adaptive data acquisition and prove concrete information-theoretic gains over uniform querying. However, characterizing these adaptive separations to sharp optimal constants and extending it to a full adaptive phase diagram across all parameter regimes is left open. 
+
+Future Work. By treating data acquisition as part of the inference problem, we open several directions for future work, including design of general adaptive querying frameworks that match or outperform uniform querying across broader SBM regimes, and closing the remaining exact-threshold gaps. 
+
+Societal Impact. This work is theoretical and does not involve real data, human subjects, or deployed systems. Its potential positive impact is to clarify when limited local measurements can reduce the cost of network recovery. At the same time, improved community recovery from partial observations could be misused in privacy-sensitive network settings. Any practical deployment should therefore account for consent, privacy constraints, and the sensitivity of inferred communities. 10 Funding and Conflict of Interest Disclosure 
+
+Suhas Thejaswi acknowledges support from the Technology Industries of Finland Centennial Foundation through a grant awarded to Aalto University. The authors declare that the funding source does not create any conflict of interest in relation to this work. 
+
+# References 
+
+[1] Emmanuel Abbe. Community detection and stochastic block models: recent developments. Journal of Machine Learning Research , 18(177):1–86, 2018. [2] Emmanuel Abbe and Colin Sandon. Recovering communities in the general stochastic block model without knowing the parameters. Advances in neural information processing systems , 28, 2015. [3] Emmanuel Abbe, Afonso S. Bandeira, and Georgina Hall. Exact recovery in the stochastic block model. 
+
+IEEE Transactions on Information Theory , 62(1):471–487, 2016. [4] Emmanuel Abbe, Jianqing Fan, Kaizheng Wang, and Yiqiao Zhong. Entrywise eigenvector analysis of random matrices with low expected rank. Annals of Statistics , 48(3):1452, 2020. [5] Jess Banks, Cristopher Moore, Joe Neeman, and Praneeth Netrapalli. Information-theoretic thresholds for community detection in sparse networks. In Conference on Learning Theory , pages 383–416. PMLR, 2016. [6] Zal´ an Bod´ o, Zsolt Minier, and Lehel Csat´ o. Active learning with clustering. In Active Learning and Experimental Design workshop In conjunction with AISTATS 2010 , pages 127–139. JMLR Workshop and Conference Proceedings, 2011. [7] C´ ecile Bothorel, Juan David Cruz, Matteo Magnani, and Barbora Micenkova. Clustering attributed graphs: models, measures and methods. Network Science , 3(3):408–444, 2015. [8] Narasinga Rao Chaganty and Jayaram Sethuraman. Strong large deviation and local limit theorems. 
+
+The Annals of Probability , pages 1671–1690, 1993. [9] Shuwen Chai and Mikl´ os Z R´ acz. Efficient graph matching for correlated stochastic block models. 
+
+Advances in Neural Information Processing Systems , 37:116388–116461, 2024. [10] Guanyi Chen, Jian Ding, Shuyang Gong, and Zhangsong Li. A computational transition for detecting correlated stochastic block models by low-degree polynomials. The Annals of Statistics , 54(1):226–251, 2026. [11] Peter Chin, Anup Rao, and Van Vu. Stochastic block model and community detection in sparse graphs: A spectral algorithm with optimal rate of recovery. In Conference on Learning Theory , pages 391–423. PMLR, 2015. [12] Aurelien Decelle, Florent Krzakala, Cristopher Moore, and Lenka Zdeborov´ a. Asymptotic analysis of the stochastic block model for modular networks and its algorithmic applications. Physical Review E—Statistical, Nonlinear, and Soft Matter Physics , 84(6):066106, 2011. [13] Shaofeng Deng, Shuyang Ling, and Thomas Strohmer. Strong consistency, graph Laplacians, and the stochastic block model. Journal of Machine Learning Research , 22(117):1–44, 2021. [14] Jingqiu Ding, Yiding Hua, Lucas Slot, and David Steurer. Low-degree evidence for computational transition of recovery rate in stochastic block model. In The Thirty-ninth Annual Conference on Neural Information Processing Systems , 2025. 11 [15] Akshay Gadde, Eyal En Gad, Salman Avestimehr, and Antonio Ortega. Active learning for community detection in stochastic block models. In 2016 IEEE International Symposium on Information Theory (ISIT) , pages 1889–1893. IEEE, 2016. [16] Julia Gaudio and Nirmit Joshi. Community detection in the hypergraph SBM: Exact recovery given the similarity matrix. In The Thirty Sixth Annual Conference on Learning Theory , pages 469–510. PMLR, 2023. [17] Julia Gaudio, Miklos Z. Racz, and Anirudh Sridhar. Exact community recovery in correlated stochastic block models. In Proceedings of Thirty Fifth Conference on Learning Theory , volume 178 of Proceedings of Machine Learning Research , pages 2183–2241, 2022. [18] Mark S Handcock and Krista J Gile. Modeling social networks from sampled data. The Annals of Applied Statistics , 4(1):5, 2010. [19] Paul W Holland, Kathryn Blackmond Laskey, and Samuel Leinhardt. Stochastic blockmodels: First steps. Social networks , 5(2):109–137, 1983. [20] Di Jin, Zhizhi Yu, Pengfei Jiao, Shirui Pan, Dongxiao He, Jia Wu, Philip S Yu, and Weixiong Zhang. A survey of community detection approaches: From statistical modeling to deep learning. IEEE Trans-actions on Knowledge and Data Engineering , 35(2):1149–1170, 2021. [21] Brian Karrer and Mark EJ Newman. Stochastic blockmodels and community structure in networks. 
+
+Physical Review E—Statistical, Nonlinear, and Soft Matter Physics , 83(1):016107, 2011. [22] Chuyang Ke and Jean Honorio. Information-theoretic limits for community detection in network models. 
+
+Advances in Neural Information Processing Systems , 31, 2018. [23] Dan Kushnir and Benjamin Mirabelli. Active community detection with maximal expected model change. In International Conference on Artificial Intelligence and Statistics , pages 724–734. PMLR, 2020. [24] Timothy LaRock, Timothy Sakharov, Sahely Bhadra, and Tina Eliassi-Rad. Understanding the limita-tions of network online learning. Applied Network Science , 5(1):60, 2020. [25] Elchanan Mossel, Joe Neeman, and Allan Sly. Consistency thresholds for the planted bisection model. In 
+
+Proceedings of the forty-seventh annual ACM symposium on Theory of Computing , pages 69–75, 2015. [26] Chung Kyong Nguen, Oscar Hernan Madrid Padilla, and Arash A Amini. Network two-sample test for block models. arXiv preprint arXiv:2406.06014 , 2024. [27] Tiago P Peixoto. Hierarchical block structures and high-resolution model selection in large networks. 
+
+Physical Review X , 4(1):011047, 2014. [28] Miklos Racz and Anirudh Sridhar. Correlated stochastic block models: Exact graph matching with ap-plications to recovering communities. In Advances in Neural Information Processing Systems , volume 34, 2021. [29] Mikl´ os Z. R´ acz and Jifan Zhang. Harnessing multiple correlated networks for exact community recovery. In Advances in Neural Information Processing Systems , volume 37. Curran Associates, Inc., 2024. [30] Jeffrey A Smith, James Moody, and Jonathan H Morgan. Network sampling coverage ii: The effect of non-random missing data on network measurement. Social networks , 48:78–99, 2017. [31] Yuanchen Wu and Yubai Yuan. Robust offline active learning on graphs. Advances in Neural Information Processing Systems , 37:58955–58983, 2024. 12 [32] Tzu-Chi Yen and Daniel B Larremore. Community detection in bipartite networks with stochastic block models. Physical Review E , 102(3):032309, 2020. [33] Se-Young Yun and Alexandre Proutiere. Community detection via random and adaptive sampling. In 
+
+Conference on Learning Theory , pages 138–175. PMLR, 2014. [34] Anderson Ye Zhang. Fundamental limits of spectral clustering in stochastic block models. IEEE Transactions on Information Theory , 70(10):7320–7348, 2024. 13 A Omitted proofs from Section 3 
+
+For the sharp homogeneous-SBM benchmark, we impose the divisibility convention k/n ∈ N0. Writing 
+
+m ∶= k/n, the uniform policy queries every vertex exactly m times. Hence an existing edge {i, j } is missed by all oracle queries at both endpoints with probability (1 − w)2m, and is therefore revealed with probability: 
+
+θunif (k, w ) ∶= 1 − (1 − w)2m = 1 − (1 − w)2k/n. Consequently, the observed graph is exactly an SBM with effective parameters ̃
+
+α = αθ unif (k, w ),̃ β = βθ unif (k, w ).
+
+Applying the Abbe–Bandeira–Hall threshold gives the following benchmark. 
+
+Proposition 1 (Uniform oracle access benchmark) . Let G ∼ SBM (n, α log n/n, β log n/n). Suppose k/n ∈ N0
+
+and the learner uses the uniform non-adaptive oracle policy with reliability w ∈ [0, 1]. Then exact recovery from the observed graph is possible w.h.p. if and only if 
+
+θunif (k, w )( √α − √β)2 > 2, θunif (k, w ) ∶= 1 − (1 − w)2k/n.
+
+Proof. Under the uniform policy, each endpoint of an existing edge is queried m = k/n times. Thus the edge is revealed with probability θunif (k, w ) = 1 − (1 − w)2m, independently across edges conditional on the labels. Hence the observed graph is an SBM with parameters ̃
+
+p = αθ unif (k, w ) log nn ,̃ q = βθ unif (k, w ) log nn .
+
+The Abbe–Bandeira–Hall threshold applied to this attenuated SBM gives 
+
+(√̃ α −
+
+√̃ 
+
+β)2 > 2,
+
+which is equivalent to 
+
+θunif (k, w )( √α − √β)2 > 2.
+
+Corollary 2. Assume w ∈ (0, 1) and ∆2 > 2. Under the divisibility convention k = mn , exact recovery under uniform oracle access is possible if and only if 1 − (1 − w)2m > 2∆2 . Equivalently, the minimum number of queries per vertex is 
+
+mmin ∶= min {m ∈ N0 ∶ 1 − (1 − w)2m > 2∆2 } ,
+
+and the corresponding minimum budget is kmin = nm min . In the continuous relaxation, the threshold corre-sponds to m > log (1− 2∆2 ) 
+
+> 2 log (1−w)
+
+. In particular, kmin = Ω(n).Proof. Under the uniform policy, each endpoint of an existing edge is queried m = k/n times. Thus the edge is revealed with probability θunif (k, w ) = 1 − (1 − w)2m, independently across edges conditional on the labels. Hence the observed graph is an SBM with parameters ̃
+
+p = αθ unif (k, w ) log nn ,̃ q = βθ unif (k, w ) log nn .
+
+The Abbe–Bandeira–Hall threshold applied to this attenuated SBM gives 
+
+(√̃ α −
+
+√̃ 
+
+β)2 > 2,
+
+which is equivalent to 
+
+θunif (k, w )( √α − √β)2 > 2.
+
+14 If w = 1, then θunif (k, 1) = 1 for every m = k/n ≥ 1. Thus, under the divisibility convention, one query per vertex suffices exactly when 
+
+(√α − √β)2 > 2,
+
+and in this case kmin = n. If w = 0, then θunif (k, 0) = 0, so no edge is ever revealed and exact recovery is impossible. 
+
+Remark (Non-divisible budgets) . If k/n ∉ N, let r = ⌊k/n⌋. A balanced allocation queries each vertex either 
+
+r or r + 1 times. Conditional on this allocation, the observed graph is generally not a homogeneous SBM, because ρij = 1 − (1 − w)Ri+Rj depends on the endpoint query counts. The homogeneous theorem above nevertheless gives a useful bracket. The balanced allocation is at least as informative as the homogeneous allocation with r queries per vertex, since the learner may ignore any extra queries. Conversely, it is no more informative than the homogeneous allocation with r + 1 queries per vertex. Therefore, with θℓ ∶= 1 − (1 − w)2ℓ, we have 
+
+θr (√α − √β)2 > 2 Ô⇒ balanced uniform querying succeeds ,
+
+whereas 
+
+θr+1(√α − √β)2 < 2 Ô⇒ balanced uniform querying fails .
+
+Thus the non-divisible case is bracketed by the two neighboring homogeneous allocations. We discuss the genuinely sublinear-budget regime separately in Lemma 6. 
+
+Theorem 3 (Adaptive labeling from a screened initialization) . Assume ∆2 > 2 and w ∈ (0, 1]. Suppose the first-stage oracle transcript admits a γ-screening initialization with reference parameter ζ for some γ ∈ (0, 1)
+
+and ζ ∈ (0, 1]. Choose a fixed integer L ≥ 1 such that 
+
+ζ
+
+2 (1 − (1 − w)L)∆2 > γ. (4) 
+
+Then there is an adaptive second-stage strategy using at most L ∣A∣ additional oracle queries that recovers all labels in A correctly with probability 1 − o(1). Consequently, the total query budget is 
+
+k = k0 + L ∣A∣ = x0 n + o(n)
+
+on the event (2) –(3) , and exact recovery succeeds w.h.p. Proof. On the event (2)–(3), fix the common global sign s. For each v ∈ A, the adaptive stage queries v
+
+exactly L additional times. It ignores all responses from vertices outside the reference set Bv and classifies 
+
+v using only the responses from v to Bv and the labels ̂ σ(−v) 
+
+> Bv
+
+. By the split measurability condition, the first-stage data that determine {v ∈ A} do not use observations on pairs {u, v } with u ∈ Bv . Hence, after conditioning on the first-stage sigma-field that defines {v ∈ A}, Bv , Cv , and ̂ σ(−v)  
+
+> Bv∪Cv
+
+, the edge variables 
+
+{G∗ 
+
+> uv
+
+∶ u ∈ Bv } are still independent conditional on the labels, and the new oracle coins are fresh. Let 
+
+aL ∶= 1 − (1 − w)L.
+
+For u ∈ Bv , define Yu = 1 if at least one of the L new queries to v returns u, and Yu = 0 otherwise. Conditional on the labels, the variables {Yu ∶ u ∈ Bv } are independent Bernoulli random variables with parameter aLp
+
+when σ∗ 
+
+> u
+
+= σ∗ 
+
+> v
+
+and aLq when σ∗ 
+
+> u
+
+≠ σ∗ 
+
+> v
+
+. By (3), Bv contains ζn /2 + o(n) vertices of each sign and therefore 
+
+∣Bv ∣ = ζn + o(n).We now spell out how the second stage assigns a label to a fixed vertex v ∈ A. The algorithm treats the labels in Bv as a reference set and uses only the fresh observations Yu from the additional queries to v. The only quantity being decided in this calculation is whether v has the same label as the +1 side of the reference set or the −1 side. First suppose that the reference labels are exact, after applying the common global sign. 15 For a candidate value τ ∈ {±1} of sσ ∗ 
+
+> v
+
+, the conditional log-likelihood of the observations Y = (Yu)u∈Bv is, up to constants independent of τ ,
+
+ℓv (τ ; Y ) = ∑
+
+> u∈Bv
+
+1{̂ σ(−v) 
+
+> u
+
+= τ } [ Yu log (aLp) + (1 − Yu) log (1 − aLp)] 
+
++ 1{̂ σ(−v) 
+
+> u
+
+≠ τ } [ Yu log (aLq) + (1 − Yu) log (1 − aLq)] .
+
+Thus the log-likelihood ratio in favor of sσ ∗ 
+
+> v
+
+= +1 over sσ ∗ 
+
+> v
+
+= −1 is Λ(2) 
+
+> v
+
+= ∑
+
+> u∈Bv
+
+̂
+
+σ(−v) 
+
+> u
+
+[Yu log pq + (1 − Yu) log 1 − aLp
+
+1 − aLq ] . (5) The second-stage decision rule is: set ̂ σ(1) 
+
+> v
+
+= +1 if Λ (2) 
+
+> v
+
+≥ 0 and ̂ σ(1) 
+
+> v
+
+= −1 otherwise, with the final labels interpreted up to the same common global sign. In words, the algorithm compares whether the fresh neighbors revealed by querying v look more like connections to vertices labeled +1 or to vertices labeled −1in the reference set. The corresponding Bhattacharyya coefficient is also explicit. For one reference vertex, the two hypotheses swap the Bernoulli parameters aLp and aLq, so the one-coordinate coefficient is 
+
+bL ∶= √aLp a Lq + √(1 − aLp)( 1 − aLq).
+
+Since the coordinates are conditionally independent and ∣Bv ∣ = ζn + o(n), the product Bhattacharyya coeffi-cient is BC v = b∣Bv ∣ 
+
+> L
+
+= bζn +o(n) 
+
+> L
+
+.
+
+The likelihood-ratio test has error probability at most this coefficient. We next return to the actual reference labels. Let Ev = {u ∈ Bv ∶̂ σ(−v) 
+
+> u
+
+≠ sσ ∗
+
+> u
+
+}. By (3), ∣Ev ∣ = o(n/ log n).Relative to the exact-reference likelihood ratio, only the terms indexed by Ev are changed. The non-edge contribution of these terms is at most 
+
+∣Ev ∣ ∣ log 1 − aLp
+
+1 − aLq ∣ = o(1),
+
+while the number of newly revealed edges from v to Ev has mean O(∣ Ev ∣ log n/n) = o(1). Hence the mislabeled reference vertices perturb (5) by o(log n) with probability 1 − o(1), uniformly over the screened vertices. Therefore the same Bhattacharyya exponent remains valid up to an o(log n) error. Using p = α log n/n and 
+
+q = β log n/n,
+
+bL = √aLp a Lq + √(1 − aLp)( 1 − aLq)
+
+= aL
+
+√pq + 1 − aL(p + q)
+
+2 + O(p2 + q2)
+
+= 1 − aL
+
+2 (√p − √q)2 + O ( log 2 nn2 )
+
+= 1 − aL∆2
+
+2log nn + O ( log 2 nn2 ) .
+
+Consequently, BC v = (1 − aL∆2
+
+2log nn + O ( log 2 nn2 )) 
+
+> ζn +o(n)
+
+= n−ζa L∆2/2+o(1).
+
+Therefore the conditional probability that the likelihood-ratio test misclassifies v is at most 
+
+n−ζa L∆2/2+o(1).
+
+16 By (4), choose η > 0 such that ζa L∆2/2 ≥ γ + 2η. A union bound over the at most nγ vertices in A gives Pr (some v ∈ A is misclassified and the screening event holds ) ≤ nγ n−ζa L∆2/2+o(1) ≤ n−η+o(1) = o(1).
+
+All vertices outside A are correct on (2) by assumption, so the combined labeling is correct up to the common global sign s w.h.p. The query count is k0 + L∣A∣ = x0n + O(nγ ) = x0n + o(n) on the same event. Before we can prove Lemma 4, we need the following result. 
+
+Lemma 9 (Uniform leave-one-out rough initialization) . Consider the exactly balanced two-block SBM on an even number n of vertices, with edge probabilities a log n/n and b log n/n. If D+(a, b ) > 3/4, then the balanced leave-one-out MLEs satisfy the following with probability 1 − o(1): there is a common global sign s ∈ {±1}
+
+such that, simultaneously for every v ∈ [n],
+
+∣{ u ≠ v ∶̂ σ(−v) 
+
+> u
+
+≠ sσ ∗
+
+> u
+
+}∣ ≤ n1/4+o(1).
+
+In particular, the number of leave-one-out reference-label errors is o(n/ log n) uniformly over v.Proof. We use a union-bound proof following in the style of ABH, keeping track of the balanced constraint. Fix v and condition on the true labels. Write N = n − 1. The restriction of the truth to [n] ∖ {v} belongs to B−v , since the full truth is exactly balanced. For τ ∈ B−v , let L−v (τ ) denote the SBM likelihood of the graph on [n] ∖ {v} under the labeling τ ; that is, the product likelihood over pairs {i, j } ⊆ [n] ∖ {v} with edge probability a log n/n when τi = τj and b log n/n otherwise. For τ ∈ B−v , choose its global sign so that 
+
+m = m(τ ) ∶= ∣{ u ≠ v ∶ τu ≠ σ∗
+
+> u
+
+}∣ ≤ N /2.
+
+Let S be this disagreement set. A pair {i, j } ⊆ [n] ∖ {v} has different within/between-community status under τ and under σ∗ exactly when one endpoint lies in S and the other lies outside S. Thus the likelihood ratio between τ and the truth only involves 
+
+M (S) = m(N − m)
+
+pairs; all other pair contributions cancel. For each such pair, the two hypotheses swap the Bernoulli parame-ters a log n/n and b log n/n. Hence, by the Bhattacharyya bound applied to the likelihood-ratio test between the truth and this fixed alternative, Pr {L−v (τ ) ≥ L−v (σ∗−v )} ≤ (√pq + √(1 − p)( 1 − q)) M (S)
+
+, p = a log nn , q = b log nn .
+
+Since 
+
+√pq + √(1 − p)( 1 − q) = 1 − D+(a, b ) log nn + O ( log 2 nn2 ) ,
+
+we obtain Pr {τ has likelihood at least that of the truth } ≤ exp (−(D+(a, b ) − o(1)) m(N − m)
+
+n log n) . (6) It remains to union bound over balanced alternatives. The number of alternatives with Hamming distance 
+
+m is at most (Nm) ≤ exp (m log (eN /m)) . For n1/4 ≤ m ≤ n/ log n, we have (N − m)/ n = 1 − o(1) and log (eN /m) ≤ (3/4 + o(1)) log n, so the total contribution from this range is at most   
+
+> n/log n
+
+∑
+
+> m=n1/4
+
+exp (−(D+(a, b ) − 34 − o(1)) m log n) = o(n−2).
+
+17 For n/ log n < m ≤ N /2, we have (N − m)/ n ≥ 1/2 − o(1) and log (eN /m) ≤ log (e log n) = O(log log n).Therefore the likelihood exponent, which is of order m log n, dominates the entropy term m log (eN /m), and this range contributes 
+
+∑  
+
+> m>n/log n
+
+exp (−Ω(m log n)) = o(n−2).
+
+Thus, for this fixed v, with probability 1 −o(n−2), no balanced labeling at distance at least n1/4 has likelihood at least that of the truth. A union bound over the n choices of v gives, with probability 1 − o(1), that every leave-one-out maximizer is within n1/4 of either σ∗(−v) or −σ∗(−v).It remains only to check that the deterministic anchor convention chooses the same sign for all v. Since 
+
+∣Dn∣ = n3/4 + O(1) and the true labels are sampled from the exactly balanced model, hypergeometric anti-concentration gives RRRRRRRRRRR
+
+∑
+
+> u∈Dn
+
+σ∗
+
+> u
+
+RRRRRRRRRRR
+
+> n1/3
+
+with probability 1 − o(1). Removing one vertex changes this anchor sum by at most one, and the leave-one-out error bound above contributes at most n1/4+o(1) = o(n1/3) errors on Dn. Hence the anchor orientation selects the same global sign for every leave-one-out maximizer. The claimed simultaneous n1/4+o(1) bound follows. 
+
+Lemma 4 (Screening estimate for the concrete first stage) . Consider the oracle-only model with α = 16 and 
+
+β = 1. Let θ0 ∶= 1 − 2−1/3, and w0 ∶= 1 − √1 − θ0. If the first stage queries every vertex exactly once with oracle reliability w0, then the first-stage transcript admits a 0.88 -screening initialization with reference parameter 
+
+1/2, in the sense of (2) –(3) .Proof. Let G(0) denote the first-stage observed graph, and let A(0) be its adjacency matrix. For notational convenience in the proof, write 
+
+a ∶= 16 θ0, b ∶= θ0.
+
+We first identify the distribution of the first-stage graph. The underlying graph is 
+
+G ∼ SBM (n, 16 log nn , log nn ) .
+
+Every vertex is queried exactly once. Thus an existing edge {u, v } is missed by the first stage if it is missed when querying u and also missed when querying v. These two oracle coins are independent, so the miss probability is 
+
+(1 − w0)2 = 1 − θ0.
+
+Therefore an existing edge is revealed with probability θ0. Since the oracle never creates false edges, the first-stage observed graph is exactly an SBM with edge probabilities 
+
+a log nn = 16 θ0
+
+log nn , b log nn = θ0
+
+log nn .
+
+Equivalently, 
+
+A(0) ∼ SBM (n, a log nn , b log nn ) .
+
+The useful point is that this graph is not strong enough for exact recovery, but it is strong enough for rough recovery. Indeed, 
+
+D+(a, b ) = 12 (√a − √b)2 = 12 θ0(√16 − √1)2 = 92 (1 − 2−1/3) > 0.92 > 34 .
+
+Hence Lemma 9 applies to the first-stage graph. It gives balanced leave-one-out rough labelings ̂ σ(−v), one for each v ∈ [n], such that with probability 1 − o(1), there is a common global sign s ∈ {±1} satisfying max 
+
+> v∈[n]
+
+∣{ u ≠ v ∶̂ σ(−v) 
+
+> u
+
+≠ sσ ∗
+
+> u
+
+}∣ ≤ n1/4+o(1) = o(n/ log n).
+
+18 Here ̂ σ(−v) is computed after deleting all first-stage observations incident to v. This leave-one-out construc-tion is important: it makes the reference labels ̂ σ(−v) independent of the first-stage observations from v,conditional on the true labels. For each v, split the other vertices into two deterministic pieces. List [n] ∖ {v} in increasing order. Let 
+
+Bv be the first ⌊( n − 1)/ 2⌋ vertices in this list, and let 
+
+Cv ∶= ([ n] ∖ {v}) ∖ Bv .
+
+The set Cv will be used only to decide whether v is ambiguous. The set Bv will be reserved for the second-stage likelihood test. This split prevents us from using the same incident observations both to screen v and later to classify v.Since the true labeling is sampled uniformly from the exactly balanced model, a deterministic set of size 
+
+n/2 + O(1) contains n/4 + o(n) vertices from each community, with high probability. By hypergeometric concentration and a union bound over all v, we have simultaneously for every v,
+
+∣Bv ∩ {u ∶ σ∗ 
+
+> u
+
+= +1}∣ = n
+
+4 + o(n), ∣Bv ∩ {u ∶ σ∗ 
+
+> u
+
+= −1}∣ = n
+
+4 + o(n),
+
+and also 
+
+∣Cv ∩ {u ∶ σ∗ 
+
+> u
+
+= +1}∣ = n
+
+4 + o(n), ∣Cv ∩ {u ∶ σ∗ 
+
+> u
+
+= −1}∣ = n
+
+4 + o(n).
+
+Now define the leave-one-out screening score Λloo  
+
+> v
+
+∶= ∑
+
+> u∈Cv
+
+̂
+
+σ(−v) 
+
+> u
+
+A(0) 
+
+> uv
+
+.
+
+This score has a simple interpretation. It compares how many revealed first-stage edges from v go to vertices currently labeled +1 and how many go to vertices currently labeled −1. If v is truly in the +1 community, then it should have more revealed edges to true +1 vertices than to true −1 vertices, so the score should usually be positive. If v is truly in the −1 community, the score should usually be negative. Vertices with scores close to zero are the ambiguous vertices that we will send to the second stage. Fix the common global sign s from the rough-initialization guarantee. For readability, assume first that s = +1 and σ∗ 
+
+> v
+
+= +1. If the reference labels ̂ σ(−v) were exact on Cv , then Λ loo  
+
+> v
+
+would have the same large-deviation behavior as 
+
+Xv − Yv ,
+
+where 
+
+Xv ∼ Bin ( n
+
+4 + o(n), a log nn ) , Yv ∼ Bin ( n
+
+4 + o(n), b log nn ) .
+
+Here Xv counts revealed edges from v to same-community vertices in Cv , while Yv counts revealed edges from v to opposite-community vertices in Cv .The reference labels are not perfectly exact, but the number of reference-label errors in Cv is o(n/ log n),uniformly over v. Conditional on the leave-one-out graph, the number of first-stage revealed edges from v
+
+to these mislabeled reference vertices has mean 
+
+O ( log nn ) o(n/ log n) = o(1).
+
+In the next claim, we show that the contribution of mislabeled reference vertices in Cv to the leave-one-out screening score Λ loo  
+
+> v
+
+is extremely small. More precisely, for every ε > 0, the probability that these mislabeled vertices perturb Λ loo  
+
+> v
+
+by more than ε log n is o(n−2), uniformly over v.
+
+Claim (Bounding the tail event) . By Chernoff upper-tail bound, for every fixed ε > 0,
+
+Pr (the mislabeled reference vertices change Λloo  
+
+> v
+
+by more than ε log n) = o(n−2),
+
+uniformly in v.
+
+19 Proof. Let Dv ⊆ Cv be the set of mislabeled reference vertices in Cv , and let Mv be the number of first-stage revealed edges from v to vertices in Dv . By the earlier part of the proof, uniformly over v,
+
+∣Dv ∣ = o(n/ log n).
+
+Since each edge {u, v } with u ∈ Dv is revealed in the first stage graph with probability at most c log n/n for some constant c > 0, it follows that Mv is stochastically dominated by Bin (∣ Dv ∣, c log nn ) ,
+
+Hence, again uniformly over v,
+
+λv ∶= E[Mv ] = O (∣ Dv ∣ log nn ) = o(1).
+
+Now let 
+
+∣∆v ∣ ∶= ∣Λloo  
+
+> v
+
+− (Xv − Yv )∣ 
+
+so that ∆ v is the perturbation of the screening score caused by the mislabeled reference vertices in Cv . Each revealed edge to a mislabeled reference vertex changes the score by at most a constant; in fact, under the present definition of Λ loo  
+
+> v
+
+, each such edge changes the score by at most 2. Therefore, for some absolute constant C > 0, 
+
+∣∆v ∣ ≤ CM v .
+
+Consequently, for every fixed ε > 0, Pr (∣ ∆v ∣ > ε log n) ≤ Pr (Mv > εC log n) .
+
+Set tv = ϵC log n and applying Chernoff upper-tail bound for the binomial random variable gives Pr (Mv ≥ tv ) ≤ ( eλ v
+
+tv
+
+)
+
+> tv
+
+Since λv = o(1) uniformly over v and tv = Θ(log n), we obtain 
+
+( eλ v
+
+tv
+
+)
+
+> tv
+
+= exp (−Θ(log n log log n)) = n−ω(1).
+
+In particular, this is o(n−2) uniformly over v.A union bound over v shows that, simultaneously for all vertices, the effect of mislabeled reference vertices is only o(log n) with probability 1 − o(1). Thus the large-deviation exponents of the actual score Λ loo  
+
+> v
+
+are the same as those of Xv − Yv , up to o(1) in the exponent. Let Ia,b (d) be the Cram´ er rate function for Xv − Yv at scale log n:
+
+Ia,b (d) ∶= sup 
+
+> t∈R
+
+{td − a
+
+4 (et − 1) − b
+
+4 (e−t − 1)} .
+
+This rate function describes the probability that Xv − Yv has an atypically small value: Pr (Xv − Yv ≤ d log n) = n−Ia,b (d)+o(1)
+
+in the lower-tail regime relevant here. In particular, 
+
+Ia,b (0) = 14 (√a − √b)2 = 14 θ0(√16 − √1)2 = 94 (1 − 2−1/3) > 0.46 .
+
+20 Choose 
+
+δ ∶= 0.32 .
+
+A direct evaluation of the displayed rate function gives 
+
+Ia,b (δ) > 0.13 , Ia,b (−δ) > 1.02 .
+
+Define the observable screened set 
+
+A ∶= {v ∶ ∣Λloo  
+
+> v
+
+∣ ≤ δ log n} .
+
+For vertices outside the screen, define the preliminary label by ̂
+
+σ(0) 
+
+> v
+
+∶= sign (Λloo  
+
+> v
+
+), v ∉ A.
+
+Thus A contains exactly those vertices whose first-stage score has too small a margin to trust. We now bound the size of A. Suppose σ∗ 
+
+> v
+
+= +1. Since the typical value of Λ loo  
+
+> v
+
+is positive, the event v ∈ A
+
+is a lower-tail event: Pr (v ∈ A) = Pr (∣ Λloo  
+
+> v
+
+∣ ≤ δ log n) ≤ n−Ia,b (δ)+o(1) ≤ n−0.13 +o(1).
+
+The same estimate holds when σ∗ 
+
+> v
+
+= −1, by symmetry. Therefore 
+
+E∣A∣ ≤ n0.87 +o(1).
+
+By Markov’s inequality, 
+
+∣A∣ ≤ n0.88 
+
+with high probability. Next we show that every vertex outside the screen is labeled correctly. If σ∗ 
+
+> v
+
+= +1, a wrong sign outside the screen requires Λloo  
+
+> v
+
+< −δ log n. 
+
+The corresponding large-deviation bound gives Pr (Λloo  
+
+> v
+
+< −δ log n) ≤ n−Ia,b (−δ)+o(1) ≤ n−1.02 +o(1).
+
+Equivalently, for both possible true labels, Pr (σ∗ 
+
+> v
+
+Λloo  
+
+> v
+
+< −δ log n) ≤ n−1.02 +o(1).
+
+A union bound over all vertices gives Pr (∃v ∉ A ∶̂ σ(0) 
+
+> v
+
+≠ sσ ∗ 
+
+> v
+
+) = o(1).
+
+Thus, with high probability, every vertex outside A is correctly labeled, up to the same global sign s.It remains to check the reference condition for vertices inside the screen. For each v ∈ A, we use Bv as the second-stage reference set and use ̂ σ(−v) restricted to Bv as the reference labeling. The rough leave-one-out guarantee gives 
+
+∣{ u ∈ Bv ∶̂ σ(−v) 
+
+> u
+
+≠ sσ ∗
+
+> u
+
+}∣ = o(n/ log n)
+
+simultaneously for every v. The hypergeometric concentration estimates above give 
+
+∣Bv ∩ {u ∶ σ∗ 
+
+> u
+
+= +1}∣ = n
+
+4 + o(n), ∣Bv ∩ {u ∶ σ∗ 
+
+> u
+
+= −1}∣ = n
+
+4 + o(n).
+
+Therefore (3) holds with reference parameter 
+
+ζ = 12 .
+
+21 Finally, the measurability and independence requirements in the definition of screened initialization hold by construction. The event {v ∈ A} uses first-stage observations incident to v only through vertices in Cv . The second-stage likelihood test will use fresh oracle queries from v to vertices in Bv . Since Bv ∩Cv = ∅, screening does not condition on the first-stage observations from v to the reference set used later for refinement. Also, the complement of Bv ∪ {v} has linear size, so the exact-balance constraint does not determine σ∗ 
+
+> v
+
+from the labels on Bv alone. Combining the preceding estimates, with probability 1 − o(1),
+
+∣A∣ ≤ n0.88 ,̂ σ(0) 
+
+> u
+
+= sσ ∗ 
+
+> u
+
+for all u ∉ A,
+
+and for every v ∈ A, the leave-one-out reference set Bv satisfies (3) with ζ = 1/2. Hence the first-stage graph admits a 0 .88-screening initialization with reference parameter 1 /2. 
+
+Theorem 5. In Model 1 every oracle-only exact-recovery strategy requires k = Ω(n) queries. Proof. We prove the contrapositive. Fix an arbitrary adaptive oracle-only strategy with query budget k =
+
+o(n). We show that exact recovery fails with probability tending to one. The main intuition is the following. A query at a vertex can only reveal neighbors of that queried vertex. If k = o(n), then only o(n) vertices can be queried at all. Moreover, since the graph has logarithmic maximum degree with high probability, the total number of vertex appearances in all oracle responses is only o(n log n).Hence most vertices are both unqueried and appear only rarely in the entire transcript. Swapping the labels of two such vertices, one from each community, changes the likelihood of the transcript by only a small polynomial factor. Since there are linearly many such balanced swaps, the true labeling cannot dominate the posterior. Let T denote the full oracle transcript, including the algorithm’s internal randomness. Define 
+
+Q(T ) ∶= {v ∶ vertex v is queried at least once }.
+
+Since the strategy makes at most k queries, 
+
+∣Q(T )∣ ≤ k = o(n).
+
+We next control how often vertices appear in oracle responses. For each v ∈ [n], let Av (T ) be the number of times v is returned as a neighbor in the oracle transcript, counted with multiplicity over repeated queries. Since the oracle never returns non-neighbors, every response is a subset of the true neighborhood of the queried vertex. With high probability, the underlying SBM has maximum degree at most Cdeg log n, for a constant 
+
+Cdeg = Cdeg (α, β ). On this event, every oracle response has size at most Cdeg log n, and hence 
+
+> n
+
+∑
+
+> v=1
+
+Av (T ) ≤ Cdeg k log n = o(n log n).
+
+Fix a small constant ε > 0, to be chosen later, and define the set of vertices that appear too often in the transcript: 
+
+H(T ) ∶= {v ∶ Av (T ) > ε log n}.
+
+Then 
+
+∣H(T )∣ ≤ 1
+
+ε log n
+
+> n
+
+∑
+
+> v=1
+
+Av (T ) ≤ Cdeg 
+
+ε k = o(n).
+
+Now define the good set 
+
+G(T ) ∶= [n] ∖ (Q(T ) ∪ H(T )) .
+
+Thus a vertex in G(T ) is never queried and is returned as a neighbor at most ε log n times in the entire transcript. Since both Q(T ) and H(T ) have size o(n), we have 
+
+∣G(T )∣ = n − o(n)
+
+22 with high probability. Because the true labeling is exactly balanced, removing only o(n) vertices leaves linearly many vertices in each community: 
+
+∣G(T ) ∩ V +∣ = n
+
+2 − o(n), ∣G(T ) ∩ V −∣ = n
+
+2 − o(n).
+
+We now fix two good vertices of opposite labels, 
+
+i ∈ G(T ) ∩ V +, j ∈ G(T ) ∩ V −.
+
+Let σ(i,j ) be the balanced labeling obtained by swapping the labels of i and j:
+
+σ(i,j ) 
+
+> i
+
+= −1, σ(i,j ) 
+
+> j
+
+= +1, σ(i,j ) 
+
+> u
+
+= σ⋆ 
+
+> u
+
+for u ∉ {i, j }.
+
+This is the natural local obstruction in the balanced SBM: a one-vertex flip is not an admissible balanced labeling, but swapping one + vertex with one − vertex is. Define the likelihood ratio 
+
+Lij (T ) ∶= Pσ(i,j ) (T )
+
+Pσ⋆ (T ) .
+
+We now lower-bound Lij (T ). The important point is that we do this directly on the original adaptive transcript. We do not compare the original run to a counterfactual run. The algorithm’s future query choices may depend on past oracle responses, but once a transcript T is fixed, the query choices are deterministic functions of the past transcript and the internal randomness. Thus the query choices themselves contribute no likelihood factor. Only the probabilities of the observed oracle responses matter. Under the swap σ⋆ ↦ σ(i,j ), all pairs not incident to i or j have the same within/between-community status as before. The pair {i, j } is also between-community under both labelings, so it contributes no likelihood difference. Therefore the only possible likelihood differences come from pairs {u, i } and {u, j }
+
+with u ∉ {i, j }.Since i, j ∈ G(T ), neither i nor j is ever queried. Thus the only way the transcript can see i or j is if some queried vertex u returns i or j as a neighbor. Consider one such pair {u, v }, where v ∈ {i, j } and u is a queried vertex. Suppose u is queried r times in the realized transcript. If v is returned at least once in those r queries, then the likelihood ratio contribution of the pair {u, v } is bounded below by a positive constant depending only on α, β . Indeed, the two possible edge probabilities are p and q, so the return event changes likelihood by at worst a factor comparable to p/q
+
+or q/p.If v is never returned in those r queries, then the probability of this non-return event is 1 − ρp or 1 − ρq, ρ ∶= 1 − (1 − w)r ∈ [0, 1],
+
+depending on whether the pair is within-community or between-community. Since p, q = O(log n/n), uni-formly over ρ ∈ [0, 1],
+
+∣log 1 − ρp 
+
+1 − ρq ∣ = O( log nn ) .
+
+Thus a non-return contributes only O(log n/n) log-likelihood loss. Combining these two cases, there exists a constant C0 = C0(α, β, w ) such that, for the realized transcript, log Lij (T ) ≥ −C0(Ai(T ) + Aj (T )) − C0∣Q(T )∣ log nn .
+
+The first term accounts for actual returns of i or j, each of which can cost only a constant factor in likelihood. The second term accounts for all queried vertices that did not return i or j, each of which costs only O(log n/n).Because i, j ∈ G(T ),
+
+Ai(T ) ≤ ε log n, Aj (T ) ≤ ε log n. 
+
+23 Also ∣Q(T )∣ ≤ k = o(n), so 
+
+∣Q(T )∣ log nn = o(log n).
+
+Therefore log Lij (T ) ≥ −2C0ε log n − o(log n),
+
+or equivalently 
+
+Lij (T ) ≥ n−2C0ε−o(1).
+
+Choose ε > 0 small enough that 2C0ε < 12 .
+
+Then every balanced swap between two good vertices of opposite communities has likelihood at least 
+
+Lij (T ) ≥ n−1/2−o(1).
+
+On the high-probability event above, choose an arbitrary matching 
+
+M(T ) ⊂ (G(T ) ∩ V +) × (G(T ) ∩ V −)
+
+of size 
+
+∣M(T )∣ = n
+
+2 − o(n).
+
+For every (i, j ) ∈ M(T ), the labeling σ(i,j ) is balanced and distinct from σ⋆, and satisfies 
+
+Pσ(i,j ) (T )
+
+Pσ⋆ (T ) = Lij (T ) ≥ n−1/2−o(1).
+
+Since the prior over balanced labelings is uniform, the posterior mass assigned to the true labeling is Π(σ⋆ ∣ T ) = Pσ⋆ (T )
+
+∑τ balanced Pτ (T )
+
+≤ Pσ⋆ (T )
+
+Pσ⋆ (T ) + ∑(i,j )∈M(T ) Pσ(i,j ) (T )
+
+= 11 + ∑(i,j )∈M(T ) Lij (T )
+
+≤ 11 + ( n 
+
+> 2
+
+− o(n)) n−1/2−o(1)
+
+= o(1).
+
+Thus, with probability 1 − o(1), the true balanced labeling has vanishing posterior mass. To translate this into an impossibility statement for every estimator, recall the standard Bayes-risk identity. Conditional on the transcript T , the best possible estimator is the MAP estimator, whose conditional success probability is max   
+
+> τbalanced
+
+Π(τ ∣ T ).
+
+Moreover, 
+
+E[Π(σ⋆ ∣ T ) ∣ T ] = ∑ 
+
+> τbalanced
+
+Π(τ ∣ T )2.
+
+Since Π (σ⋆ ∣ T ) = o(1) with high probability and is always at most one, we have 
+
+E ∑ 
+
+> τbalanced
+
+Π(τ ∣ T )2 = o(1).
+
+24 Therefore 
+
+E max   
+
+> τbalanced
+
+Π(τ ∣ T ) ≤ E
+
+⎡⎢⎢⎢⎢⎣( ∑ 
+
+> τbalanced
+
+Π(τ ∣ T )2)
+
+> 1/2
+
+⎤⎥⎥⎥⎥⎦
+
+= o(1).
+
+Hence even the MAP estimator succeeds with probability o(1), and no estimator can achieve exact recovery with probability tending to one. We conclude that every oracle-only exact-recovery strategy must use k = Ω(n) queries. 25 B Omitted proofs from Section 4 
+
+Lemma 6 (Uniform querying fails) . Consider Model 2 with subsampling rate s ∈ (0, 1), oracle reliability 
+
+w ∈ (0, 1], and query budget k = o(n). Suppose the learner uses a data-independent balanced uniform querying strategy: the queried set is fixed in advance, or chosen independently of Gsub and the oracle responses. Then, in the sublinear-budget regime, uniform querying does not improve the exact-recovery threshold beyond that of Gsub alone. In particular, exact recovery under uniform querying is impossible w.h.p. whenever s ∆2 < 2.Proof. The proof has one simple idea. When k = o(n), a balanced uniform querying rule touches only 
+
+o(n) vertices. Hence almost every vertex is unqueried. For two unqueried vertices of opposite communities, the extra oracle observations affect only o(n) possible comparison vertices, while the n − o(n) remaining comparisons are exactly those from the subsampled graph. Thus the local exact-recovery exponent for such vertices is the same as for Gsub alone. Write 
+
+p = α log nn , q = β log nn , I = (√α − √β)2.
+
+For all sufficiently large n, since k = o(n), we have k < n. A balanced uniform non-adaptive strategy queries 
+
+k vertices once and leaves the remaining n − k vertices unqueried. Let 
+
+Q ∶= {i ∈ [n] ∶ Ri = 1}, U ∶= [n] ∖ Q. 
+
+Thus ∣Q∣ = k = o(n) and ∣U ∣ = n − o(n). We condition throughout on the queried set Q. Since the querying rule is data-independent, Q is fixed in advance, or randomized independently of both the graph and the labels. For an existing edge {i, j }, the edge is observed in the final data if it is retained in Gsub , or if it is revealed by an oracle query to one of its endpoints. Conditional on the query counts, 
+
+ρij ∶= Pr ({ i, j } is observed ∣ { i, j } ∈ E) = 1 − (1 − s)( 1 − w)Ri+Rj .
+
+In particular, if i, j ∈ U , then ρij = s, whereas if i ∈ U and j ∈ Q, then 
+
+ρij = 1 − (1 − s)( 1 − w) = s + (1 − s)w. 
+
+Therefore, for every unqueried vertex i ∈ U ,
+
+∑
+
+> j≠i
+
+ρij = ∑ 
+
+> j∈U∖{i}
+
+ρij + ∑
+
+> j∈Q
+
+ρij (7) 
+
+= s(∣ U ∣ − 1) + (s + (1 − s)w)∣ Q∣ (8) 
+
+= s(n − k − 1) + (s + (1 − s)w)k (9) 
+
+= sn + o(n). (10) Thus an unqueried vertex has total exposure sn + o(n), and the extra oracle exposure coming from queried vertices contributes only o(n) possible comparison vertices. We now prove impossibility using balanced two-vertex swaps. Let 
+
+U+ ∶= U ∩ {i ∶ σ⋆ 
+
+> i
+
+= +1}, U− ∶= U ∩ {i ∶ σ⋆ 
+
+> i
+
+= −1}.
+
+Because Q is independent of the labels and ∣Q∣ = o(n), the exact balance of the true labeling implies, with probability 1 − o(1),
+
+∣U+∣ = n
+
+2 − o(n), ∣U−∣ = n
+
+2 − o(n). (11) We work on this event. 26 Let Y denote the final observation, consisting of Gsub and the oracle-revealed edges. Conditional on Q
+
+and on a candidate labeling σ, the final observed edge indicators are independent over unordered pairs, and 
+
+Yab ∼
+
+⎧⎪⎪⎨⎪⎪⎩
+
+Bernoulli (ρab p), σa = σb,
+
+Bernoulli (ρab q), σa ≠ σb.
+
+For i ∈ U+, define the signed one-vertex log-likelihood ratio in favor of assigning i the wrong label: 
+
+Xi ∶= ∑
+
+> ℓ≠i
+
+σ⋆ 
+
+> ℓ
+
+[Yiℓ log qp + (1 − Yiℓ ) log 1 − ρiℓ q
+
+1 − ρiℓ p ] .
+
+Indeed, if σ⋆ 
+
+> ℓ
+
+= +1, then under the true label σi = +1 the pair {i, ℓ } is within-community, while under the wrong label σi = −1 it is between-community. The corresponding single-pair log-likelihood ratio is 
+
+Yiℓ log ρiℓ qρiℓ p + (1 − Yiℓ ) log 1 − ρiℓ q
+
+1 − ρiℓ p = Yiℓ log qp + (1 − Yiℓ ) log 1 − ρiℓ q
+
+1 − ρiℓ p .
+
+If instead σ⋆ 
+
+> ℓ
+
+= −1, the roles of p and q are reversed, and the log-likelihood ratio changes sign. This is exactly captured by the factor σ⋆ 
+
+> ℓ
+
+. Hence Xi is the log-likelihood ratio between assigning i the wrong label −1 and assigning it the true label +1, with all other labels fixed at their true values. For j ∈ U−, define analogously 
+
+Xj ∶= − ∑
+
+> ℓ≠j
+
+σ⋆ 
+
+> ℓ
+
+[Yjℓ log qp + (1 − Yjℓ ) log 1 − ρjℓ q
+
+1 − ρjℓ p ] ,
+
+so that Xj is the log-likelihood ratio in favor of assigning j the wrong label +1. We first estimate the probability that one such unqueried vertex has atypically strong evidence for the wrong label. Fix i ∈ U+. Conditional on the labels, Xi is a sum of independent terms. The terms corre-sponding to queried vertices contribute negligibly to the logarithmic large-deviation scale. More precisely, for any fixed θ in a neighborhood of 0, each ℓ ∈ Q contributes log E exp {θ σ ⋆ 
+
+> ℓ
+
+[Yiℓ log qp + (1 − Yiℓ ) log 1 − ρiℓ q
+
+1 − ρiℓ p ]} = O ( log nn ) ,
+
+uniformly in ρiℓ ∈ [0, 1]. This is because Pr (Yiℓ = 1) = O(log n/n), the edge-present log-ratio is O(1), and the edge-absent log-ratio is O(log n/n). Since ∣Q∣ = k = o(n), the total contribution of queried vertices to log EeθX i is o(log n). Hence the queried vertices contribute o(1) to the normalized cumulant generating function at scale log n. Equation (10) also shows that their first-moment contribution is o(n), so they do not shift the typical value of Xi at the relevant scale. The remaining n−o(n) comparison vertices are unqueried and therefore have retention probability exactly 
+
+s. Thus the usual one-vertex Cram´ er calculation for the logarithmic-degree SBM applies with effective parameters sα and sβ . Consequently, Pr  
+
+> σ⋆
+
+(Xi ≥ 0) = n−sI /2+o(1).
+
+More generally, for fixed t in a neighborhood of 0, Pr  
+
+> σ⋆
+
+(Xi ≥ t log n) = n−J(t)+o(1),
+
+where J is the corresponding Cram´ er rate function and 
+
+J(0) = sI 
+
+2 .
+
+The matching lower bound is a standard strong large-deviation estimate for triangular arrays. In particular, it follows from the Bahadur–Rao-type theorem of Chaganty and Sethuraman [8], applied to the log-moment 27 generating functions of the independent Bernoulli summands. In the logarithmic-degree SBM, the same logarithmic asymptotic is computed explicitly in the converse proof of Abbe, Bandeira, and Hall [3]; see also Mossel, Neeman, and Sly [25] for the corresponding exact-recovery converse. Since sI < 2, we have J(0) < 1. By continuity of J, choose a sufficiently small fixed δ > 0 such that 
+
+μ ∶= J(δ) < 1.
+
+Then, uniformly for i ∈ U+,Pr  
+
+> σ⋆
+
+(Xi ≥ δ log n) = n−μ+o(1). (12) The same estimate holds symmetrically for j ∈ U−.Define 
+
+Z+ ∶= ∣{ i ∈ U+ ∶ Xi ≥ δ log n}∣ , Z− ∶= ∣{ j ∈ U− ∶ Xj ≥ δ log n}∣ .
+
+By (11) and (12), 
+
+Eσ⋆ Z+ = n1−μ+o(1) → ∞, Eσ⋆ Z− = n1−μ+o(1) → ∞.
+
+We next show concentration. For distinct i, i ′ ∈ U+, the score Xi depends on the edge variables {Yiℓ ∶ ℓ ≠ i},while Xi′ depends on {Yi′ℓ ∶ ℓ ≠ i′}. These two collections share exactly one unordered edge variable, namely 
+
+Yii ′ . All other edge observations entering the two sums are disjoint and hence independent conditional on the labels. Write 
+
+Xi = Si + Tii ′ , Xi′ = Si′ + Ti′i,
+
+where Tii ′ and Ti′i are the contributions of the shared edge {i, i ′}. Conditional on Yii ′ , the variables Si and 
+
+Si′ are independent. Moreover, Pr  
+
+> σ⋆
+
+(Yii ′ = 1) = O ( log nn ) .
+
+If Yii ′ = 0, then Tii ′ , T i′i = O(log n/n), so the threshold δ log n is shifted only by o(1). The sharp large-deviation estimate above is stable under such an o(1) shift, giving the same tail probability up to a factor 1 + o(1). If Yii ′ = 1, then Tii ′ , T i′i = O(1); this changes the logarithmic exponent only by o(1), while the event 
+
+Yii ′ = 1 itself has probability O(log n/n), making this contribution negligible compared to the product of the two one-vertex tail probabilities. Therefore, uniformly over distinct i, i ′ ∈ U+,Pr  
+
+> σ⋆
+
+(Xi ≥ δ log n, X i′ ≥ δ log n) = (1 + o(1)) Pr  
+
+> σ⋆
+
+(Xi ≥ δ log n) Pr  
+
+> σ⋆
+
+(Xi′ ≥ δ log n).
+
+It follows that Var (Z+) = o(( EZ+)2).
+
+Hence, by Chebyshev’s inequality, Z+ ≥ 1 with probability 1 − o(1). The same argument gives Z− ≥ 1 with probability 1 − o(1). By a union bound, with probability 1 − o(1) both events occur. On the event {Z+ ≥ 1, Z − ≥ 1}, choose i ∈ U+ and j ∈ U− such that 
+
+Xi ≥ δ log n, Xj ≥ δ log n. 
+
+Let σ(i,j ) be the balanced labeling obtained from σ⋆ by swapping the labels of i and j:
+
+σ(i,j ) 
+
+> i
+
+= −1, σ(i,j ) 
+
+> j
+
+= +1, σ(i,j ) 
+
+> ℓ
+
+= σ⋆ 
+
+> ℓ
+
+for all ℓ ∉ {i, j }.
+
+Let 
+
+Lij (Y ) ∶= Pσ(i,j ) (Y )
+
+Pσ⋆ (Y )
+
+be the likelihood ratio between the swapped labeling and the true labeling. Pairs {u, v } with u, v ∉ {i, j } have identical distributions under σ⋆ and σ(i,j ), so they contribute 0 to log Lij (Y ). Pairs {i, ℓ } with ℓ ∉ {i, j } contribute the corresponding terms in Xi, and pairs {j, ℓ } with 28 ℓ ∉ {i, j } contribute the corresponding terms in Xj . The pair {i, j } is between-community under both σ⋆
+
+and σ(i,j ), so it contributes 0 to the likelihood ratio of the balanced swap. The only bookkeeping issue is that the one-vertex scores Xi and Xj include the terms corresponding to the pair {i, j }, even though this pair does not contribute to the balanced-swap likelihood ratio. Therefore log Lij (Y ) = Xi + Xj − [the ℓ = j term in Xi] − [the ℓ = i term in Xj ].
+
+Each of the two subtracted terms is O(1) if Yij = 1, and O(log n/n) if Yij = 0. Hence, uniformly in Y ,log Lij (Y ) = Xi + Xj + O(1).
+
+Consequently, log Lij (Y ) ≥ 2δ log n − O(1) > 0for all sufficiently large n. Thus 
+
+Pσ(i,j ) (Y ) > Pσ⋆ (Y ).
+
+Therefore, with probability 1 − o(1), there exists a balanced labeling σ(i,j ) ≠ σ⋆ whose likelihood is strictly larger than the likelihood of the true labeling. Since the prior over balanced labelings is uniform, the maximum-a-posteriori estimator cannot return σ⋆ on this event. Hence exact recovery is impossible with probability tending to one. The argument was carried out after conditioning on the queried set Q and on the high-probability event (11). Removing this conditioning changes the failure probability by only o(1). The use of data-independence of Q is essential in two places: first, it allows us to condition on Q and retain a product measure over the edge observations with deterministic exposures ρab ; second, it gives (11), since Q is independent of the true labels. Thus the conclusion applies to any non-adaptive allocation that is fixed in advance or randomized independently of (Gsub , σ ⋆). It does not apply to allocations that depend on Gsub .We conclude that exact recovery under balanced uniform non-adaptive querying is impossible with high probability whenever 
+
+s(√α − √β)2 = sI < 2.
+
+This proves the lemma. 
+
+Lemma 7. Consider Model 2, a subsampling rate s ∈ (0, 1), and oracle reliability w ∈ (0, 1]. There exist constants (α, β, s, w ) and a budget k = o(n) such that a two-stage strategy that uses Gsub to target queries succeeds at exact recovery w.h.p. Proof. All label recovery statements are understood up to the unavoidable global sign flip. We prove the lemma by giving one concrete choice of parameters and one concrete two-stage strategy. 
+
+Step 1: Choose parameters. Set 
+
+α = 16 , β = 1, w = 12 , (√α − √β)2 = 9.
+
+Choose a sufficiently small fixed ϵ > 0 and set 
+
+s = 2(1 − ϵ)
+
+9 .
+
+Then the subsampled graph Gsub has effective exact-recovery signal 
+
+s(√α − √β)2 = 2(1 − ϵ) < 2.
+
+Thus Gsub alone is below the sharp Abbe–Bandeira–Hall threshold for exact recovery in the logarithmic-degree SBM. This is useful context: the subsampled graph alone cannot exactly recover, so the oracle queries must be targeted to repair the remaining ambiguous vertices. 29 Let 
+
+c ∶= (√α − √β)2
+
+2 = 92 .
+
+Then 
+
+cs = 1 − ϵ. 
+
+Step 2: A leave-one-out near-exact initial estimator. We use the following standard near-exact recovery fact for the logarithmic-degree SBM. There exist estimators ̂ σ(0,−v), one for each v ∈ [n], such that ̂ σ(0,−v) is computed from Gsub after deleting all edges incident to v, and such that, after orienting all estimators by a common deterministic anchor convention, max  
+
+> v∈[n]
+
+Ham (̂ σ(0,−v), σ ⋆) ≤ n1−cs +o(1) = nϵ+o(1) (13) with high probability. Intuitively, Gsub is below the exact-recovery threshold but still contains enough information to recover all but a subpolynomially small fraction of the labels. The leave-one-out construction is used only to ensure independence: ̂ σ(0,−v) is computed without looking at any subsampled edge incident to v, so it is independent of those incident edges conditional on the true labels. 
+
+Step 3: Split the neighbors of each vertex into a screening set and a refinement set. We now separate the information used to decide whether v is ambiguous from the information used later to refine v
+
+by oracle queries. This separation is the key technical point. Set 
+
+b0 ∶= 720 , c0 ∶= 13 20 .
+
+For every v, choose deterministic disjoint sets Bv , C v ⊂ [n] ∖ {v} satisfying 
+
+∣Bv ∣ = b0n + o(n), ∣Cv ∣ = c0n + o(n).
+
+For example, one can choose these sets by a fixed cyclic rule independent of the graph and of the labels. The set Cv will be used only to screen v, and the set Bv will be used only for the second-stage oracle refinement. Because the true labels are balanced and the sets Bv , C v are fixed independently of the labels, hyperge-ometric concentration and a union bound over v imply that, with high probability, simultaneously for all 
+
+v,
+
+∣Bv ∩ {u ∶ σ⋆ 
+
+> u
+
+= +1}∣ = b0n
+
+2 + o(n), ∣Bv ∩ {u ∶ σ⋆ 
+
+> u
+
+= −1}∣ = b0n
+
+2 + o(n),
+
+and similarly 
+
+∣Cv ∩ {u ∶ σ⋆ 
+
+> u
+
+= +1}∣ = c0n
+
+2 + o(n), ∣Cv ∩ {u ∶ σ⋆ 
+
+> u
+
+= −1}∣ = c0n
+
+2 + o(n).
+
+Step 4: Define the screening score. Write 
+
+p = α log nn , q = β log nn .
+
+For each vertex v, define the leave-one-out screening score Λloo  
+
+> v
+
+∶= ∑
+
+> u∈Cv
+
+̂
+
+σ(0,−v) 
+
+> u
+
+[Asub  
+
+> uv
+
+log pq + (1 − Asub  
+
+> uv
+
+) log 1 − sp 
+
+1 − sq ] .
+
+This is the log-likelihood evidence, computed from the subsampled graph, for whether v has label +1 or −1, using the leave-one-out estimates of the labels of vertices in Cv as references. 30 We screen vertices whose evidence is not strong. Let 
+
+τ ∶= 21 20 and define 
+
+A ∶= {v ∶ ∣Λloo  
+
+> v
+
+∣ ≤ τ log n} .
+
+The intended interpretation is simple: vertices outside A have a large positive or negative likelihood score and will be trusted; vertices in A are ambiguous and will be queried. 
+
+Step 5: Analyze the ideal genie-aided screening score. First replace the estimated reference labels ̂
+
+σ(0,−v) 
+
+> u
+
+by the true labels σ⋆
+
+> u
+
+. Define Λ⋆ 
+
+> v
+
+∶= ∑
+
+> u∈Cv
+
+σ⋆ 
+
+> u
+
+[Asub  
+
+> uv
+
+log pq + (1 − Asub  
+
+> uv
+
+) log 1 − sp 
+
+1 − sq ] .
+
+We compute the large-deviation rate of Λ ⋆ 
+
+> v
+
+conditional on σ⋆ 
+
+> v
+
+= +1. For a reference vertex u with σ⋆ 
+
+> u
+
+= +1, the subsampled edge indicator satisfies 
+
+Asub  
+
+> uv
+
+∼ Bernoulli (sp ).
+
+For such a vertex, the single-edge log-likelihood contribution is 
+
+Xp = Asub  
+
+> uv
+
+log pq + (1 − Asub  
+
+> uv
+
+) log 1 − sp 
+
+1 − sq .
+
+For fixed θ, using p = α log n/n and q = β log n/n, we have log EeθX p = s log nn [α (( αβ )
+
+> θ
+
+− 1 − θ) + θβ ] + o ( log nn ) .
+
+For a reference vertex u with σ⋆ 
+
+> u
+
+= −1, we have Asub  
+
+> uv
+
+∼ Bernoulli (sq ) and the score contributes the negative of the same log-likelihood expression. Hence log EeθX q = s log nn [β (( βα )
+
+> θ
+
+− 1 − θ) + θα ] + o ( log nn ) .
+
+The linear terms in θ cancel when we sum over asymptotically equal numbers of +1 and −1 reference labels in 
+
+Cv . Since ∣Cv ∣ = c0n + o(n) and Cv contains asymptotically half of each community, the normalized cumulant generating function of Λ ⋆ 
+
+> v
+
+is 
+
+ψc0 (θ) ∶= lim 
+
+> n→∞
+
+1log n log E [eθΛ⋆ 
+
+> v
+
+∣ σ⋆ 
+
+> v
+
+= +1]
+
+with 
+
+ψc0 (θ) = c0
+
+s
+
+2 [α (( αβ )
+
+> θ
+
+− 1) + β (( βα )
+
+> θ
+
+− 1)] .
+
+Let 
+
+Ic0 (t) ∶= sup 
+
+> θ∈R
+
+{θt − ψc0 (θ)} 
+
+be the associated rate function. The Chernoff bound gives, for fixed t below the typical value of Λ ⋆ 
+
+> v
+
+/ log n,Pr (Λ⋆ 
+
+> v
+
+≤ t log n ∣ σ⋆ 
+
+> v
+
+= +1) ≤ n−Ic0 (t)+o(1).
+
+31 We now evaluate this rate function for our constants. At ϵ = 0, s = 2/9, and therefore 
+
+ψc0 (θ) = 13 180 [16 (16 θ − 1) + 16 −θ − 1] .
+
+The optimizer in 
+
+Ic0 (t) = sup 
+
+> θ∈R
+
+{θt − ψc0 (θ)} 
+
+is the unique solution of ψ′ 
+
+> c0
+
+(θ) = t. Since 
+
+ψ′ 
+
+> c0
+
+(θ) = 13 180 log 16 [16 ⋅ 16 θ − 16 −θ ] ,
+
+this is a one-dimensional equation. Direct evaluation at t = τ = 21 /20 and t = −τ = −21 /20 gives 
+
+Ic0 ( 21 20 ) ≈ 0.24515 , Ic0 (− 21 20 ) ≈ 1.29515 .
+
+Hence, for ϵ > 0 sufficiently small, by continuity of the rate function in s = 2(1 − ϵ)/ 9, 
+
+Ic0 (τ ) > 0.24 , Ic0 (−τ ) > 1.25 . (14) 
+
+Step 6: Replace the genie labels by the leave-one-out labels. We now compare Λ loo  
+
+> v
+
+with Λ ⋆ 
+
+> v
+
+. By (13), uniformly over v, the number of reference labels in Cv on which ̂ σ(0,−v) disagrees with σ⋆ is at most 
+
+nϵ+o(1).The effect of these wrong reference labels is negligible on the log n scale. Indeed, for any fixed θ, changing the sign of a single reference label changes the corresponding single-vertex log-moment generating function by at most O(log n/n), because the edge itself appears with probability only O(log n/n). Therefore the total change in the log-moment generating function caused by all wrong reference labels is at most 
+
+nϵ+o(1)O ( log nn ) = o(1).
+
+In particular, the large-deviation exponents for Λ loo  
+
+> v
+
+are the same as those for the genie-aided score Λ ⋆ 
+
+> v
+
+, up to o(1).Combining this perturbation bound with (14), we get Pr (∣ Λloo  
+
+> v
+
+∣ ≤ τ log n) ≤ n−0.24 +o(1).
+
+Indeed, conditional on σ⋆ 
+
+> v
+
+= +1, the event ∣Λloo  
+
+> v
+
+∣ ≤ τ log n is contained in the lower-tail event Λ loo  
+
+> v
+
+≤ τ log n,and the case σ⋆ 
+
+> v
+
+= −1 is symmetric. Similarly, Pr (Λloo  
+
+> v
+
+≤ −τ log n ∣ σ⋆ 
+
+> v
+
+= +1) ≤ n−1.25 +o(1),
+
+and, by symmetry, Pr (Λloo  
+
+> v
+
+≥ τ log n ∣ σ⋆ 
+
+> v
+
+= −1) ≤ n−1.25 +o(1).
+
+Step 7: The screen is small and all unscreened vertices are correct. Since 
+
+A = {v ∶ ∣Λloo  
+
+> v
+
+∣ ≤ τ log n},
+
+the previous bound gives 
+
+E∣A∣ ≤ n0.76 +o(1).
+
+By Markov’s inequality, 
+
+∣A∣ ≤ n0.77 (15) 32 with high probability. Next consider a vertex outside the screen. If σ⋆ 
+
+> v
+
+= +1 and v ∉ A but the score has the wrong sign, then necessarily Λloo  
+
+> v
+
+< −τ log n. 
+
+This event has probability at most n−1.25 +o(1). The same argument applies symmetrically when σ⋆ 
+
+> v
+
+= −1. A union bound over all vertices gives Pr (∃v ∉ A ∶ sign (Λloo  
+
+> v
+
+) ≠ σ⋆ 
+
+> v
+
+) ≤ n ⋅ n−1.25 +o(1) = n−0.25 +o(1) = o(1).
+
+Thus, with high probability, every vertex outside A is already correctly labeled by sign (Λloo  
+
+> v
+
+).
+
+Step 8: Refine the screened vertices using fresh oracle queries. We now query every vertex in A
+
+once. The second-stage classifier for v ∈ A uses only oracle responses from v to vertices in Bv , together with the reference labels ̂ σ(0,−v) 
+
+> u
+
+for u ∈ Bv .The separation between Bv and Cv is crucial. The event {v ∈ A} depends on subsampled incident edges from v only through pairs {u, v } with u ∈ Cv . The second-stage oracle likelihood test uses only pairs {u, v }
+
+with u ∈ Bv , and Bv ∩ Cv = ∅. Moreover, ̂ σ(0,−v) was computed after deleting all subsampled edges incident to v. Therefore, conditional on the first-stage data and on the event v ∈ A, the underlying edges from v to 
+
+Bv are still independent SBM edges, and the oracle coins used in the second stage are fresh. For one oracle query, an edge from v to u is revealed with probability w if it exists. Thus the effective second-stage edge probabilities are 
+
+wp = wα log nn , wq = wβ log nn .
+
+Using the same single-vertex Bhattacharyya calculation as in the standard SBM exact-recovery analysis, but now restricted to the reference set Bv , the error probability for classifying a fixed screened vertex is Pr (̂ σ(1) 
+
+> v
+
+≠ σ⋆ 
+
+> v
+
+∣ v ∈ A) ≤ n−b0w(√α−√β)2/2+o(1).
+
+Here Bv has asymptotic size b0n and contains asymptotically half of each community. The leave-one-out reference labels on Bv are not perfectly correct, but by (13) they contain at most 
+
+nϵ+o(1) = o(n/ log n) errors, uniformly in v. As before, these wrong reference labels perturb the likelihood exponent by only o(1) and do not change the displayed exponent. For our constants, 
+
+b0w
+
+2 (√α − √β)2 = 7/20 2 ⋅ 12 ⋅ 9 = 63 80 = 0.7875 .
+
+Therefore Pr (̂ σ(1) 
+
+> v
+
+≠ σ⋆ 
+
+> v
+
+∣ v ∈ A) ≤ n−0.7875 +o(1).
+
+On the high-probability event (15), ∣A∣ ≤ n0.77 . Hence a union bound over all screened vertices gives Pr (∃v ∈ A ∶̂ σ(1) 
+
+> v
+
+≠ σ⋆ 
+
+> v
+
+) ≤ n0.77 ⋅ n−0.7875 +o(1) = n−0.0175 +o(1) = o(1).
+
+Thus all screened vertices are correctly recovered after one oracle query each. 
+
+Step 9: Query budget and conclusion. Choose 
+
+k = ⌈n0.78 ⌉ .
+
+By (15), with high probability this budget is enough to query every vertex in A once. Since 0 .78 < 1, we have k = o(n).With high probability, all vertices outside A are correctly labeled by the screening score, and all vertices inside A are correctly labeled by the second-stage oracle refinement. Therefore the two-stage targeted strategy achieves exact recovery with probability 1 − o(1) using k = o(n) oracle queries. 33 Theorem 8. In Model 2, there exist SBM parameters α, β > 0, a subsampling rate s ∈ (0, 1), an oracle reliability w ∈ (0, 1] and a query budget k = o(n) such that simultaneously: 1. Every data-independent uniform querying strategy fails to achieve exact recovery w.h.p. 2. There exists a two-stage adaptive querying strategy that uses Gsub to target queries and achieves exact recovery with high probability. Proof. By Lemma 6, when k = o(n), uniform non-adaptive querying does not improve the exact-recovery threshold beyond that of the subsampled graph Gsub alone. Hence, for parameter choices satisfying s(√α −√β)2 < 2, any uniform querying strategy fails with high probability. On the other hand, by Lemma 7, there exist constants (α, β, s, w ) and a sublinear budget k = o(n)
+
+for which a two-stage strategy that uses Gsub to target its queries succeeds at exact recovery with high probability. Therefore, for the same observation model and the same asymptotic budget regime, uniform querying fails while a Gsub -dependent non-uniform strategy succeeds. This establishes a strict adaptivity gap for Model 2. 34
