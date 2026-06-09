@@ -1,0 +1,408 @@
+Title: CATPO: Critique-Augmented Tree Policy Optimization
+
+URL Source: https://arxiv.org/pdf/2606.08346v1
+
+Published Time: Tue, 09 Jun 2026 00:53:33 GMT
+
+Number of Pages: 14
+
+Markdown Content:
+# CATPO: C RITIQUE -A UGMENTED TREE POLICY OPTI -
+
+# MIZATION 
+
+Ayush Singh ∗
+
+Vision and Language Group Indian Institute of Technology Roorkee Roorkee, Uttarakhand, India 
+
+ayush s@mt.iitr.ac.in 
+
+Umang Goyal ∗
+
+Vision and Language Group Indian Institute of Technology Roorkee Roorkee, Uttarakhand, India 
+
+umang g@mt.iitr.ac.in 
+
+Ankur Dahiya ∗
+
+Vision and Language Group Indian Institute of Technology Roorkee Roorkee, Uttarakhand, India 
+
+ankur d@mfs.iitr.ac.in 
+
+## ABSTRACT 
+
+Reinforcement learning with verifiable rewards (RLVR) has become a domi-nant paradigm for improving the reasoning capabilities of large language mod-els (LLMs). Recent tree-based methods such as T REE RPO extend flat trajectory sampling with tree-structured rollouts to obtain dense, step-level reward signals without a separate process reward model. However, not all trees are equally infor-mative: trees where all leaves succeed, all leaves fail, or the policy already predicts the reward distribution contribute little to gradient updates, wasting compute. We introduce CATPO (Critique-Augmented Tree Policy Optimization), which diag-noses and addresses this waste at the tree level. CATPO first scores each tree via a tree informativeness score F (T ), combining leaf-outcome diversity with policy-reward decorrelation at zero extra compute. For dead-wrong trees where all branches fail, CATPO applies critique-guided healing : it locates the shallow-est failure point, generates a natural-language critique, and grafts refined continu-ations to recover training signal. Finally, an informativeness-weighted loss scales each tree’s gradient contribution by its normalized score, concentrating parameter updates on the most informative trees while preserving overall gradient magni-tude. Experiments on Qwen2.5-Math-1.5B trained with the MATH dataset show that CATPO achieves 37.5% macro accuracy across four benchmarks (AIME24, MATH-500, OlympiadBench, MinervaMath), improving over T REE RPO by 1.9% and GRPO by 4.8%. 
+
+## 1 INTRODUCTION 
+
+Recent breakthroughs in reinforcement learning have brought transformative progress to large lan-guage model (LLM) reasoning. Models such as DeepSeek-R1 (DeepSeek-AI et al., 2025), and QwQ (Team, 2025) achieve remarkable performance on complex reasoning tasks by training with Reinforcement Learning with Verifiable Rewards (RLVR), where the model explores reasoning paths toward correct, automatically checkable answers. A central challenge in RLVR is credit assignment, trajectory-level rewards reveal whether a solution is right or wrong, but say little about which reasoning steps actually mattered. Two lines of work address this. Process reward models (PRMs) (Lightman et al., 2024; Wang et al., 2024; Luo et al., 2024) train separate networks to score each step, but require costly step level annotation. Tree based methods avoid any auxiliary model, by expanding multiple continuations at each step, approaches like T REE RPO (Yang et al., 2025) and TreeRL (Hou et al., 2025) estimate step level advantages 
+
+> ∗
+
+Equal contribution. 
+
+1                                                          
+
+> arXiv:2606.08346v1 [cs.CL] 6 Jun 2026 Phase 1 Tree Rollout Phase 2 Score & Classify Phase 3 Critique-Guided Healing Phase 4 Weighted Policy Update
+> Prompt q
+> sampled from
+> q
+> N= 8 branches · D= 3 depth
+> Correct Incorrect
+> Propagate rewards bottom-up
+> Compute sibling advantages A
+> F(T) = p(1 p)(1 2,r)
+> diversity × decorrelation
+> Dead-correct Downweight
+> Flow ,p> 0.5
+> Dead-wrong HEAL
+> Flow ,p0.5
+> Stale Mod. weight
+> low <Fhigh
+> Informative Full weight
+> F>high
+> Dead-wrong: Flow ,p0.5
+> Find failure node v*
+> Shallowest node where all
+> children: reward <
+> Generate critique
+> LLM critiques partial solution
+> at temperature 0.3
+> Generate k= 4 refinements
+> Continuations from v*
+> at temperature 0.6
+> Graft & re-score
+> Attach knodes to v*;
+> re-propagate; recompute A
+> w(T)
+> w(T) = F(T) / F
+> Informativeness weight per tree
+> Dead-
+> correct
+> Stale
+> Informative
+> Dead-wrong
+> (healed)
+> * healed trees become most informative
+> CATPO =T
+> w(T)clip (,A)
+> +DKL (ref )
+> Clipped surrogate +KL regularization
+> +CATPO
+> Policy update · next iteration
+> Next training iteration
+
+Figure 1: Overview of the CATPO training pipeline. Each iteration proceeds in four phases: (1) sample an N -ary tree of partial solutions and propagate rewards; (2) score each tree with F (T ) and classify it into one of four regimes; (3) apply critique-guided healing to dead-wrong trees by finding the failure node, generating a critique, and grafting k refined continuations; (4) scale advantages by the informativeness weight w(T ) and update the policy. from leaf outcomes propagated bottom-up through the tree, yielding dense gradient signal at the cost of only extra sampling. Yet tree-based methods treat all trees equally in the training loss. In practice, many sampled trees carry little or no useful signal: • Dead-correct trees: all leaves produce the right answer, the model already solves this problem, leaving no contrastive signal. • Dead-wrong trees: every leaf fails, without a single positive branch, group-relative advan-tages collapse to zero. • Stale trees: the policy’s confidence already tracks the reward distribution, further training yields diminishing returns. This waste is substantial. DAPO (Yu et al., 2025) and GRESO (Zheng et al., 2025) mitigate the analogous problem for flat rollouts by filtering or predicting uninformative prompts. But these operate at the prompt level, not the tree level: the same prompt can yield an informative tree or a dead one depending on the sample, and the internal structure of the tree - which branches the policy finds surprising - carries signal that prompt-level filtering discards. We propose CATPO (Critique-Augmented Tree Policy Optimization), which tackles this waste directly at the tree level through three complementary mechanisms: 1. Tree informativeness score. We define F (T ) = ˆ p(1 −ˆp) · (1 − ρ2
+
+π,r ), combining leaf outcome diversity ( ˆp: leaf pass rate) with policy-reward decorrelation ( ρπ,r : Pearson corre-lation between node log-probabilities and propagated rewards). Because every ingredient is already computed during tree sampling, F (T ) comes at zero additional cost. 2. Critique-guided healing. For dead-wrong trees ( F ≈ 0), we locate the shallowest failing depth, prompt the policy model itself to critique the error, and graft k critique conditioned continuations as new branches, recovering training signal from rollouts that would other-wise be wasted. 3. Informativeness-weighted loss. Each tree’s contribution to the policy gradient is scaled by its normalized score w(T ) = F (T )/ ¯F , modulating advantages and returns so that infor-mative trees drive parameter updates while dead-correct and stale trees receive diminished influence. 22 RELATED WORK 
+
+2.1 REINFORCEMENT LEARNING FOR LLM R EASONING 
+
+Reinforcement learning from human feedback (RLHF) (Ouyang et al., 2022) established the paradigm of optimizing LLM policies with reward signals from human preferences. PPO (Schul-man et al., 2017) has been the dominant algorithm, though its learned value function introduces instability and overhead. GRPO (Shao et al., 2024) eliminated the value network entirely by us-ing group-normalized rewards as advantage estimates, forming the backbone of breakthroughs like DeepSeek-R1 (DeepSeek-AI et al., 2025). However, GRPO suffers from length and normalization biases (Liu et al., 2025). Subsequent work has refined this paradigm: DAPO (Yu et al., 2025) intro-duced dynamic sampling and token level policy gradient losses, VAPO (Yue et al., 2025) advocated for value based credit assignment, and RLOO (Ahmadian et al., 2024) and Open-Reasoner-Zero (Hu et al., 2025) showed that simpler REINFORCE style baselines can match or exceed GRPO. 2.2 TREE -B ASED RL FOR DENSE REWARD ESTIMATION 
+
+Tree structured exploration has roots in inference time methods, Tree-of-Thoughts (Yao et al., 2023), RAP (Hao et al., 2023), and LATS (Zhou et al., 2023), which explore multiple reasoning paths without updating model weights. ReST-MCTS* (Zhang et al., 2024) and rStar-Math (Guan et al., 2025) extended this idea to training time via MCTS for offline self-training. TREE RPO (Yang et al., 2025) was the first to integrate tree sampling into the on-policy RL loop, computing step level advantages via bottom-up reward propagation over sibling nodes. TreeRL (Hou et al., 2025) added entropy guided branching, while TreeGRPO (Ji et al., 2025) and Tree-OPO (Huang et al., 2025) extended tree based advantages to agent tasks and off-policy settings. Crucially, all existing tree based methods treat every tree equally in the training objective. CATPO is the first to diagnose tree informativeness and intervene on uninformative trees. 2.3 PROCESS REWARD MODELS AND CREDIT ASSIGNMENT 
+
+An alternative approach to step level credit assignment trains a separate neural network, a Process Reward Model (PRM), to score intermediate reasoning steps. Let’s Verify Step by Step (Light-man et al., 2024) established that process supervision (per step correctness labels) outperforms out-come supervision for guiding the LLM policy, but requires expensive human annotation. Math-Shepherd (Wang et al., 2024) and OmegaPRM (Luo et al., 2024) automated PRM data collec-tion via Monte Carlo rollouts from intermediate states. PRIME (Cui et al., 2025) computes to-ken level implicit process rewards through a log ratio formulation without explicit PRM training. VinePPO (Kazemnejad et al., 2025) replaces value networks with MC state value estimates for pol-icy optimization, and SPO (Guo et al., 2025) provides segment level credit assignment. These meth-ods improve the quality of advantage estimates for the LLM policy gradient within existing rollout structures. CATPO is complementary, operating at the tree level to filter and repair the rollouts themselves before they are used for policy updates. 2.4 SAMPLE EFFICIENCY IN LLM RL Wasted compute from uninformative rollouts is a recognized problem. DAPO’s Dynamic Sam-pling (Yu et al., 2025) filters prompts where all responses succeed or fail. GRESO (Zheng et al., 2025) predicts uninformative prompts before rollout, achieving 2.4 × speedup. CDAS (Kong et al., 2025) aligns problem difficulty to model competence. However, these methods operate at the prompt level, they decide whether to train on a problem at all, but cannot diagnose the internal structure of a tree rollout. CATPO operates at the tree level, scoring and repairing the rollout structure itself. 2.5 SELF -C ORRECTION AND CRITIQUE FOR LLM S
+
+Self-Refine (Madaan et al., 2023) and Reflexion (Shinn et al., 2023) demonstrated iterative self-improvement through inference time critique, though Huang et al. (2023) showed that intrinsic self-correction often degrades reasoning without external feedback. SCoRe (Kumar et al., 2024) addressed this via multi-turn online RL, while GLoRe (Havrilla et al., 2024), RISE (Qu et al., 2024), 3and DRLC (Cao et al., 2024) trained refinement models on synthetic correction trajectories or used critiques as dense rewards. CATPO differs structurally, rather than correcting complete trajectories or training a separate refine-ment model, we apply critique within the tree at the specific point where reasoning first goes wrong, grafting corrected branches while preserving the shared prefix. This is more compute efficient than full regeneration and integrates naturally with the tree-based RL loop. 
+
+## 3 METHODOLOGY 
+
+We present CATPO in four parts: background on tree-based RL (Section 3.1), the tree informative-ness score (Section 3.2), critique-guided healing (Section 3.3), and the informativeness-weighted training objective (Section 3.4). Figure 1 gives an overview of the full training pipeline. 3.1 BACKGROUND : T REE -B ASED RL WITH GRPO 
+
+GRPO. Given a prompt q, GRPO (Shao et al., 2024) samples a group of G complete responses 
+
+{oi}Gi=1 from the current LLM policy πθold . Each response receives a reward Ri from a rule-based verification function (e.g., checking whether the final answer matches the ground truth). The ad-vantage for response i is computed by normalizing rewards within the group. The LLM policy parameters θ are then updated via a clipped surrogate objective with KL regularization against a reference policy πref . Crucially, no separate value network or reward model is trained - only the LLM policy is optimized. 
+
+TreeRPO. Instead of sampling G independent trajectories, T REE RPO (Yang et al., 2025) samples an N -ary tree of depth D from the LLM policy. At each reasoning step, N candidate continuations (each up to Lstep tokens) are generated, producing a tree where sibling nodes share a common prefix. Leaf nodes are scored by a verification function ϕ, and rewards propagate bottom-up via mean aggregation: 
+
+rnode = Ec∈Children (v)[rc]. (1) Advantages are computed over step-level sibling groups (children of the same parent). For a node with propagated reward rn and sibling rewards {rs}, T REE RPO uses a Bernoulli-variance normal-ization: 
+
+ˆAn = rn − μμ(1 − μ) + ϵ , μ = mean ({rs}), (2) where μ(1 − μ) replaces the empirical standard deviation to maintain consistency between binary and continuous reward normalization. This advantage is replicated across all tokens in the node’s response. No separate value network or reward model is trained. 
+
+Limitation. As discussed in Section 1, both GRPO and T REE RPO weight all sampled data equally. Zero-variance groups in GRPO become zero-gradient trees in T REE RPO ,dead-correct, dead-wrong, and stale trees all waste compute. No existing mechanism diagnoses or repairs unin-formative trees within the training loop; CATPO fills this gap. 3.2 TREE INFORMATIVENESS SCORE 
+
+We propose a tree informativeness score that quantifies how useful a tree T is for improving the LLM policy. The score combines two signals available at zero extra cost after tree sampling: 
+
+Leaf Diversity Term. Let ˆp be the fraction of leaves in T that receive a positive reward. The implementation uses Bernoulli variance: 
+
+VB (ˆ p) = ˆ p(1 − ˆp). (3) This term is zero when all leaves agree (all correct or all incorrect), and reaches its maximum 0.25 
+
+at ˆp = 0 .5. Intuitively, it measures the amount of contrastive signal available for group-relative advantages. 4Policy-Reward Decorrelation. Let ℓn = P 
+
+> t
+
+log πθ (on,t | q, o n,<t ) be the sum of token log-probabilities for non-root node n under the current policy, and rn the propagated reward of node n.We compute: 
+
+ρπ,r = Pearson  {ℓn}n∈T \root , {rn}n∈T \root 
+
+. (4) We use 1−ρ2 
+
+> π,r
+
+, which is the fraction of reward variation not linearly explained by policy confidence. When |ρπ,r | ≈ 1, the reward structure is largely explained and the tree is less informative; when 
+
+ρπ,r is near 0, learning potential is higher. 
+
+Informativeness Score. Combining the leaf diversity term (Eq. 3) with the decorrelation term (Eq. 4), the tree informativeness score is: 
+
+F (T ) = ˆ p(1 − ˆp) · (1 − ρ2 
+
+> π,r
+
+) (5) with range [0 , 0.25] . This multiplicative form ensures that both ingredients are necessary, a tree needs diverse outcomes and residual policy uncertainty to yield useful gradients. All quantities are already computed during tree sampling and log-probability evaluation, so F (T ) incurs zero additional forward passes. 
+
+Tree Classification. Based on F (T ), we classify trees into four regimes using thresholds τlow and 
+
+τhigh (Table 1): 
+
+Regime Condition Interpretation Action 
+
+Dead-correct F ≤ τlow , ˆp(1 − ˆp) < 0.05 , ˆp > 0.5 Near-unanimous success Downweight Dead-wrong F ≤ τlow , ˆp(1 − ˆp) < 0.05 , ˆp ≤ 0.5 Near-unanimous failure Heal via critique Stale τlow < F ≤ τhigh Moderate residual signal Moderate weight Informative F > τ high High learning potential Full weight 
+
+Table 1: Tree classification regimes based on the informativeness score F (T ). We use τlow =0 .025 
+
+and τhigh =0 .10 for F ∈ [0 , 0.25] .3.3 CRITIQUE -G UIDED HEALING 
+
+Dead-wrong trees ( F ≈ 0, all leaves incorrect) represent problems where the model consistently fails. Rather than discarding them, CATPO attempts to heal them by introducing corrected branches via natural-language critique. 
+
+Step 1: Identify the Failure Point. We perform a breadth-first search from the root to find the shallowest depth d∗ where all children have propagated reward rc < ϵ (with ϵ = 0 .05 ). This is the point where reasoning first goes entirely wrong. 
+
+Step 2: Generate a Critique. The original problem text (from the root node) and the partial solution text (from the root to the failing node at depth d∗) are decoded. The policy model itself is prompted to identify the specific error: 
+
+Critique Prompt 
+
+You are a mathematical reasoning critic. A student attempted the following problem but got it wrong. Problem: {Problem text }
+
+Student’s partial solution: {Partial solution }
+
+Task: Identify the specific mathematical or logical error. Be precise about which step is wrong and why. 
+
+The critique is generated at low temperature ( τ = 0 .3) to produce a focused error diagnosis. 5Step 3: Graft Refined Continuations. The policy model is then prompted with the problem, the partial solution, and the generated critique, and asked to produce k corrected continuations. These are scored by the verification function and added as new children of the failing node (at depth d∗ +1 ), alongside the original failing children: 
+
+Refinement Prompt   
+
+> Problem text A student’s incorrect attempt: {Partial solution }
+> Critique of the error: {Critique text }
+> Provide a corrected solution continuing from where the error was found. Show your work step by step.
+
+Each refinement is generated at the standard sampling temperature ( τ = 0 .6), tokenized, truncated to Lstep tokens, and scored by the verification function to obtain a leaf reward. 
+
+Step 4: Re-score and Re-propagate. The new leaves are scored by the verification function, rewards are re-propagated bottom-up via Eq. 1, and the informativeness score F (T ) is recomputed. If healing succeeds, some refined branches produce correct answers, converting a dead-wrong tree into one with positive reward diversity. We validate this empirically in Section 4 (H2). 3.4 CATPO T RAINING OBJECTIVE 
+
+After healing, all nodes original and grafted are treated uniformly. Each tree’s contribution to the policy gradient is weighted by its normalized informativeness: 
+
+w(T ) = F ( ˜T )
+
+> 1
+> |B|
+
+P  
+
+> T′∈B
+
+F ( ˜T ′) , (6) where ˜T denotes the tree after healing. This normalization preserves the overall gradient magnitude while redistributing it toward informative trees. The weight w(T ) is treated as a detached constant during backpropagation; gradients do not flow through the informativeness computation. We adopt the clipped surrogate objective of T REE RPO with this per-tree weight: 
+
+JCATPO (θ) = X 
+
+> T∈B
+
+w(T ) X
+
+> n∈T
+
+1
+
+|on|
+
+> |on|
+
+X
+
+> t=1
+
+
+
+min  rn,t (θ) ˆAn,t , clip (rn,t (θ), 1 − ε, 1 + ε) ˆAn,t 
+
+
+
+− β D KL (πθ ∥πref )
+
+
+
+,
+
+(7) where rn,t (θ) is the standard importance ratio and ˆAn,t is the Bernoulli-variance-normalized ad-vantage (Eq. 2). Following T REE RPO , only non-root nodes whose sibling reward range exceeds 
+
+τprune = 0 .1 participate. Grafted nodes from healing enter the same computation without modifica-tion, the informativeness weight is the only difference from T REE RPO . The complete algorithm is summarized in Appendix A. 
+
+## 4 EXPERIMENTS 
+
+4.1 EXPERIMENTAL SETUP 
+
+Datasets. We follow the T REE RPO experimental protocol. For training, we use the training split of the MATH dataset (Hendrycks et al., 2021), which contains 7.5k high-quality mathematical reasoning problems. For evaluation, we report results on four widely used benchmarks: MATH-500 (Lightman et al., 2024) (500 representative problems from the MATH test split), Olympiad-Bench (He et al., 2024), MinervaMath (Lewkowycz et al., 2022), and AIME24. 
+
+Base Models. Our experiments use the Qwen2.5-Math series (Yang et al., 2024). We report results on Qwen2.5-Math-1.5B. 6Method AIME24 MATH-500 OlympiadBench Minerva Macro Acc. 
+
+Qwen2.5-Math-1.5B as the Base Model 
+
+GRPO 13.8 67.9 28.5 20.5 32.7 TREE RPO 16.8 ↑3.0 70.7 ↑2.8 30.9 ↑2.4 24.0 ↑3.5 35.6 ↑2.9 
+
+CATPO 20.3 ↑6.5 71.8 ↑3.9 33.1 ↑4.6 24.8 ↑4.3 37.5 ↑4.8 
+
+Table 2: Overall Pass@1 (Avg@8 ) performance on four mathematical reasoning benchmarks. 
+
+Baselines. We compare against: • GRPO (Shao et al., 2024): flat trajectory sampling with group-relative advantages. • TREE RPO (Yang et al., 2025): tree-structured sampling with step-level group-relative advantages (our direct base method). 
+
+Implementation Details. We build on the rllm framework 1 derived from verl (Sheng et al., 2025), with vLLM (Kwon et al., 2023) for efficient inference. For GRPO: temperature 0.6, 8 rollouts per prompt, batch size 128, learning rate 1e-6, max response length 1152. For T REE RPO and CATPO : temperature 0.6, branching factor N = 8 , max depth D = 3 , max step length Lstep = 384 ,pruning threshold τ = 0 .1. CATPO -specific: τlow = 0 .025 , τhigh = 0 .10 , dead-tree variance cutoff ˆp(1 − ˆp) < 0.05 , and k = 4 refinements. KL coefficient β = 0 .001 , entropy loss coefficient 
+
+α = −0.001 . All experiments are conducted on a single A100-80GB GPU. Full hyperparameters and software details are provided in Appendix B (Tables 4–6). 
+
+Metrics. We report Pass@1 (Avg@8) accuracy: for each test problem, 8 responses are sampled at temperature 0.6, and accuracy is averaged across samples. This differs from standard Pass@ k,which measures whether any of k samples is correct; our metric reports the mean binary correctness across all 8 samples. We report individual benchmark scores and the Macro Accuracy (unweighted average across four benchmarks). 4.2 HYPOTHESIS VALIDATION 
+
+We validate the two core hypotheses that motivate our design: (H1) the informativeness score F (T )
+
+is a meaningful proxy for how much a tree contributes to the policy gradient, and (H2) critique-guided healing can recover useful signal from dead-wrong trees. 
+
+H1: Informativeness Predicts Gradient Utility. We build trees offline for 100 problems from the MATH training set using Qwen2.5-Math-1.5B, compute F (T ) for each tree, and measure the per-tree gradient norm ∥g(T )∥2 via REINFORCE-style forward-backward passes. If F (T ) is a good proxy for training utility, it should correlate positively with ∥g(T )∥2.
+
+Correlation Metric Value p-value 
+
+Pearson r 0.54 4.1e-05 Spearman ρ 0.62 1.7e-06 Table 3: Correlation between tree informativeness score F (T ) and per-tree gradient norm ∥g(T )∥2
+
+on 50 trees from MATH training set. As shown in Table 3, the tree informativeness score F (T ) exhibits a strong positive correlation with per-tree gradient norms, with Spearman ρ = 0.62 ( p = 1.7e-06). The relationship is monotonic but not perfectly linear: trees with very low informativeness ( F < 0.025 ) consistently produce near-zero gradient norms, confirming that dead-correct and dead-wrong trees are indeed uninformative 
+
+> 1https://github.com/agentica-project/rllm
+
+7for the policy update. In the mid-range ( 0.025 < F < 0.10 ), gradient norms increase steadily, while the most informative trees ( F > 0.10 ) produce the largest gradients, though with greater variance, reflecting the fact that some informative trees contain harder problems where the gradient direction is useful but noisy. A small number of outliers appear at moderate F with unusually high gradient norms, inspection reveals these correspond to problems at the boundary of the model’s competence where a single correct branch among many failures creates a strong contrastive signal. Overall, H1 validates that F (T ) is a reliable, zero-cost proxy for gradient utility, justifying its use as an informativeness weight in the training loss. 
+
+H2: Critique Heals Dead-Wrong Trees. From the same tree set, we select all dead-wrong trees (F ≤ 0.025 , ˆp(1 − ˆp) < 0.05 , ˆp ≤ 0.5) and apply critique-guided healing with k = 4 refinements and measure the informativeness improvement percentage. Of the dead-wrong trees subjected to healing, 88.1% show a positive improvement in F , indicat-ing that the critique then refine pipeline successfully introduces at least one correct branch in the majority of cases. The remaining trees where healing fails ( ∆F = 0 ) correspond to problems that are fundamentally beyond the model’s current capability: the critique correctly identifies the error, but the refined continuations repeat similar mistakes. This is consistent with prior findings that self-correction without external feedback is bounded by model capability (Huang et al., 2023). Notably, healing is most effective when the failure occurs at a shallow depth (depth 1), where the critique has access to a short, focused error trace rather than a long chain of compounding mistakes. Using the policy model as its own critic avoids the inference cost of a separate model while leveraging the policy’s own understanding of its reasoning process. While this validates that critique-guided heal-ing mechanistically restores gradient signal in dead-wrong trees, the downstream impact on policy accuracy is confirmed by the main results in Table 2. 4.3 MAIN RESULTS 
+
+As shown in Table 2, CATPO achieves a Macro Accuracy of 37.5% on Qwen2.5-Math-1.5B, im-proving over T REE RPO by 1.9% and over GRPO by 4.8%. The gains are consistent across all four benchmarks, but notably larger on the harder evaluation sets (AIME24 and OlympiadBench) than on MATH-500. This pattern is expected: harder problems produce a higher proportion of dead-wrong trees under the baseline, giving CATPO more opportunities to recover training signal through both informativeness weighting and critique healing. On MATH-500, where the model already achieves reasonable accuracy under T REE RPO , fewer trees fall into the dead-wrong regime, so the margin is naturally smaller. The substantial improvement on Minerva a benchmark outside the MATH training distribution suggests that informativeness-weighted training helps the model learn more transferable reasoning strategies rather than overfitting to the training domain. 
+
+## 5 CONCLUSION 
+
+We introduced CATPO , a method that enhances tree-based reinforcement learning for training LLM reasoning policies through three complementary mechanisms, a zero-cost tree informativeness score that identifies which trees carry the most useful signal for the policy gradient, a critique-guided heal-ing procedure that recovers training signal from dead-wrong trees, and an informativeness-weighted loss that concentrates parameter updates on informative trees. Our informativeness score F (T ) com-bines leaf-level diversity with policy-reward decorrelation to quantify each tree’s learning potential, and we validated that it correlates with per-tree gradient norms and that critique healing significantly increases the informativeness of failing trees. By scaling the policy gradient loss with normalized tree informativeness, CATPO redistributes gradient contributions toward the most useful rollouts while rescuing otherwise wasted compute through critique-guided healing. 
+
+## ACKNOWLEDGMENTS 
+
+We thank E2E cloud networks for providing the computational resources and GPUs required for the project. 8REFERENCES 
+
+Arash Ahmadian, Chris Cremer, Matthias Gall´ e, Marzieh Fadaee, Julia Kreutzer, Olivier Pietquin, Ahmet ¨ Ust¨ un, and Sara Hooker. Back to basics: Revisiting reinforce style optimization for learn-ing from human feedback in llms, 2024. Meng Cao, Lei Shu, Lei Yu, Yun Zhu, Nevan Wichers, Yinxiao Liu, and Lei Meng. Beyond sparse rewards: Enhancing reinforcement learning with language model critique in text generation. arXiv preprint arXiv:2401.07382 , 2024. Ganqu Cui, Lifan Yuan, Zefan Wang, Hanbin Wang, Yuchen Zhang, Jiacheng Chen, Wendi Li, Bingxiang He, Yuchen Fan, Tianyu Yu, Qixin Xu, Weize Chen, Jiarui Yuan, Huayu Chen, Kaiyan Zhang, Xingtai Lv, Shuo Wang, Yuan Yao, Xu Han, Hao Peng, Yu Cheng, Zhiyuan Liu, Maosong Sun, Bowen Zhou, and Ning Ding. Process reinforcement through implicit rewards. arXiv preprint arXiv:2502.01456 , 2025. DeepSeek-AI, Daya Guo, Dejian Yang, Haowei Zhang, Junxiao Song, Peiyi Wang, Qihao Zhu, Runxin Xu, Ruoyu Zhang, Shirong Ma, Xiao Bi, Xiaokang Zhang, Xingkai Yu, Yu Wu, Z. F. Wu, Zhibin Gou, Zhihong Shao, Zhuoshu Li, Ziyi Gao, Aixin Liu, Bing Xue, Bingxuan Wang, Bochao Wu, Bei Feng, Chengda Lu, Chenggang Zhao, Chengqi Deng, Chenyu Zhang, Chong Ruan, Damai Dai, Deli Chen, Dongjie Ji, Erhang Li, Fangyun Lin, Fucong Dai, Fuli Luo, Guangbo Hao, Guanting Chen, Guowei Li, H. Zhang, et al. Deepseek-r1: Incentivizing rea-soning capability in llms via reinforcement learning. arXiv preprint arXiv:2501.12948 , 2025. doi: 10.1038/s41586-025-09422-z. Xinyu Guan, Li Lyna Zhang, Yifei Liu, Ning Shang, Youran Sun, Yi Zhu, Fan Yang, and Mao Yang. rstar-math: Small LLMs can master math reasoning with self-evolved deep thinking. arXiv preprint arXiv:2501.04519 , 2025. Yiran Guo, Lijie Xu, Jie Liu, Dan Ye, and Shuang Qiu. Segment policy optimization: Effective segment-level credit assignment in RL for large language models. In Advances in Neural Infor-mation Processing Systems (NeurIPS) , 2025. Shibo Hao, Yi Gu, Haodi Ma, Joshua Jiahua Hong, Zhen Wang, Daisy Zhe Wang, and Zhiting Hu. Reasoning with language model is planning with world model. In Proceedings of the 2023 Conference on Empirical Methods in Natural Language Processing (EMNLP) , 2023. Alex Havrilla, Sharath Raparthy, Christoforus Nalmpantis, Jane Dwivedi-Yu, Maksym Zhuravin-skyi, Eric Hambro, and Roberta Raileanu. Glore: When, where, and how to improve llm reasoning via global and local refinements. arXiv preprint arXiv:2402.10963 , 2024. Chaoqun He, Renjie Luo, Yuzhuo Bai, Shengding Hu, Zhen Leng Thai, Junhao Shen, Jinyi Hu, Xu Han, Yujie Huang, Yuxiang Zhang, Jie Liu, Lei Qi, Zhiyuan Liu, and Maosong Sun. OlympiadBench: A challenging benchmark for promoting AGI with olympiad-level bilingual multimodal scientific problems. In Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (ACL) , 2024. Dan Hendrycks, Collin Burns, Saurav Kadavath, Akul Arora, Steven Basart, Eric Tang, Dawn Song, and Jacob Steinhardt. Measuring mathematical problem solving with the math dataset. In Ad-vances in Neural Information Processing Systems (NeurIPS) , 2021. Zhenyu Hou, Ziniu Hu, Yujiang Li, Rui Lu, Jie Tang, and Yuxiao Dong. Treerl: Llm reinforcement learning with on-policy tree search, 2025. Jingcheng Hu, Yinmin Zhang, Qi Han, Daxin Jiang, Xiangyu Zhang, and Heung-Yeung Shum. Open-reasoner-zero: An open source approach to scaling up reinforcement learning on the base model, 2025. Bingning Huang, Tu Nguyen, and Matthieu Zimmer. Tree-opo: Off-policy monte carlo tree-guided advantage optimization for multistep reasoning, 2025. Jie Huang, Xinyun Chen, Swaroop Mishra, Huaixiu Steven Zheng, Adams Wei Yu, Xinying Song, and Denny Zhou. Large language models cannot self-correct reasoning yet. arXiv preprint arXiv:2310.01798 , 2023. Published at ICLR 2024. 9Yuxiang Ji, Ziyu Ma, Yong Wang, Guanhua Chen, Xiangxiang Chu, and Liaoni Wu. Tree search for llm agent reinforcement learning, 2025. Amirhossein Kazemnejad, Milad Aghajohari, Eva Portelance, Alessandro Sordoni, Siva Reddy, Aaron Courville, and Nicolas Le Roux. VinePPO: Refining credit assignment in RL training of LLMs. In Proceedings of the 42nd International Conference on Machine Learning (ICML) ,2025. Deyang Kong, Qi Guo, Xiangyu Xi, Wei Wang, Jingang Wang, Xunliang Cai, Shikun Zhang, and Wei Ye. Rethinking the sampling criteria in reinforcement learning for LLM reasoning: A competence-difficulty alignment perspective. arXiv preprint arXiv:2505.17652 , 2025. Aviral Kumar, Vincent Zhuang, Rishabh Agarwal, Yi Su, John D Co-Reyes, Avi Singh, Kate Baumli, Shariq Iqbal, Colton Bishop, Rebecca Roelofs, Lei M Zhang, Kay McKinney, Disha Shrivastava, Cosmin Paduraru, George Tucker, Doina Precup, Feryal Behbahani, and Aleksandra Faust. Train-ing language models to self-correct via reinforcement learning. arXiv preprint arXiv:2409.12917 ,2024. Woosuk Kwon, Zhuohan Li, Siyuan Zhuang, Ying Sheng, Lianmin Zheng, Cody Hao Yu, Joseph E. Gonzalez, Hao Zhang, and Ion Stoica. Efficient memory management for large language model serving with pagedattention. In Proceedings of the 29th Symposium on Operating Systems Prin-ciples (SOSP) , 2023. Aitor Lewkowycz, Anders Andreassen, David Dohan, Ethan Dyer, Henryk Michalewski, Vinay Ra-masesh, Ambrose Slone, Cem Anil, Imanol Schlag, Theo Gutman-Solo, Yuhuai Wu, Behnam Neyshabur, Guy Gur-Ari, and Vedant Misra. Solving quantitative reasoning problems with lan-guage models. In Advances in Neural Information Processing Systems (NeurIPS) , 2022. Hunter Lightman, Vineet Kosaraju, Yura Burda, Harri Edwards, Bowen Baker, Teddy Lee, Jan Leike, John Schulman, Ilya Sutskever, and Karl Cobbe. Let’s verify step by step. In International Conference on Learning Representations (ICLR) , 2024. Zichen Liu, Changyu Chen, Wenjun Li, Penghui Qi, Tianyu Pang, Chao Du, Wee Sun Lee, and Min Lin. Understanding r1-zero-like training: A critical perspective, 2025. Liangchen Luo, Yinxiao Liu, Rosanne Liu, Samrat Phatale, Meiqi Guo, Harsh Lara, Yunxuan Li, Lei Shu, Yun Zhu, Lei Meng, Jiao Sun, and Abhinav Rastogi. Improve mathematical reasoning in language models by automated process supervision. arXiv preprint arXiv:2406.06592 , 2024. Aman Madaan, Niket Tandon, Prakhar Gupta, Skyler Hallinan, Luyu Gao, Sarah Wiegreffe, Uri Alon, Nouha Dziri, Shrimai Prabhumoye, Yiming Yang, Shashank Gupta, Bodhisattwa Prasad Majumder, Katherine Hermann, Sean Welleck, Amir Yazdanbakhsh, and Peter Clark. Self-refine: Iterative refinement with self-feedback. Advances in Neural Information Processing Systems , 36, 2023. Long Ouyang, Jeff Wu, Xu Jiang, Diogo Almeida, Carroll L. Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Ray, John Schulman, Jacob Hilton, Fraser Kel-ton, Luke Miller, Maddie Simens, Amanda Askell, Peter Welinder, Paul Christiano, Jan Leike, and Ryan Lowe. Training language models to follow instructions with human feedback. Advances in Neural Information Processing Systems , 35:27730–27744, 2022. Yuxiao Qu, Tianjun Zhang, Naman Garg, and Aviral Kumar. Recursive introspection: Teaching language model agents how to self-improve. arXiv preprint arXiv:2407.18219 , 2024. John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. Proximal policy optimization algorithms. arXiv preprint arXiv:1707.06347 , 2017. Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. Deepseekmath: Pushing the limits of mathe-matical reasoning in open language models. arXiv preprint arXiv:2402.03300 , 2024. 10 Guangming Sheng, Chi Zhang, Zilingfeng Ye, Xibin Wu, Wang Zhang, Ru Zhang, Yanghua Peng, Haibin Lin, and Chuan Wu. Hybridflow: A flexible and efficient rlhf framework. In Proceedings of the Nineteenth European Conference on Computer Systems (EuroSys) , 2025. doi: 10.1145/ 3689031.3696075. Noah Shinn, Federico Cassano, Edward Berman, Ashwin Gopinath, Karthik Narasimhan, and Shunyu Yao. Reflexion: Language agents with verbal reinforcement learning. Advances in Neural Information Processing Systems , 36, 2023. Qwen Team. Qwq-32b: Embracing the power of reinforcement learning, March 2025. URL 
+
+https://qwenlm.github.io/blog/qwq-32b/ .Peiyi Wang, Lei Li, Zhihong Shao, Runxin Xu, Damai Dai, Yifei Li, Deli Chen, Yu Wu, and Zhifang Sui. Math-shepherd: Verify and reinforce LLMs step-by-step without human annotations. In 
+
+Proceedings of the 62nd Annual Meeting of the Association for Computational Linguistics (ACL) ,pp. 9426–9439, 2024. An Yang, Beichen Zhang, Binyuan Hui, Bofei Gao, Bowen Yu, Chengpeng Li, Dayiheng Liu, Jianhong Tu, Jingren Zhou, Junyang Lin, Keming Lu, Mingfeng Xue, Runji Lin, Tianyu Liu, Xingzhang Ren, and Zhenru Zhang. Qwen2.5-math technical report: Toward mathematical ex-pert model via self-improvement. arXiv preprint arXiv:2409.12122 , 2024. Zhicheng Yang, Zhijiang Guo, Yinya Huang, Xiaodan Liang, Yiwei Wang, and Jing Tang. Treerpo: Tree relative policy optimization, 2025. Shunyu Yao, Dian Yu, Jeffrey Zhao, Izhak Shafran, Thomas L. Griffiths, Yuan Cao, and Karthik Narasimhan. Tree of thoughts: Deliberate problem solving with large language models. In Ad-vances in Neural Information Processing Systems (NeurIPS) , 2023. Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan, Gaohong Liu, Lingjun Liu, Xin Liu, Haibin Lin, Zhiqi Lin, Bole Ma, Guangming Sheng, Yuxuan Tong, Chi Zhang, Mofan Zhang, Wang Zhang, Hang Zhu, Jinhua Zhu, Jiaze Chen, Jiangjie Chen, Chengyi Wang, Hongli Yu, Yuxuan Song, Xiangpeng Wei, Hao Zhou, Jingjing Liu, Wei-Ying Ma, Ya-Qin Zhang, Lin Yan, Mu Qiao, Yonghui Wu, and Mingxuan Wang. Dapo: An open-source llm reinforcement learning system at scale, 2025. Yu Yue, Yufeng Yuan, Qiying Yu, Xiaochen Zuo, Ruofei Zhu, Wenyuan Xu, Jiaze Chen, Chengyi Wang, TianTian Fan, Zhengyin Du, Xiangpeng Wei, Xiangyu Yu, Gaohong Liu, Juncai Liu, Lingjun Liu, Haibin Lin, Zhiqi Lin, Bole Ma, Chi Zhang, Mofan Zhang, Wang Zhang, Hang Zhu, Ru Zhang, Xin Liu, Mingxuan Wang, Yonghui Wu, and Lin Yan. Vapo: Efficient and reliable reinforcement learning for advanced reasoning tasks, 2025. Dan Zhang, Sining Zhoubian, Ziniu Hu, Yisong Yue, Yuxiao Dong, and Jie Tang. ReST-MCTS*: LLM self-training via process reward guided tree search. In Advances in Neural Information Processing Systems (NeurIPS) , 2024. Haizhong Zheng, Yang Zhou, Brian R. Bartoldson, Bhavya Kailkhura, Fan Lai, Jiawei Zhao, and Beidi Chen. Act only when it pays: Efficient reinforcement learning for LLM reasoning via selective rollouts. arXiv preprint arXiv:2506.02177 , 2025. Andy Zhou, Kai Yan, Michal Shlapentokh-Rothman, Haohan Wang, and Yu-Xiong Wang. Lan-guage agent tree search unifies reasoning acting and planning in language models. arXiv preprint arXiv:2310.04406 , 2023. 11 A ALGORITHM 
+
+The complete algorithm is summarized in Algorithm 1. 
+
+Algorithm 1 CATPO : Critique-Augmented Tree Policy Optimization 
+
+Require: LLM policy πθ , reference policy πref , training data D, branching factor N , max depth D,refinements k, thresholds τlow , τ high  
+
+> 1:
+
+for each training iteration do  
+
+> 2:
+
+Sample batch of prompts {qi} from D 
+
+> 3:
+
+Phase 1: For each qi, sample N -ary tree Ti of depth D; score leaves; propagate rewards bottom-up; compute sibling-relative advantages (Eq. 2); prune low-variance sibling groups; compute log πθold for all non-pruned nodes  
+
+> 4:
+
+Phase 2: Compute F (Ti) = ˆ pi(1 − ˆpi)·(1 −ρ2 
+
+> π,r i
+
+) using the log-probs from Phase 1; classify each tree  
+
+> 5:
+
+Phase 3: For each dead-wrong tree Ti (where F (Ti) ≤ τlow , ˆpi(1 − ˆpi) < 0.05 , and ˆpi ≤ 0.5):  
+
+> 6:
+
+Find shallowest node v∗ where all children have rc < ϵ  
+
+> 7:
+
+Decode problem text (from root) and partial solution (from root to v∗) 
+
+> 8:
+
+Generate critique at temperature τ =0 .3 
+
+> 9:
+
+Generate k refined continuations at temperature τ =0 .6 
+
+> 10:
+
+Graft as children of v∗; score with verification function; re-propagate rewards; recompute advantages  
+
+> 11:
+
+Phase 4: Compute informativeness weights w(Ti) = F ( ˜Ti)/F ; scale advantages by w(Ti) 
+
+> 12:
+
+Update θ via ∇θ JCATPO (θ) (Eq. 7)  
+
+> 13:
+
+end for 
+
+## B IMPLEMENTATION DETAILS 
+
+We provide full implementation details for reproducibility. All experiments are built on the rllm 
+
+framework 2 derived from verl (Sheng et al., 2025), using vLLM (Kwon et al., 2023) as the roll-out engine with the XFORMERS attention backend. Training uses PyTorch 2.4 with FSDP for distributed training and gradient checkpointing enabled throughout. B.1 MODEL AND DATA 
+
+We use Qwen2.5-Math-1.5B as the base model. The training data is the MATH dataset (Hendrycks et al., 2021) formatted as chain-of-thought parquet files with <think> delimiters, which are ig-nored during reward computation ( ignore think=True ). Prompts are truncated to 512 tokens. B.2 OPTIMIZATION HYPERPARAMETERS 
+
+Table 4 summarizes the optimization and batching hyperparameters. 
+
+> 2https://github.com/agentica-project/rllm
+
+12 Table 4: Optimization and batching hyperparameters. 
+
+Hyperparameter Value 
+
+Learning rate 1 × 10 −6
+
+LR warmup ratio 0.0 PPO epochs per iteration 1PPO clip ratio ε 0.2 PPO mini-batch size 16 Gradient clipping 1.0 KL loss type low-var KL KL loss coefficient β 0.001 KL control coefficient 0.001 Train batch size 32 Validation batch size 128 Max prompt length 512 tokens Max response length 1152 tokens Dynamic batch sizing ✓
+
+Max tokens per GPU 12288 
+
+B.3 TREE STRUCTURE AND CATPO-S PECIFIC HYPERPARAMETERS 
+
+Table 5 details the hyperparameters governing tree rollouts (shared by TreeRPO and CATPO) and the CATPO-specific critique-healing parameters. Table 5: Tree rollout and CATPO-specific hyperparameters. 
+
+Hyperparameter Value 
+
+Tree Structure (TreeRPO & CATPO) 
+
+Branching factor N 8Step length Lstep 384 tokens Max depth D = ⌈1152 /384 ⌉ 3Sampling temperature 0.6 Validation temperature 0.6 Validation rollouts nval 8
+
+CATPO-Specific 
+
+Informativeness threshold τlow 0.025 Informativeness threshold τhigh 0.10 Dead-tree variance cutoff 0.05 Healing failure threshold ϵ 0.05 Critique temperature 0.3 Critique max tokens 256 Refinement temperature 0.6 Number of refinements k 4
+
+B.4 INFRASTRUCTURE 
+
+All experiments run on a single NVIDIA A100-80GB GPU. Table 6 lists infrastructure and training schedule settings. 13 Table 6: Infrastructure and training schedule. 
+
+Setting Value 
+
+GPUs 1×A100-80GB Tensor parallel size 1FSDP parameter offload ×FSDP optimizer offload ✓
+
+Reference model param offload ✓
+
+vLLM GPU memory utilization 0.5 Total epochs 30 Checkpoint frequency every 20 steps Evaluation frequency every 20 steps 
+
+14

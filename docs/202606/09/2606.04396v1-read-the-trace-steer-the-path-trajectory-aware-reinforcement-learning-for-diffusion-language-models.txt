@@ -1,0 +1,1157 @@
+Title: Read the Trace, Steer the Path: Trajectory-Aware Reinforcement Learning for Diffusion Language Models
+
+URL Source: https://arxiv.org/pdf/2606.04396v1
+
+Published Time: Thu, 04 Jun 2026 00:29:54 GMT
+
+Number of Pages: 19
+
+Markdown Content:
+# Read the Trace, Steer the Path: Trajectory-Aware Reinforcement Learning for Diffusion Language Models 
+
+Anant Khandelwal, Manish Gupta 
+
+Microsoft AI, India 
+
+{anantk,gmanish}@microsoft.com  
+
+> §https://github.com/infusion-zero-edit/CAPR
+> https://huggingface.co/collections/anantk/capr-checkpoints
+
+Abstract 
+
+Diffusion large language models (dLLMs) gen-erate responses by iteratively unmasking and revising many positions in parallel. This pro-cess leaves a rich denoising trace depicting which tokens become confident, which remain unstable, and when commitments form. Ex-isting dLLM reinforcement learning methods use this signal only weakly. Flat rollouts are cheap, but assign a single outcome reward to the whole trajectory. Tree rollouts provide finer, verifiable training signals by branching par-tial trajectories and propagating leaf rewards upward, but is compute intensive. We ask whether the denoising trace itself can provide tree-like supervision without tree-level com-pute. We introduce CAPR ( Cached-Amortized 
+
+Path Refinement), a dLLM-RL algorithm that summarizes the denoising trace into a compact path state, uses cached trajectory states to gen-erate cheap sibling continuations, and trains a block-level value head for local block-wise supervision. Under a block-wise unmasking schedule, CAPR records path-state and block-progress features, then redistributes the final outcome reward across blocks according to the tokens revealed in each block. This trains the value head to convert one sparse reward into block-level PPO weights. CAPR therefore re-covers much of the granularity of tree search while avoiding full tree expansion, reducing rollout-generation cost to roughly 0.75 × of flat rollouts and 0.6 × of tree rollouts (at stan-dard setting). Across 4×4 Sudoku, Countdown, GSM8K, and Math500, on dense and mixture-of-experts LLaDA backbones, CAPR sets a new state of the art for RL-tuned dLLMs at 256- and 512-token budgets. On Sudoku, it matches the strongest tree-structured baseline at less than one third of the per-step compute. 
+
+1 Introduction 
+
+Diffusion large language models (dLLMs) (Nie et al., 2025b; Zhu et al., 2025b) generate text by de-noising a fully masked sequence over many parallel steps. At every step, the model exposes a predic-tive distribution for every masked position. This is a rich trace of how the answer forms, but current reinforcement learning (RL) based post-training for dLLMs (Zhao et al., 2025a; Zhu et al., 2025a; Tang et al., 2026; Xie et al., 2026; Pan et al., 2026) uses little of it. An end-of-generation reward must still be assigned across many denoising steps and token blocks, so the learner has no direct signal for which step fixed an important token and which step merely changed an irrelevant one. Existing RL methods for dLLMs sit at two ex-tremes. Flat-rollout methods assign the same out-come reward to all steps. They are cheap, but they cannot tell which denoising decisions mat-tered. Tree-rollout methods (Pan et al., 2026) fork alternative continuations and compare their final rewards. They obtain finer advantages, but their cost grows quickly with branching factor and depth. Figure 1 (right) shows this cost-granularity trade-off. The denoising trace offers a third route. At each step, a position either becomes more stable and confident, or it keeps changing. Figure 1 (left) illustrates this on a simple prompt (“ 7+5 :”). By step three the tens digit has settled at 1, while the units digit is still oscillating. The trace therefore tells us which positions are becoming committed, without running a tree search. The key question is how to convert this trace into a learning signal. We answer this question with CAPR (Cached-
+
+Amortized Path Refinement), an RL algorithm for block-based dLLMs. CAPR consists of three broad mechanisms. a) Cache & Steer : CAPR records the early denoising steps, builds a compact path state from confidence and stability at each posi-tion, and reuses this cached prefix for producing sibling rollouts or branches. The path state is used immediately at every denoising step to steer the next-step logits, reinforcing stable commitments and damping oscillating ones. b) Branch & Prune :At a fixed mid-trajectory step, CAPR branches a    
+
+> arXiv:2606.04396v1 [cs.CL] 3 Jun 2026 Figure 1: The denoising trace contains information that current RL methods do not use. Left: each masked position has a sequence of provisional predictions however stable and confident positions can be separated from positions that keep changing. Right: prior dLLM-RL methods occupy two extremes of the cost–granularity plane. Flat rollouts are cheap but give one scalar advantage per trajectory, d-TreeRPO (Pan et al., 2026) pays tree-expansion cost for a small number of segment-level advantages. The approach introduced in this paper named, CAPR, uses the trace to obtain per-block advantages at roughly 0.75 ×flat-rollout cost.
+
+small number of Gumbel-perturbed sibling contin-uations (rollouts when completed) from the cached prefix. At block boundaries, it keeps the siblings whose path states indicate the strongest commit-ments while pruning others. Finally, a small c) 
+
+Block Critic that reads the path state at each block boundary and converts the outcome reward into one advantage per block for the PPO update. Figure 2 depicts the three mechanisms. This design keeps the useful part of tree methods which makes local comparison among alternatives, without expanding a full tree. Due to caching and pruning, CAPR is much more efficient compared to both flat rollouts as well as tree rollouts. Figure 1(right) shows that CAPR consumes 0.75 × of the flat rollout gener-ation cost. At standard d-TreeRPO tree rollout settings of branching factor = 4 and tree depth = 2 ,CAPR incurs 0.6 × of the tree rollout generation cost as shown in Table 6 in Appendix B. CAPR is not just efficient but also more accurate compared to both flat and tree rollouts. On four reasoning benchmarks ( 4×4 Sudoku, Countdown, GSM8K, Math500) and two open-source LLaDA backbones spanning dense and mixture-of-experts variants, CAPR sets a new state of the art for RL-tuned dLLMs at both the 256-token and 512-token decoding budgets. On Sudoku, it matches the strongest tree-structured baseline at less than a third of the per-step compute (Table 2). Ablations show that all three mechanisms help, with per-block ad-vantages providing the largest gain. 
+
+Contributions. 
+
+• A denoising trace-based view of RL for masked dLLMs: confidence and stability along the de-noising path can be turned into per-block advan-tages, without full tree expansion. • CAPR, a block-based RL algorithm that caches early denoising outputs, amortizes sibling roll-outs from the cached prefix, steers each next de-noising step with a path state, and uses a block critic to turn the final reward into one advantage per block for PPO. • State-of-the-art results for RL-tuned dLLMs at both 256-token and 512-token decoding bud-gets across four reasoning benchmarks and two LLaDA backbones, with less than a third of the per-step compute of the strongest tree-structured baseline on Sudoku. 
+
+2 Related Work 
+
+Diffusion language models. Diffusion language models generate text by iteratively denoising masked tokens rather than predicting strictly left to right (Nie et al., 2025b; Zhu et al., 2025b; Sahoo et al., 2024; Shi et al., 2024; Nie et al., 2025a; Ye et al., 2025b,a; Labs et al., 2025; Song et al., 2025). This decoding process exposes a distribution over every masked position at every step, which makes dLLMs a natural setting for trace-based training sig-nals. Recent open models and paradigms, including LLaDA-1.5 (Zhu et al., 2025a), LLaDA-MoE (Zhu et al., 2025b), Dream-7B (Ye et al., 2025a), and SDAR (Cheng et al., 2025), have made dLLMs strong reasoning backbones. We use the dense and MoE LLaDA variants in our experiments. 
+
+RL post-training for dLLMs. Most RL methods for dLLMs differ in how they assign an outcome reward to the denoising process. Flat-rollout meth-ods, including Diffu-GRPO (Zhao et al., 2025a), VRPO (Zhu et al., 2025a), wd1 (Tang et al., 2026), and d2-stepMerge (Wang et al., 2026), keep sam-pling cheap by applying one trajectory-level reward to all token updates. This makes the update sim-ple, but it does not identify which denoising steps or blocks mattered. Step-aware methods such as SAPO (Xie et al., 2026) and TraceRL (Wang et al., 2025) attach more local signals inside a rollout, but they do not use the denoising trace to learn a block-level value function. Tree-based methods, especially d-TreeRPO (Pan et al., 2026), compare branched continuations and produce segment-level advantages. They are effective, but the cost grows rapidly with branching factor and depth. CAPR targets the gap between these regimes. It keeps the rollout structure close to flat sampling, but uses the trace to produce one advantage per block. Concurrent work explores related ways to stabi-lize or enrich dLLM-RL, including consistency-trajectory regularization (Yang et al., 2025a), lateral-thought reinforcement (Huang et al., 2025b), multimodal RL for dLLMs (Yang et al., 2025b), entropy and anchoring objectives (Yang et al., 2026; Cui et al., 2025; Li et al., 2026), boundary-aware updates (Lin et al., 2025), MDPO (He et al., 2025), principled denoising objectives (Ou et al., 2025), and inpainting-style RL (Zhao et al., 2025b). CAPR is complementary to these direc-tions. Its main contribution is to convert the denois-ing trace into reusable path states and per-block PPO weights. 
+
+Connections to policy optimization and guided decoding. CAPR’s block critic is a lightweight actor–critic component (Sutton, 1988; Schulman et al., 2016, 2017) adapted to sparse, outcome-only rewards. It reads features that are specific to masked decoding: path-state statistics, block progress, prompt-level reward statistics, and the tokens revealed so far. A slowly-updated target copy (Lillicrap et al., 2016) and a small replay buffer keep this online value head stable. The steering shift is related to guided decoding, but it does not use an external classifier or reward model. It uses the model’s own trace. Stable, confi-dent positions receive a small positive bias on the next denoising step, while oscillating positions are damped. The form follows the additive logit con-trol induced by linearly-solvable MDPs (Todorov, 2006). Finally, CAPR uses a one-sided χ2 trust region to suppress rare token-level log-ratio spikes without penalizing all policy movement equally. This is related in spirit to asymmetric clipping (Yu et al., 2025; Xie et al., 2026) and policy-gradient stabilization (Cui et al., 2025; Zhang et al., 2025; Tan et al., 2026; Zheng et al., 2025), but it is ap-plied to token-level dLLM updates with an explicit upper-tail trust-region interpretation. 
+
+3 Method 
+
+3.1 Preliminaries 
+
+A masked dLLM πθ generates a completion y for prompt q over N denoising steps, moving from 
+
+zN = [ q; [MASK] L] to z0 = [ q; y]. Block decod-ing partitions the L completion tokens into blocks. Flat GRPO (Shao et al., 2024) optimizes a clipped policy-gradient objective with a rollout-level out-come advantage shared by all tokens in the comple-tion. Tree methods (Pan et al., 2026) obtain more local advantages by comparing branched contin-uations. CAPR keeps the sampling pattern close to flat GRPO, but replaces the single rollout-level advantage with one advantage per block. We write 
+
+rij (θ) = πθ(yij )/π θold (yij ) for the token-level im-portance ratio used by the PPO update in CAPR. The CAPR methodology is illustrated in Fig. 2. During the early denoising steps it records how each masked position behaves across steps. Sta-ble, confident positions are treated as emerging commitments, oscillating positions are treated as unresolved. This record is compressed into a path state. The path state is then used in three ways: it steers the transition zt to zt−1, later branches reuse a cached prefix, and it gives the block critic the information needed to turn one final reward into one advantage per block. 
+
+3.2 CACHE & S TEER 
+
+At each denoising step t, CAPR reads how each position j is behaving by recording confidence in the current top token, entropy of the probability distribution per position at the current step, and whether the top token stayed stable across denois-ing steps. These are packed into a small feature vector ϕ(t) 
+
+> j
+
+=  c(t) 
+
+> j
+
+, s (t) 
+
+> j
+
+, e (t) 
+
+> j
+
+, a (t)
+
+> j
+
+ where cj is con-fidence, sj is top-token stability, ej is normalized entropy, and aj is certainty. The feature computa-tions are defined in App. A.1. The path state h(t) 
+
+> j
+
+is updated in GRU-style (Cho et al., 2014). A reset gate forgets stale evidence when entropy is high, and an update gate preserves memory when the token has remained stable and certain. Thus hj acts as a signed memory of com-mitment. Positive hj means the position is stable, negative hj means the model is still oscillating. The exact analytic gates are defined in App. A.1. 
+
+h(t) 
+
+> j
+
+← PathGRU  h(t−1)  
+
+> j
+
+, ϕ (t)
+
+> j
+
+, (1) Motivation                     
+
+> Flat GRPO sees only one rollout-level reward.
+> JRL (θ) = Eτ∼πθ
+> ˆAb·∇log πθ
+> abc
+> steer sample weight
+> CAPR uses the denoising trace
+> path state →cheap branches
+> →block-level PPO weights
+> CAPR optimisation path
+> aCache & Steer
+> confidence entropy, stability
+> trace
+> path state
+> h(t)
+> j
+> bBranch & Prune
+> cached prefixes
+> pruned pruned
+> R=1 R=1
+> cBlock Critic
+> block-boundary state
+> h, progress, reward stats
+> Vϕ(st)
+> per-block weights
+> ˆAb→Aj
+> PPO update
+> self-distill solved leaves
+
+Figure 2: Overview of CAPR. (a) Trace State / Cache & Steer : CAPR summarizes per-position confidence, entropy, and stability into a path state, then uses it to steer the next reverse step while carrying only the previous clean-token prediction and path state. (b) Branch & Prune : a shared denoising prefix is forked once at the branch step, and siblings are kept by path-state quality. (c) Block Critic : a value head reads block-boundary states and converts the final reward into per-block PPO weights. Self-distillation uses solved rollouts as supervised targets so zero-variance groups still provide learning signal. 
+
+At step t, CAPR uses zt to steer the resulting logits and then identifies the positions and sampled token predictions to form zt−1. Across steps, only 
+
+zt and the path state h(t) 
+
+> j
+
+are carried over and the logits themselves are recomputed each step. CAPR steers the logits as follows. 
+
+ℓ(t) 
+
+> j
+
++= h(t) 
+
+> j
+
+c(t) 
+
+> j
+
+(2 s(t) 
+
+> j
+
+− 1) 
+
+λ (2) where λ is a path state steering scaling constant. A stable and confident token receives a positive push and an oscillating token is dampened. The same path state adjusts the confidence used to choose which masked positions are revealed as well as which unmasked positions should be re-masked. First, we compute κ(t) 
+
+> j
+
+as follows. 
+
+κ(t) 
+
+> j
+
+= c(t) 
+
+> j
+
++ γh (t) 
+
+> j
+
+a(t)
+
+> j
+
+1 + s(t)
+
+> j
+
+2 , (3) where γ is a path state injection scaling constant. 
+
+κj steers which positions are trusted enough to unmask. If the denoising schedule decides to un-mask Kt tokens, CAPR selects 
+
+Ut = TopK j:zt,j =[MASK] 
+
+ κ(t) 
+
+> j
+
+, K t
+
+, (4) For these positions in Ut identified for unmask-ing, the logit bias steers which token is sampled. After sampling, the new prediction replaces zt for the following denoising step and the logits them-selves are not carried forward. Both steering sig-nals in Eq. 3 and 4 come from the model’s own denoising trace rather than an external classifier. 
+
+3.3 BRANCH & P RUNE 
+
+To explore alternative completions (see App. D), and to assign granular rewards for every block in every branch, at low compute cost, we perform branching at the midpoint of the denoising trajec-tory in CAPR. To reduce compute costs for each branch, CAPR caches a prefix so that these sibling continuations (i.e. branches) can start without any extra forward pass. The prefix is a combination of logits distribution at the branch step, along with the predicted tokens, and path state h(t).At a fixed fraction fb (we set it to 0.5) of the denoising budget N , it forks Gb branches from the shared prefix. The fork reuses the stored branch-step prefix and changes only the predictions for the Gb branches by sampling a different Gv for every vocab token v in each branch. The pre-dictions for each branch are then calculated as 
+
+arg max v
+
+ ℓ(t)
+
+> j,v
+
+/τ + Gv
+
+ for every position j in Ut
+
+at t = fb × N with Gv ∼ Gumbel(0 , 1) . τ is the sampling temperature. Each sibling copies the cur-rent path state and then completes the remaining denoising steps independently. This prefix caching gives the compute advantage. One branch group costs fb + Gb(1 − fb)N for-ward steps, detailed comparision with baselines on forward cost is given in App. B. At Gb=2, and fb=0.5, cost per rollout is 1
+
+> Gb
+
+fb + Gb(1 −
+
+fb)N =0.75 N . To produce G rollouts, we run 
+
+M = ⌈G/G b⌉ such groups. At a regular frequency schedule after the fork, CAPR keeps the most useful branches rather than carrying all of them forward. The score is com-puted based on mean path state h(t) of the branch and hence branches with more positions settled into stable predictions receive higher scores. This pruning is deliberately local and cheap. It does not require evaluating a reward model at interme-diate steps, it uses the same trace signal already maintained by “Cache & Steer”. Tree method branches many times and compares final rewards of many continuations, but this ex-pands compute quickly. CAPR instead creates a small local comparison set by forking sibling con-tinuations from a cached mid-trajectory state. Since the siblings share the same prefix and differ only in the suffix, their outcomes and path-state quality give useful evidence about which later denoising decisions are promising. Pruning them prevents the small branch set from growing into a full tree. 
+
+3.4 BLOCK CRITIC 
+
+The block critic answers a simple question: after seeing only the final reward, which blocks were most useful? At each block boundary, CAPR stores a compact state containing the path state, block progress (number of unmasked tokens within the block), prompt-level reward statistics, and tokens revealed so far. Using this compact state, the value head is trained as discussed in App. A.2. After the rollout finishes, CAPR redistributes the final reward R over blocks according to how many tokens each block revealed, with the final block also receiving the terminal outcome signal. TD/GAE (Schulman et al., 2016; Sutton, 1988) with a slowly updated target head V¯ϕ (Lillicrap et al., 2016) then produces one block advantage ˆAb
+
+for each block b. Thus, the value head converts one sparse outcome reward into block-level weights over the denoising path. For PPO, these block advantages are used only to reweight the rollout-level GRPO advantage. Let 
+
+bi(j) denote the block in which token j of rollout i
+
+is revealed. CAPR computes 
+
+wi,b = B softmax( ˆAi, 1: B )b,
+
+eAi,j = AGRPO 
+
+> i
+
+(1 − βTD ) + βTD wi,b i(j)
+
+, (5) where B is the number of blocks. The factor B
+
+keeps the mean block weight near one, so the block critic redistributes the rollout-level signal rather than changing its overall scale. Every token re-vealed in the same block receives the same block weight. When the value head is poorly calibrated, the blend βTD is reduced and PPO falls back to-ward the flat GRPO advantage. Appendix A.2 gives the value-head features, TD targets, and blending gate. At inference, the value head is removed and only the trained LoRA-adapted policy remains. 
+
+3.5 Training Objective and CAPR Algorithm 
+
+The complete CAPR objective is 
+
+LCAPR = LPPO + β LKL + λf Lχ2
+
++ LNLL + cvLV . (6) In Eq. 6, LPPO is the clipped PPO loss using the block-weighted advantages from Eq. 5, βLKL 
+
+keeps the policy near the reference model, λf Lχ2
+
+is a chi-square regularizer that damps large positive log-ratio deviations, LNLL is the self-distillation loss on solved rollouts, and cvLV trains the block critic. The joint KL + χ2 design is motivated by the observation that KL regularization alone is too weak to prevent over-optimization of sparse rewards (Huang et al., 2025a). Appendix A.2 gives the value-head features and calibration, Ap-pendix A.3 defines LNLL and its schedule, and Ap-pendix A.4 defines Lχ2 . Algorithm 1 summarizes one optimization iteration. 
+
+Inference. At deployment, CAPR uses only the trained LoRA policy with the standard single-path dLLM denoising loop. Cache & Steer, branching, pruning, the block critic, and self-distillation are training-only mechanisms. Their signal has already been distilled into the policy weights at train time. Inference therefore uses the same number of model forwards as the base dLLM, with no value head or training-time path state. 
+
+4 Experiments 
+
+We evaluate CAPR on four verifiable reasoning benchmarks under matched decoding budgets. The experiments ask three questions: whether block-level attribution improves final accuracy, whether the gains hold across dense and mixture-of-experts dLLMs, and whether the extra training signal is cheaper than tree-structured rollouts. 
+
+4.1 Experimental Setup Models and tasks. We evaluate LLaDA-8B-Instruct (Nie et al., 2025b) and LLaDA-MoE-7B-A1B-Instruct (Zhu et al., 2025b). Both are trained with rank-64 LoRA adapters on frozen base weights, bf16 activations, fp32 optimizer state, and DeepSpeed ZeRO-2. Benchmarks are 4×4 Su-doku, Countdown, GSM8K (Cobbe et al., 2021), and Math500 (Lightman et al., 2024). Sudoku Table 1: Pass@1 on four reasoning benchmarks at 256 -and 512 -token generation budgets. CAPR is evalu-ated with the same zero-shot setting, including prompts, parser, deterministic decoding, and token budget as in 
+
+d-TreeRPO. Gray values show gains over the corre-sponding base model.                                                                                                                                        
+
+> Method Sudoku Countdown GSM8K Math500 256 512 256 512 256 512 256 512
+> LLaDA-8B-Instruct
+> Base 6.7 5.5 19.5 16.0 76.7 78.2 32.4 36.2 + Diffu-GRPO 12.9 11.2 31.3 37.1 79.8 81.9 34.1 39.0 + VRPO 12.8 9.6 22.3 18.0 80.1 81.5 35.6 34.8 + wd1 25.2 24.2 51.2 46.1 80.8 82.3 34.4 39.0 + SAPO 20.3 16.1 52.0 56.3 80.6 82.1 33.8 38.4 + d2-stepMerge 76.1 66.2 52.4 52.1 81.1 82.0 34.4 38.5 + TraceRL 25.6 25.4 50.4 52.6 80.3 82.4 35.6 39.1 +d-TreeRPO 92.9 80.3 71.1 62.1 81.2 82.6 37.7 38.9 +CAPR 93.0
+> +86.3
+> 92.7
+> +87.2
+> 72.7
+> +53.2
+> 69.9
+> +53.9
+> 82.4
+> +5.7
+> 82.4
+> +4.2
+> 37.9
+> +5.5
+> 39.8
+> +3.6
+> LLaDA-MoE-7B-A1B-Instruct
+> Base 12.7 8.1 42.6 41.4 71.8 71.0 30.1 42.2 + Diffu-GRPO 17.3 15.4 50.1 48.2 74.2 73.7 38.1 43.4 + wd1 40.6 35.4 56.6 58.7 76.2 76.4 39.8 43.4 + SAPO 21.2 18.7 54.2 54.8 75.2 76.8 38.6 40.4 + GDPO 31.2 30.6 58.1 53.4 74.8 75.2 38.4 41.2 + TraceRL 27.4 25.2 54.2 49.1 75.4 76.1 40.0 44.1 +d-TreeRPO 78.3 72.0 67.2 60.6 75.5 77.4 41.2 46.3 +CAPR 84.8
+> +72.1
+> 81.0
+> +72.9
+> 68.8
+> +26.2
+> 72.7
+> +31.3
+> 79.4
+> +7.6
+> 77.5
+> +6.5
+> 41.6
+> +11.5
+> 50.4
+> +8.2
+
+and Countdown stress exact constraint satisfaction, while GSM8K and Math500 test mathematical rea-soning from natural-language prompts. 
+
+Evaluation. We follow the d-TreeRPO evalua-tion script (Pan et al., 2026): zero-shot pass@1, de-terministic decoding ( τ =0 ), block length ℓblk =32 ,and denoising steps N =L/ 2.
+
+Baselines and hyperparameters. Baselines in-clude the base model, Diffu-GRPO (Zhao et al., 2025a), VRPO (Zhu et al., 2025a), wd1 (Tang et al., 2026), SAPO (Xie et al., 2026), d2-stepMerge (Wang et al., 2026), TraceRL (Wang et al., 2025), GDPO where available, and d-TreeRPO (Pan et al., 2026). CAPR uses 
+
+G=8 rollouts, Branch & Prune with fork fraction fb=0 .5 and Gb=2 sibling continua-tions, GAE (γ, λ gae )=(0 .99 , 0.95) , value coeffi-cient cv=0 .5, chi-square regularizer coefficient 
+
+λf =0 .01 , reference-KL coefficient β=0 .01 , learn-ing rate 3×10 −5, and max self-distillation weight 
+
+wmax sd =0 .10 . Baselines reproduced from d-TreeRPO (Pan et al., 2026). App. C gives the full configuration. 
+
+4.2 Main Results 
+
+Table 1 reports results for the two decoding budgets 
+
+L=256 and L=512 in separate columns so short-and long-budget decoding are compared under the 0.0 
+
+> 0.5
+> 1.0
+> Training reward  Sudoku
+> 0.0
+> 0.5
+> 1.0
+> Countdown
+> 0.0
+> 0.5
+> 1.0
+> GSM8K
+> 0.0
+> 0.5
+> 1.0
+> Math500
+> 0.0
+> 0.5
+> 1.0
+> Training reward
+> 0.0
+> 0.5
+> 1.0
+> 0.0
+> 0.5
+> 1.0
+> 0.0
+> 0.5
+> 1.0
+> Training step
+
+Figure 3: Training reward for the eight CAPR runs. Curves are centred rolling means with raw reward shown faintly. Sudoku shows the clearest cold start, GSM8K and Math500 start from stronger base-model compe-tence. (Top) LLaDA-8B-Instruct (Bottom) LLaDA-MoE-7B-A1B-Instruct. Refer App. F for contrast with baselines 
+
+same parser, prompt format, and token limit for every method. At L=256 , CAPR is best or tied-best on all reported tasks for both backbones. On LLaDA-8B-Instruct, at L=256 , CAPR reaches 93 .0 on Sudoku, 72 .7 on Countdown, 82 .4
+
+on GSM8K, and 37 .9 on Math500. Compared with 
+
+d-TreeRPO at L=256 , the gains are +0 .1, +1 .6,
+
++1 .2, and +0 .2 points, respectively. The largest absolute improvements over flat-rollout baselines occur on Sudoku and Countdown, where the final reward is sparse and a single rollout-level advan-tage gives weak reward assignment. Fig. 3 shows that training rewards improve con-sistently across most tasks, with Sudoku exhibiting the strongest cold-start effect and the steepest gains during training. In contrast, GSM8K and Math500 begin from substantially higher initial rewards, in-dicating stronger base-model competence but com-paratively smaller RL-driven improvements. The MoE backbone generally shows noisier optimiza-tion dynamics than the dense model, though both converge to stable high-reward regimes. On LLaDA-MoE-7B-A1B-Instruct, CAPR ob-tains 84 .8 on Sudoku, 68 .8 on Countdown, 79 .4
+
+on GSM8K, and 41 .6 on Math500. This is +6 .5
+
+over d-TreeRPO on Sudoku and +1 .6 on Count-down, +4 .1 on GSM8k while slightly improving the best prior scores on Math500. Thus, same training recipe transfers from dense backbone to sparse-MoE backbone without task-specific retun-ing. Case study in App. H Table 2 reports wall-clock cost on 8×A100-80GB. CAPR takes 165 seconds per optimization step versus 596 seconds for d-TreeRPO. The sav-ing comes from sharing the early denoising prefix Table 2: Compute cost on 4×4 Sudoku with LLaDA-8B-Instruct. Batch = wall-time per rollout batch; Update =wall-time per parameter update; Conv. = total training time to convergence. Baselines reproduced from (Pan et al., 2026). For all batch size = 4/device                                 
+
+> Method Batch (s) Update (s) Conv. (h) Acc (%)
+> Diffu-GRPO 111 9.12 ≈24 12.9 wd1 86 7.21 ≈24 25.2 SAPO 423 35.25 ≈72 20.3 GDPO 153 12.72 ≈48 25.7 TraceRL 604 43.14 ≈48 25.6
+> d-TreeRPO 596 9.91 ≈48 92.9
+> CAPR 165 10.10 ≈24 93.0
+
+Table 3: Module ablation on 4×4 Sudoku (LLaDA-8B-Instruct). Br/Pr/Cr/SD denote Branch, Prune, Block Critic, and self-distillation. Metrics are computed over the last 200 steps.                                              
+
+> Br Pr Cr SD rpeak rlast200 DKL zsr
+> ✓0.27 0.20 0.61 0.00
+> ✓✓0.36 0.34 1.30 0.00
+> ✓0.48 0.50 3.07 0.00
+> ✓✓0.53 0.46 0.81 0.00
+> ✓✓✓0.85 0.69 0.16 0.00
+> ✓✓✓✓1.00 0.83 1.15 0.22
+> ✓✓✓✓0.90 0.83 0.21 0.10
+
+and spending extra forwards only on a small num-ber of suffix continuations, while the block critic supplies the per-block attribution. 
+
+4.3 Ablation: Contribution of Each Mechanism 
+
+Table 3 and Figures 4 and 5 isolate the CAPR mech-anisms on Sudoku, where sparse rewards make reward assignment most visible. Branch-only train-ing improves over Diffu-GRPO but stays in the low-reward regime, adding pruning gives only a modest lift. The block critic is the first component that changes the learning curve substantially. By it-self it reaches 0.48 peak reward, and together with Branch & Prune it reaches 0.85 . This shows that se-lective suffix exploration and per-block attribution are complementary rather than interchangeable. The full model adds self-distillation on top of this branch–critic stack. In Figure 4, the full CAPR curve rises into the high-reward band early and remains above the non-distilled variants for most of training. Figure 5 shows the same progression as peak rewards: 0.27 for Branch only, 0.36 with pruning, 0.85 with Branch & Prune plus the Block Critic, and 0.90 –1.00 for full CAPR depending on maximum self-distillation weight wmax sd . We select 
+
+wmax sd =0 .10 because it keeps the last-200 reward equal to the highest-peak variant while reducing KL from 1.15 to 0.21 .Figure 6 explains the role of self-distillation. Without self-distillation, zero-variance groups con-0.0 0.2 0.4 0.6 0.8 1.0  
+
+> Training progress
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Training reward  Branch only
+> Branch + Prune
+> Block Critic
+> Branch + Block Critic
+> Branch + Prune + Block Critic
+> Full CAPR ( wsd = 0.05 )
+
+Figure 4: Sudoku training reward under progressive activation of CAPR mechanisms. Branching and prun-ing alone give small gains, the block critic changes the slope, and self-distillation moves the curve into the high-reward band. 0.00 0.25 0.50 0.75 1.00   
+
+> Peak training reward
+> Diffu-GRPO baseline
+> Branch only
+> Branch + Prune
+> Block Critic
+> Branch + Block Critic
+> Branch + Prune + Block Critic
+> Full CAPR ( wsd = 0.05 )
+> Full CAPR ( wsd = 0.10 )
+> 0.13
+> 0.27
+> 0.36
+> 0.48
+> 0.53
+> 0.85
+> 1.00
+> 0.90
+
+Figure 5: Peak Sudoku reward by ablation configuration. The bar chart mirrors Table 3. The largest jump occurs when Branch & Prune is paired with the Block Critic, followed by self-distillation. 0.00 0.25 0.50 0.75 1.00       
+
+> Training progress
+> 0.00
+> 0.25
+> 0.50
+> 0.75
+> 1.00
+> Zero-variance ratio
+> 0.00 0.25 0.50 0.75 1.00
+> Training progress
+> 10 −1
+> 10 0
+> 10 1
+> Gradient norm
+> Branch only CAPR w/o SD Full CAPR
+
+Figure 6: Sudoku stability diagnostics. Left: self-distillation (SD) turns solved zero-variance groups into usable signal. Right: full CAPR avoids the large gradi-ent spikes seen without self-distillation. 
+
+tribute no relative advantage and therefore pro-vide little training signal. Full CAPR reuses those solved groups as supervised targets, so the zero-variance ratio rises when more rollouts are solved instead of becoming dead data. The gra-dient panel shows the trade-off. Branch only has small gradients but weak learning, CAPR without self-distillation has large spikes, and full CAPR keeps useful solved-group signal while producing a smoother late-training gradient profile. 
+
+4.4 Training Dynamics 
+
+Table 4 and Figure 7 check whether the accuracy gains come from unstable policy drift. For the dense backbone, reference KL stays below the 
+
+0.4 guide line in all four tasks. Countdown and Table 4: Training-time diagnostics for the eight main CAPR experiments. Reward statistics use the last 200 
+
+steps up to the selected peak; the remaining columns are medians over the same window.                                                        
+
+> Benchmark rpeak rlast200 DKL χ2reg LV×10 3|∇|
+> LLaDA-8B-Instruct
+> Sudoku 0.90 0.83 0.29 0.25 1.0 0.00 Countdown 0.87 0.63 0.07 0.18 4.0 0.05 GSM8K 0.81 0.78 0.06 0.14 6.0 0.08 Math500 0.45 0.36 0.07 0.21 5.0 0.06
+> LLaDA-MoE-7B-A1B-Instruct
+> Sudoku 0.97 0.72 1.02 0.09 17.0 0.13 Countdown 0.94 0.60 0.57 0.15 13.0 0.13 GSM8K 0.86 0.64 0.06 0.28 7.0 0.12 Math500 0.55 0.34 0.97 0.03 7.0 0.14 0.0
+> 0.2
+> 0.4
+> Reference  DKL  Sudoku
+> 0.0
+> 0.2
+> 0.4
+> Countdown
+> 0.0
+> 0.2
+> 0.4
+> GSM8K
+> 0.0
+> 0.2
+> 0.4
+> Math500
+> 0.0
+> 0.2
+> 0.4
+> χ2 regulariser
+> 0.0
+> 0.2
+> 0.4
+> 0.0
+> 0.2
+> 0.4
+> 0.0
+> 0.2
+> 0.4
+> 0.000
+> 0.005
+> 0.010
+> Value-head MSE
+> 0.000
+> 0.005
+> 0.010
+> 0.000
+> 0.005
+> 0.010
+> 0.000
+> 0.005
+> 0.010
+> Training step
+
+Figure 7: Dense-backbone diagnostics. Reference KL stays below the guide line, the chi-square regularizer remains bounded, and the value-head MSE stays small across benchmarks. 
+
+GSM8K remain especially close to the reference model, while Sudoku and Math500 move more be-cause they require larger changes from the base pol-icy. The chi-square regularizer statistic rises when learning accelerates but stays bounded, and the value-head MSE remains small, indicating that the block critic is tracking the changing policy rather than diverging. The MoE rows in Table 4 show the same qualita-tive pattern with higher task-dependent KL on Su-doku and Math500, which is expected for routing-sensitive logits. Importantly, the reported check-points still have controlled gradient norms and sta-ble last-window rewards. Figure 8 gives the com-plementary view. The block critic loss typically peaks when the policy is changing fastest and then falls or stabilises, while the self-distillation NLL tracks how predictable solved rollouts become. These modules are therefore useful as training-time attribution and stabilization signals, but they are removed at inference, only the trained LoRA policy is used. Sudoku Countdown GSM8K Math500           
+
+> 01010101
+> fraction of training
+> value-head loss Vself-distillation NLL NLL
+
+Figure 8: Block Critic loss and self-distillation NLL for the eight CAPR runs. Curves are min-max normalized within each panel, peaks mark phases where the policy changes fastest. (Top) LLaDA-8B-Instruct (Bottom) LLaDA-MoE-7B-A1B-Instruct. Table 5: Hyperparameter sensitivity on 4×4 Sudoku (LLaDA-8B-Instruct). Entries are peak training reward for maximum self-distillation weight wmax sd and learning rate η, other settings are in App. C.            
+
+> Configuration η=3 ×10 −5η=5 ×10 −5
+> wmax sd =0 0.85 0.63
+> wmax sd =0 .05 1.00 0.85
+> wmax sd =0 .10 0.90 0.78
+
+4.5 Hyperparameter Sensitivity 
+
+Table 5 varies the two most important optimization knobs on Sudoku. The lower learning rate is con-sistently better. The selected setting, wmax sd =0 .10 
+
+and η=3 ×10 −5, gives slightly lower peak reward than wmax sd =0 .05 but substantially tighter KL and smoother gradients, hence used in all exps. 
+
+5 Conclusion 
+
+Masked diffusion language models expose a denois-ing trace that standard RL post-training largely ig-nores. CAPR turns this trace into a training signal. It records confidence, entropy, and token stability in a compact path state, uses that state to steer re-verse denoising steps, reuses cached prefixes to cre-ate cheap sibling continuations, and trains a Block Critic to convert one final outcome reward into per-block PPO weights. In this way, CAPR preserves the locality of tree-style comparisons without ex-panding a full search tree. Across dense and mixture-of-experts LLaDA backbones, CAPR improves reasoning under the same decoding setting as the baselines. At the matched 256-token budget, it is best or tied-best on all reported tasks, with the largest gains on Sudoku and Countdown, where flat rollout-level signals are weakest. The 512-token results show that the same pattern holds at longer generation lengths. On Sudoku, CAPR matches the strongest tree-structured baseline while using less than one third of its per-step wall-clock time. The ablations show that the gains do not come from branching alone. Branching and pruning add useful diversity, the Block Critic provides the largest intermediate improvement by localizing the reward signal, self-distillation keeps solved groups useful after group-relative advantages vanish, and the chi-square regu-larizer limits unstable ratio spikes. CAPR therefore offers a practical middle ground for dLLM-RL, with finer reward assignment than flat rollouts at substantially lower cost than full tree expansion. 
+
+Limitations 
+
+CAPR is evaluated on automatically verifiable rea-soning tasks. This is a controlled setting for study-ing reward assignment, but it does not establish performance for open-ended instruction following, factuality, dialogue safety, or preference-based ob-jectives where rewards are noisier and less local. The experiments also use zero-shot pass@1 decod-ing, pass@ k evaluation, robustness under different sampling settings, and out-of-domain prompts re-main important tests of generalization. The block critic is learned online from the same rollouts used to update the policy. This keeps CAPR lightweight, but the value estimates may be less reliable for very long reasoning chains, de-layed subgoals, or domains where many partial tra-jectories can lead to the same final reward. CAPR is also tested only on LLaDA-family masked diffu-sion language models. Other dLLM architectures may expose different trace statistics, and branch fraction, block size, self-distillation weight, and value-head calibration may need retuning. Finally, the compute measurements reflect our software stack and 8×A100-80GB hardware. CAPR reduces denoising continuations relative to tree expansion, but it still requires RL fine-tuning of large language models. Memory layout, kernel efficiency, and distributed-training overhead can change wall-clock cost on other systems. 
+
+Ethical Considerations 
+
+CAPR is a training algorithm for improving rea-soning in masked diffusion language models. The experiments use public reasoning benchmarks with automatically checkable rewards, and we do not introduce new user data or sensitive annotations. However, stronger reasoning models can be mis-used in the same ways as other capable language models, including producing misleading explana-tions, assisting harmful workflows, or making in-correct answers appear more persuasive. CAPR does not add a safety-alignment layer, so user-facing deployments should retain the safeguards, monitoring, refusal behaviour, and domain-specific evaluations required for the underlying model. RL fine-tuning large models also has an envi-ronmental cost. CAPR is designed to reduce train-ing cost relative to tree-structured rollouts, and we report hardware and wall-clock measurements to make that cost visible. Future work should continue to report compute transparently and study whether trajectory-aware signals can be reused across tasks, seeds, or training runs. We downloaded models from huggingface. GSAI-ML/LLaDA-8B-Instruct 1 is available under MIT license. inclusionAI/LLaDA-MoE-7B-A1B-Instruct 2 is available under Apache license 2.0. The models were used as per their intended use. 
+
+References         
+
+> Shuang Cheng, Yihan Bian, Dawei Liu, Linfeng Zhang, Qian Yao, Zhongbo Tian, Wenhai Wang, Qipeng Guo, Kai Chen, Biqing Qi, and Bowen Zhou. 2025. Sdar: A synergistic diffusion-autoregression paradigm for scalable sequence generation. Preprint ,arXiv:2510.06303. Kyunghyun Cho, Bart van Merriënboer, Caglar Gul-cehre, Dzmitry Bahdanau, Fethi Bougares, Holger Schwenk, and Yoshua Bengio. 2014. Learning phrase representations using RNN encoder–decoder for statistical machine translation. In Proceedings of the 2014 Conference on Empirical Methods in Natural Language Processing (EMNLP) , pages 1724– 1734, Doha, Qatar. Association for Computational Linguistics. Karl Cobbe, Vineet Kosaraju, Mohammad Bavarian, Mark Chen, Heewoo Jun, Lukasz Kaiser, Matthias Plappert, Jerry Tworek, Jacob Hilton, Reiichiro Nakano, Christopher Hesse, and John Schulman. 2021. Training verifiers to solve math word prob-lems. Preprint , arXiv:2110.14168. Ganqu Cui, Yuchen Zhang, Jiacheng Chen, Lifan Yuan, Zhi Wang, Yuxin Zuo, Haozhan Li, Yuchen Fan, Huayu Chen, Weize Chen, Zhiyuan Liu, Hao Peng, Lei Bai, Wanli Ouyang, Yu Cheng, Bowen Zhou, and Ning Ding. 2025. The entropy mechanism of rein-forcement learning for reasoning language models.
+> Preprint , arXiv:2505.22617.
+> 1https://huggingface.co/GSAI-ML/ LLaDA-8B-Instruct
+> 2https://huggingface.co/inclusionAI/ LLaDA-MoE-7B-A1B-Instruct
+
+Haoyu He, Katrin Renz, Yong Cao, and Andreas Geiger. 2025. Mdpo: Overcoming the training-inference di-vide of masked diffusion language models. Preprint ,arXiv:2508.13148. Audrey Huang, Wenhao Zhan, Tengyang Xie, Jason D. Lee, Wen Sun, Akshay Krishnamurthy, and Dy-lan J. Foster. 2025a. Correcting the mythos of kl-regularization: Direct alignment without overopti-mization via chi-squared preference optimization. 
+
+Preprint , arXiv:2407.13399. Zemin Huang, Zhiyang Chen, Zijun Wang, Tiancheng Li, and Guo-Jun Qi. 2025b. Reinforcing the diffu-sion chain of lateral thought with diffusion language models. Preprint , arXiv:2505.10446. Sham M. Kakade and John Langford. 2002. Approxi-mately optimal approximate reinforcement learning. In Machine Learning, Proceedings of the Nineteenth International Conference (ICML 2002), University of New South Wales, Sydney, Australia, July 8-12, 2002 ,pages 267–274. Morgan Kaufmann. Inception Labs, Samar Khanna, Siddhant Kharbanda, Shufan Li, Harshit Varma, Eric Wang, Sawyer Birn-baum, Ziyang Luo, Yanis Miraoui, Akash Palrecha, Stefano Ermon, Aditya Grover, and Volodymyr Kuleshov. 2025. Mercury: Ultra-fast language mod-els based on diffusion. Preprint , arXiv:2506.17298. Xianzhi Li, Ethan Callanan, Abdellah Ghassel, and Xiaodan Zhu. 2026. Entropy-gated branch-ing for efficient test-time reasoning. Preprint ,arXiv:2503.21961. Hunter Lightman, Vineet Kosaraju, Yuri Burda, Harri-son Edwards, Bowen Baker, Teddy Lee, Jan Leike, John Schulman, Ilya Sutskever, and Karl Cobbe. 2024. Let’s verify step by step. In The Twelfth In-ternational Conference on Learning Representations, ICLR 2024, Vienna, Austria, May 7-11, 2024 . Open-Review.net. Timothy P. Lillicrap, Jonathan J. Hunt, Alexander Pritzel, Nicolas Heess, Tom Erez, Yuval Tassa, David Silver, and Daan Wierstra. 2016. Continuous con-trol with deep reinforcement learning. In 4th Inter-national Conference on Learning Representations, ICLR 2016, San Juan, Puerto Rico, May 2-4, 2016, Conference Track Proceedings .Nianyi Lin, Jiajie Zhang, Lei Hou, and Juanzi Li. 2025. Boundary-guided policy optimization for memory-efficient rl of diffusion large language mod-els. Preprint , arXiv:2510.11683. Shen Nie, Fengqi Zhu, Chao Du, Tianyu Pang, Qian Liu, Guangtao Zeng, Min Lin, and Chongxuan Li. 2025a. Scaling up masked diffusion models on text. 
+
+Preprint , arXiv:2410.18514. Shen Nie, Fengqi Zhu, Zebin You, Xiaolu Zhang, Jingyang Ou, Jun Hu, Jun Zhou, Yankai Lin, Ji-Rong Wen, and Chongxuan Li. 2025b. Large language diffusion models. Preprint , arXiv:2502.09992. Jingyang Ou, Jiaqi Han, Minkai Xu, Shaoxuan Xu, Jianwen Xie, Stefano Ermon, Yi Wu, and Chongx-uan Li. 2025. Principled rl for diffusion llms emerges from a sequence-level perspective. Preprint ,arXiv:2512.03759. Leyi Pan, Shuchang Tao, Yunpeng Zhai, Zheyu Fu, Liancheng Fang, Minghua He, Lingzhe Zhang, Zhaoyang Liu, Bolin Ding, Aiwei Liu, and Lijie Wen. 2026. d-treerpo: Towards more reliable policy op-timization for diffusion language models. Preprint ,arXiv:2512.09675. Kevin Rojas, Jiahe Lin, Kashif Rasul, Anderson Schnei-der, Yuriy Nevmyvaka, Molei Tao, and Wei Deng. 2026. Improving reasoning for diffusion language models via group diffusion policy optimization. 
+
+Preprint , arXiv:2510.08554. Subham S. Sahoo, Marianne Arriola, Yair Schiff, Aaron Gokaslan, Edgar Marroquin, Justin T. Chiu, Alexan-der Rush, and Volodymyr Kuleshov. 2024. Simple and effective masked diffusion language models. In 
+
+Advances in Neural Information Processing Systems 38: Annual Conference on Neural Information Pro-cessing Systems 2024, NeurIPS 2024, Vancouver, BC, Canada, December 10 - 15, 2024 .John Schulman, Philipp Moritz, Sergey Levine, Michael I. Jordan, and Pieter Abbeel. 2016. High-dimensional continuous control using generalized advantage estimation. In 4th International Confer-ence on Learning Representations, ICLR 2016, San Juan, Puerto Rico, May 2-4, 2016, Conference Track Proceedings .John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. 2017. Prox-imal policy optimization algorithms. Preprint ,arXiv:1707.06347. Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. 2024. Deepseekmath: Pushing the limits of mathemati-cal reasoning in open language models. Preprint ,arXiv:2402.03300. Jiaxin Shi, Kehang Han, Zhe Wang, Arnaud Doucet, and Michalis K. Titsias. 2024. Simplified and generalized masked diffusion for discrete data. In Advances in Neural Information Processing Systems 38: Annual Conference on Neural Information Processing Sys-tems 2024, NeurIPS 2024, Vancouver, BC, Canada, December 10 - 15, 2024 .Yuxuan Song, Zheng Zhang, Cheng Luo, Pengyang Gao, Fan Xia, Hao Luo, Zheng Li, Yuehang Yang, Hongli Yu, Xingwei Qu, Yuwei Fu, Jing Su, Ge Zhang, Wenhao Huang, Mingxuan Wang, Lin Yan, Xiaoy-ing Jia, Jingjing Liu, Wei-Ying Ma, and 3 others. 2025. Seed diffusion: A large-scale diffusion lan-guage model with high-speed inference. Preprint ,arXiv:2508.02193. Richard S. Sutton. 1988. Learning to predict by the methods of temporal differences. Mach. Learn. , 3:9– 44. Hongze Tan, Zihan Wang, Jianfei Pan, Jinghao Lin, Hao Wang, Yifan Wu, Tao Chen, Zhihang Zheng, Zhihao Tang, and Haihua Yang. 2026. Gtpo and grpo-s: Token and sequence-level reward shaping with policy entropy. Preprint , arXiv:2508.04349. Xiaohang Tang, Rares Dolga, Sangwoong Yoon, and Ilija Bogunovic. 2026. wd1: Weighted policy opti-mization for reasoning in diffusion language models. 
+
+Preprint , arXiv:2507.08838. Emanuel Todorov. 2006. Linearly-solvable markov de-cision problems. In Advances in Neural Information Processing Systems 19, Proceedings of the Twentieth Annual Conference on Neural Information Process-ing Systems, Vancouver, British Columbia, Canada, December 4-7, 2006 , pages 1369–1376. MIT Press. Guanghan Wang, Gilad Turok, Yair Schiff, Marianne Arriola, and Volodymyr Kuleshov. 2026. d2: Im-proved techniques for training reasoning diffusion language models. Preprint , arXiv:2509.21474. Yinjie Wang, Ling Yang, Bowen Li, Ye Tian, Ke Shen, and Mengdi Wang. 2025. Revolutionizing reinforce-ment learning framework for diffusion large language models. Preprint , arXiv:2509.06949. Shaoan Xie, Lingjing Kong, Xiangchen Song, Xinshuai Dong, Guangyi Chen, Eric P. Xing, and Kun Zhang. 2026. Advancing reasoning in diffusion language models with denoising process rewards. Preprint ,arXiv:2510.01544. Jingyi Yang, Guanxu Chen, Xuhao Hu, and Jing Shao. 2025a. Taming masked diffusion language models via consistency trajectory reinforcement learning with fewer decoding step. Preprint ,arXiv:2509.23924. Kai Yang, Xin Xu, Yangkun Chen, Weijie Liu, Jiafei Lyu, Zichuan Lin, Deheng Ye, and Saiyong Yang. 2026. Entropic: Towards stable long-term training of llms via entropy stabilization with proportional-integral control. Preprint , arXiv:2511.15248. Ling Yang, Ye Tian, Bowen Li, Xinchen Zhang, Ke Shen, Yunhai Tong, and Mengdi Wang. 2025b. Mmada: Multimodal large diffusion language mod-els. Preprint , arXiv:2505.15809. Jiacheng Ye, Zhihui Xie, Lin Zheng, Jiahui Gao, Zirui Wu, Xin Jiang, Zhenguo Li, and Lingpeng Kong. 2025a. Dream 7b: Diffusion large language models. 
+
+Preprint , arXiv:2508.15487. Jiasheng Ye, Zaixiang Zheng, Yu Bao, Lihua Qian, and Quanquan Gu. 2025b. Diffusion language models can perform many tasks with scaling and instruction-finetuning. Preprint , arXiv:2308.12219. Qiying Yu, Zheng Zhang, Ruofei Zhu, Yufeng Yuan, Xiaochen Zuo, Yu Yue, Weinan Dai, Tiantian Fan, Gaohong Liu, Lingjun Liu, Xin Liu, Haibin Lin, Zhiqi Lin, Bole Ma, Guangming Sheng, Yuxuan Tong, Chi Zhang, Mofan Zhang, Wang Zhang, and 16 others. 2025. Dapo: An open-source llm re-inforcement learning system at scale. Preprint ,arXiv:2503.14476. Hanning Zhang, Pengcheng Wang, Shizhe Diao, Yong Lin, Rui Pan, Hanze Dong, Dylan Zhang, Pavlo Molchanov, and Tong Zhang. 2025. Entropy-regularized process reward model. Preprint ,arXiv:2412.11006. Siyan Zhao, Devaansh Gupta, Qinqing Zheng, and Aditya Grover. 2025a. d1: Scaling reasoning in diffusion large language models via reinforcement learning. Preprint , arXiv:2504.12216. Siyan Zhao, Mengchen Liu, Jing Huang, Miao Liu, Chenyu Wang, Bo Liu, Yuandong Tian, Guan Pang, Sean Bell, Aditya Grover, and Feiyu Chen. 2025b. Inpainting-guided policy optimization for diffusion large language models. Preprint , arXiv:2509.10396. Chujie Zheng, Shixuan Liu, Mingze Li, Xiong-Hui Chen, Bowen Yu, Chang Gao, Kai Dang, Yuqiong Liu, Rui Men, An Yang, Jingren Zhou, and Jun-yang Lin. 2025. Group sequence policy optimization. 
+
+Preprint , arXiv:2507.18071. Fengqi Zhu, Rongzhen Wang, Shen Nie, Xiaolu Zhang, Chunwei Wu, Jun Hu, Jun Zhou, Jianfei Chen, Yankai Lin, Ji-Rong Wen, and Chongxuan Li. 2025a. Llada 1.5: Variance-reduced preference optimiza-tion for large language diffusion models. Preprint ,arXiv:2505.19223. Fengqi Zhu, Zebin You, Yipeng Xing, Zenan Huang, Lin Liu, Yihong Zhuang, Guoshan Lu, Kangyu Wang, Xudong Wang, Lanning Wei, Hongrui Guo, Jiaqi Hu, Wentao Ye, Tieyuan Chen, Chenchen Li, Chengfu Tang, Haibo Feng, Jun Hu, Jun Zhou, and 7 others. 2025b. Llada-moe: A sparse moe diffusion language model. Preprint , arXiv:2509.24389. A CAPR Optimisation Iteration 
+
+Algorithm 1 states the full per-prompt update used in our experiments. The same loop runs unchanged across the four benchmarks. Only the schedules and weights listed in Table 7 differ. Symbols fol-low §3: G is the target group size, fb the branch fraction, Gb the number of branches per cached prefix, B the number of blocks, τp the Polyak rate of the slow value head V¯ϕ, βTD the TD blend, and 
+
+τsd the self-distillation reward threshold. 
+
+A.1 Path-State Update Details 
+
+For masked position j at denoising state zt, let 
+
+p(t) 
+
+> j
+
+= πθ(· | zt)j and v(t) 
+
+> j
+
+= arg max v p(t) 
+
+> j
+
+(v).Let ¯v(t−1)  
+
+> j
+
+be the token prediction carried from the previous denoising update. CAPR forms the same path-state features used in §3.2: 
+
+c(t) 
+
+> j
+
+= p(t) 
+
+> j
+
+(v(t) 
+
+> j
+
+), s(t) 
+
+> j
+
+= 1[v(t) 
+
+> j
+
+= ¯ v(t−1)  
+
+> j
+
+],e(t) 
+
+> j
+
+= H(p(t) 
+
+> j
+
+)max k H(p(t) 
+
+> k
+
+) , a(t) 
+
+> j
+
+= c(t) 
+
+> j
+
+(1 − e(t) 
+
+> j
+
+).
+
+(7) Here c(t) 
+
+> j
+
+is confidence, s(t) 
+
+> j
+
+is stability, e(t) 
+
+> j
+
+is nor-malized entropy, and a(t) 
+
+> j
+
+is certainty. The Path-GRU update in Eq. 1 is implemented as                                   
+
+> r(t)
+> j=σ
+> 
+> αe(0 .5−e(t)
+> j)
+> 
+> ,u(t)
+> j=σαs
+> s(t)
+> j+a(t)
+> j
+> 2−0.5
+> !!
+> ,m(t)
+> j=14(2 c(t)
+> j−1)(1 + a(t)
+> j)(1 + s(t)
+> j),
+> ˜h(t)
+> j= tanh
+> 
+> r(t)
+> jh(t−1)
+> j+ (1 −r(t)
+> j)m(t)
+> j
+> 
+> ,h(t)
+> j= RMSNorm
+> 
+> u(t)
+> jh(t−1)
+> j+ (1 −u(t)
+> j)˜h(t)
+> j
+> 
+> ,(8)
+
+where r(t) 
+
+> j
+
+is the reset gate and u(t) 
+
+> j
+
+is the update gate, αe and αs are constants. The final RMS normalization is applied across positions in the sequence and prevents prompt-dependent hidden-scale drift. 
+
+A.2 Block Critic Features and TD Blending 
+
+We use b ∈ { 1, . . . , B } for block index and reserve 
+
+t for denoising time. At block boundary b, the value head receives a compact state with both scalar features and a pooled token-embedding feature:      
+
+> ψb= μ(hb), σ (hb), ρ mask
+> b, b/ (B−1) ,¯Rq, σ R(q), e b
+> ,
+> (9)
+
+where μ(hb) and σ(hb) are the mean and standard deviation of the path state inside the current block, 
+
+ρmask  
+
+> b
+
+is the fraction of positions in that block that remain masked, ( ¯Rq, σ R(q)) are the mean and stan-dard deviation of outcome rewards among rollouts for prompt q, and eb is the average input embed-ding of the tokens that have already been placed in block b.For rollout i with final outcome reward Ri, let 
+
+ni,b be the number of tokens unmasked in block b,i.e., positions that switch from [MASK] to a visible token while block b is being denoised. CAPR forms reward-conserving block rewards 
+
+ri,b = ωblk Ri
+
+ni,b 
+
+PBc=1 ni,c 
+
++ (1 − ωblk )Ri1[b = B].
+
+(10) The first term gives dense block supervision propor-tional to the tokens revealed in each block, while the second term keeps the terminal outcome signal on the final block. This mattered in runs that reach EOS before block B, instead of 1/B it will be ac-curate with ni,b / P 
+
+> c
+
+ni,c , where ni,b is the number of tokens latest unmasked in block b.The target head V¯ϕ computes TD residuals and GAE advantages on the block-boundary chain (Schulman et al., 2016; Sutton, 1988): 
+
+δi,b = ri,b + γV ¯ϕ(si,b +1 ) − V¯ϕ(si,b ),
+
+ˆAλi,b =
+
+> B−b
+
+X
+
+> ℓ=0
+
+(γλ gae )ℓδi,b +ℓ, (11) with V¯ϕ(si,B +1 ) = 0 . The value-head regression target is the corresponding λ-return: 
+
+yVi,b = sg 
+
+ ˆAλi,b + V¯ϕ(si,b )
+
+
+
+, (12) where sg denotes stop-gradient. The online value head Vϕ is trained to predict yVi,b , while V¯ϕ is up-dated as a slow Polyak average (Lillicrap et al., 2016). The block-level signal is blended into PPO only when the value head is calibrated. Let LV be the recent value-head loss and bV be a running baseline tracking the best smoothed value loss so far. CAPR uses 
+
+qV = b2
+
+> V
+
+b2 
+
+> V
+
++ L2
+
+> V
+
+, βeff TD = βTD qV . (13) When the value head loss rises far above its base-line, qV becomes small and CAPR falls back to-ward the flat GRPO signal. As the value head re-covers, the block weighting reopens automatically. A.3 Self-Distillation Loss 
+
+CAPR uses self-distillation only during training. Let Ai be the active completion tokens of rollout i,i.e., the valid completion tokens selected by the cur-rent PPO mask. In our reported runs all tokens in 
+
+Ai are averaged uniformly, so no additional token weighting is used. First, solved rollouts supervise themselves with a small next-token loss. Let C = {i : Ri ≥ τsd }
+
+be the solved rollouts and let ρcor = |C| /(QG ) be their fraction in a batch of Q prompts. CAPR uses 
+
+LNLL = −weff sd 
+
+P
+
+> i∈C
+
+P 
+
+> j∈A i
+
+log πθ(yij )
+
+P 
+
+> i∈C
+
+|A i| . (14) The effective self-distillation weight grows with the solved-rollout fraction and is bounded by the tuned maximum, 
+
+weff sd = min( wsd ρp
+
+> cor
+
+, wmax sd ) , (15) so it is near zero when solved rollouts are rare, in-creases as correct samples become common, and never exceeds wmax sd . In Table 5, we vary this max-imum while keeping the remaining self-distillation settings fixed. 
+
+A.4 Chi-Square Regulariser 
+
+Sparse-reward updates can fail because of a few tokens, not because the whole completion moves too far. In a solved rollout, PPO may strongly in-crease the probability of a small number of already-likely tokens. These upper-tail log-ratio spikes can dominate the gradient, especially when most other rollouts have zero or identical reward. Standard PPO clipping and KL regularisation (Kakade and Langford, 2002; Schulman et al., 2017) control av-erage policy movement, but they do not specifically target this token-level upper tail. CAPR therefore adds a small outlier-only χ2
+
+term. It is not a second full KL penalty: ordi-nary movement is still handled by PPO and KL. The extra term activates only when a token’s cen-tred log-ratio is unusually large and positive. This follows the robustness motivation of chi-squared preference optimisation (Huang et al., 2025a) and is related in spirit to asymmetric policy-gradient controls that treat positive and negative update di-rections differently (Yu et al., 2025; Xie et al., 2026). For each sequence, CAPR computes dj =log πθ(yj ) − log πref (yj ) on the active completion-token set A and normalises it by 
+
+¯d = |A| −1 X
+
+> k∈A
+
+dk,sd = |A| −1 X
+
+> k∈A
+
+(dk − ¯d)2
+
+!1/2
+
+,
+
+ˆdj = ( dj − ¯d)/(sd + ϵ). (16) Only the upper tail is penalized: 
+
+Lχ2 = |A| −1 X
+
+> j∈A
+
+h ˆdj − 1
+
+i2+ . (17) The one-sided form is important. Positive spikes make the new policy over-commit to a few sampled tokens. Negative movements usually reflect proba-bility mass being moved away from sampled tokens and are already bounded by the clipped PPO objec-tive. Penalising both sides equally would make the regulariser behave like another broad KL term and would unnecessarily resist useful exploration. A simple trust-region view gives the same intuition. For bounded token advantages, the performance-difference bound contains an error term proportional to how far the new policy moves from the old one (Kakade and Langford, 2002). Since total variation is controlled by chi-squared divergence, keeping the upper-tail χ2 small bounds the harmful part of the update: 
+
+J(πθ′ ) − J(πθ) ≳ b∆PPO − C
+
+q
+
+Lχ2 , (18) for a constant C depending on the advantage scale. CAPR uses Eq. 17 only as a soft penalty, so the method keeps the usual PPO/KL update while damping the rare token-level jumps most likely to destabilise sparse-reward training. 
+
+B Denoising Forward-Pass Cost 
+
+We compare rollout-generation cost by counting de-noising model forward passes for one prompt. This is the shared cost paid before the PPO-style update. For shared quantities we follow the d-TreeRPO comparison setting (Pan et al., 2026): comple-tion length L=256 , and denoising budget N =256 .CAPR-specific quantities use our reported values in Appendix C: branch fraction fb=0 .5 and branches per cached prefix Gb=2 , G=8 terminal comple-tions. Flat methods sample each completion indepen-dently. With G completions and N denoising steps per completion, the cost is 
+
+Cflat = GN. (19) Algorithm 1 One CAPR optimisation iteration for prompt q.
+
+Require: Policy πθ , reference πref , value head Vϕ and target head V ¯ϕ.
+
+Require: Rollouts G, branches per cached prefix Gb, fork fraction fb, denoising steps N , blocks B.1: Set M = ⌈G/G b⌉ cached prefixes and initialise path state h = 0.2: for m = 1 , . . . , M do 
+
+3: Denoise from zN to the fork step fbN , updating h
+
+from confidence, entropy, and stability. 4: Cache the fork-step state and spawn Gb sibling con-tinuations by resampling the cached scores. 5: Continue the siblings to completion with the same trace update and steering rule. 6: At scheduled block boundaries, prune low-quality sib-lings using mean path-state quality. 7: end for 
+
+8: Score the completed rollouts with the verifier to obtain outcome rewards Ri.9: for each rollout i and block b do 
+
+10: Form the reward-conserving block signal 
+
+ri,b = ωblk Rini,b P  
+
+> cni,c
+
++ (1 − ωblk )Ri1[b = B].11: Compute TD residuals, GAE advantages ˆAi,b , and value targets yVi,b using Eq. 11 and Eq. 12. 12: end for 
+
+13: Convert block advantages into token weights with Eq. 5. 14: Optimise the policy and value head with LCAPR in Eq. 6, including KL, χ2, and self-distillation terms. 15: Update the target head by Polyak averaging: ¯ϕ ← (1 −
+
+τp) ¯ϕ + τpϕ.
+
+Thus the flat baseline costs 8 · 256 = 2048 for-wards. For d-TreeRPO, we use the forward-count for-mula reported in Pan et al. (2026). With tree branch-ing factor Btree and depth H, the reported cost is 
+
+Ctree = Btree (BH 
+
+> tree
+
+− 1) 
+
+Btree − 1 · NH . (20) With Btree =4 , H=2 , (these settings are the min-imal requirements as per (Pan et al., 2026)) and 
+
+N =256 , this gives (4 + 16) · 128 = 2560 forwards. CAPR uses a smaller comparison set by sharing the early prefix. One branch group runs a shared prefix for fbN steps, then forks Gb sibling suffixes of length (1 − fb)N . Without pruning, one group costs 
+
+Cgroup = fb + Gb(1 − fb)N. (21) Producing G completions requires G/G b groups, giving 
+
+CCAPR = GGb
+
+fb + Gb(1 − fb)N. (22) With G=8 , Gb=2 , fb=0 .5, and N =256 , the no-pruning count is 4 · 1.5 · 256 = 1536 forwards. Scheduled pruning can only reduce this value. If 
+
+0 = p0 < p 1 < · · · < p P < p P +1 = 1 are suffix checkpoints and am siblings are kept on interval 
+
+[pm, p m+1 ], then one group costs 
+
+N
+
+"
+
+fb + (1 − fb)
+
+> P
+
+X
+
+> m=0
+
+am(pm+1 − pm)
+
+#
+
+, (23) which is no larger than the no-pruning value when-ever am ≤ Gb. Table 6 therefore reports CAPR’s conservative upper bound. 
+
+Table 6: Per-prompt denoising forward-pass cost under the d-TreeRPO comparison setting. Shared quantities use, L=256 , and N =256 . CAPR-specific quantities use Gb=2 and fb=0 .5, G=8 .
+
+Method Forwards per prompt # fwd 
+
+Diffu-GRPO G N 2048 
+
+d-TreeRPO Btree (BH 
+
+> tree −1)
+> Btree −1
+
+· NH 2560 
+
+CAPR ≤ GGb ·fb+Gb(1 −fb) N ≤ 1536 
+
+C Hyperparameters 
+
+Table 7 reports the CAPR hyperparameters used for the results in Table 1. Unless noted otherwise, the values are shared across tasks. 
+
+D CAPR Search Efficiency 
+
+This appendix explains CAPR’s compute advan-tage. The goal is not to prove a new convergence theorem, but to clarify why a block-level value head can recover much of the attribution signal that tree rollouts obtain by spending additional forward passes. 
+
+D.1 Tree Search reduces Variance by spending Forwards 
+
+Tree methods branch a partial denoising path, fin-ish many continuations, and compare their final rewards. If a node has BHmtree leaves, the reward average at that node has variance roughly 
+
+Var( ˆRtree | st) ≈ σ2
+
+> R|st
+
+BH
+
+> tree
+
+, (24) where σ2 
+
+> R|st
+
+is the outcome-reward variance after state st. This is useful, but the variance reduction is purchased by evaluating many continuations. 
+
+D.2 CAPR learns the same Signal Once 
+
+CAPR keeps only a small number of continuations, but it records the path state at every block boundary. For block boundary state sb, the value head learns 
+
+Vϕ(sb) ≈ E[R | sb], (25) Table 7: CAPR hyperparameters, organised by mecha-nism.                                                                        
+
+> Group Parameter Value
+> Generation & rollouts
+> target rollouts G8block length ℓblk 32 tokens number of blocks BL/ℓ blk
+> denoising steps NL/ 2
+> evaluation temperature 0 / pass@1 decoding rollout temperature 1.0
+> Cache & Steer path state (§3.2)
+> αe(entropy gate scale) 4.0
+> αs(stability gate scale) 5.0
+> γ(path-state injection) 0.15
+> λ(path-state steering scale) 1.0
+> λf(χ2coefficient) 0.01
+> β(reference KL coefficient) 0.01
+> Branch-and-prune sampler (§3.3)
+> branch fraction fb0.5 branches per cached prefix Gb2first prune checkpoint p10.33 second prune checkpoint p20.67 keep ratio 0.75
+> Block Critic (§3.4)
+> TD discount γ0.99 GAE λgae 0.95 value-MSE coefficient cv0.5 value-head hidden dim 128 Polyak coefficient τp0.005 replay-buffer size 32 block-shaping mass ωblk 0.20
+> Self-distillation loss (Appendix A.3)
+> wsd (base NLL scale) 0.10
+> wmax sd (maximum NLL weight) 0.10
+> τsd (reward threshold) 0.99 power p2.0
+> τNLL (NLL clamp) 3.0
+> Optimisation
+> learning rate η3×10 −5
+> optimiser AdamW weight decay 0.1 gradient clip 1.0 PPO inner epochs μ2PPO clip ϵ0.4 LoRA rank ( r,α, dropout) (128 ,64 ,0.05)
+> DeepSpeed stage ZeRO-2 precision bf16 (fp32 master)
+
+so it can estimate which blocks made the final re-ward more likely before seeing many extra leaves. The TD residual 
+
+δb = rb + γV ¯ϕ(sb+1 ) − V¯ϕ(sb) (26) turns one final reward into one block-level signal. This is the same role that a tree plays: it tells the optimiser which parts of a path were useful. The difference is that CAPR learns this mapping and reuses it, instead of rebuilding a fresh tree for every prompt. 
+
+D.3 Why this is Stable 
+
+Two safeguards keep the learned signal from domi-nating when it is unreliable. First, the target value head V¯ϕ is a slow Polyak average of the online head, which smooths noisy block targets. Second, CAPR gates the TD blend using the recent value loss: when the value head is poorly calibrated, βeff TD 
+
+becomes small and the update falls back toward the flat GRPO advantage. The self-distillation loss and chi-square regu-lariser are local to the policy update and are de-fined in Appendix A.3 and Appendix A.4. Self-distillation copies solved rollouts back into the LoRA policy, which is why the value head and search machinery can be removed at inference. 
+
+D.4 Implication of the Bound 
+
+CAPR trades tree depth for a learned block predic-tor. When the value head explains a nonzero part of the final-reward variance, the resulting block advantage has lower noise than a flat rollout advan-tage at nearly the same generation cost. When the value head is weak, the calibration gate reduces its influence, so CAPR reverts toward the flat baseline rather than relying on an inaccurate local signal. This yields the following practical comparison: tree search : lower variance by more leaves ,
+
+CAPR : lower variance by learned block values .
+
+(27) The empirical diagnostics in §4.4 check this predic-tion. The value loss decreases, the χ2 statistic stays bounded, and the full CAPR run has the smoothest gradient-norm trajectory. 
+
+E Detailed Descriptions of dLLM RL Baselines 
+
+This appendix summarises the baselines in Table 1. For each method, we describe its training signal, the advantage assigned to token updates, and the main approximation used for masked diffusion like-lihoods. The goal is to make the comparison with CAPR interpretable rather than to reproduce the original derivations. 
+
+Diffu-GRPO (Zhao et al., 2025a). A direct port of GRPO to masked dLLMs. The reward is the ver-ifier outcome on the final completion oi, and the ad-vantage Ai,k = ri − mean {rj }Gj=1 is broadcast to every token of oi. The only dLLM-specific piece is the log-probability estimator: rather than marginal-ising over denoising orders, Diffu-GRPO evalu-ates log πθ in a single forward pass on a randomly masked prompt and a fully masked completion, and re-samples the prompt mask each inner update for regularisation. This makes training cheap but gives every token the same rollout-level signal. CAPR instead uses the per-block advantages of §3.4. 
+
+VRPO (Zhu et al., 2025a). A DPO-style prefer-ence optimiser using offline pairs (q, o w, o l) and no explicit reward model. Since log πθ(o | q)
+
+is intractable, VRPO substitutes an ELBO bound 
+
+Bπ(o | q) ≤ log π(o | q) and forms the DPO score from differences of Bπθ − Bπref on ow and ol.Two ideas reduce the variance of this estimator: an optimal allocation of the sampling budget across diffusion timesteps (more nt, fewer nzt ) and anti-thetic sampling that shares noise between the live and reference models. The remaining gap is struc-tural: the score is built on a lower bound, not the true log-likelihood. VRPO is the recipe behind the public LLaDA-1.5 release on LLaDA-8B-Instruct. 
+
+wd1 (Tang et al., 2026). A ratio-free alterna-tive to GRPO. After scoring a group with the verifier, wd1 maps the group-relative advantages 
+
+Ai = Ri − mean( R1: G) to softmax weights 
+
+w± 
+
+> i
+
+= softmax( ±ψA i) and optimises P
+
+> i
+
+(−w+ 
+
+> i
+
++
+
+w− 
+
+> i
+
+) log πθ(oi | q), sidestepping the dLLM ratio entirely. The token-level log-probabilities are still approximated by the mean-field, single-pass esti-mator of Diffu-GRPO, with the same rollout-level signal for every token. 
+
+SAPO (Xie et al., 2026). An augmented Diffu-GRPO with a step-aware reward. SAPO estimates whether an intermediate diffusion state makes progress by comparing the expected outcome of rollouts continued from two intermediate states. In practice, the cheaper variant continues from one intermediate state and the fully masked state. The combined signal Atotal  
+
+> i
+
+= Ai + 1[Ai > 0] Rprocess 
+
+is again broadcast to all tokens, so the per-step gran-ularity ends at the rollout level. Like Diffu-GRPO, SAPO inherits the mean-field likelihood approxi-mation under randomly masked conditioning. 
+
+GDPO (Rojas et al., 2026). A GRPO variant that keeps the broadcast advantage but lifts the importance ratio from token-level (mean-field) to sequence-level via an ELBO surrogate, ri =
+
+LELBO (oi | q, θ )/L ELBO (oi | q, θ old ). Variance is controlled by replacing the outer Monte Carlo over diffusion time with a small set of determinis-tic quadrature points (typically N =2 or 3) and a lightweight inner Monte Carlo over masked states. As with VRPO, the optimisation runs on a bound rather than on the true log-likelihood. We include GDPO only in the LLaDA-MoE-7B-A1B-Instruct section of Table 1 because Pan et al. (2026) report it only on that backbone under their shared evaluation setting. 
+
+TraceRL (Wang et al., 2025). A trajectory-aware PPO that optimises along the model’s actual decoding path rather than under random masking. For each prompt, a rollout exposes a chain of inter-mediate states (z1, . . . , z 0). For a token oj revealed at the transition zt → zt−1, the importance ratio is computed on π(· | zt). A diffusion-based value model Vθv then produces per-token GAE-style ad-vantages, giving a fine-grained learning signal. The trade-off is the standard one: a learned value model is sensitive to value mis-specification and reward hacking, and the trajectory-conditioned likelihoods do not correct for the marginalisation over alterna-tive decoding orders that lead to the same o.
+
+d-TreeRPO (Pan et al., 2026). A tree-rollout baseline. Each prompt expands into a balanced tree of branching factor B and depth H. Every node represents an N/H -step diffusion segment, and the per-tree-node advantage is averaged bottom-up from leaf rewards. This gives the finest non-CAPR advantage signal in our comparison, but the cost grows as B(BH −1)  
+
+> B−1
+
+· NH forwards per prompt. CAPR targets similar attribution granularity with a single flat rollout structure, with cost linear in G
+
+and independent of tree depth. 
+
+F Reward-Curve Comparison 
+
+Figure 9 compares CAPR training reward curves with d-TreeRPO and the open-source Diffu-GRPO (Zhao et al., 2025a) and wd1 (Tang et al., 2026) baselines. CAPR moves from the low-reward region into the same high-reward band as the tree method while using the cheaper cached/branched rollout structure. On GSM8K and Math500, the base model already has stronger task competence and the reward axis is much narrower, so CAPR stays close to the d-TreeRPO curve and may move slightly above or below it at different parts of training. This is the expected behaviour: on easier dense-backbone tasks, the main benefit is stable without paying for full tree expansion, rather than a large absolute change in training reward. 0 0.5 1
+
+> 0.0
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+> 1.0
+> Training reward
+
+Sudoku   
+
+> 00.5 1
+> 0.2
+> 0.4
+> 0.6
+> 0.8
+
+Countdown   
+
+> 00.5 1
+> Training progress
+> 0.6
+> 0.7
+> 0.8
+> 0.9
+> Training reward
+
+GSM8K   
+
+> 00.5 1
+> Training progress
+> 0.1
+> 0.2
+> 0.3
+> 0.4
+> 0.5
+> 0.6
+
+Math500    
+
+> Diffu-GRPO wd1 d-TreeRPO CAPR
+
+Figure 9: Training reward curves for CAPR compared with d-TreeRPO and open-source baselines Diffu-GRPO and wd1 across the four reasoning tasks. 
+
+G Training Details 
+
+G.1 Prompts 
+
+Prompts used in Sudoku, Countdown, GSM8k and Math500 are as follows: 
+
+### Sudoku Please solve the following 4x4 Sudoku puzzle. The puzzle is provided as a 16-character string reading left-to-right, top-to-bottom, where '0' represents empty cells. Rules: - Fill empty cells with digits 1-4 - Each row must contain digits 1-4 exactly once - Each column must contain digits 1-4 exactly once - Each 2x2 box must contain digits 1-4 exactly once Important: Your solution must be a COMPLETE 16-character string with only the digits 1-4, representing your final solved grid. Respond in this exact format: <reasoning> Your step-by-step solving process </reasoning> <answer> [16-character solution string with no spaces or separators] </answer> Solve the following Sudoku puzzle: {PUZZLE} ### Countdown Respond in the following format: <reasoning> ... </reasoning> <answer> ... </answer> Using only the numbers {NUMBERS}, create an arithmetic expression that evaluates to exactly {TARGET}. You must use all numbers from the list, and each number must be used exactly once. You may use the operations +, -, *, and / as needed. After reasoning, provide only your final expression inside <answer></answer> tags without including an equals sign or the target number. For example, if the numbers are [2, 3, 4] and the target is 5, a valid answer is: <answer>2*4-3</answer>. ### GSM8k Respond in the following format: <reasoning> ... </reasoning> <answer> ... </answer> You are a math expert. You will be given a question to solve. Solve it step by step. Put only the final answer (the number) in the <answer> </answer> tag without any other text. {QUESTION} ### Math500 Respond in the following format: <reasoning> ... </reasoning> <answer> ... </answer> You are a math expert. You will be given a question to solve. Solve it step by step. Wrap the final answer in a \\boxed{{}}. {QUESTION} 
+
+G.2 Reward Functions Sudoku. The reward is defined as the percentage of correctly filled previously empty cells, with a maximum value of 1 and a minimum value of 0. 
+
+Countdown. The reward is 1.0 if the provided expression achieves the target using the given num-bers. If the numbers used are correct but the target is missed, the reward is 0.1. In all other cases, the reward is 0. 
+
+GSM8k. During training, we utilize a correctness-based reward, assigning a value of 1.0 if the pro-vided answer matches the ground truth. 
+
+Math500. Similarly, during training, we employ a correctness-based reward system, assigning a re-ward of 1.0 if the given answer matches the ground truth. 
+
+G.3 Dataset Links 
+
+Following previous works (Zhao et al., 2025a; Tang et al., 2026), we adopt the 4×4 Sudoku training and test sets provided by Diffu-GRPO (Zhao et al., 2025a) for Sudoku. For Countdown, models are trained on the 3to4 Countdown task training set 3
+
+and evaluated using the test set provided by Diffu-GRPO. For GSM8K 4 and Math500 5, we strictly fol-low their official training-test splits for both train-ing and evaluation. All datasets were used as per their intended use. 
+
+H Case Study 
+
+This section presents a case study comparing CAPR against its strongest baseline, d-TreeRPO, on the same GSM8K question, as shown in Fig-ure 10. CAPR produces both a correct reasoning process and the correct final answer.    
+
+> 3https://huggingface.co/datasets/Jiayi-Pan/ Countdown-Tasks-3to4
+> 4https://huggingface.co/datasets/openai/gsm8k
+> 5train: https://huggingface.co/datasets/ankner/ math-500 ,test: https://huggingface.co/datasets/ HuggingFaceH4/MATH-500
+
+LLaDA-8B-Instruct + CAPR 
+
+Question: Digimon had its 20th anniversary. When it came out John was twice as old as Jim. If John is 28 now how old is Jim? 
+
+Model Output: 
+
+<reasoning> 
+
+To determine Jim’s current age, we need to follow these steps: 1. Identify John’s age when Digimon came out. 2. Determine Jim’s age when Digimon came out. 3. Calculate Jim’s current age. First, we know that Digimon had its 20th anniversary, so it came out 20 years ago. If John is currently 28 years old, then his age when Digimon came out was 28 − 20 = 8 years old. Next, we know that when Digimon came out, John was twice as old as Jim. Therefore, let’s set up the equation: 8 = 2 · Jim’s age. To find Jim’s age, we divide both sides by 2: Jim’s age = 8 /2 = 4 .Now, we know Jim was 4 years old when Digimon came out. Since Digimon came out 20 years ago, Jim’s current age is 4 + 20 = 24 years old. ✓
+
+</reasoning> <answer> 
+
+24 ✓
+
+</answer> 
+
+LLaDA-8B-Instruct + d-TreeRPO 
+
+Question: Digimon had its 20th anniversary. When it came out John was twice as old as Jim. If John is 28 now how old is Jim? 
+
+Model Output: 
+
+<reasoning> 
+
+To determine Jim’s current age, we need to follow these steps: 1. Understand that Digimon had its 20th anniversary, 20 years ago. 2. At that time, John was twice as old as Jim. 3. We are currently given that John is 28 years old. Let’s denote Jim’s current age as J.Since Digimon had its 20th anniversary 20 years ago, John was 28 − 20 = 8 years old at that time. At that time, John was twice as old as Jim. Therefore, we can set up the equation: 8 = 2 J. To find Jim’s current age, we solve for J: J = 82 = 4 .Thus, Jim is currently 4 years old. ✗
+
+</reasoning> <answer> 
+
+4 ✗ (ground truth: 24 )
+
+</answer>
