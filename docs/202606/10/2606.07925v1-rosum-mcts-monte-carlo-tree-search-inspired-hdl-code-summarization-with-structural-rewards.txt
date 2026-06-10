@@ -1,0 +1,449 @@
+Title: ROSUM-MCTS: Monte Carlo Tree Search-Inspired HDL Code Summarization with Structural Rewards
+
+URL Source: https://arxiv.org/pdf/2606.07925v1
+
+Published Time: Tue, 09 Jun 2026 00:24:24 GMT
+
+Number of Pages: 8
+
+Markdown Content:
+# ROSUM -M CTS : Monte Carlo Tree Search-Inspired HDL Code Summarization with Structural Rewards 
+
+Prashanth Vijayaraghavan 
+
+IBM Research 
+
+San Jose, CA, USA prashanthv@ibm.com 
+
+Charles Mackin 
+
+IBM Research 
+
+San Jose, CA, USA charles.mackin@ibm.com 
+
+Luyao Shi 
+
+IBM Research 
+
+San Jose, CA, USA luyao.shi@ibm.com 
+
+Apoorva Nitsure 
+
+IBM Research 
+
+San Jose, CA, USA Apoorva.Nitsure@ibm.com 
+
+Ashutosh Jadhav 
+
+IBM Research 
+
+San Jose, CA, USA ashutosh@us.ibm.com 
+
+David Beymer 
+
+IBM Research 
+
+San Jose, CA, USA beymer@us.ibm.com 
+
+Tyler Baldwin 
+
+IBM Research 
+
+San Jose, CA, USA tbaldwin@us.ibm.com 
+
+Ehsan Degan 
+
+IBM Research 
+
+San Jose, CA, USA edehgha@us.ibm.com 
+
+Vandana Mukherjee 
+
+IBM Research 
+
+San Jose, CA, USA vandana@us.ibm.com 
+
+Abstract —Large language models (LLMs) have shown promise in code summarization, yet their effectiveness for Hardware Description Languages (HDLs) like VHDL and Verilog remains underexplored. We propose R OSUM -M CTS , an LLM-guided ap-proach inspired by Monte Carlo Tree Search (MCTS) that refines summaries through structured exploration and reinforcement-driven optimization. Our method integrates both local and global context via a hierarchical candidate expansion mechanism and optimizes summaries using a composite reward function balanc-ing functional correctness (FC), local content adequacy (LCA), and fluency. We evaluate ROSUM -M CTS on the VHDL-eval and Verilog-eval datasets, demonstrating its consistent outperfor-mance over baseline methods by leveraging structured bottom-up refinement and reinforcement-based optimization. Ablation studies confirm the necessity of both local and global expansion strategies, as well as the importance of balancing FC and LCA for optimal performance. Furthermore, R OSUM -M CTS proves ro-bust against superficial modifications, such as variable renaming, maintaining summary quality where baselines degrade. These results establish R OSUM -M CTS as an effective and robust HDL summarization framework, paving the way for further research into reinforcement-enhanced code summarization. 
+
+Index Terms —HDL Code Summarization, MCTS, Monte Carlo Tree Search, LLM, Functional Correctness, Local Content Adequacy, Bottom-up refinement, Verilog, VHDL, AST, Code Explanation, Code Summarization. 
+
+I. I NTRODUCTION 
+
+Large Language Models (LLMs) have significantly ad-vanced code-related tasks, including generation, translation, and summarization, thereby enhancing software development and maintenance processes [1]–[4], [4]–[7]. However, their application to Hardware Description Languages (HDLs) such as VHDL and Verilog has been relatively limited and has specifically been focused more on Verilog [8]–[11]. HDLs present unique challenges due to their inherent concurrency, hardware-specific semantics, and structural complexity, which are not typically encountered in general-purpose programming languages. Recent studies have begun to explore the applica-tion of LLMs in HDL code generation and summarization. For instance, recent works, such as AutoChip, have investigated automating HDL generation using LLM feedback, focusing on improving functional correctness but not specifically targeting summarization tasks [12]. Similarly, studies on classification-based and paradigm-based automatic HDL code generation using LLMs have aimed to mitigate issues like hallucination in code generation but have not directly addressed the robustness of code summarization [13]. In the area focused on HDL code summarization, the CODES approach leverages Abstract Syntax Trees (ASTs) to generate intermediate descriptive information and use that to generate the overall summary of the VHDL code [14]. While CODES utilizes structural insights from ASTs to produce summaries, it does not explicitly address robustness against syntactic variations like identifier renaming. A notable chal-lenge in HDL code summarization is the sensitivity of LLMs to superficial syntactic variations, such as changes in variable names, module identifiers, or signal names. These variations can lead to inconsistencies in generated summaries, as LLMs may misinterpret or overlook the core functionality of the code when faced with different naming conventions. This issue highlights the necessity for summarization approaches that are robust to such variations, ensuring accurate and consistent representation of the code’s intent. To address these challenges, we introduce R OSUM -M CTS , a novel approach inspired by Monte Carlo Tree Search (MCTS) [15]–[17], traditionally used in sequential decision-making tasks like game playing. In the context of HDL code sum-marization, MCTS principles can be adapted for structured exploration and optimization. Our method integrates both local and global contexts through a hierarchical candidate expansion mechanism, systematically exploring and evaluating potential summary refinements. Unlike conventional summa-rization methods that rely solely on sequence-to-sequence modeling, R OSUM -M CTS incorporates reinforcement-driven optimization to iteratively refine initial LLM-generated sum-maries. The refinement process is guided by a composite reward function that balances multiple objectives: functional correctness (FC), ensuring the generated summary accurately reflects the core functionality of the HDL design; local content 
+
+> arXiv:2606.07925v1 [cs.CL] 6 Jun 2026
+
+adequacy (LCA), measuring whether critical design aspects are preserved in the summary; and fluency, ensuring the generated summary remains readable and grammatically coherent. By optimizing these objectives through reinforcement learning, ROSUM -M CTS produces more robust and informative sum-maries compared to existing approaches. We conduct extensive experiments on both VHDL and Verilog datasets [18], [19], evaluating the effectiveness of R OSUM -M CTS across multiple LLMs and comparing it with state-of-the-art baseline meth-ods. Our results demonstrate that R OSUM -M CTS consistently outperforms existing summarization techniques, achieving su-perior results across various automatic evaluation metrics. Our key contributions in this work are as follows: 
+
+MCTS-inspired Summarization: We introduce ROSUM -MCTS , an MCTS-inspired approach for HDL code summariza-tion that refines LLM-generated summaries through structured exploration and reinforcement-driven optimization, integrating both local and global contexts via a hierarchical candidate expansion mechanism. 
+
+Comprehensive Evaluation: Extensive experiments on VHDL and Verilog datasets show that R OSUM -M CTS remains effective under perturbations like variable/module renaming, outperforming baselines across LLMs and metrics. II. R ELATED WORK 
+
+Large Language Models (LLMs) have significantly im-proved code summarization by generating concise and infor-mative summaries across multiple languages. Sun et al. [20] provide a detailed analysis of LLMs’ summarization capabili-ties, demonstrating their effectiveness. However, LLMs remain sensitive to variations in variable names and module identi-fiers, leading to inconsistencies in generated summaries. HDLs such as VHDL and Verilog pose challenges for summarization due to their concurrency and hardware-specific semantics. Traditional methods often struggle with these complexities, necessitating specialized approaches. The C ODES framework [14] enhances VHDL summarization using intermediate de-scriptions, while C ODE V [8] improves Verilog summarization through multi-level summarization. Despite these advances, existing methods remain sensitive to superficial changes in variable and module names, impacting summary quality. To address these limitations, we propose ROSUM -M CTS , an MCTS-inspired approach that refines LLM-generated sum-maries through structured exploration. By integrating local and global contexts via hierarchical candidate expansion and optimizing functional correctness, local content adequacy, and fluency, R OSUM -M CTS enhances robustness against syntactic variations. Our experiments across multiple datasets and LLMs show that R OSUM -M CTS consistently outperforms existing methods, setting a new standard for HDL code summarization. III. M ETHODOLOGY 
+
+In this section, we describe the proposed R OSUM -M CTS 
+
+framework for HDL code summarization. R OSUM -M CTS is a hierarchical method that integrates Abstract Syntax Trees (ASTs) with Large Language Models (LLMs) and is inspired by Monte Carlo Tree Search (MCTS). Rather than apply-ing MCTS directly to sequential decision-making tasks, our approach adapts the algorithm for HDL code summarization through a bottom-up strategy. In this framework, summaries are incrementally refined from the leaf nodes upward by leveraging prompt-based candidate generation and a composite reward evaluation. This design preserves the structural and semantic integrity of the HDL design, producing final sum-maries that are robust to superficial variations such as changes in variable or module names. Figure 1 depicts the R OSUM -MCTS framework for HDL code summarization. 
+
+A. HDL Parsing and AST Construction 
+
+To capture both the structural and behavioral aspects of HDL designs, we first parse the HDL file F to construct its AST. For Verilog HDL, we utilize pyverilog —a Python toolkit designed for RTL design analysis and code generation [21]. This toolkit efficiently extracts ASTs that reflect the design’s structure and functionality. In the case of VHDL, 
+
+pyVHDLParser is employed—a streaming-based parser that tokenizes VHDL-2008 source files and constructs detailed ASTs [22]. Although our initial focus is on single-file parsing, both tools support cross-file dependency resolution, ensuring that inter-file references are accurately maintained in the AST. 
+
+B. Generation of Preliminary Global Summary 
+
+Before initiating the hierarchical summarization process, a preliminary summary G of the entire HDL code is generated using an LLM-based summarization approach. This global summary provides essential context and guides the candidate generation process at each node, thereby enhancing the quality and variability of the generated node-level summaries. 
+
+C. MCTS-Inspired Hierarchical HDL Code Summarization Approach 1) Overview and Motivation: Traditional MCTS is widely used in sequential decision-making tasks, such as game play-ing, by exploring multiple candidate paths via simulation rollouts. In R OSUM -M CTS , we adapt this idea to HDL code summarization through a bottom-up approach. At each non-leaf node in the AST, multiple candidate summaries are generated using various prompt templates. These candidates are evaluated using a composite reward function that integrates a fluency reward , a local content adequacy reward , and a 
+
+functional correctness reward (the detailed reward design is provided in Section III-C4). The candidate with the highest composite score is then selected as the refined summary for that node. This one-step candidate expansion and direct eval-uation (rather than full rollouts) improves computational effi-ciency while preserving the structural and semantic integrity of the HDL design, ultimately producing a final summary that is robust to naming perturbations. 
+
+2) Procedure: The summarization process in ROSUM -MCTS proceeds through the following steps:  
+
+> •
+
+Parsing and Global Context: The HDL file is parsed using pyverilog (for Verilog) or pyVHDLParser Summarization Prompt    
+
+> + HDL Code (C)
+> HDL Parser
+> LLM Preliminary Summary
+> G
+> Abstract Syntax Tree
+> (T)
+> Candidate Generation
+> (Expansion)
+> Candidate Evaluation
+> (Rewards)
+> Candidate Summary
+> Selection
+> SummarizeNode (node, G, C)
+> Functional
+> Correctness
+> Fluency
+> Local Content
+> Adequacy
+> Final Summary S*
+> Bottom-Up
+> Summarization
+> SummarizeNode( T.root, G, C) Fig. 1. Illustration of our R OSUM -M CTS method for HDL Code Summarization.
+
+(for VHDL) to construct the AST. Simultaneously, a preliminary global summary of the entire code is gen-erated using an LLM-based summarization approach, which provides essential context for guiding subsequent summarization tasks.  
+
+> •
+
+Recursive Summarization: The algorithm traverses the AST in a bottom-up manner. For each node, summaries of its immediate children are first generated. If a node is a leaf, its summary is produced directly; otherwise, the child summaries are aggregated to form an ordered list.  
+
+> •
+
+Candidate Generation: At every non-leaf node, multiple candidate summaries are generated using various prompt templates (see Table IV in Appendix). These candidates leverage both the local child summaries and the global context to capture different facets of the node’s function-ality.  
+
+> •
+
+Candidate Evaluation and Selection: Each candidate summary is evaluated using a composite reward function that integrates the fluency reward , the local content ade-quacy reward , and the functional correctness reward (the detailed formulation is provided in Section III-C4). The candidate with the highest composite reward is selected as the refined summary for the node.  
+
+> •
+
+Propagation: The refined summary is propagated upward in the AST, ensuring that each higher-level node benefits from the best local information, ultimately leading to a robust final summary. 
+
+3) Candidate Expansion Mechanism: At every non-leaf AST node, candidate expansion is achieved using four distinct prompt templates (see Table IV). These templates are designed to capture various dimensions of the code’s functionality:  
+
+> •
+
+Type 1 (Local Summary Context): This prompt com-bines the child summaries to generate a concise, localized summary that reflects the immediate details of the node.  
+
+> •
+
+Type 2 (Local Inference): Here, the focus is solely on the child summaries to infer the higher-level functionality, abstracting the underlying behavior of the node.  
+
+> •
+
+Type 3 (Global Code Context): This variant integrates the full code context along with the child summaries, ensuring that the generated summary is informed by the complete source code.  
+
+> •
+
+Type 4 (Global Summary Context): This template leverages the preliminary global summary together with the child summaries to refine the description of the current node’s functionality. These candidate expansion techniques are crucial as they ensure that both the local details and the overall global context of the HDL code are captured, ultimately enhancing the coherence and completeness of the final summary. Table IV presents the prompt templates used to generate candidate summaries. 
+
+4) Reward Function Design: In our hierarchical HDL code summarization framework, the quality of a candidate summary 
+
+Si is evaluated by integrating three distinct reward compo-nents. Each component is designed to assess a key aspect of summary quality—ensuring fluency, content adequacy, and functional correctness. 
+
+a) Fluency Reward RF (Si): Fluency is crucial for pro-ducing summaries that are readable and easily understood by developers. We quantify fluency by measuring the perplexity of the candidate summary, PPL (Si). The fluency reward is then defined as: 
+
+RF (Si) = 11 + PPL (Si) ,
+
+which maps lower perplexity values (indicating higher fluency) to scores closer to 1. 
+
+b) Local Content Adequacy Reward RLCA (Si, S child list ):
+
+This reward evaluates whether the candidate summary accu-rately and comprehensively encapsulates the ordered sequence of its child summaries. Let 
+
+Schild list = Schild 1 , S child 2 , . . . , S child k
+
+represent the ordered list of children summaries. 
+
+Algorithm 1 ROSUM -MCTS: Hierarchical HDL Code Sum-marization 
+
+Input: HDL file F
+
+Output: Final summary S∗
+
+// Parse HDL file into AST 
+
+T ← PARSE HDLF ILE (F )
+
+// Load HDL source code 
+
+C ← LOAD HDLF ILE (F )
+
+// Generate global context summary 
+
+G ← PRELIMINARY SUMMARY (C)
+
+function SUMMARIZE NODE (node, G, C) 
+
+if ISLEAF (node) then 
+
+// Generate summary for leaf node 
+
+Snode ← GENERATE SUMMARY (node )
+
+return Snode 
+
+else 
+
+// Initialize child summary list 
+
+Schild list ← [ ] 
+
+for j = 1 to |node. children | do 
+
+child j ← node. children [j]
+
+Schild j ← SUMMARIZE NODE (child j , G, C )
+
+Append Schild j to Schild list 
+
+end for 
+
+// Candidate expansion 
+
+S ← GENERATE CANDIDATES (Schild list , G, C )
+
+for each candidate Si ∈ S do 
+
+R(Si) ← αR F (Si) + βR LCA (Si, S child list ) + 
+
+γR F C (Si, C )
+
+end for 
+
+// Select best candidate 
+
+Snode ← arg max Si∈S R(Si)
+
+return Snode 
+
+end if end function 
+
+// Main execution 
+
+S∗ ← SUMMARIZE NODE (T. root , G, C )
+
+return S∗
+
+To assess content adequacy, we compute semantic embed-dings of each child summary using SimCSE [23] and average them as: 
+
+¯E(Schild list ) = 1
+
+k
+
+> k
+
+X
+
+> j=1
+
+ESimCSE 
+
+ Schild j
+
+.
+
+We next determine the cosine similarity between the em-bedding of the candidate summary, ESimCSE (Si), and the aggregated embedding ¯E(Schild list ). Scaling this similarity to the range [0 , 1] yields: 
+
+RLCA (Si, S child list ) = cos 
+
+
+
+ESimCSE (Si), ¯E(Schild list )
+
+
+
++ 1 2 .
+
+c) Functional Correctness Reward RF C (Si, C ): This reward verifies whether the candidate summary Si accurately describes a submodule that is functionally present within the complete HDL code C. Instead of generating an intermediate global summary, we directly employ a prompt-based eval-uation using an LLM. The LLM is provided with the full HDL code C along with Si and is tasked with assessing the consistency of Si with the functionality of C. The LLM returns a normalized score (between 0 and 1) as follows: 
+
+RF C (Si, C ) = LLM_Score 
+
+
+
+Prompt (C, S i)
+
+
+
+.
+
+d) Composite Reward: The overall composite reward for a candidate summary is computed as a weighted sum of the three components: 
+
+R(Si) = α·RF (Si)+ β ·RLCA (Si, S child list )+ γ ·RF C (Si, C ),
+
+where α, β, and γ are hyperparameters that balance the contributions of fluency, local content adequacy, and functional correctness, respectively. This composite reward function en-sures that the selected summary is fluent, maintains submodule structure, and aligns functionally with the HDL code. The complete process is detailed in Algorithm 1. IV. E XPERIMENTS 
+
+A. Overview 
+
+In this section, we outline our experimental setup to assess the effectiveness of our R OSUM -M CTS method for HDL code summarization. Our experiments are designed to answer the following research questions: 
+
+RQ1: How effective is our R OSUM -M CTS method compared to existing baseline approaches? 
+
+RQ2: How do different aspects of R OSUM -M CTS (e.g., can-didate expansion mechanism, composite rewards, and hyper-parameters) contribute to the overall performance? 
+
+RQ3: How robust is the approach to superficial modifications, such as changes in variable or module names? 
+
+B. Datasets 
+
+We evaluate our approach on two widely used HDL datasets: (a) Verilog-Eval: A benchmark suite for Verilog HDL code summarization consisting of 156 problems sourced from the HDLBits website [18]; and (b) VHDL-Eval: A com-prehensive dataset for VHDL code summarization comprising 202 code problems tailored for VHDL [19]. 
+
+C. Metrics 
+
+We employ the following automatic metrics to assess the quality of the generated summaries: (a) ROUGE-L: Measures the longest common subsequence between the generated sum-mary and the reference summary, emphasizing fluency and coherence [24]; and (b) LLM Preferred Rate (PR): Utilizes large language models (LLMs) to rate and compare the quality of summaries, serving as a proxy for human judgment [25]. TABLE I COMPARISON OF SUMMARIZATION APPROACHES ACROSS DIFFERENT MODELS AND DATASETS . H IGHER VALUES INDICATE BETTER PERFORMANCE .Dataset Method GPT-4o Llama-3 Granite Code-34b DeepSeek-Coder-33b LLM PR Rouge-L LLM PR Rouge-L LLM PR Rouge-L LLM PR Rouge-L VHDL Vanilla 48.7 39.3 42.6 34.1 34.2 29.5 26.8 25.1 CODES 52.3 43.2 46.1 39.5 39.1 33.4 29.4 28.6 ROSUM -M CTS 60.9 50.8 53.2 45.9 45.6 39.3 35.7 33.1 Verilog Vanilla 52.4 43.1 45.9 40.2 40.5 33.0 32.1 29.5 CODES 55.0 46.9 48.7 43.5 43.8 37.8 35.5 31.2 ROSUM -M CTS 64.2 55.4 55.6 48.8 50.3 44.2 40.5 36.7 
+
+D. Baseline Models and Approaches 
+
+For evaluation, we consider several LLMs which includes proprietary and open source models such as GPT-4o, Llama-3, DeepSeek-Coder-33b, Granite Code-34b, and CodeLlama 34b. To benchmark our method, we compare against two baseline approaches: (a) Vanilla Prompting: A straightfor-ward approach where a simple prompt is used to summarize the HDL code; and (b) CODES : A multi-step prompting strategy, referred to as Chain-of-Description, that aggregates summaries from different components of the AST. We evaluate ROSUM -M CTS alongside baselines to demonstrate its strength in capturing local details and global code context. 
+
+E. Implementation Details and Experimental Setup 
+
+Our experimental framework is implemented in PyTorch [26], using ChatGPT APIs [27] for generating global and candidate summaries. The system runs on two NVIDIA V100 GPUs (32 GB each), supporting high-throughput inference and embedding computations via models like SimCSE [23]. Candidate generation and reward evaluation are batched to re-duce latency and improve GPU utilization. Parallel processing and asynchronous execution maximize hardware efficiency. Reward weights ( α, β, γ ) are tuned on validation data. With an average of ∼ 62 .7 AST nodes per module and ∼ 290 tokens per end-to-end prompt across evaluation datasets, our batching, pruning, and chunking strategies minimize both LLM calls and token cost. These optimizations ensure that ROSUM -MCTS remains scalable and cost-efficient across both local and proprietary model deployments. V. R ESULTS 
+
+A. (RQ1) Effectiveness of our ROSUM -M CTS Method 
+
+Table I presents the evaluation of our proposed R OSUM -MCTS method compared to the baseline approaches—Vanilla and Codes—across two datasets (VHDL and Verilog) using various large language models. We report results using LLM Preferred Rate (LLM PR) and Rouge-L as key performance metrics. Table I clearly demonstrates that R OSUM -M CTS con-sistently outperforms the baseline methods across all datasets and models. GPT-4o achieves the highest LLM PR and Rouge-L scores, indicating superior summarization capability. Llama-3 follows closely, surpassing Granite Code-34b, which in turn performs better than DeepSeek-Coder-33b. Among code-specific LLMs, Granite Code-34b exhibits strong performance relative to DeepSeek-Coder-33b and CodeLlama-34b. Since DeepSeek-Coder-33b and CodeLlama-34b yield comparable results with only minor variations, we report only one of them in the table. Verilog consistently outperforms VHDL in summarization quality, likely due to the increased exposure of LLMs to Verilog data compared to VHDL, given Ver-ilog’s greater popularity and wider adoption. Although the CODES method employs AST-based summaries similar to our approach, it lacks the bottom-up strategy and reinforce-ment mechanisms incorporated in ROSUM -M CTS , leading to inferior performance. Our results confirm R OSUM -M CTS 
+
+significantly improves summarization quality across models and datasets, validating our method. 
+
+B. (RQ2) Ablation Studies 
+
+In this section, we analyze the contribution of different com-ponents of R OSUM -M CTS , including the candidate expansion mechanism, composite reward functions, and the impact of varying reward coefficients for Verilog-Eval dataset. 
+
+1) Impact of Expansion Mechanism (Local Vs Global): To evaluate the impact of the expansion mechanism, we compare three settings: (1) Full R OSUM -M CTS using both local and global context, (2) Only local context, and (3) Only global context. Table II presents the results for GPT-4o in terms of ROUGE-L and LLM PR.             
+
+> TABLE II IMPACT OF EXPANSION MECHANISM ON GPT-4 OPERFORMANCE
+> Expansion Mechanism ROUGE-L LLM PR Full R OSUM -M CTS 55.4 64.2
+> Only Local Context 50.1 58.8 Only Global Context 52.5 60.3
+
+We observe that using only local context results in asignificant performance drop compared to the full model, although it still outperforms the C ODES baseline. On the other hand, using only global context performs slightly better than the local-only variant but remains inferior to the full ROSUM -M CTS . These findings suggest that both local and global context contribute uniquely to generating high-quality summaries, and their combination leads to the best results. 
+
+2) Effect of Reward Functions: To analyze the contribution of individual reward components, we conduct an ablation study by removing each reward term separately and evaluating its impact on GPT-4o and Llama-3. Table III presents the results for ROUGE-L and LLM PR scores.                       
+
+> TABLE III EFFECT OF REWARD FUNCTIONS ON PERFORMANCE
+> Model Setting ROUGE-L LLM PR GPT-4o Full R OSUM -M CTS 55.4 64.2
+> w/o FC 52.3 60.4 w/o LCA 50.8 58.5 w/o Fluency 54.1 63.8 Llama-3 Full R OSUM -M CTS 48.8 55.6
+> w/o FC 44.6 49.7 w/o LCA 46.2 52.0 w/o Fluency 47.4 54.3
+
+From the results, we find that removing the fluency reward leads to only a marginal drop in performance for both models. This suggests that modern LLMs inherently possess strong fluency and readability capabilities, making explicit fluency rewards less critical. In contrast, removing Functional Cor-rectness (FC) or Local Content Adequacy (LCA) significantly degrades quality. GPT-4o is particularly sensitive to LCA, highlighting its importance for preserving relevant local details in summaries. Llama-3 suffers a larger performance drop without FC, showing that functional correctness is critical for its summaries. These results highlight the importance of FC and LCA in boosting quality, with fluency a secondary factor given LLMs’ inherent coherence. 
+
+3) Influence of Reward Coefficients: Based on the previous findings, we plot line graphs for reward coefficients as α =0.1, 0.2, varying β = {0.3, 0.4, 0.5, 0.6, 0.7, 0.8}. This ensures that γ is adjusted accordingly so that all coefficients sum up to 1. From the plot in Figure 2, we observe that GPT-4o’s perfor-mance improves as β increases, highlighting the importance of Local Content Adequacy (LCA). However, this improvement stops beyond β = 0 .6, indicating diminishing returns from further emphasizing LCA. On the other hand, Llama-3 exhibits greater volatility with increasing β, peaking around β = 0 .4,after which performance declines. This suggests that while LCA contributes positively, excessive weighting might disrupt the balance needed for effective summarization. These trends indicate that while both LCA and Functional Correctness (FC) are crucial, their relative importance varies across models. GPT-4o appears to benefit more from LCA, whereas Llama-3 shows a more delicate balance between these rewards. This reinforces the need for careful tuning of reward coefficients to optimize performance across different models. 
+
+4) Robustness to Superficial Modifications: To assess the robustness of our approach against superficial modifications, we introduce controlled renaming noise by systematically replacing variable names in Verilog designs with varying re-naming ratios ranging from 0.1 to 0.7. We evaluate the perfor-mance of R OSUM -M CTS and C ODES under these conditions using the LLM PR metric. Figure 3 illustrates the impact of renaming noise on summarization quality. We observe that as the renaming ratio increases, C ODES exhibits a sharper decline 0.3 0.4 0.5 0.6 0.7 0.8       
+
+> values
+> 50
+> 52
+> 54
+> 56
+> 58
+> 60
+> 62
+> 64
+> LLM PR Score
+> = 0.1
+> GPT-4o
+> Llama-3
+> 0.3 0.4 0.5 0.6 0.7 0.8
+> values
+> = 0.2
+> GPT-4o
+> Llama-3
+> Fig. 2. Effect of reward coefficients on LLM PR scores for GPT-4o and Llama-3.
+
+in performance, indicating its sensitivity to variable renaming. In contrast, ROSUM -M CTS maintains robust performance, with only a marginal drop before stabilizing. This suggests that our method effectively captures structural and contextual information beyond mere lexical matches, ensuring resilience against such superficial modifications. 0.1 0.2 0.3 0.4 0.5 0.6 0.7  
+
+> Renaming Noise Ratio
+> 45
+> 50
+> 55
+> 60
+> LLM PR Score
+> RoSum-MCTS
+> CoDes
+> Fig. 3. Effect of Renaming Noise Ratio on Summarization Robustness
+
+VI. C ONCLUSION 
+
+We introduced R OSUM -M CTS , a novel code summarization approach inspired by Monte Carlo Tree Search (MCTS), leveraging structured rewards and an effective expansion mechanism. Extensive experiments across multiple LLMs and datasets demonstrate its superiority over baselines, including CODES , due to its bottom-up expansion and reinforcement-driven optimization. GPT-4o achieves the best performance, followed by Llama-3 and Granite Code-34b, with Verilog summarization outperforming VHDL, likely due to greater model exposure. Ablation studies highlight the importance of combining local and global context, with significant perfor-mance drops when using only one. R OSUM -M CTS optimizes summaries using three key rewards: functional correctness (FC), local content adequacy (LCA), and fluency, each playing a critical role. While fluency has a marginal impact, FC and LCA are essential, with GPT-4o relying more on LCA and Llama-3 on FC. Tuning reward coefficients further reinforces the need for a balance between these factors. R OSUM -M CTS 
+
+also proves robust against renaming modifications, maintaining high summarization quality while C ODES degrades signifi-cantly. These findings establish R OSUM -M CTS as an effective and resilient summarization method. Future work includes refining reward mechanisms and extending to additional lan-guages and hardware description paradigms. REFERENCES [1] M. Fakih, R. Dharmaji, Y. Moghaddas, G. Quiros, O. Ogundare, and M. A. Al Faruque, “Llm4plc: Harnessing large language models for verifiable programming of plcs in industrial control systems,” in Pro-ceedings of the 46th International Conference on Software Engineering: Software Engineering in Practice , pp. 192–203, 2024. [2] I. Paul, G. Glavaˇ s, and I. Gurevych, “Ircoder: Intermediate representa-tions make language models robust multilingual code generators,” arXiv preprint arXiv:2403.03894 , 2024. [3] Y. Wei, Z. Wang, J. Liu, Y. Ding, and L. Zhang, “Magicoder: Empower-ing code generation with oss-instruct,” arXiv preprint arXiv:2312.02120 ,2023. [4] Y. Yang, S. Xiong, A. Payani, E. Shareghi, and F. Fekri, “Harnessing the power of large language models for natural language to first-order logic translation,” arXiv preprint arXiv:2305.15541 , 2023. [5] F. Cassano, J. Gouwar, F. Lucchetti, C. Schlesinger, A. Freeman, C. J. Anderson, M. Q. Feldman, M. Greenberg, A. Jangda, and A. Guha, “Knowledge transfer from high-resource to low-resource programming languages for code llms,” Proceedings of the ACM on Programming Languages , vol. 8, no. OOPSLA2, pp. 677–708, 2024. [6] R. Li, L. B. Allal, Y. Zi, N. Muennighoff, D. Kocetkov, C. Mou, M. Marone, C. Akiki, J. Li, J. Chim, et al. , “Starcoder: may the source be with you!,” arXiv preprint arXiv:2305.06161 , 2023. [7] B. Roziere, J. Gehring, F. Gloeckle, S. Sootla, I. Gat, X. E. Tan, Y. Adi, J. Liu, R. Sauvestre, T. Remez, et al. , “Code llama: Open foundation models for code,” arXiv preprint arXiv:2308.12950 , 2023. [8] Y. Zhao, D. Huang, C. Li, P. Jin, Z. Nan, T. Ma, L. Qi, Y. Pan, Z. Zhang, R. Zhang, et al. , “Codev: Empowering llms for verilog generation through multi-level summarization,” arXiv preprint arXiv:2407.10424 ,2024. [9] F. Cui, C. Yin, K. Zhou, Y. Xiao, G. Sun, Q. Xu, Q. Guo, D. Song, D. Lin, X. Zhang, et al. , “Origen: Enhancing rtl code generation with code-to-code augmentation and self-reflection,” arXiv preprint arXiv:2407.16237 , 2024. [10] M. Gao, J. Zhao, Z. Lin, W. Ding, X. Hou, Y. Feng, C. Li, and M. Guo, “Autovcoder: A systematic framework for automated verilog code gen-eration using llms,” in 2024 IEEE 42nd International Conference on Computer Design (ICCD) , pp. 162–169, IEEE, 2024. [11] Z. Pei, H.-L. Zhen, M. Yuan, Y. Huang, and B. Yu, “Betterv: Con-trolled verilog generation with discriminative guidance,” arXiv preprint arXiv:2402.03375 , 2024. [12] S. Thakur, J. Blocklove, H. Pearce, B. Tan, S. Garg, and R. Karri, “Au-tochip: Automating hdl generation using llm feedback,” arXiv preprint arXiv:2311.04887 , 2023. [13] W. Sun, B. Li, G. L. Zhang, X. Yin, C. Zhuo, and U. Schlichtmann, “Classification-based automatic hdl code generation using llms,” arXiv preprint arXiv:2407.18326 , 2024. [14] P. Vijayaraghavan, A. Nitsure, C. Mackin, L. Shi, S. Ambrogio, A. Ha-ran, V. Paruthi, A. Elzein, D. Coops, D. Beymer, et al. , “Chain-of-descriptions: Improving code llms for vhdl code generation and summarization,” in Proceedings of the 2024 ACM/IEEE International Symposium on Machine Learning for CAD , pp. 1–10, 2024. [15] Q. Li, W. Xia, K. Du, X. Dai, R. Tang, Y. Wang, Y. Yu, and W. Zhang, “Rethinkmcts: Refining erroneous thoughts in monte carlo tree search for code generation,” arXiv preprint arXiv:2409.09584 , 2024. [16] N. Dainese, M. Merler, M. Alakuijala, and P. Marttinen, “Generating code world models with large language models guided by monte carlo tree search,” arXiv preprint arXiv:2405.15383 , 2024. [17] C. B. Browne, E. Powley, D. Whitehouse, S. M. Lucas, P. I. Cowling, P. Rohlfshagen, S. Tavener, D. Perez, S. Samothrakis, and S. Colton, “A survey of monte carlo tree search methods,” IEEE Transactions on Computational Intelligence and AI in games , vol. 4, no. 1, pp. 1–43, 2012. [18] M. Liu, N. Pinckney, B. Khailany, and H. Ren, “Verilogeval: Evaluating large language models for verilog code generation,” in 2023 IEEE/ACM International Conference on Computer Aided Design (ICCAD) , pp. 1–8, IEEE, 2023. [19] P. Vijayaraghavan, L. Shi, S. Ambrogio, C. Mackin, A. Nitsure, D. Beymer, and E. Degan, “Vhdl-eval: A framework for evaluating large language models in vhdl code generation,” in 2024 IEEE LLM Aided Design Workshop (LAD) , pp. 1–6, IEEE, 2024. [20] W. Sun, Y. Miao, Y. Li, H. Zhang, C. Fang, Y. Liu, G. Deng, Y. Liu, and Z. Chen, “Source code summarization in the era of large language models,” arXiv preprint arXiv:2407.07959 , 2024. [21] S. Takamaeda-Yamazaki, “Pyverilog: A python-based hardware design processing toolkit for verilog hdl,” in Applied Reconfigurable Comput-ing , vol. 9040 of Lecture Notes in Computer Science , pp. 451–460, Springer International Publishing, Apr 2015. [22] P. Lehmann, “pyvhdlparser: A vhdl parser written in python,” 2019. [23] T. Gao, X. Yao, and D. Chen, “Simcse: Simple contrastive learning of sentence embeddings,” in International Conference on Learning Representations , 2021. [24] C.-Y. Lin, “Rouge: A package for automatic evaluation of summaries,” in Text Summarization Branches Out , 2004. [25] Z. Yuan, J. Liu, Q. Zi, M. Liu, X. Peng, and Y. Lou, “Evaluating instruction-tuned large language models on code comprehension and generation,” arXiv preprint arXiv:2308.01240 , 2023. [26] A. Paszke, S. Gross, F. Massa, A. Lerer, J. Bradbury, G. Chanan, T. Killeen, Z. Lin, N. Gimelshein, L. Antiga, et al. , “Pytorch: An imperative style, high-performance deep learning library,” Advances in Neural Information Processing Systems , vol. 32, 2019. [27] OpenAI, “Chatgpt api.” https://openai.com/blog/chatgpt/, 2023. APPENDIX TABLE IV PROMPT TEMPLATES USED FOR CANDIDATE GENERATION IN                                                                                 
+
+> ROSUM -M CTS . H ERE ,Nc=|node.children |,DENOTES THE NUMBER OF CHILD NODES FOR THE CURRENT AST NODE .
+> Variation Type Prompt Template
+> Local Summary Con-text
+> Combine the following child summaries to form aconcise summary: [Schild 1, S child 1, ..S Nc]Local Inference Infer the higher-level functionality based solely on the following child summaries: [Schild 1, S child 1, ..S Nc]Local with Global Code Context
+> Infer the functionality of the current node based on the following intermediate steps (child summaries) in the broader context of the full code: Child Summaries:
+> [Schild 1, S child 1, ..S Nc]
+> Full Code: {global_code_text }
+> Local with Global Summary Context
+> Infer the functionality of the current node using the following intermediate steps (child summaries) in the broader context of the overall code summary: Child Summaries:
+> [Schild 1, S child 1, ..S Nc]
+> Global Code Summary:
+> {global_code_summary }
+
+A. Implementation Details 
+
+The R OSUM -M CTS framework is implemented in Python, leveraging the capabilities of modern deep learning frame-works such as PyTorch or TensorFlow for neural model computations. The system integrates:  
+
+> •
+
+HDL Parsing: Utilizing pyverilog and 
+
+pyVHDLParser for AST construction.  
+
+> •
+
+LLM-based Summarization: Pre-trained language mod-els (e.g., GPT variants) are used to generate both the preliminary global summary and the candidate summaries at each node.  
+
+> •
+
+Candidate Generation and Evaluation: Multiple prompt templates are employed to generate candidate summaries, while reward evaluation leverages state-of-the-art semantic embedding models such as SimCSE and prompt-based LLM scoring. The design allows for parallel processing at several stages, notably during candidate generation and reward computation, to mitigate latency introduced by LLM calls. 
+
+B. Computational Cost and Scalability 
+
+Although integrating AST parsing, LLM-based summariza-tion, candidate generation, and reward evaluation may seem computationally heavy, R OSUM -M CTS remains efficient and scalable in practice. Our experiments report an average AST size of ∼ 62 .7 nodes per HDL module. Moreover, the average prompt size across our evaluation datasets (VerilogEval and VHDL-Eval) is ∼ 290 tokens, making LLM-based inference cost-effective for both cloud APIs and local deployments. While HDL code is often sparsely commented, our datasets comprises of examples without any inline comments to assess generalizability. We observe that R OSUM -M CTS , due to its AST-level and semantic reward structure, is able to generate better summaries compared to baseline approaches. We deploy on two NVIDIA V100 GPUs (32GB each), utilizing high-throughput inference and embedding computation. To ensure scalability and robustness, especially when extending to real-world designs, we integrate the following strategies: 
+
+Batch Processing. Candidate generation and embedding computations are batched across nodes, significantly reduc-ing per-call overhead and ensuring GPU utilization is op-timized—especially beneficial for local models with low throughput or proprietary models with cost constraints. 
+
+Efficient Embedding Computation. We use parallelized in-ference of SimCSE-like models for semantic similarity scoring during reward computation, enabling fast candidate evaluation. 
+
+Controlled Tree Traversal & AST Pruning. With ∼ 62 .7
+
+nodes per module, we avoid exhaustive exploration by pruning low-reward subtrees based on reward heuristics, which reduces the number of LLM calls without compromising summariza-tion quality. 
+
+AST Chunking for Large Modules. While current bench-marks may involve mid-sized HDL modules, we simulate scalability to larger designs via chunked traversal. For larger designs, the AST can be partitioned and processed indepen-dently, with summary integration handled via global context anchoring. This enables practical deployment for real-world industrial modules. 
+
+Asynchronous Execution. LLM calls and reward evaluations are asynchronously scheduled, maximizing hardware resource utilization and minimizing wait times. 
+
+Handling LLM Variability. To account for the known stochasticity of LLM outputs, we report aggregate metrics over multiple sampling runs for a subset of modules and observe consistent ranking among methods. While full multiple-run evaluation is computationally expensive, especially when op-erating over tree-structured search spaces, we validate that our hierarchical selection framework dampens variance across runs due to the reward-guided selection of summaries. 
+
+Local vs Proprietary Model Defense. Proprietary APIs incur per-call or per-token costs, whereas local models incur fixed compute costs but higher latency per interaction. Our batching, pruning, and chunking strategies reduce total calls and token volume—minimizing monetary cost for API users and improving throughput for self-hosted setups. These combined strategies ensure that ROSUM -M CTS 
+
+handles mid-scale ASTs (∼ 62 .7 nodes, ∼ 290 to-ken prompts) with both computational efficiency and cost-effectiveness—across diverse deployment environments.

@@ -1,0 +1,69 @@
+{
+  "label": "2026-06-10",
+  "date": "2026-06-10",
+  "generated_at": "2026-06-10T21:59:37",
+  "count": 4,
+  "papers": [
+    {
+      "paper_id": "202606/10/2606.10228v1-shapo-sharpness-aware-policy-optimization-for-safe-exploration",
+      "section": "deep",
+      "title_en": "SHAPO: Sharpness-Aware Policy Optimization for Safe Exploration",
+      "authors": "Kaustubh Mani, Yann Pequignot, Vincent Mai, Liam Paull",
+      "date": "2026-06-08",
+      "pdf": "https://arxiv.org/pdf/2606.10228v1",
+      "score": "9.0",
+      "evidence": "提出SHAPO，一种基于锐度感知的安全探索策略优化方法",
+      "tldr": "强化学习在安全关键场景的部署需要解决安全探索问题。本文提出Sharpness-Aware Policy Optimization (SHAPO)，通过锐度感知的策略更新规则，在扰动参数上计算梯度，使策略对认知不确定性保持悲观。该方法隐式重新加权策略梯度，放大稀有危险动作的影响，抑制安全动作的贡献。在连续控制任务中，SHAPO在安全性和任务性能上均优于现有基线，显著扩展了Pareto前沿。",
+      "tags": "query:graph-part",
+      "abstract_en": "Safe exploration is a prerequisite for deploying reinforcement learning (RL) agents in safety-critical domains. In this paper, we approach safe exploration through the lens of epistemic uncertainty, where the actor's sensitivity to parameter perturbations serves as a practical proxy for regions of high uncertainty. We propose Sharpness-Aware Policy Optimization (SHAPO), a sharpness-aware policy update rule that evaluates gradients at perturbed parameters, making policy updates pessimistic with respect to the actor's epistemic uncertainty. Analytically we show that this adjustment implicitly reweighs policy gradients, amplifying the influence of rare unsafe actions while tempering contributions from already safe ones, thereby biasing learning toward conservative behavior in under-explored regions. Across several continuous-control tasks, our method consistently improves both safety and task performance over existing baselines, significantly expanding their Pareto frontiers.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202606/10/2606.07925v1-rosum-mcts-monte-carlo-tree-search-inspired-hdl-code-summarization-with-structural-rewards",
+      "section": "quick",
+      "title_en": "ROSUM-MCTS: Monte Carlo Tree Search-Inspired HDL Code Summarization with Structural Rewards",
+      "authors": "Prashanth Vijayaraghavan, Charles Mackin, Luyao Shi, Apoorva Nitsure, Ashutosh Jadhav, David Beymer, Tyler Baldwin, Ehsan Degan, Vandana Mukherjee",
+      "date": "2026-06-06",
+      "pdf": "https://arxiv.org/pdf/2606.07925v1",
+      "score": "6.0",
+      "evidence": "使用奖励函数的强化驱动优化",
+      "tldr": "针对硬件描述语言（HDL）代码摘要任务，现有大语言模型效果不佳。本文提出ROSUM-MCTS，融合蒙特卡洛树搜索的结构化探索与强化学习优化，通过层次化候选扩展机制整合局部与全局上下文，并设计复合奖励函数平衡功能正确性、内容充分性与流畅性。在VHDL和Verilog基准上，该方法显著优于基线，消融实验验证了各组件必要性，并对变量重命名等扰动保持鲁棒。该工作为强化学习增强的代码摘要开辟了新方向。",
+      "tags": "query:graph-part",
+      "abstract_en": "Large language models (LLMs) have shown promise in code summarization, yet their effectiveness for Hardware Description Languages (HDLs) like VHDL and Verilog remains underexplored. We propose ROSUM-MCTS, an LLM-guided approach inspired by Monte Carlo Tree Search (MCTS) that refines summaries through structured exploration and reinforcement-driven optimization. Our method integrates both local and global context via a hierarchical candidate expansion mechanism and optimizes summaries using a composite reward function balancing functional correctness (FC), local content adequacy (LCA), and fluency. We evaluate ROSUM-MCTS on the VHDL-eval and Verilog-eval datasets, demonstrating its consistent outperformance over baseline methods by leveraging structured bottom-up refinement and reinforcement-based optimization. Ablation studies confirm the necessity of both local and global expansion strategies, as well as the importance of balancing FC and LCA for optimal performance. Furthermore, ROSUM-MCTS proves robust against superficial modifications, such as variable renaming, maintaining summary quality where baselines degrade. These results establish ROSUM-MCTS as an effective and robust HDL summarization framework, paving the way for further research into reinforcement-enhanced code summarization.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202606/10/2606.10611v1-geometry-aware-reinforcement-learning-for-2d-irregular-nesting",
+      "section": "quick",
+      "title_en": "Geometry-Aware Reinforcement Learning for 2D Irregular Nesting",
+      "authors": "Auguste Lehuger, Guillaume Henon-Just",
+      "date": "2026-06-09",
+      "pdf": "https://arxiv.org/pdf/2606.10611v1",
+      "score": "6.0",
+      "evidence": "强化学习用于2D不规则排料",
+      "tldr": "二维不规则排样问题中，传统启发式方法忽视几何信息，依赖盲目搜索。本文提出几何感知强化学习框架，通过Polygons Transformer (PoT)编码连续矢量几何，结合组合优化强化学习（CORL）训练，使智能体自动学习几何先验以引导搜索。实验表明，该方法在面积利用率上与最先进启发式Sparrow相当，证明了强化学习能有效发现并利用几何感知解决精确空间任务。",
+      "tags": "query:graph-part",
+      "abstract_en": "Traditional heuristic solvers for the 2D irregular nesting problem share a fundamental limitation: they are blind to polygon geometry, relying on guided brute-force to navigate the continuous placement space with minimal geometrical guidance. In this paper, we argue that Reinforcement Learning is uniquely positioned to overcome this bottleneck. By pairing an optimization policy with a geometry-aware neural encoder, an agent can automatically discover rich geometric priors directly from data, utilizing these learned intuitions to strategically guide exploration. To realize this, we introduce the Polygons Transformer (PoT), a novel architecture that encodes 2D continuous vector geometries while allowing cross-polygons attention. We couple this novel architecture with a Combinatorial Optimization Reinforcement Learning (CORL) training framework to find optimal solutions. To support this paradigm, we release an open-source training dataset derived from complex geographic contours alongside a dedicated evaluation benchmark. Our empirical validation demonstrates that our trained agent achieves area utilization performance highly competitive with Sparrow, the state-of-the-art heuristic solver, proving that reinforcement learning can successfully discover and exploit geometric awareness for precise spatial tasks.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "paper_id": "202606/10/2606.10781v1-recovering-the-zipfian-distribution-in-unsupervised-term-discovery",
+      "section": "quick",
+      "title_en": "Recovering the Zipfian Distribution in Unsupervised Term Discovery",
+      "authors": "Danel Slabbert, Simon Malan, Herman Kamper",
+      "date": "2026-06-09",
+      "pdf": "https://arxiv.org/pdf/2606.10781v1",
+      "score": "6.0",
+      "evidence": "使用Leiden算法的图聚类用于划分",
+      "tldr": "无监督术语发现中，真实词表遵循Zipf分布，但主流K-means等中心聚类方法因归纳偏置导致聚类分布更均匀。本文提出基于图的聚类（Leiden算法）作为自底向上替代，通过片段嵌入的相似性图进行划分。在三种语言的词和音节级发现任务中，图聚类大幅优于K-means、GMM、BIRCH，产生更接近Zipf的分布。另一种凝聚聚类（平均链接）也有效但计算效率低。该工作质疑中心聚类的主导地位，推广图聚类为术语发现的有力替代方案。",
+      "tags": "query:graph-part",
+      "abstract_en": "Unsupervised term discovery involves segmenting unlabelled speech into word- or syllable-like units and clustering these into a lexicon of candidate types. True lexicons follow a Zipfian distribution, yet the dominant centre-based clustering approach -- K-means -- produces a more uniform distribution due to an inductive bias toward spherical clusters. In this paper we revisit graph-based clustering as a bottom-up alternative, where segment embeddings are connected by pairwise similarity and partitioned using the Leiden algorithm. We show that graph clustering substantially outperforms centre-based approaches (K-means, GMM, BIRCH) in both word- and syllable-level lexicon discovery across three languages, producing more Zipf-like distributions. Another bottom-up approach, agglomerative clustering with average linkage, also performs well, although it is computationally less efficient and allows for less control over the resulting distribution. Our work calls into question the dominance of centre-based clustering for term discovery, and promotes graph clustering as an attractive alternative.",
+      "source": "arxiv",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "errors": []
+}
