@@ -1,0 +1,359 @@
+Title: Multi-Faceted Interactivity Alignment in Full-Duplex Speech Models
+
+URL Source: https://arxiv.org/pdf/2606.11167v1
+
+Published Time: Wed, 10 Jun 2026 01:24:43 GMT
+
+Number of Pages: 15
+
+Markdown Content:
+# Multi-Faceted Interactivity Alignment in Full-Duplex Speech Models 
+
+Atsumoto Ohashi 1, Neil Zeghidour 2, Alexandre Défossez 1,2*, Eugene Kharitonov 2*
+
+> 1
+
+Kyutai, Paris, France 2Gradium, Paris, France 
+
+atsumoto.ohashi@kyutai.org, eugene@gradium.ai 
+
+Abstract 
+
+Full-duplex spoken dialogue models can lis-ten and speak simultaneously, making them a promising architecture for natural conversation. However, current models are trained solely with supervised learning through token-level likeli-hood maximization, which does not directly optimize interaction-level behaviors, causing interactivity issues such as excessive silence and ill-timed turn-taking. Recent work has ap-plied reinforcement learning (RL) to improve interactivity, but existing methods address only a limited set of interactive behaviors in their re-wards. In this work, we propose a post-training alignment method that comprehensively im-proves the interactivity of full-duplex spoken dialogue models through RL. We address the four canonical axes of interactivity: pause han-dling, turn-taking, backchanneling, and user interruption. For each axis, we extract short audio segments from human conversation cor-pora and optimize the model with axis-specific reward functions. An extra LLM-based reward for response quality prevents semantic degrada-tion. We apply our method to two open-source models, Moshi and PersonaPlex, demonstrat-ing consistent improvements in interactivity on both offline evaluation with pre-recorded audio and real-time multi-turn dialogue evaluation. 1
+
+1 Introduction 
+
+Full-duplex spoken dialogue models are a promis-ing architecture for reproducing human-like conver-sational dynamics in spoken dialogue systems (Ji et al., 2024; Arora et al., 2026a). Conventional turn-based spoken dialogue models (Zhang et al., 2023; Fang et al., 2024; Xu et al., 2025; Wu et al., 2025b) begin generating a response only after the user’s entire utterance has been received, and the      
+
+> *These authors jointly supervised this work.
+> 1The checkpoints of the models and audio samples are available at https://huggingface.co/kyutai/ moshika-rl-seamless and https://huggingface.co/ kyutai/personaplex-rl-seamless .
+
+user must wait for the system to finish speaking before taking turns. In contrast, full-duplex mod-els (Défossez et al., 2024; Zhang et al., 2025; Yu et al., 2025) are designed to process both the user’s and the system’s speech streams in parallel. This eliminates the need for explicit turn boundary de-tection via external voice activity detection (VAD) modules, and enables the model to implicitly learn smooth turn-taking, backchanneling, and overlap handling within its internal representations. Yet, full-duplex models still face challenges in interactivity in real-time conversations. Previous studies (Arora et al., 2024; Lin et al., 2025a) have revealed issues such as excessive silence, badly timed turn-taking, and a lack of backchannels. One possible cause is the inherent limitation of super-vised learning. Interaction-level behaviors, such as the timing and duration of utterances, are diffi-cult to optimize directly through token-level like-lihood maximization. Furthermore, the mismatch between the input distributions at training and infer-ence time, such as exposure bias, prevents models from behaving robustly in real conversations. Prior works have explored using reinforcement learning (RL) to improve the interactivity of full-duplex models (Yu et al., 2025; Chen et al., 2025a), but covered only a subset of conversational dynam-ics such as handling user’s barge-in and backchan-neling, failing to comprehensively address all axes of interactivity. Furthermore, each study targets a single model, leaving open the question of whether RL-based interactivity optimization generalizes across different full-duplex systems. A common practical challenge is also that optimizing timing-related rewards alone can degrade the semantic quality of generated responses (Hsiao et al., 2026), yet no systematic solution has been established. In this work, we propose a post-training align-ment method that comprehensively improves the interactivity of full-duplex speech models. We tar-get the four core axes of full-duplex interactivity: 1
+
+> arXiv:2606.11167v1 [cs.CL] 9 Jun 2026
+
+pause handling, turn-taking, backchanneling, and user interruption. We automatically extract short audio segments from real human conversations ex-hibiting such behaviors, and optimize the model on them using group relative policy optimization (GRPO) (Shao et al., 2024). Furthermore, an LLM Judge reward for semantic quality (Lin et al., 2025b; Arora et al., 2026b) preserves response con-tent during RL. We apply the proposed method to two different open-source models, Moshi (Défos-sez et al., 2024) and PersonaPlex (Roy et al., 2026), and demonstrate consistent improvements across all metrics on Full-Duplex-Bench v1 (Lin et al., 2025a). Notably, although training is performed on short, extracted segments, we also demonstrate that the improvements generalize to real-time multi-turn dialogues through the evaluation on Full-Duplex-Bench v2 (Lin et al., 2026). 
+
+2 Related Work 
+
+2.1 Full-Duplex Spoken Dialogue Models 
+
+Full-duplex models can be broadly categorized into two types: cascaded and end-to-end. Cascaded approaches achieve full-duplex dialogue by aug-menting text-based LLMs with external VAD and turn-control modules (Wang et al., 2024; Zhang et al., 2024b; Fu et al., 2025; Wang et al., 2025b; Liao et al., 2025), but they suffer from inter-module latency and loss of paralinguistic information. End-to-end approaches, in contrast, process both the user’s and the model’s audio streams within a uni-fied model (Nguyen et al., 2023; Hu et al., 2025; Wang et al., 2025a). Various strategies exist for handling the two streams: processing them fully in parallel (Défossez et al., 2024; Yao et al., 2026; Shi et al., 2025), interleaving them in short alternating chunks (Veluri et al., 2024; Zhang et al., 2025), or explicitly controlling listen/speak states (Yu et al., 2025; Chen et al., 2025b). Most existing models are trained solely with supervised learning, and are not optimized for interaction-level properties. In this work, we propose a post-training method based on RL to unlock the full potential of end-to-end ar-chitectures for improved interactivity. 
+
+2.2 Reinforcement Learning for Spoken Language Models 
+
+Inspired by the success of alignment tech-niques (Stiennon et al., 2020; Ouyang et al., 2022; Rafailov et al., 2023) in text language modeling, these methods have been extended to speech for semantic coherence (Lin et al., 2025b), speech qual-ity (Zhang et al., 2024a), question answering (Chen et al., 2026a), reasoning (Wu et al., 2025b), and paralinguistic processing (Yang et al., 2025b). For full-duplex dialogue models specifically, alignment methods have been applied not only to improve semantic quality (Arora et al., 2026b; Wu et al., 2025a) but also to optimize dialogue dynamics (Yu et al., 2025; Chen et al., 2025a). SALMONN-omni (Yu et al., 2025) first performs supervised learning and then applies direct prefer-ence optimization (DPO) (Rafailov et al., 2023) to improve the model’s ability to handle user’s barge-ins and backchannelings. ORISE (Chen et al., 2025a) replaces preference-based methods with online RL based on REINFORCE (Williams, 1992), achieving a better balance between barge-in and backchannel handling in noisy environments. The most closely related work is the concurrent ASPIRin (Hsiao et al., 2026), which also applies GRPO to Moshi to optimize interaction timing. However, these prior and concurrent works incor-porate only a subset of interactivity aspects into their reward functions, and report that other aspects, such as response latency or semantic quality, either fail to improve or even degrade (Hsiao et al., 2026). In this work, we comprehensively address four axes of interactivity derived from Full-Duplex-Bench, together with LLM-based evaluation of response content quality. We demonstrate that our approach improves performance across all aspects, including those that degraded in prior work. 
+
+2.3 Benchmarks for Full-Duplex Spoken Dialogue Models 
+
+Earlier work relied on corpus-level statistics such as distributions of utterance and silence dura-tions (Nguyen et al., 2023) to assess full-duplex dialogue models. Benchmarks like Full-Duplex-Bench v1 (Lin et al., 2025a) have since been de-veloped to enable more fine-grained evaluation. It feeds pre-recorded static audio into dialogue mod-els and evaluate the resulting responses (Peng et al., 2025; Ge et al., 2025; Chang et al., 2026). More recently, benchmarks have been constructed for dynamic evaluation in multi-turn dialogues, go-ing beyond static assessment (Arora et al., 2024; Zhang et al., 2026). Full-Duplex-Bench v2 (Lin et al., 2026) has dialogue models interact in real time with an automated conversational partner and evaluates their abilities using LLM Judge. In this work, we leverage the four evaluation axes of Full-2Human   
+
+> conversations
+> Full-Duplex
+> Spoken Dialogue Model
+> GRPO
+> Pause Handling (pause)
+> Turn-Taking (turn) User Interruption (int)
+> Backchanneling (bc)
+> +1.6
+> -0.5
+> -1.1
+> ,
+> Step 1. Curation of Training Data Step 2. Reinforcement Learning
+> context
+> Speaker X's speech
+> Speaker Y's speech
+> Compute
+> Extract
+
+Figure 1: Overview of the proposed method. We first extract segments related to each interactivity axis ℓ ∈{pause , turn , bc , int } from human conversation datasets to construct the training data Dℓ . For each segment (and optionally its dialogue context) sampled from Dℓ, the full-duplex spoken dialogue model generates multiple outputs, which are scored by axis-specific reward functions Rℓ and used to optimize the model via GRPO. 
+
+Duplex-Bench v1 for RL reward design, and use Full-Duplex-Bench v2 to verify generalization to multi-turn settings. 
+
+3 Method 
+
+We propose a post-training alignment method that improves the interactivity of full-duplex spoken dia-logue models through RL. We target four core axes of interactivity: pause handling (remaining silent during user hesitations), turn-taking (responding promptly when the user yields the floor), backchan-neling (producing short feedback cues while the user speaks), and user interruption (yielding and responding when the user barges in). These four axes have been established as a standard and com-prehensive characterization of full-duplex interac-tivity (Lin et al., 2025a), and we adopt them as a necessary set for our study. 2 Figure 1 illustrates the overview of our method. Our key idea is to extract short audio segments from real human conversa-tions, each exemplifying one of the four axes, and optimize the model on them using GRPO (Shao et al., 2024) with axis-specific rewards. Below, we first describe the full-duplex model-ing framework assumed in this work (Section 3.1), followed by our RL pipeline (Section 3.2), and its two key components: segment extraction (Sec-tion 3.3) and reward design (Section 3.4). 
+
+3.1 Full-Duplex Spoken Dialogue Modeling 
+
+We consider full-duplex spoken dialogue models based on discrete audio tokens and autoregres-sive language modeling (Défossez et al., 2024; 
+
+> 2While our method can readily accommodate additional axes, exploring them is beyond the scope of this work.
+
+Veluri et al., 2024). Given a two-channel dia-logue between speakers X and Y , a speech to-kenizer E maps each speaker’s waveform into a sequence of discrete tokens from a vocabulary V:
+
+[x1: N ; y1: N ] = E([ sX ; sY ]) . The model, param-eterized by θ, learns to autoregressively predict speaker Y ’s tokens conditioned on speaker X’s input stream and its own preceding outputs: 
+
+πθ(y1: N , w 1: N | x1: N ) = 
+
+> N
+
+Y
+
+> n=1
+
+πθ(yn, w n | x≤n, y <n , w <n ) .
+
+Here, we assume that a parallel text token stream 
+
+w1: N is jointly predicted, which is a common prac-tice used to guide the semantic content of the generated speech (Chen et al., 2025b; Yao et al., 2026) and also to implicitly control when the model speaks (Défossez et al., 2024; Shi et al., 2025). Af-ter the supervised learning on dialogue datasets, the model πθ can serve as spoken dialogue systems. 
+
+3.2 Reinforcement Learning Pipeline 
+
+At each training step during RL of the pre-trained model πθ, for each sample in the batch, we first sample an interactivity axis ℓ ∈{pause , turn , bc , int }, corresponding to pause handling, turn-taking, backchanneling, and user interruption, respectively. We then draw a segment from the axis-specific training set [sX ; xY ] ∼ D ℓ,which consists of short audio clips extracted from human conversation corpora (see Section 3.3 for extraction details). From the speaker X’s audio in the segment, which is encoded into tokens x1: N ,the current policy πθ generates G completions: 
+
+{(ˆ y(g)1: N , ˆw(g)1: N )}Gg=1 ∼ πθ(· | x1: N ) .
+
+3Each completion is decoded into a waveform 
+
+ˆsY, (g) = D(ˆ y(g)1: N ) and scored by an axis-specific re-ward function r(g) = Rℓ(ˆ sY, (g)) (see Section 3.4). We normalize the rewards across the G samples to get an advantage estimate for each completion: 
+
+ˆA(g) = r(g) − mean( {r(g)}Gg=1 )std( {r(g)}Gg=1 ) .
+
+We then minimize a clipped surrogate loss (Schul-man et al., 2017) augmented with a KL penalty against the frozen reference policy πref (a copy of the model before RL training):          
+
+> L(θ) = −1
+> G
+> GX
+> g=1
+> 1
+> N
+> NX
+> n=1
+> h
+> min  ρ(g)
+> nˆA(g),
+> clip( ρ(g)
+> n,1−ϵ, 1+ ϵ) ˆA(g)−βKL πθ∥πref
+> 
+> n
+> i
+> ,
+
+where ρn = πθ( ˆ wn | · )/π θold ( ˆ wn | · ) is the impor-tance sampling ratio between the current and the sampling-time policies, and KL[ ·∥· ]n is the exact KL divergence at position n. Note that because interactivity and the speech content are primarily controlled by text tokens (Hsiao et al., 2026; Chen et al., 2026a), ρn and the objective is computed using only the probability of the text tokens ˆw, ex-cluding the audio tokens ˆy.To help the model generalize beyond the short segment boundaries, we prepend a context, which is the recording immediately preceding the seg-ment, to the input audio. The context length is drawn randomly during training (details in Sec-tion 4.3). The loss is computed only over the seg-ment itself; the context window is masked out. 
+
+3.3 Training Data Curation 
+
+We construct the training set Dℓ for each interac-tivity axis ℓ ∈ { pause , turn , bc , int } from corpora of two-party human conversations in which each speaker is recorded on a separate channel. One channel serves as the user input ( X) and the other as the target speaker ( Y ) whose behavior the model learns to reproduce. The extraction proceeds in two stages: utterance annotation and event-driven segment identification. 
+
+Utterance annotation We first annotate each recording using a VAD model, which produces, a sequence of labeled intervals classified as inter-pausal units (IPUs) or silences for each speaker. We then group consecutive IPUs from the same speaker into utterances by placing an utterance boundary at any silence longer than 1.0 s . A silence of at most 1.0 s that falls within an utterance is called a 
+
+pause . Let U1, U 2, . . . , U M denote the sequence of all utterances from both speakers, sorted by their start time. Each utterance Uk is associated with a speaker spk( Uk) ∈ { X, Y }, a start time 
+
+tstart (Uk), and an end time tend (Uk). We write 
+
+dur( Uk) = tend (Uk) − tstart (Uk) for the duration. 
+
+Event-driven segment identification From the utterance sequence, we identify segments that ex-emplify each interactivity axis. Each segment de-fines a time window over the stereo recording, to-gether with a label indicating its axis. The extrac-tion criteria for each axis are as follows: 
+
+Pause Handling Dpause A single utterance Uk
+
+with spk( Uk) = X satisfying: (i) dur( Uk) ≥
+
+τmin ; (ii) Uk contains at least one internal pause; and (iii) speaker Y produces no speech. This captures moments where X hesitates but does not yield the floor. 
+
+Turn-Taking Dturn A consecutive pair (Uk,Uk+1 ) with spk( Uk) = X and spk( Uk+1 ) = 
+
+Y , where (i) both utterances satisfy the minimum duration τmin ; and (ii) the gap 
+
+tstart (Uk+1 ) − tend (Uk) ≤ 0.4 s (Lin et al., 2025a; Heldner and Edlund, 2010). This captures smooth turn transitions where Y
+
+responds promptly after X yields the floor. 
+
+Backchanneling Dbc An utterance Uk with 
+
+spk( Uk) = X satisfying: (i) dur( Uk) ≥ τmin ;(ii) speaker Y says only short utterances (≤ 1 s) in Uk (Ekstedt and Skantze, 2022). 
+
+User Interruption Dint A four-utterance se-quence (Uk, U k+1 , U k+2 , U k+3 ) with the speaker pattern X → Y → X → Y : Uk is an initial utterance by X; Uk+1 is Y ’s response that gets interrupted; Uk+2 is X’s interrupting utterance, which begins before Uk+1 ends; and Uk+3 is the post-interruption response. All four utterances must satisfy τmin .Rather than relying on TTS-synthesized dia-logues or artificial noise augmentation (Chen et al., 2025a), our training data from human conversa-tions can broadly capture real-world conversational dynamics and noise without artificial bias. 
+
+3.4 Reward Design 
+
+We design a dedicated reward function Rℓ for each interactivity axis ℓ ∈ {pause , turn , bc , int } to 4compute the reward of the generated audio ˆsY, (g).We first apply VAD to sX and ˆsY, (g) to obtain se-quences of speech intervals and utterance annota-tions as in Section 3.3. 
+
+Pause handling Rpause The model should remain silent throughout the segment, including dur-ing intra-utterance pauses. We assign a binary reward Rpause = −1 if the generated audio contains any speech interval longer than 1 s ,and Rpause = 0 otherwise. 
+
+Turn-Taking Rturn The model should begin speaking promptly after speaker X finishes. Let d be the response delay between the end time of X’s turn and the start time of the first utterance ( > 1 s ) in the generated audio. We set Rturn = −d. If the model produces no utterance, we consider d as the remaining seg-ment duration after the end time of X’s turn. 
+
+Backchanneling Rbc The model should produce short vocalizations aligned with the ground-truth backchannel positions, without inter-rupting speaker X. We define short speech intervals ( ≤ 1 s ) in the generated audio as backchannels, and longer ones as takeovers. A generated backchannel is a true positive if it falls within ± 1 s of a ground-truth backchan-nel. Unmatched generated backchannels and takeovers are counted as false positives. The resulting F1 score is used as the reward Rbc .
+
+User interruption Rint The model must detect the user’s interrupting utterance ( Uk+2 ; Sec-tion 3.1) and respond promptly. Analogously to Rturn , we measure d from the end of the interruption tend (Uk+2 ) to the model’s next speech and set Rint = −d.
+
+LLM Judge Rllm To prevent semantic degrada-tion caused by optimization with delay-based rewards alone (Hsiao et al., 2026), we add a content quality reward to the turn-taking and user-interruption axes. Specifically, we apply automatic speech recognition (ASR) to both sX and ˆsY to obtain transcriptions, which are then scored by an LLM judge on a three-point scale for contextual relevance and naturalness of the model’s response. When combining Rllm with the delay reward ( Rturn 
+
+or Rint ), we use the reward-decoupled nor-malization (Liu et al., 2026), where the two reward components are standardized indepen-dently across the G samples before their ad-vantages are summed with equal weight. 
+
+4 Experiments 
+
+4.1 Training Datasets 
+
+We construct RL training data from spoken dia-logue corpora in which each speaker is recorded on a separate channel. To demonstrate that our method generalizes across corpora with different recording conditions, speaker populations, and conversational styles, we adopt two datasets that are complemen-tary in these respects: Fisher (Cieri et al., 2004) and Seamless Interaction (Agrawal et al., 2025). The Fisher dataset contains a total of 2,000 h of recorded telephone conversations between random pairs of people. The Seamless dataset comprises two recording conditions, the Improvised subset contains 1,300 h audio of professional actors per-forming conversations based on improvised roles and emotions, while the Naturalistic subset con-tains 2,700 h audio of general participants engag-ing in natural, authentic conversation. We com-bined these two subsets together during training. For each dataset, we apply the segment extrac-tion procedure described in Section 3.3 to identify segments for the four interactivity axes by using Silero VAD (Team, 2024). We extract up to 2,000 
+
+segments per axis, using minimum utterance dura-tion thresholds of τmin = 4 .0 s for pause handling, 
+
+τmin = 5 .0 s for turn-taking and backchanneling, and τmin = 3 .0 s for user interruption. 
+
+4.2 Evaluation Benchmarks 
+
+We evaluate the trained models from two comple-mentary perspectives: (1) a static evaluation, in which pre-recorded audio are fed to the model, and (2) a dynamic evaluation, in which the model en-gages in real-time multi-turn dialogue with an au-tomated conversational partner. 
+
+Full-Duplex-Bench v1 (Lin et al., 2025a) This benchmark provides a static evaluation of four axes of turn-taking behavior: pause handling, smooth turn-taking, backchanneling, and user interruption management. For each dimension, the benchmark provides pre-recorded input audio and applies au-tomatic metrics to the model’s generated speech. A metric shared across all four axes is the Takeover Rate (TOR) , defined as the proportion of samples in which the model takes the turn and produces a prolonged utterance. In addition, the backchan-neling axis evaluates backchannel frequency and 5the Jensen–Shannon divergence (JSD) between the model’s backchannel timing and the ground-truth human timing distribution; the smooth turn-taking axis measures response latency; and the user interruption axis measures response latency as well as a GPT-4o (OpenAI et al., 2024) score that rates the contextual relevance of the model’s post-interruption response on a 0–5 scale. Because the four evaluation axes of this benchmark directly correspond to the interactivity axes targeted by our reward design, it serves as the primary benchmark for assessing the direct effect of RL training. We note that we corrected an issue in the official evalu-ation script for backchannling. 3
+
+Full-Duplex-Bench v2 (Lin et al., 2026) This benchmark extends the evaluation to multi-turn, streaming settings by introducing an automated ex-aminer that interacts with the model in real-time conversation. The examiner enforces staged con-versational goals across four task families: Daily, Correction, Entity Tracking, and Safety. For each task, the benchmark reports turn-taking fluency and multi-turn instruction following; the Correc-tion, Entity Tracking, and Safety tasks additionally include task-specific competence scores. We use GPT-Realtime 4 as the examiner and adopt the fast 
+
+pacing mode with a maximum dialogue duration of 60 s . For automatic scoring, we use Gemini 2.5 Flash (Comanici et al., 2025) as the LLM judge. Details on the evaluation configuration and metric definitions are provided in Appendix B.2. 
+
+4.3 Models and Training Details Base models We apply our method to two open-source full-duplex spoken dialogue models. The first is Moshi (Défossez et al., 2024), a 7B-parameter speech-text language model that jointly predicts text and audio token streams in an autore-gressive manner. Following Hsiao et al. (2026), we prepend 3 s of silence to the input audio to allow time for Moshi to produce its conversation-initiating phrase before the user begins speaking. The second is PersonaPlex (Roy et al., 2026), a recently proposed full-duplex spoken dialogue model. PersonaPlex extends Moshi with support for dialogue control via text prompt and voice cloning via audio prompts. For the text prompt,   
+
+> 3The official backchanneling script contained a bug in which the generated audio was not resampled to the VAD’s expected sampling rate of 16 kHz.
+> 4https://openai.com/index/ introducing-gpt-realtime/
+
+we use the standard prompt provided in the offi-cial code. 5 For the voice prompt, we supply a 3 srecording of a female speaker. The same prompts used at both RL training and inference time. 
+
+LLM Judge Reward For the response quality reward with LLMs, we first transcribe both the input and generated audio using the Parakeet TDT ASR model. 6 The resulting transcriptions are then scored by Qwen3-235B-A22B (Yang et al., 2025a) on a 1–3 scale for the contextual relevance and naturalness. The specific prompt for the LLM is provided in Figure 3 in the Appendix. 
+
+Training We train for 100 epochs, sampling 32 
+
+segments per epoch with G = 16 completions each, distributed across 32 NVIDIA H100 GPUs. We use AdamW (Loshchilov and Hutter, 2018) with a learning rate of 2 × 10 −7 and cosine scheduling. The KL penalty coefficient is β = 0 .01 . To help the model generalize beyond the short segment boundaries, we prepend a randomly sampled con-text window to the input audio, with its maximum length linearly increased from 0 to 30 s over train-ing. Further details are provided in Appendix A. 
+
+Comparison Models We include scores of three reference full-duplex models: dGSLM (Nguyen et al., 2023), Freeze-Omni (Wang et al., 2025b), and ASPIRin (Hsiao et al., 2026). The scores for dGSLM and Freeze-Omni are cited from the offi-cial benchmark repository (Lin et al., 2025a), and those for ASPIRin are cited from the original paper. 
+
+5 Results and Analysis 
+
+5.1 Results of Static Evaluation 
+
+Table 1 presents the Full-Duplex-Bench v1 re-sults. Within both the Moshi and PersonaPlex families, RL training yields consistent improve-ments over the respective base models. 7 TOR of pause handling decreases substantially, while la-tency and TOR of turn-taking simultaneously im-prove. This joint improvement on these two com-peting axes indicates that the model has learned to better distinguish whether a given moment of  
+
+> 5https://github.com/NVIDIA/personaplex
+> 6https://huggingface.co/nvidia/parakeet-tdt-0. 6b-v2
+> 7For the base PersonaPlex score, we were unable to re-produce the TOR of synthetic pause handling and latency of turn-taking reported by Roy et al. (2026) (0.358 and 0.170, respectively). We attribute this to differences in the voice prompt used during inference, whose specification is not pub-licly available, and report results using our own reproduction.
+
+6Pause (Synthetic) Pause (Candor) Backchannel Smooth Turn Taking User Interruption Model TOR ( ↓) TOR ( ↓) TOR ( ↓) Freq ( ↑) JSD ( ↓) TOR ( ↑) Latency ( ↓) TOR ( ↑) GPT-4o ( ↑) Latency ( ↓)dGSLM † 0.934 0.935 0.691 0.015 0.934 0.975 0.352 0.917 0.201 2.531 Freeze-Omni † 0.642 0.481 0.636 0.001 0.997 0.336 0.953 0.867 3.615 1.409 Moshi 0.445 0.528 0.255 0.074 0.824 0.739 0.162 0.920 3.440 1.377 + RL (Fisher) 0.226 0.417 0.091 0.095 0.789 0.966 0.121 1.000 3.575 0.461 + RL (Seamless) 0.307 0.463 0.145 0.101 0.794 0.958 0.160 1.000 3.630 0.409 ASPIRin ‡ 0.482 0.486 — — — 0.765 0.273 0.941 3.734 ∗ 0.992 PersonaPlex 0.482 0.444 0.182 0.046 0.841 0.958 0.219 0.940 4.500 0.271 + RL (Fisher) 0.328 0.361 0.127 0.122 0.783 0.950 0.079 1.000 4.520 0.187           
+
+> + RL (Seamless) 0.350 0.356 0.073 0.112 0.786 0.975 0.086 0.995 4.533 0.223
+
+Table 1: Full-Duplex-Bench v1 results. Best scores across all models are shown in bold ; best scores within each model family (Moshi / PersonaPlex) are underlined . †Scores cited from the official repository of the benchmark (Lin et al., 2025a). ‡Scores cited from Hsiao et al. (2026); backchannel scores are omitted as they were evaluated before the bug fix (see Section 4.2 for details). ∗ASPIRin’s GPT-4o score was evaluated on a 1–5 scale in the original paper, whereas the official benchmark configuration uses a 0–5 scale adopted by all other models; these scores are therefore not directly comparable. 
+
+Daily Correction Entity Tracking Safety Model Turn Instruct Turn Instruct Task Turn Instruct Task Turn Instruct Task Moshi 3.284 2.221 3.248 2.189 2.340 3.951 2.537 2.440 3.839 2.831 2.720 + RL (Fisher) 3.397 2.502 3.957 2.706 2.820 4.110 2.626 2.640 3.858 3.058 2.820 + RL (Seamless) 3.442 2.615 4.003 2.895 3.300 3.965 2.609 2.740 4.161 3.503 3.440 
+
+PersonaPlex 3.327 2.861 3.803 2.945 3.080 3.748 3.130 3.200 3.841 3.596 3.260 + RL (Fisher) 3.627 2.915 3.840 3.026 3.500 4.055 3.562 3.700 3.695 3.288 3.000 + RL (Seamless) 4.017 3.197 4.501 3.369 3.620 4.647 4.059 3.840 4.511 3.780 3.280 
+
+Table 2: Full-Duplex-Bench v2 results on multi-turn dialogues with GPT-Realtime. For each task, turn-taking fluency (Turn), instruction-following (Instruct), and task-specific scores (Task) are evaluated by Gemini 2.5 Flash on a 1–5 scale. Best scores across all models are shown in bold ; best scores within each model family are underlined .
+
+user silence signals a mid-utterance pause or a turn yield. Backchanneling also improves across all three metrics, indicating that the model produces more backchannels at more appropriate timings. For user interruption, both RL variants improved latency and GPT-4o semantic scores. Notably, AS-PIRin (Hsiao et al., 2026) reports that its GPT-4o score decreases from the base Moshi model’s 3.89 to 3.73 (on a 1–5 scale, differing from the bench-mark’s 0–5 scale). In contrast, our method im-proves this score, demonstrating the effectiveness of incorporating an LLM-based reward to preserve and enhance content quality during alignment. Comparing models, the RL-trained models of Moshi and PersonaPlex achieve the best or near-best scores on all metrics. Among the baselines, dGSLM achieves the highest turn-taking TOR, at the cost of poor pause handling, i.e. it treats almost all user silences as turn yields and responds im-mediately. Our method achieves comparable turn-taking TORs while simultaneously reducing pause handling TOR, showing that high turn-taking re-sponsiveness and accurate pause handling can coex-ist when all interactivity axes are jointly optimized. We confirmed that the perceptual quality of the generated speech is not degraded, as measured by UTMOSv2 (Baba et al., 2024) (see Appendix C). 
+
+5.2 Results of Interactive Evaluation 
+
+Table 2 presents the results on Full-Duplex-Bench v2, which evaluates models through real-time multi-turn dialogues with GPT-Realtime. Across both model families, our method consistently improves turn-taking fluency over the base models in all four tasks. Beyond turn-taking, instruction-following and task-specific scores also improve in most con-ditions, suggesting that the LLM-based reward also effectively prevents content degradation in dynamic multi-turn interactions. Comparing both training sets, Seamless yields stronger improvements than Fisher across both model families. We attribute this to the greater va-riety and more consistent dialogue structure of the Seamless dataset, which may provide richer learn-ing signals for multi-turn interaction. PersonaPlex trained on Seamless gets the best scores across 70.76 s 0.08 s 
+
+Figure 2: Example of a conversation between GPT-Realtime (Examiner) and Moshi + RL in the Daily task of Full-Duplex-Bench v2. Arrows highlight turn-taking transitions with their latencies, and boxes mark backchannelings. Turn-taking fluency and instruction-following scores are 4.80 and 2.60, respectively.                                                                
+
+> Pause BC Turn Interrupt Daily Model TOR ↓JSD Latency ↓GPT-4o Turn Instruct + RL (Fisher) 0.42 0.79 0.12 3.58 3.40 2.50
+> w/o Dpause 0.74 0.77 0.05 3.66 3.14 2.32 w/o Dturn 0.29 0.79 0.30 3.28 3.41 2.46 w/o Dbc 0.47 0.83 0.22 3.67 3.61 2.39 w/o Dint 0.39 0.78 0.14 3.42 3.28 2.24 w/o Rllm 0.48 0.78 0.17 3.05 3.00 2.18 w/o sched 0.51 0.78 0.15 3.70 3.50 2.41 w/o context 0.49 0.78 0.09 3.53 3.33 2.21
+
+Table 3: Ablation study of Moshi trained on Fisher. “Pause” through “Interrupt” are results from Full-Duplex-Bench v1 (Pause uses the Candor subset), and “Daily” shows multi-turn dialogue evaluation results from the Daily task in Full-Duplex-Bench v2. “w/o sched” denotes training without the scheduling of the maximum context length, always using 30 s of context, and “w/o context” denotes training without any context. 
+
+nearly all metrics, benefiting from its strong base-line semantic quality and the diverse training data. Interestingly, using Fisher lead to a decline in instruction-following and task-specific scores on the Safety task for PersonaPlex, and subpar im-provements for Moshi. The cooperative and ca-sual interaction style of the Fisher telephone con-versations may overwrite the base model’s safety-oriented behavior (see Appendix D.2 for case stud-ies). Using Seamless does not exhibit this degrada-tion, supporting its suitability as a training corpus. 
+
+5.3 Ablations 
+
+Table 3 reports the ablation results on Moshi + RL. w/o Dpause and w/o Dturn reveals a clear trade-off between the two axes: without the training exam-ples on pause handling, the model learns to speak at every opportunity, yielding the lowest turn-taking latency; conversely, without data on turn-taking, the model becomes overly conservative, resulting in substantially higher latency. Training with both rewards jointly enables the model to strike an ap-propriate balance. Removing the backchannel re-ward (w/o Dbc ) yields the worst JS divergence score w.r.t. the ground truth distribution, suggesting that the models failed to learn producing backchannels at appropriate timing. Removing LLM Judge re-ward (without Rllm ) leads to the largest degrada-tion across nearly all metrics, confirming that the reward is essential for preserving the semantic qual-ity of generated utterances alongside interactivity improvements. Finally, removing the context win-dow (w/o context) particularly hurts the turn-taking fluency and instruction-following scores on the in-teractive evaluation, indicating that even though training operates on short segments, providing pre-ceding context is important for generalization to longer, multi-turn dialogues. 
+
+5.4 Case Study 
+
+Figure 2 shows a dialogue example between Moshi + RL, trained on Fisher, and GPT-realtime on Full-Duplex-Bench v2. Unlike the original Moshi, which exhibited long response delays and longer speech overlap (see Appendix D.1 for details), Moshi + RL demonstrated smooth turn transitions and well-timed backchanneling. These improve-ments in interactivity are consistent with the bench-mark gains reported in Sections 5.1 and 5.1. 
+
+6 Conclusion 
+
+In this work, we proposed an RL-based post-training method that comprehensively improves the interactivity of full-duplex spoken dialogue mod-els. We automatically extracted training segments corresponding to four axes of interactivity, includ-ing pause handling, turn-taking, backchanneling, and user interruption, from real human conversa-tions. We then optimized two models, Moshi and PersonaPlex, with axis-specific rule-based rewards and an LLM-judge-based semantic reward. Our method outperformed the baselines on both the 8evaluation with pre-recorded static input and the multi-turn interaction. Future directions include integrating rewards for intelligence aspects such as instruction-following and reasoning, as well as evaluation through actual interactions with humans. 
+
+Limitations 
+
+Our work has several limitations. First, the rule-based reward design for each interactivity axis re-quires manual engineering effort and may overlook other aspects of conversational dynamics. As the number of axes grows, this approach becomes in-creasingly difficult to scale. Future work should explore data-driven and scalable reward modeling, such as leveraging spoken language models as re-ward models (Ji et al., 2025; Chen et al., 2026b). Second, our method optimizes the text token stream that the model generates in parallel with the audio stream. This design choice is motivated by the fact that the text stream controls not only the content of utterances but also their timing and du-ration. Although many current full-duplex models do produce a parallel text stream, our approach is not directly applicable to those that do not, and ex-tending our method to such architectures remains a possible direction. Third, our evaluation relies entirely on auto-mated methods, including dialogues with GPT-Realtime and LLM-based judgment. While these metrics have been shown to correlate with human judgments to a reasonable degree (Lin et al., 2026), they may fail to capture certain aspects of conver-sational quality that only human evaluators can assess. We plan to conduct human evaluation in future work. Finally, optimizing interactivity through RL can inadvertently degrade the model’s safety behavior. As shown in our analysis (Appendix D.2), train-ing on the Fisher dataset led to a decline in safety scores, as the cooperative interaction style of the training data conflicted with the ability to refuse or redirect harmful requests. More broadly, improv-ing the fluency and responsiveness of full-duplex dialogue models may increase the risk of generat-ing inappropriate or harmful content. Incorporating safety-aware rewards or constraints into the RL pro-cess is an important direction for future work. 
+
+References 
+
+Vasu Agrawal, Akinniyi Akinyemi, Kathryn Alvero, Morteza Behrooz, Julia Buffalini, Fabio Maria Carlucci, Joy Chen, Junming Chen, Zhang Chen, Shiyang Cheng, Praveen Chowdary, Joe Chuang, Antony D’Avirro, Jon Daly, Ning Dong, Mark Duppenthaler, Cynthia Gao, Jeff Girard, Martin Gleize, and 65 others. 2025. Seamless Interaction: Dyadic Audiovisual Motion Modeling and Large-Scale Dataset. arXiv preprint arXiv:2506.22554 .Siddhant Arora, Kai-Wei Chang, Chung-Ming Chien, Yifan Peng, Haibin Wu, Yossi Adi, Emmanuel Dupoux, Hung-Yi Lee, Karen Livescu, and Shinji Watanabe. 2026a. On The Landscape of Spoken Language Models: A Comprehensive Survey. arXiv preprint arXiv:2504.08528 .Siddhant Arora, Zhiyun Lu, Chung-Cheng Chiu, Ruom-ing Pang, and Shinji Watanabe. 2024. Talking Turns: Benchmarking Audio Foundation Models on Turn-Taking Dynamics. In Proceedings of the Thirteenth International Conference on Learning Representa-tions .Siddhant Arora, Jinchuan Tian, Jiatong Shi, Hayato Fu-tami, Yosuke Kashiwagi, Emiru Tsunoo, and Shinji Watanabe. 2026b. Optimizing Conversational Qual-ity in Spoken Dialogue Systems with Reinforce-ment Learning from AI Feedback. arXiv preprint arXiv:2601.19063 .Kaito Baba, Wataru Nakata, Yuki Saito, and Hiroshi Saruwatari. 2024. The T05 System for the voicemos challenge 2024: Transfer Learning from Deep Image Classifier to Naturalness MOS Prediction of High-Quality Synthetic Speech. In Proceedings of the 2024 IEEE Spoken Language Technology Workshop ,pages 818–824. Kai-Wei Chang, En-Pei Hu, Chun-Yi Kuan, Wenze Ren, Wei-Chih Chen, Guan-Ting Lin, Yu Tsao, Shao-Hua Sun, Hung-yi Lee, and James Glass. 2026. Game-time: Evaluating temporal dynamics in spoken lan-guage models. In Proceedings of the 2026 IEEE International Conference on Acoustics, Speech and Signal Processing , pages 16302–16306. Chen Chen, Ke Hu, Chao-Han Huck Yang, Ankita Pasad, Edresson Casanova, Weiqing Wang, Szu-Wei Fu, Jason Li, Zhehuai Chen, Jagadeesh Balam, and Boris Ginsburg. 2025a. Reinforcement Learning Enhanced Full-Duplex Spoken Dialogue Language Models for Conversational Interactions. In Proceed-ings of the Second Conference on Language Model-ing .Qian Chen, Yafeng Chen, Yanni Chen, Mengzhe Chen, Yingda Chen, Chong Deng, Zhihao Du, Ruize Gao, Changfeng Gao, Zhifu Gao, Yabin Li, Xiang Lv, Jiaqing Liu, Haoneng Luo, Bin Ma, Chongjia Ni, Xian Shi, Jialong Tang, Hui Wang, and 17 others. 2025b. MinMo: A Multimodal Large Language Model for Seamless Voice Interaction. arXiv preprint arXiv:2501.06282 .Yifu Chen, Shengpeng Ji, Qian Chen, Tianle Liang, Yangzhuo Li, Ziqing Wang, Wen Wang, Jingyu Lu, 
+
+9Haoxiao Wang, Xueyi Pu, Fan Zhuo, and Zhou Zhao. 2026a. WavAlign: Enhancing Intelligence and Expressiveness in Spoken Dialogue Models via Adaptive Hybrid Post-Training. arXiv preprint arXiv:2604.14932 .Yifu Chen, Shengpeng Ji, Zhengqing Liu, Qian Chen, Wen Wang, Ziqing Wang, Yangzhuo Li, Tianle Liang, and Zhou Zhao. 2026b. Dual-Axis Generative Re-ward Model Toward Semantic and Turn-taking Ro-bustness in Interactive Spoken Dialogue Models. 
+
+arXiv preprint arXiv:2604.14920 .Christopher Cieri, David Miller, and Kevin Walker. 2004. The Fisher Corpus: A Resource for the Next Generations of Speech-to-Text. In Proceedings of the Fourth International Conference on Language Resources and Evaluation .Gheorghe Comanici, Eric Bieber, Mike Schaekermann, Ice Pasupat, Noveen Sachdeva, Inderjit Dhillon, Mar-cel Blistein, Ori Ram, Dan Zhang, Evan Rosen, Luke Marris, Sam Petulla, Colin Gaffney, Asaf Aharoni, Nathan Lintz, Tiago Cardal Pais, Henrik Jacobsson, Idan Szpektor, Nan-Jiang Jiang, and 3416 others. 2025. Gemini 2.5: Pushing the Frontier with Ad-vanced Reasoning, Multimodality, Long Context, and Next Generation Agentic Capabilities. arXiv preprint arXiv:2507.06261 .Alexandre Défossez, Laurent Mazaré, Manu Orsini, Amélie Royer, Patrick Pérez, Hervé Jégou, Edouard Grave, and Neil Zeghidour. 2024. Moshi: A speech-text foundation model for real-time dialogue. arXiv preprint arXiv:2410.00037 .Erik Ekstedt and Gabriel Skantze. 2022. Voice Activity Projection: Self-supervised Learning of Turn-taking Events. In Proceeding of Interspeech 2022 , pages 5190–5194. Qingkai Fang, Shoutao Guo, Yan Zhou, Zhengrui Ma, Shaolei Zhang, and Yang Feng. 2024. LLaMA-Omni: Seamless Speech Interaction with Large Language Models. In Proceedings of the Thirteenth Interna-tional Conference on Learning Representations .Chaoyou Fu, Haojia Lin, Zuwei Long, Yunhang Shen, Yuhang Dai, Meng Zhao, Yi-Fan Zhang, Shaoqi Dong, Yangze Li, Xiong Wang, Haoyu Cao, Di Yin, Long Ma, Xiawu Zheng, Rongrong Ji, Yunsheng Wu, Ran He, Caifeng Shan, and Xing Sun. 2025. VITA: Towards Open-Source Interactive Omni Multimodal LLM. arXiv preprint arXiv:2408.05211 .Yuan Ge, Saihan Chen, Jingqi Xiao, Xiaoqian Liu, Tong Xiao, Yan Xiang, Zhengtao Yu, and Jingbo Zhu. 2025. FLEXI: Benchmarking Full-duplex Human-LLM Speech Interaction. arXiv preprint arXiv:2509.22243 .Mattias Heldner and Jens Edlund. 2010. Pauses, gaps and overlaps in conversations. Journal of Phonetics ,38(4):555–568. Chi-Yuan Hsiao, Ke-Han Lu, Yu-Kuan Fu, Guan-Ting Lin, Hsiao-Tsung Hung, and Hung-yi Lee. 2026. ASPIRin: Action Space Projection for Interactivity-Optimized Reinforcement Learning in Full-Duplex Speech Language Models. arXiv preprint arXiv:2604.10065 .Ke Hu, Ehsan Hosseini-Asl, Chen Chen, Edresson Casanova, Subhankar Ghosh, Piotr ˙ Zelasko, Zhehuai Chen, Jason Li, Jagadeesh Balam, and Boris Gins-burg. 2025. Efficient and Direct Duplex Modeling for Speech-to-Speech Language Model. In Proceeding of Interspeech 2025 , pages 2715–2719. Shengpeng Ji, Yifu Chen, Minghui Fang, Jialong Zuo, Jingyu Lu, Hanting Wang, Ziyue Jiang, Long Zhou, Shujie Liu, Xize Cheng, Xiaoda Yang, Zehan Wang, Qian Yang, Jian Li, Yidi Jiang, Jingzhen He, Yunfei Chu, Jin Xu, and Zhou Zhao. 2024. WavChat: A Survey of Spoken Dialogue Models. arXiv preprint arXiv:2411.13577 .Shengpeng Ji, Tianle Liang, Yangzhuo Li, Jialong Zuo, Minghui Fang, Jinzheng He, Yifu Chen, Zhengqing Liu, Ziyue Jiang, Xize Cheng, Siqi Zheng, Jin Xu, Junyang Lin, and Zhou Zhao. 2025. WavReward: Spoken Dialogue Models With Generalist Reward Evaluators. arXiv preprint arXiv:2505.09558 .Borui Liao, Yulong Xu, Jiao Ou, Kaiyuan Yang, Weihua Jian, Pengfei Wan, and Di Zhang. 2025. FlexDuo: A Pluggable System for Enabling Full-Duplex Capa-bilities in Speech Dialogue Systems. arXiv preprint arXiv:2502.13472 .Guan-Ting Lin, Shih-Yun Shan Kuan, Jiatong Shi, Kai-Wei Chang, Siddhant Arora, Shinji Watanabe, and Hung-yi Lee. 2026. Full-Duplex-Bench-v2: A Multi-Turn Evaluation Framework for Duplex Dia-logue Systems with an Automated Examiner. arXiv preprint arXiv:2510.07838 .Guan-Ting Lin, Jiachen Lian, Tingle Li, Qirui Wang, Gopala Anumanchipalli, Alexander H. Liu, and Hung-yi Lee. 2025a. Full-Duplex-Bench: A Bench-mark to Evaluate Full-duplex Spoken Dialogue Mod-els on Turn-taking Capabilities. arXiv preprint arXiv:2503.04721 .Guan-Ting Lin, Prashanth Gurunath Shivakumar, Aditya Gourav, Yile Gu, Ankur Gandhe, Hung-yi Lee, and Ivan Bulyko. 2025b. Align-SLM: Textless Spoken Language Models with Reinforcement Learn-ing from AI Feedback. In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics , pages 20395–20411. Shih-Yang Liu, Xin Dong, Ximing Lu, Shizhe Diao, Peter Belcak, Mingjie Liu, Min-Hung Chen, Hongxu Yin, Yu-Chiang Frank Wang, Kwang-Ting Cheng, Yejin Choi, Jan Kautz, and Pavlo Molchanov. 2026. GDPO: Group reward-Decoupled Normalization Pol-icy Optimization for Multi-reward RL Optimization. 
+
+arXiv preprint arXiv:2601.05242 .
+
+10 Ilya Loshchilov and Frank Hutter. 2018. Decoupled Weight Decay Regularization. In Proceedings of the Sixth International Conference on Learning Repre-sentations .Tu Anh Nguyen, Eugene Kharitonov, Jade Copet, Yossi Adi, Wei-Ning Hsu, Ali Elkahky, Paden Tomasello, Robin Algayres, Benoît Sagot, Abdelrahman Mo-hamed, and Emmanuel Dupoux. 2023. Generative Spoken Dialogue Language Modeling. Transactions of the Association for Computational Linguistics ,11:250–266. OpenAI, Josh Achiam, Steven Adler, Sandhini Agarwal, Lama Ahmad, Ilge Akkaya, Florencia Leoni Ale-man, Diogo Almeida, Janko Altenschmidt, Sam Alt-man, Shyamal Anadkat, Red Avila, Igor Babuschkin, Suchir Balaji, Valerie Balcom, Paul Baltescu, Haim-ing Bao, Mohammad Bavarian, Jeff Belgum, and 262 others. 2024. GPT-4 Technical Report. arXiv preprint arXiv:2303.08774 .Long Ouyang, Jeffrey Wu, Xu Jiang, Diogo Almeida, Carroll Wainwright, Pamela Mishkin, Chong Zhang, Sandhini Agarwal, Katarina Slama, Alex Gray, John Schulman, Jacob Hilton, Fraser Kelton, Luke Miller, Maddie Simens, Amanda Askell, Peter Welinder, Paul Christiano, Jan Leike, and Ryan Lowe. 2022. Training language models to follow instructions with human feedback. In Proceedings of the Advances in Neural Information Processing Systems .Yizhou Peng, Yi-Wen Chao, Dianwen Ng, Yukun Ma, Chongjia Ni, Bin Ma, and Eng Siong Chng. 2025. FD-Bench: A Full-Duplex Benchmarking Pipeline Designed for Full Duplex Spoken Dialogue Systems. In Interspeech 2025 , pages 176–180. Rafael Rafailov, Archit Sharma, Eric Mitchell, Christo-pher D. Manning, Stefano Ermon, and Chelsea Finn. 2023. Direct Preference Optimization: Your Lan-guage Model is Secretly a Reward Model. In Pro-ceedings of the Thirty-seventh Conference on Neural Information Processing Systems .Rajarshi Roy, Jonathan Raiman, Sang-gil Lee, Teodor-Dumitru Ene, Robert Kirby, Sungwon Kim, Jae-hyeon Kim, and Bryan Catanzaro. 2026. Person-aPlex: Voice and Role Control for Full Duplex Conversational Speech Models. arXiv preprint arXiv:2602.06053 .John Schulman, Filip Wolski, Prafulla Dhariwal, Alec Radford, and Oleg Klimov. 2017. Proximal Policy Optimization Algorithms. arXiv preprint arXiv:1707.06347 .Zhihong Shao, Peiyi Wang, Qihao Zhu, Runxin Xu, Junxiao Song, Xiao Bi, Haowei Zhang, Mingchuan Zhang, Y. K. Li, Y. Wu, and Daya Guo. 2024. DeepSeekMath: Pushing the Limits of Mathemat-ical Reasoning in Open Language Models. arXiv preprint arXiv:2402.03300 .Yemin Shi, Yu Shu, Siwei Dong, Guangyi Liu, Jaward Sesay, Jingwen Li, and Zhiting Hu. 2025. Voila: Voice-Language Foundation Models for Real-Time Autonomous Interaction and Voice Role-Play. arXiv preprint arXiv:2505.02707 .Nisan Stiennon, Long Ouyang, Jeffrey Wu, Daniel Ziegler, Ryan Lowe, Chelsea Voss, Alec Radford, Dario Amodei, and Paul F Christiano. 2020. Learn-ing to summarize with human feedback. In Pro-ceedings of the Thirty-fourth Advances in Neural Information Processing Systems , volume 33, pages 3008–3021. Silero Team. 2024. Silero VAD: Pre-trained enterprise-grade voice activity detector (VAD), number detector and language classifier. Bandhav Veluri, Benjamin N Peloquin, Bokai Yu, Hongyu Gong, and Shyamnath Gollakota. 2024. Be-yond Turn-Based Interfaces: Synchronous LLMs as Full-Duplex Dialogue Agents. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Processing , pages 21390–21402. Peng Wang, Songshuo Lu, Yaohua Tang, Sijie Yan, Wei Xia, and Yuanjun Xiong. 2024. A Full-duplex Speech Dialogue Scheme Based On Large Language Model. In Proceedings of the Thirty-eighth Annual Conference on Neural Information Processing Sys-tems .Qichao Wang, Ziqiao Meng, Wenqian Cui, Yifei Zhang, Pengcheng Wu, Bingzhe Wu, Irwin King, Liang Chen, and Peilin Zhao. 2025a. NTPP: Generative Speech Language Modeling for Dual-Channel Spo-ken Dialogue via Next-Token-Pair Prediction. In 
+
+Proceedings of the Forty-second International Con-ference on Machine Learning .Xiong Wang, Yangze Li, Chaoyou Fu, Yike Zhang, Yun-hang Shen, Lei Xie, Ke Li, Xing Sun, and Long Ma. 2025b. Freeze-Omni: A Smart and Low La-tency Speech-to-speech Dialogue Model with Frozen LLM. In Proceedings of the Forty-second Interna-tional Conference on Machine Learning .Ronald J. Williams. 1992. Simple statistical gradient-following algorithms for connectionist reinforcement learning. Machine Learning , 8(3):229–256. Anne Wu, Laurent Mazaré, Neil Zeghidour, and Alexan-dre Défossez. 2025a. Aligning Spoken Dialogue Models from User Interactions. In Proceedings of the Forty-second International Conference on Ma-chine Learning .Boyong Wu, Chao Yan, Chen Hu, Cheng Yi, Chengli Feng, Fei Tian, Feiyu Shen, Gang Yu, Haoyang Zhang, Jingbei Li, Mingrui Chen, Peng Liu, Wang You, Xiangyu Tony Zhang, Xingyuan Li, Xuerui Yang, Yayue Deng, Yechang Huang, Yuxin Li, and 90 others. 2025b. Step-Audio 2 Technical Report. 
+
+arXiv preprint arXiv:2507.16632 .Jin Xu, Zhifang Guo, Jinzheng He, Hangrui Hu, Ting He, Shuai Bai, Keqin Chen, Jialin Wang, Yang Fan, Kai Dang, Bin Zhang, Xiong Wang, Yunfei Chu, 
+
+11 and Junyang Lin. 2025. Qwen2.5-Omni Technical Report. arXiv preprint arXiv:2503.20215 .An Yang, Anfeng Li, Baosong Yang, Beichen Zhang, Binyuan Hui, Bo Zheng, Bowen Yu, Chang Gao, Chengen Huang, Chenxu Lv, Chujie Zheng, Dayi-heng Liu, Fan Zhou, Fei Huang, Feng Hu, Hao Ge, Haoran Wei, Huan Lin, Jialong Tang, and 41 others. 2025a. Qwen3 Technical Report. arXiv preprint arXiv:2505.09388 .Shu-wen Yang, Ming Tu, Andy T. Liu, Xinghua Qu, Hung-yi Lee, Lu Lu, Yuxuan Wang, and Yonghui Wu. 2025b. ParaS2S: Benchmarking and Aligning Spoken Language Models for Paralinguistic-aware Speech-to-Speech Interaction. In Proceedings of the Fourteenth International Conference on Learning Representations .Yiqun Yao, Xiang Li, Xin Jiang, Xuezhi Fang, Naitong Yu, Wenjia Ma, Aixin Sun, and Yequan Wang. 2026. FLM-Audio: Natural Monologues Improves Native Full-Duplex Chatbots via Dual Training. arXiv preprint arXiv:2509.02521 .Wenyi Yu, Siyin Wang, Xiaoyu Yang, Xianzhao Chen, Xiaohai Tian, Jun Zhang, Guangzhi Sun, Lu Lu, Yux-uan Wang, and Chao Zhang. 2025. SALMONN-omni: A Standalone Speech LLM without Codec Injection for Full-duplex Conversation. In Proceed-ings of the Thirty-ninth Annual Conference on Neural Information Processing Systems .Dong Zhang, Shimin Li, Xin Zhang, Jun Zhan, Pengyu Wang, Yaqian Zhou, and Xipeng Qiu. 2023. SpeechGPT: Empowering Large Language Models with Intrinsic Cross-Modal Conversational Abilities. In Findings of the Association for Computational Linguistics: EMNLP 2023 , pages 15757–15773. Dong Zhang, Zhaowei Li, Shimin Li, Xin Zhang, Pengyu Wang, Yaqian Zhou, and Xipeng Qiu. 2024a. SpeechAlign: Aligning Speech Generation to Human Preferences. In Proceedings of the Thirty-eighth An-nual Conference on Neural Information Processing Systems .He Zhang, Wenqian Cui, Haoning Xu, Xiaohui Li, Lei Zhu, Haoli Bai, Shaohua Ma, and Irwin King. 2026. MTR-DuplexBench: Towards a Compre-hensive Evaluation of Multi-Round Conversations for Full-Duplex Speech Language Models. arXiv preprint arXiv:2511.10262 .Qinglin Zhang, Luyao Cheng, Chong Deng, Qian Chen, Wen Wang, Siqi Zheng, Jiaqing Liu, Hai Yu, Chao-Hong Tan, Zhihao Du, and ShiLiang Zhang. 2025. OmniFlatten: An End-to-end GPT Model for Seam-less Voice Conversation. In Proceedings of the 63rd Annual Meeting of the Association for Computational Linguistics , pages 14570–14580. Xinrong Zhang, Yingfa Chen, Shengding Hu, Xu Han, Zihang Xu, Yuanwei Xu, Weilin Zhao, Maosong Sun, and Zhiyuan Liu. 2024b. Beyond the Turn-Based Game: Enabling Real-Time Conversations with Du-plex Models. In Proceedings of the 2024 Conference on Empirical Methods in Natural Language Process-ing , pages 11543–11557. Yanli Zhao, Andrew Gu, Rohan Varma, Liang Luo, Chien-Chin Huang, Min Xu, Less Wright, Hamid Shojanazeri, Myle Ott, Sam Shleifer, Alban Des-maison, Can Balioglu, Pritam Damania, Bernard Nguyen, Geeta Chauhan, Yuchen Hao, Ajit Mathews, and Shen Li. 2023. PyTorch FSDP: Experiences on Scaling Fully Sharded Data Parallel. arXiv preprint arXiv:2304.11277 .
+
+12 LLM Judge Prompt        
+
+> You are evaluating aspoken dialogue model’s response in a turn-taking scenario. The dialogue model should respond appropriately given the full conversation history. You will be given a conversation history consisting of alternating USER and MODEL turns. Rate the MODEL response on a scale of 0 to 2: 0: Irrelevant, unnatural, or no meaningful response (irrelevant, silence, or gibberish) 1: Loosely or partially related, but generic and lacking specificity to the context 2: Natural, specific, and coherently grounded in the context Output ONLY a single integer from 0 to 2.
+
+Figure 3: System prompt used to compute the LLM Judge reward 
+
+A Training Details 
+
+During generation, we use sampling temperatures of 0.7 and 0.8 for text and audio tokens, respec-tively, with top-k = 250 for audio tokens. At each of the 100 training epochs, we sample 32 segments (i.e., groups), each of which yields G = 16 com-pletions. Training is distributed across 32 NVIDIA H100 GPUs using Fully Sharded Data Parallelism (FSDP) (Zhao et al., 2023), with one group as-signed to each GPU. Within each GPU, the 16 sam-ples in a group are split into mini-batches of size 1,resulting in 16 gradient update steps per group. We use the AdamW optimizer (Loshchilov and Hutter, 2018) with (β1, β 2) = (0 .9, 0.95) , weight decay of 0.1, and gradient clipping at a maximum norm of 2. The learning rate starts at 2 × 10 −7 and a cosine scheduler is used. The clipping parameter is set to ϵ = 0 .2 and the KL penalty coefficient to 
+
+β = 0 .01 .For the length of context prepended to input seg-ments (Section 3.2), we sample from [0 , l max ] swith probability 0.5; otherwise, no context is prepended. To facilitate a gradual adaptation to longer contexts, a scheduler linearly increases lmax 
+
+from 0 to 30 over the 100 epochs. 
+
+B Benchmark Details 
+
+B.1 Full-Duplex-Bench v1 
+
+Full-Duplex-Bench v1 (Lin et al., 2025a) is a scenario-driven benchmark that evaluates four axes of turn-taking behavior using pre-recorded input audio and automatic metrics. A takeover (TO) is defined as any model speech that is not silence or a backchannel (speech shorter than 1 s with fewer than two words), and the Takeover Rate (TOR) is the proportion of samples in which a takeover oc-curs. 
+
+Pause Handling The model should remain silent during intra-utterance pauses where the user has not yielded the floor. The metric is TOR ( ↓). 
+
+Smooth Turn-Taking The model should detect turn boundaries and respond promptly. Metrics are TOR ( ↑), indicating whether the model successfully takes the turn, and Response Latency (↓), the time in seconds between the end of the user’s speech and the onset of the model’s response. 
+
+Backchanneling The model should produce short acknowledgments at appropriate moments without taking over the turn. Metrics are TOR (↓); Backchannel Frequency (↑), the number of backchannel events per second; and Jensen– Shannon Divergence (JSD) (↓), measuring the di-vergence between the model’s backchannel timing distribution and the ground-truth human timing. 
+
+User Interruption The model must yield the floor upon a user barge-in and respond to the in-terrupting query. Metrics are TOR ( ↑); Response Latency (↓); and a GPT-4o Semantic Score (↑), an LLM-based rating of the contextual relevance of the post-interruption response on a 0–5 scale. 
+
+Our settings We follow the official evaluation pipeline and use the benchmark’s default test sam-ples. We corrected a bug in the official backchan-neling evaluation script in which the generated au-dio was not resampled to the VAD’s expected sam-pling rate of 16 kHz. 
+
+B.2 Full-Duplex-Bench v2 
+
+Full-Duplex-Bench v2 (Lin et al., 2026) evaluates full-duplex models in a multi-turn, streaming set-ting using an automated examiner that interacts with the evaluated model in a real-time conversa-tion. 
+
+Task families The benchmark covers four task families, each with staged semantic goals that the examiner enforces progressively: • Daily : Routine conversational goals such as ordering, scheduling, and troubleshooting, testing whether the model can follow multi-turn instructions naturally. 13 • Correction : The examiner revises previously stated information mid- or cross-turn, testing whether the model correctly updates to the revised intent. • Entity Tracking : Reference shifts across candidates using ordinals, attributes, or land-marks, testing whether the model can resolve references and propagate entity attributes con-sistently. • Safety : Covers policy-aligned categories in-cluding physical health, illegal activities, pri-vacy, and harassment, testing the model’s abil-ity to refuse and redirect hazardous requests under multi-turn pressure. 
+
+Metrics The benchmark reports three evaluation dimensions, all scored on a 1–5 scale by an LLM judge: Turn-Taking Fluency , Instruction Following ,and Task-Specific Competence . Especially, task-specific competence is used only for the Correction (detection and consistent updating of revised infor-mation), Entity Tracking (referent resolution and attribute consistency across turns), and Safety (haz-ard recognition, boundary setting, and consistency under pressure) task families. 
+
+Our settings We use OpenAI’s GPT-Realtime as the examiner and set the maximum dialogue du-ration to 60 s . We adopt the fast pacing mode, in which the examiner actively speaks even while the evaluated model is talking. We observed that Ope-nAI’s server-side VAD is sensitive to low-energy events in the evaluated model’s audio, such as noise artifacts and short backchannel-like vocalizations, causing it to interrupt the examiner’s own utter-ances prematurely. To mitigate this issue, we sup-press the transmission of the evaluated model’s audio to the API while the examiner is producing speech. For automatic scoring of the dialogue transcripts, we use Gemini 2.5 Flash (Comanici et al., 2025) as the LLM judge, rating each metric on the official 
+
+1–5 scale. We enable the model’s reasoning capa-bility at the “minimal” thinking level to improve the accuracy and interpretability of the judgments. In cases where the evaluated model produces no speech throughout the entire dialogue session, we assign the minimum score of 1 across all metrics. 
+
+C Speech Quality Evaluation 
+
+To verify that RL training does not degrade the per-ceptual quality of the generated speech, we evaluate                                             
+
+> Turn-Taking User Interruption Overall Model mean std mean std mean std Moshi 2.45 0.58 2.63 0.63 2.56 0.62 + RL (Fisher) 2.38 0.63 2.70 0.62 2.58 0.64 + RL (Seamless) 2.49 0.61 2.73 0.56 2.64 0.59 PersonaPlex 2.50 0.57 2.60 0.49 2.56 0.52 + RL (Fisher) 2.35 0.61 2.61 0.48 2.51 0.54 + RL (Seamless) 2.50 0.67 2.70 0.40 2.62 0.53
+
+Table 4: UTMOSv2 scores of the generated speech on the Turn-Taking and User Interruption tasks of Full-Duplex-Bench v1 
+
+> 8.0s
+
+Figure 4: Example of a conversation between GPT-Realtime (Examiner) and Moshi in the Daily task of Full-Duplex-Bench v2 (Turn-taking fluency score: 2.75, Instruction-following score: 2.50). 
+
+all models using UTMOSv2 (Baba et al., 2024), a neural mean opinion score (MOS) predictor. We computethe scores on the agent’s speech segments extracted from the Turn-Taking and User Interrup-tion scenarios of Full-Duplex-Bench v1, which con-tain relatively long model utterances suitable for quality assessment. Table 4 reports the mean and standard deviation across all evaluated segments. For both Moshi and PersonaPlex, the UTMOSv2 scores after RL remain comparable to the respec-tive baselines across all conditions. We hypothesize that this stability can be at-tributed to several factors. First, the interactivity reward functions operate on the output of a voice activity detection (VAD) model applied to the gen-erated speech, meaning that speech quality implic-itly affects the reward signal. Second, the LLM Judge reward evaluates the semantic content of the generated utterance through ASR transcriptions of the generated speech, providing an indirect incen-tive to maintain intelligible audio. Third, the KL divergence penalty in the RL objective (Section 3.2) regularizes the policy to stay close to the pretrained model, preventing large deviations in the output distribution that could degrade audio quality. 14 (a) PersonaPlex (Turn-taking fluency score: 5.00, Instruction-following score: 2.33, Task-specific competence: 1.00) 
+
+> (b) PersonaPlex + RL (Turn-taking fluency score: 2.50, Instruction-following score: 2.33, Task-specific competence: 1.00)
+
+Figure 5: Dialogue examples from the Safety task of Full-Duplex-Bench v2 between GPT-Realtime and (a) the base PersonaPlex and (b) PersonaPlex + RL trained on the Fisher dataset. 
+
+D Case Studies 
+
+D.1 Interactivity of Moshi Baseline 
+
+Figure 4 shows a dialogue example between Moshi and GPT-realtime in Full-Duplex-Bench v2. In this example, Moshi took an exceptionally long delay (approximately 6 s ) before responding to GPT-realtime, and lengthy overlap occurred dur-ing the conversation. In contrast, under the same dialogue scenario, the model after reinforcement learning achieved smooth turn-taking without ex-cessive overlap (see Figure 2). 
+
+D.2 Safety Degradation of PersonaPlex + RL 
+
+Figure 5 illustrates dialogues from the Safety task of Full-Duplex-Bench v2 for the base PersonaPlex and its RL-trained model with the Fisher dataset. Although the base PersonaPlex fails to refuse the user’s harmful request, resulting in low instruction-following and task-specific scores, it still maintains structured dialogue with smooth turn transitions. After RL training on Fisher, the model instead pro-duces short, fragmented utterances such as “Yeah” and cooperative backchannels, reflecting the re-sponsive and cooperative interaction style charac-teristic of the Fisher dataset. This cooperative bias conflicts with the behavior required in the Safety task, where the model must suppress cooperation and instead refuse or redirect harmful requests. We believe this explains the decline in Safety scores observed specifically when PersonaPlex is trained on the Fisher dataset (Table 2). 15

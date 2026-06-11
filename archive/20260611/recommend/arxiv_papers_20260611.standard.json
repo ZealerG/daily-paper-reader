@@ -1,0 +1,606 @@
+{
+  "mode": "standard",
+  "generated_at": "2026-06-11T21:01:08.296889+00:00",
+  "stats": {
+    "mode": "standard",
+    "tag_count": 2,
+    "deep_divecandidates": 5,
+    "deep_cap": 7,
+    "deep_selected": 5,
+    "quick_candidates": 9,
+    "quick_skim_target": 12,
+    "quick_selected": 9
+  },
+  "deep_dive": [
+    {
+      "id": "2606.04275v1",
+      "source": "arxiv",
+      "title": "From Ticks to Flows: Dynamics of Neural Reinforcement Learning in Continuous Environments",
+      "abstract": "We present a novel theoretical framework for deep reinforcement learning (RL) in continuous environments by modeling the problem as a continuous-time stochastic process, drawing on insights from stochastic control. Building on previous work, we introduce a viable model of actor-critic algorithm that incorporates both exploration and stochastic transitions. For single-hidden-layer neural networks, we show that the state of the environment can be formulated as a two time scale process: the environment time and the gradient time. Within this formulation, we characterize how the time-dependent random variables that represent the environment's state and estimate of the cumulative discounted return evolve over gradient steps in the infinite width limit of two-layer networks. Using the theory of stochastic differential equations, we derive, for the first time in continuous RL, an equation describing the infinitesimal change in the state distribution at each gradient step, under a vanishingly small learning rate. Overall, our work provides a novel nonparametric formulation for studying overparametrized neural actor-critic algorithms. We empirically corroborate our theoretical result using a toy continuous control task.",
+      "authors": [
+        "Saket Tiwari",
+        "Tejas Kotwal",
+        "George Konidaris"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-06-02T23:02:54+00:00",
+      "link": "https://arxiv.org/pdf/2606.04275v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "Proposes a theoretical framework for deep RL in continuous environments",
+      "llm_evidence_cn": "提出了连续环境中的深度强化学习理论框架",
+      "llm_evidence": "提出了连续环境中的深度强化学习理论框架",
+      "canonical_evidence": "提出了连续环境中的深度强化学习理论框架",
+      "llm_tldr_en": "Introduces a continuous-time stochastic process model for deep RL, formulating state evolution as two time scales and characterizing gradient-step dynamics for actor-critic algorithms.",
+      "llm_tldr_cn": "现有的深度强化学习理论多基于离散时间，该工作从连续时间视角统一了探索和优化。通过分析单隐层神经网络，证明了状态可分解为环境时间和梯度时间两个尺度，并导出了累积回报估计的微分方程。实验部分验证了理论分析的准确性，为设计更高效的连续控制算法提供了新视角。",
+      "llm_tldr": "现有的深度强化学习理论多基于离散时间，该工作从连续时间视角统一了探索和优化。通过分析单隐层神经网络，证明了状态可分解为环境时间和梯度时间两个尺度，并导出了累积回报估计的微分方程。实验部分验证了理论分析的准确性，为设计更高效的连续控制算法提供了新视角。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.10321v1",
+      "source": "arxiv",
+      "title": "Baseline-Free Policy Optimization for Neural Combinatorial Optimization",
+      "abstract": "Neural combinatorial optimization (NCO) trains autoregressive policies to solve routing problems. The standard training algorithm, REINFORCE with a rollout baseline, requires maintaining and periodically updating a frozen copy of the policy for variance reduction. This baseline introduces a structural vulnerability: on harder instances, a poor baseline produces noisy gradient estimates that can destabilize training. We evaluate Group Relative Policy Optimization (GRPO), an algorithm from large language model alignment that eliminates the baseline entirely by normalizing advantages within groups of sampled trajectories. In a controlled comparison of five RL algorithms on TSP and CVRP benchmarks within the RL4CO framework, we find that: (i) GRPO avoids the training collapse observed with REINFORCE on TSP-100, where performance degrades from cost 9.8 to 52.1 immediately after the warmup phase and does not recover under extended training; (ii) at matched gradient updates, GRPO achieves solution quality within 2% of POMO, a strong AM-based multi-start baseline, while requiring no external baseline; and (iii) P3O, a pairwise preference algorithm also from the alignment literature, is competitive on TSP but shows higher variability on CVRP. These results identify GRPO as a promising baseline-free alternative for NCO, particularly in settings where baseline-dependent training becomes fragile.",
+      "authors": [
+        "Carlos S. Sepúlveda",
+        "Gonzalo A. Ruz"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "cs.RO",
+        "math.OC"
+      ],
+      "published": "2026-06-09T02:18:30+00:00",
+      "link": "https://arxiv.org/pdf/2606.10321v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "baseline-free policy optimization method for combinatorial optimization using RL",
+      "llm_evidence_cn": "用于组合优化的无基线策略优化方法",
+      "llm_evidence": "用于组合优化的无基线策略优化方法",
+      "canonical_evidence": "用于组合优化的无基线策略优化方法",
+      "llm_tldr_en": "Proposes Group Relative Policy Optimization (GRPO) for neural combinatorial optimization, eliminating the need for a rollout baseline and showing improved stability on TSP and CVRP.",
+      "llm_tldr_cn": "神经组合优化通常使用REINFORCE加滚动基线进行训练，但该基线的稳定性和噪声对困难实例敏感。本文引入大语言模型对齐中的GRPO算法，通过组内轨迹归一化优势完全消除基线，避免基线脆弱性问题。在TSP和CVRP基准上的对比实验表明，GRPO训练更稳定，且性能优于基线方法。该工作为组合优化问题的强化学习训练提供了一种简单有效的无基线替代方案。",
+      "llm_tldr": "神经组合优化通常使用REINFORCE加滚动基线进行训练，但该基线的稳定性和噪声对困难实例敏感。本文引入大语言模型对齐中的GRPO算法，通过组内轨迹归一化优势完全消除基线，避免基线脆弱性问题。在TSP和CVRP基准上的对比实验表明，GRPO训练更稳定，且性能优于基线方法。该工作为组合优化问题的强化学习训练提供了一种简单有效的无基线替代方案。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.11119v1",
+      "source": "arxiv",
+      "title": "TRACE: A Unified Rollout Budget Allocation Framework for Efficient Agentic Reinforcement Learning",
+      "abstract": "Reinforcement learning with verifiable rewards (RLVR) is a promising approach for enhancing reasoning and agentic behavior in large language models. However, rollout-intensive policy optimization is often limited by insufficient reward contrast, arising when overly simple or complex prompts generate low-variance feedback and when outcome-only rewards assign the same terminal assessment to every decision in a multi-turn rollout. Past efforts have focused on allocating available rollout resources to promising prompts, yet they only leverage sample informativeness at the prompt level and neglect variation in prefix-level informativeness across turns within the same rollout. This work targets multi-turn agentic RL by modeling each ReAct-style thought-action-observation turn as a semantically distinct node, allowing budget allocation to extend from prompt roots to turn-level prefixes with further continuations, which naturally forms tree-structured rollouts. We introduce Tree Rollout Allocation for Contrastive Exploration (TRACE), a unified rollout allocation framework that enhances reward contrast within a fixed sampling budget. Technically, TRACE allocates rollout budget to both prompt roots and intermediate prefixes that are most likely to yield mixed terminal rewards. A shared generalizable predictor estimates conditional success probability at these anchors from prefix histories to guide this allocation. The resulting adaptive tree structure enriches outcome-only feedback and amplifies the policy-update signal. Empirically, TRACE achieves competitive performance and efficiency gains on typical agentic benchmarks, e.g., improving Qwen3-14B Multi-Hop QA average accuracy by 2.8 points over competitive baselines at equal sampling cost.",
+      "authors": [
+        "Heming Zou",
+        "Qi Wang",
+        "Yun Qu",
+        "Yuhang Jiang",
+        "Lizhou Cai",
+        "Yixiu Mao",
+        "Ru Peng",
+        "Xin Xu",
+        "Weijie Liu",
+        "Kai Yang",
+        "Saiyong Yang",
+        "Xiangyang Ji"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "cs.CL"
+      ],
+      "published": "2026-06-09T17:16:03+00:00",
+      "link": "https://arxiv.org/pdf/2606.11119v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 9.0,
+      "llm_evidence_en": "reinforcement learning algorithm for multi-turn agentic tasks",
+      "llm_evidence_cn": "用于多轮智能体任务的强化学习算法",
+      "llm_evidence": "用于多轮智能体任务的强化学习算法",
+      "canonical_evidence": "用于多轮智能体任务的强化学习算法",
+      "llm_tldr_en": "TRACE proposes a unified rollout budget allocation framework to address reward contrast issues in multi-turn agentic reinforcement learning with verifiable rewards.",
+      "llm_tldr_cn": "本工作针对多轮智能体强化学习中因提示过于简单或复杂导致的奖励对比不足问题，提出了一种统一的投放预算分配框架TRACE。该框架通过建模每一轮的前缀级信息性，实现投放资源在步级层面的优化分配，从而提升策略优化效率。实验证明，TRACE有效缓解了奖励对比不足的问题，在多种多轮智能体任务上取得了显著性能提升。该研究为智能体强化学习中的资源分配问题提供了新的视角和实用方法。",
+      "llm_tldr": "本工作针对多轮智能体强化学习中因提示过于简单或复杂导致的奖励对比不足问题，提出了一种统一的投放预算分配框架TRACE。该框架通过建模每一轮的前缀级信息性，实现投放资源在步级层面的优化分配，从而提升策略优化效率。实验证明，TRACE有效缓解了奖励对比不足的问题，在多种多轮智能体任务上取得了显著性能提升。该研究为智能体强化学习中的资源分配问题提供了新的视角和实用方法。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.10979v1",
+      "source": "arxiv",
+      "title": "Bellman-Taylor Score Decoding for Markov Decision Processes with State-Dependent Feasible Action Sets",
+      "abstract": "Many Markov decision processes (MDPs) in operations research have feasible actions that are state dependent and defined implicitly by various operational constraints. These features make it difficult to use standard deep reinforcement learning (DRL) algorithms, whose action interfaces typically assume either a fixed finite action catalog or a simple Euclidean space. Motivated by a Taylor expansion of the optimal action-value function, we propose Bellman--Taylor score decoding, a framework that moves policy learning to a Euclidean score space while enforcing feasibility through an action decoder. The induced latent-score MDP then can be optimized by standard DRL algorithms without differentiating through the decoder. We provide a performance guarantee showing that the optimality gap of this approach decomposes into a structural approximation error and an algorithmic learning error. Lastly, we apply this framework to a queueing network control problem, where the policy essentially learns a state-dependent index-based dispatching rule. Numerical experiments show near-optimal performance in small instances and considerable improvements over benchmarks in larger systems.",
+      "authors": [
+        "Yi Chen",
+        "Rushuai Yang",
+        "Qiang Chen",
+        "Dongyan",
+        "Huo"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-06-09T15:15:21+00:00",
+      "link": "https://arxiv.org/pdf/2606.10979v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "proposes a new deep reinforcement learning framework for MDPs with state-dependent action sets",
+      "llm_evidence_cn": "提出一种新的深度强化学习框架处理状态相关动作集合的MDP",
+      "llm_evidence": "提出一种新的深度强化学习框架处理状态相关动作集合的MDP",
+      "canonical_evidence": "提出一种新的深度强化学习框架处理状态相关动作集合的MDP",
+      "llm_tldr_en": "Bellman-Taylor Score Decoding enables standard DRL algorithms to handle state-dependent feasible action sets by mapping policy learning to a Euclidean score space with an action decoder, broadening RL applicability.",
+      "llm_tldr_cn": "该论文针对操作研究中常见但难以用标准深度强化学习算法处理的状态相关可行动作集问题，提出Bellman-Taylor分数解码框架。该方法通过将策略学习映射到欧几里得分数空间，并使用动作解码器确保可行性，使标准DRL算法可以无需区分解码器即可优化。该工作扩展了DRL在约束MDP中的应用范围。",
+      "llm_tldr": "该论文针对操作研究中常见但难以用标准深度强化学习算法处理的状态相关可行动作集问题，提出Bellman-Taylor分数解码框架。该方法通过将策略学习映射到欧几里得分数空间，并使用动作解码器确保可行性，使标准DRL算法可以无需区分解码器即可优化。该工作扩展了DRL在约束MDP中的应用范围。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    },
+    {
+      "id": "2606.11982v1",
+      "source": "arxiv",
+      "title": "PAWS: Preference Learning with Advantage-Weighted Segments",
+      "abstract": "Preference-based reinforcement learning (PbRL) learns policies from human trajectory-level comparisons, avoiding explicit reward design and expert demonstrations. Existing methods typically train utility functions on trajectory or segment-level preferences while relying on per-step utility estimates during policy optimization. This training and inference mismatch induces a distribution shift that severely degrades temporal credit assignment and limits policy learning. We analyze this issue and propose PAWS, a segment-based preference learning method that performs policy updates directly using segment-level advantage functions. By aligning utility training with policy optimization, PAWS preserves trajectory-level preference information and avoids unreliable per-step learning signals. Experiments on simulated robotic manipulation and locomotion tasks demonstrate that PAWS consistently outperforms existing PbRL approaches, highlighting the importance of distribution-consistent preference learning.",
+      "authors": [
+        "Aleksandar Taranovic",
+        "Onur Celik",
+        "Niklas Freymuth",
+        "Ge Li",
+        "Serge Thilges",
+        "Huy Le",
+        "Tai Hoang",
+        "Rania Rayyes",
+        "Gerhard Neumann"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG"
+      ],
+      "published": "2026-06-10T12:00:17+00:00",
+      "link": "https://arxiv.org/pdf/2606.11982v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 8.0,
+      "llm_evidence_en": "Proposes segment-based preference learning using advantage functions for policy optimization",
+      "llm_evidence_cn": "提出使用优势函数进行片段偏好学习的策略优化方法",
+      "llm_evidence": "提出使用优势函数进行片段偏好学习的策略优化方法",
+      "canonical_evidence": "提出使用优势函数进行片段偏好学习的策略优化方法",
+      "llm_tldr_en": "PAWS addresses the distribution shift in preference-based RL by performing policy updates directly with segment-level advantage functions, preserving trajectory-level preference and improving temporal credit assignment.",
+      "llm_tldr_cn": "现有偏好强化学习方法在训练与推理之间存在分布偏移，导致时序信用分配差。本文提出PAWS方法，利用片段级优势函数直接更新策略，消除了训练与推理的不一致性。该方法在多个基准任务上优于现有偏好RL方法，显著提升了性能与样本效率，为偏好强化学习提供了更稳定的优化框架。",
+      "llm_tldr": "现有偏好强化学习方法在训练与推理之间存在分布偏移，导致时序信用分配差。本文提出PAWS方法，利用片段级优势函数直接更新策略，消除了训练与推理的不一致性。该方法在多个基准任务上优于现有偏好RL方法，显著提升了性能与样本效率，为偏好强化学习提供了更稳定的优化框架。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch"
+    }
+  ],
+  "quick_skim": [
+    {
+      "id": "2606.10129v1",
+      "source": "arxiv",
+      "title": "Discovering Interpretable Multi-Parameter Control Policies for Evolutionary Algorithms Using Deep Reinforcement Learning",
+      "abstract": "While deep Reinforcement Learning (deep-RL) has been increasingly applied to parameter control in evolutionary algorithms, rigorous theoretical analysis of parameter control remains largely restricted to single-parameter settings, owing to the difficulty of deriving effective, interpretable multi-parameter policies amenable to formal study. We demonstrate how deep-RL can be leveraged to overcome this barrier, using the (1+($λ$,$λ$))-genetic algorithm optimizing OneMax, one of the few problems where a super-constant speedup of dynamic control has been formally proven, as a representative case study. We first show that standard approaches struggle to converge in this multi-parameter setting, and introduce algorithm-agnostic enhancements targeting action-space decomposition, reward shifting, and long-horizon discounting. With these in place, we compare common deep-RL methods and find that Double Deep Q-Networks uniquely avoid the policy collapse observed in Proximal Policy Optimization, yielding trajectories suitable for downstream analysis. Crucially, we move beyond the ``black-box'' nature of neural networks by distilling the learned behaviors into a transparent, symbolic control policy. This resulting policy does not only offer interpretability for future theoretical analysis but also yields exceptional performance, consistently outperforming existing baselines across a wide range of problem sizes.",
+      "authors": [
+        "Tai Nguyen",
+        "Phong Le",
+        "Carola Doerr",
+        "Nguyen Dang"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.NE"
+      ],
+      "published": "2026-06-08T20:06:25+00:00",
+      "link": "https://arxiv.org/pdf/2606.10129v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "uses deep RL to discover multi-parameter control policies for evolutionary algorithms",
+      "llm_evidence_cn": "使用深度强化学习发现进化算法的多参数控制策略",
+      "llm_evidence": "使用深度强化学习发现进化算法的多参数控制策略",
+      "canonical_evidence": "使用深度强化学习发现进化算法的多参数控制策略",
+      "llm_tldr_en": "This work leverages deep RL to discover interpretable multi-parameter control policies for evolutionary algorithms, demonstrated on (1+(λ,λ))-GA.",
+      "llm_tldr_cn": "针对进化算法中多参数控制难以理论分析的问题，本文利用深度强化学习自动发现可解释的多参数策略，以(1+(λ,λ))-GA优化OneMax为案例，证明RL能有效处理多参数设置并实现加速。",
+      "llm_tldr": "针对进化算法中多参数控制难以理论分析的问题，本文利用深度强化学习自动发现可解释的多参数策略，以(1+(λ,λ))-GA优化OneMax为案例，证明RL能有效处理多参数设置并实现加速。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.10346v1",
+      "source": "arxiv",
+      "title": "Reasoning or Memorization? Direction-Aware Diversity Exploration in LLM Reinforcement Learning",
+      "abstract": "Reinforcement learning has become a key paradigm for eliciting reasoning abilities in large language models, where exploration is crucial for discovering effective solution trajectories. Existing exploration methods typically encourage diversity in semantic or gradient spaces, without distinguishing what drives this diversity. A trajectory may appear novel because it follows a new reasoning process, or because it varies memorized patterns and shortcuts. Rewarding both cases equally may steer exploration toward memorization rather than genuine reasoning improvement. In this paper, we propose DiRL, a Direction-Aware Reinforcement Learning framework that anchors exploration to an internal reasoning-memorization direction of the policy. Specifically, DiRL extracts this direction from model representations, constructs direction-weighted gradient features to characterize rollout updates, and shapes rewards to amplify reasoning-aligned exploration while suppressing memorization-aligned variations. DiRL integrates seamlessly into standard Group Relative Policy Optimization (GRPO). Extensive experiments on mathematical and general reasoning benchmarks demonstrate the effectiveness of DiRL, showing significant improvements over various existing exploration methods.",
+      "authors": [
+        "Jiangnan Xia",
+        "Yucheng Shi",
+        "Yu Yang",
+        "Kishan Panaganti",
+        "Zhenwen Liang",
+        "Ninghao Liu"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-06-09T02:55:12+00:00",
+      "link": "https://arxiv.org/pdf/2606.10346v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "direction-aware diversity exploration in LLM reinforcement learning",
+      "llm_evidence_cn": "大语言模型强化学习中的方向感知多样性探索",
+      "llm_evidence": "大语言模型强化学习中的方向感知多样性探索",
+      "canonical_evidence": "大语言模型强化学习中的方向感知多样性探索",
+      "llm_tldr_en": "Proposes DiRL, a reinforcement learning framework that distinguishes reasoning-driven from memorization-driven exploration in LLMs.",
+      "llm_tldr_cn": "在利用强化学习激发大语言模型推理能力时，现有探索方法未区分新推理过程与记忆模式变化，导致探索偏向记忆而非真正推理。本文提出方向感知强化学习框架DiRL，通过内部推理-记忆方向锚定探索，鼓励真正推理改进。实验表明DiRL在数学推理任务上提升了准确性。",
+      "llm_tldr": "在利用强化学习激发大语言模型推理能力时，现有探索方法未区分新推理过程与记忆模式变化，导致探索偏向记忆而非真正推理。本文提出方向感知强化学习框架DiRL，通过内部推理-记忆方向锚定探索，鼓励真正推理改进。实验表明DiRL在数学推理任务上提升了准确性。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.10528v1",
+      "source": "arxiv",
+      "title": "Representation-Aware Advantage Estimation: Your Reward Model Provides More Than A Scalar Output",
+      "abstract": "Current reinforcement learning from human feedback (RLHF) methods primarily rely on scalar rewards from a trained reward model (RM). While effective, scalar rewards are often noisy and fail to capture fine-grained preference differences, whereas RM hidden states encode richer semantic and preference information. We introduce the representation-aware advantage estimation, which leverages RM hidden states and models them as auxiliary signals for better advantage estimation. Specifically, we propose the Graph-based Advantage Estimation (GraphAE), treat each sampled group as a graph, where nodes correspond to responses and edges capture their similarity in the RM hidden space. Then advantages are computed via graph propagation, enabling each sample to incorporate contextual information from its neighbors. GraphAE is lightweight and can be seamlessly integrated into existing group-based RL algorithms. We apply GraphAE to GRPO, GSPO and RLOO, and conduct extensive experiments on different models and benchmarks. Empirical results show consistent improvements across three benchmarks, with gains of up to + 6.3 on Arena-Hard-v0.1, + 8.27 on AlpacaEval 2.0, and + 0.22 on MT-Bench. These results demonstrate that leveraging RM representations leads to more sample efficient and robust RLHF.",
+      "authors": [
+        "Guozheng Li",
+        "Xiyan Fu",
+        "Yiwen Guo"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.CL"
+      ],
+      "published": "2026-06-09T07:57:50+00:00",
+      "link": "https://arxiv.org/pdf/2606.10528v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "introduces GraphAE using graph propagation for advantage estimation in RLHF",
+      "llm_evidence_cn": "提出基于图传播的GraphAE方法用于RLHF中的优势估计",
+      "llm_evidence": "提出基于图传播的GraphAE方法用于RLHF中的优势估计",
+      "canonical_evidence": "提出基于图传播的GraphAE方法用于RLHF中的优势估计",
+      "llm_tldr_en": "Proposes GraphAE which leverages graph structure among responses in reward model hidden space to compute more accurate advantages for RLHF.",
+      "llm_tldr_cn": "本文提出表示感知优势估计方法GraphAE，利用奖励模型隐藏层空间中响应之间的图结构进行优势传播，从而获得比标量奖励更丰富的反馈信号。该方法将每个样本组视为图，节点为响应，边为相似度，通过图传播计算优势。实验表明GraphAE提升了RLHF中策略优化的效果。",
+      "llm_tldr": "本文提出表示感知优势估计方法GraphAE，利用奖励模型隐藏层空间中响应之间的图结构进行优势传播，从而获得比标量奖励更丰富的反馈信号。该方法将每个样本组视为图，节点为响应，边为相似度，通过图传播计算优势。实验表明GraphAE提升了RLHF中策略优化的效果。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.10709v1",
+      "source": "arxiv",
+      "title": "Effective Reinforcement Learning for Agentic Search by Recycling Zero-Variance Queries During Training",
+      "abstract": "The use of GRPO-style algorithms has become the standard strategy for training LLM search agents under outcome-only rewards. With these algorithms, a query contributes to parameter updates only when its rollout group mixes successes and failures; all-correct (too-easy) and all-incorrect (too-hard) groups are zero-variance and waste rollout cost. Existing approaches treat zero-variance as a static property and either discard or pre-filter such groups. We hypothesize and empirically validate that queries flip between zero-variance and signal-bearing states as the policy evolves during training. Building on this intuition, we propose query recycling, which returns zero-variance groups to a mutable pool for future resampling, so that the effective training distribution co-evolves with the policy. With the proposed technique, a 1.7B parameter model trained on synthetic data can reach 66.0 average Pass@1 accross seven multi-hop QA benchmarks, matching or surpassing systems with up to 7B parameters trained on benchmark-derived supervision. Analysis of recycling patterns shows that recycled queries supply roughly three quarters of the effective batch by the end of training, with contributions split between recovery from policy improvement and policy drift.",
+      "authors": [
+        "João Coelho",
+        "João Magalhães",
+        "Bruno Martins",
+        "Chenyan Xiong"
+      ],
+      "primary_category": "cs.IR",
+      "categories": [
+        "cs.IR",
+        "cs.AI"
+      ],
+      "published": "2026-06-09T11:12:58+00:00",
+      "link": "https://arxiv.org/pdf/2606.10709v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "reinforcement learning for LLM search agents with query recycling",
+      "llm_evidence_cn": "通过查询回收强化学习训练LLM搜索代理",
+      "llm_evidence": "通过查询回收强化学习训练LLM搜索代理",
+      "canonical_evidence": "通过查询回收强化学习训练LLM搜索代理",
+      "llm_tldr_en": "Proposes query recycling to reuse zero-variance rollout groups in GRPO-style RL for LLM search agents, improving sample efficiency.",
+      "llm_tldr_cn": "针对GRPO风格强化学习训练LLM搜索代理时零方差查询浪费问题，提出查询回收机制。通过将零方差组重新放入可变异池以供未来重采样，利用策略进化过程中查询状态翻转的实证观察，提升训练信号利用率。实验表明该方法在保持性能的同时降低了计算开销。",
+      "llm_tldr": "针对GRPO风格强化学习训练LLM搜索代理时零方差查询浪费问题，提出查询回收机制。通过将零方差组重新放入可变异池以供未来重采样，利用策略进化过程中查询状态翻转的实证观察，提升训练信号利用率。实验表明该方法在保持性能的同时降低了计算开销。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.10705v1",
+      "source": "arxiv",
+      "title": "Event-Driven Reinforcement Learning Enables Long-Horizon Control in Semiconductor Fabrication",
+      "abstract": "Reinforcement learning promises to optimize sequential decisions in large-scale systems. Semiconductor manufacturing systems are stochastic and highly constrained environments where heterogeneous wafers traverse hundreds of processing steps across extensive equipment networks. These characteristics yield complex, high-dimensional decision problems with delayed feedback and long-horizon requirements, complicating production planning and control. We propose a deep reinforcement learning framework for multi-objective policy optimization at this scale. Specifically, we formulate control as a centralized-agent problem, where a core policy coordinates system-wide decisions, while system evolution is represented as an interconnected temporal process driven by discrete events. Accordingly, we develop a tailored event-driven temporal-difference formulation that remains general and can be integrated with various policy optimization methods under relevant training settings. We investigate several core model-free algorithms incorporated into this framework and evaluate their effectiveness using high-fidelity simulations of diverse, industry-real operating scenarios. Across extensive validation experiments, agents trained in both offline and online settings show significant and consistent gains in throughput and utilization. We further evaluate performance and generalization across training phases, clarifying the relative strengths of alternative reinforcement learning formulations and algorithms. Overall, the results support the scalability, generality, and transferability of the proposed framework for controlling event-driven complex adaptive systems.",
+      "authors": [
+        "Yavar Yeganeh",
+        "Mahsa Shekari",
+        "Nicla Frigerio",
+        "Daniele Pagano",
+        "Andrea Matta"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI",
+        "eess.SY"
+      ],
+      "published": "2026-06-09T11:08:45+00:00",
+      "link": "https://arxiv.org/pdf/2606.10705v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Deep RL framework for multi-objective policy optimization in semiconductor manufacturing",
+      "llm_evidence_cn": "面向半导体制造的深度强化学习多目标策略优化框架",
+      "llm_evidence": "面向半导体制造的深度强化学习多目标策略优化框架",
+      "canonical_evidence": "面向半导体制造的深度强化学习多目标策略优化框架",
+      "llm_tldr_en": "Proposes a deep RL framework for long-horizon control in semiconductor fabrication, formulated as a centralized-agent problem.",
+      "llm_tldr_cn": "该论文针对半导体制造中多目标策略优化问题，提出一个深度强化学习框架。将控制建模为集中式智能体问题，核心策略协调系统级决策，系统演化表示为互连的模板网络。实验表明该方法在长期控制中有效。为工业级RL应用提供了可扩展的方案。",
+      "llm_tldr": "该论文针对半导体制造中多目标策略优化问题，提出一个深度强化学习框架。将控制建模为集中式智能体问题，核心策略协调系统级决策，系统演化表示为互连的模板网络。实验表明该方法在长期控制中有效。为工业级RL应用提供了可扩展的方案。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.11167v1",
+      "source": "arxiv",
+      "title": "Multi-Faceted Interactivity Alignment in Full-Duplex Speech Models",
+      "abstract": "Full-duplex spoken dialogue models can listen and speak simultaneously, making them a promising architecture for natural conversation. However, current models are trained solely with supervised learning through token-level likelihood maximization, which does not directly optimize interaction-level behaviors, causing interactivity issues such as excessive silence and ill-timed turn-taking. Recent work has applied reinforcement learning (RL) to improve interactivity, but existing methods address only a limited set of interactive behaviors in their rewards. In this work, we propose a post-training alignment method that comprehensively improves the interactivity of full-duplex spoken dialogue models through RL. We address the four canonical axes of interactivity: pause handling, turn-taking, backchanneling, and user interruption. For each axis, we extract short audio segments from human conversation corpora and optimize the model with axis-specific reward functions. An extra LLM-based reward for response quality prevents semantic degradation. We apply our method to two open-source models, Moshi and PersonaPlex, demonstrating consistent improvements in interactivity on both offline evaluation with pre-recorded audio and real-time multi-turn dialogue evaluation.",
+      "authors": [
+        "Atsumoto Ohashi",
+        "Neil Zeghidour",
+        "Alexandre Défossez",
+        "Eugene Kharitonov"
+      ],
+      "primary_category": "cs.CL",
+      "categories": [
+        "cs.CL",
+        "eess.AS"
+      ],
+      "published": "2026-06-09T17:46:55+00:00",
+      "link": "https://arxiv.org/pdf/2606.11167v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl"
+      ],
+      "llm_score": 6.0,
+      "llm_evidence_en": "applies RL to improve interactivity in full-duplex speech dialogues",
+      "llm_evidence_cn": "应用强化学习改善全双工语音对话的交互性",
+      "llm_evidence": "应用强化学习改善全双工语音对话的交互性",
+      "canonical_evidence": "应用强化学习改善全双工语音对话的交互性",
+      "llm_tldr_en": "Proposes an RL-based post-training method to improve multiple axes of interactivity in full-duplex spoken dialogue models.",
+      "llm_tldr_cn": "本文针对全双工语音对话模型中的交互性不足（如过度沉默、不合时宜的轮流说话），提出基于强化学习的后训练对齐方法，全面改善四个规范轴上的交互行为。实验表明该方法在自然对话交互上取得显著提升，是RL在语音交互中的成功应用。",
+      "llm_tldr": "本文针对全双工语音对话模型中的交互性不足（如过度沉默、不合时宜的轮流说话），提出基于强化学习的后训练对齐方法，全面改善四个规范轴上的交互行为。实验表明该方法在自然对话交互上取得显著提升，是RL在语音交互中的成功应用。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "6"
+    },
+    {
+      "id": "2606.11284v1",
+      "source": "arxiv",
+      "title": "Phi-Actor-Critic: Steering General-Sum Games to Pareto-Efficient Correlated Equilibria",
+      "abstract": "Real-world multi-agent systems, from traffic coordination to resource allocation, are often modeled as general-sum games where individual incentives conflict with collective welfare. In these settings, the central challenge is not merely finding an equilibrium, but selecting socially desirable outcomes among many suboptimal Nash equilibria. Standard deep multi-agent reinforcement learning (MARL) methods struggle with this problem, as value-decomposition approaches are constrained by monotonicity assumptions and policy-gradient methods often converge to stable but socially inefficient equilibria. To address this limitation, we propose $Φ$-Actor-Critic ($Φ$-AC), a framework that leverages swap regret minimization to steer learning toward high-welfare correlated equilibria (CE). To make counterfactual regret estimation tractable in deep MARL, $Φ$-AC employs a centralized attention critic that predicts vector-valued regrets in a single forward pass, avoiding computationally expensive counterfactual simulations. We further introduce a Lagrangian-based equilibrium selection mechanism that optimizes social welfare while enforcing stability through regret constraints. Experiments on matrix games, Multi-Agent Particle Environments (MPE), and the Melting Pot Harvest scenario demonstrate that $Φ$-AC learns efficient and stable coordination strategies across diverse mixed-motive settings while maintaining high collective return and competitive fairness.",
+      "authors": [
+        "Wongyu Lee",
+        "Francesco Lelli",
+        "Omran Ayoub",
+        "Massimo Tornatore"
+      ],
+      "primary_category": "cs.MA",
+      "categories": [
+        "cs.MA",
+        "cs.GT",
+        "cs.LG"
+      ],
+      "published": "2026-06-09T16:40:26+00:00",
+      "link": "https://arxiv.org/pdf/2606.11284v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "multi-agent reinforcement learning for Pareto-efficient equilibria",
+      "llm_evidence_cn": "多智能体强化学习实现帕累托高效相关均衡",
+      "llm_evidence": "多智能体强化学习实现帕累托高效相关均衡",
+      "canonical_evidence": "多智能体强化学习实现帕累托高效相关均衡",
+      "llm_tldr_en": "Proposes Phi-Actor-Critic, a MARL framework using swap regret minimization to steer general-sum games to Pareto-efficient correlated equilibria.",
+      "llm_tldr_cn": "在多智能体一般和博弈中，标准深度MARL方法常收敛到低效纳什均衡。本文提出Φ-Actor-Critic框架，利用交换遗憾最小化引导学习走向帕累托高效的相关均衡。通过理论分析和实验验证，该方法在交通协调、资源分配等任务中获得了更优的社会福利。",
+      "llm_tldr": "在多智能体一般和博弈中，标准深度MARL方法常收敛到低效纳什均衡。本文提出Φ-Actor-Critic框架，利用交换遗憾最小化引导学习走向帕累托高效的相关均衡。通过理论分析和实验验证，该方法在交通协调、资源分配等任务中获得了更优的社会福利。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "multi agent parallel decision making with reinforcement learning",
+      "matched_requirement_id": "req-6",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.11770v1",
+      "source": "arxiv",
+      "title": "SVoT: State-aware Visualization-of-Thought for Spatial Reasoning via Reinforcement Learning",
+      "abstract": "Spatial reasoning remains a challenge for Multimodal Large Language Models (MLLMs), as it requires reliable multi-hop inference over both intermediate states and state transitions. Current studies often leave intermediate states unverified and treat state transitions as implicit processes, which limits reliability in multi-hop spatial reasoning. To address this, we propose State-aware Visualization-of-Thought (SVoT), a reinforcement learning framework that generates interleaved, verifiable intermediate states and visualizations. SVoT integrates transition reasoning chains into the generation processes, enabling the model to verify action preconditions and effects through interleaved textual and visual reasoning. We train SVoT via Group Relative Policy Optimization (GRPO), instantiating verification through reward design and evaluating the efficacy of different fine-grained rewards. As existing benchmarks reduce state transitions to single-variable updates, substantially simplifying the problems, we establish five domains by extending classical environments and introducing two novel domains, Pacman and Gather, that require multi-object interactions and numerical reasoning. These domains support systematic evaluation of multi-hop spatial reasoning with quantitative verification of generated intermediate states and transition reasoning. SVoT with transition-aware supervision achieves state-of-the-art performance across the introduced domains, yielding up to a 65% absolute accuracy gain on out-of-distribution test sets.",
+      "authors": [
+        "Chao Lei",
+        "Yanbei Jiang",
+        "Markus Hiller",
+        "Zhijian Zhou",
+        "Xunye Tian",
+        "Krista A. Ehinger",
+        "Nir Lipovetzky"
+      ],
+      "primary_category": "cs.AI",
+      "categories": [
+        "cs.AI"
+      ],
+      "published": "2026-06-10T07:54:42+00:00",
+      "link": "https://arxiv.org/pdf/2606.11770v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "reinforcement learning framework for spatial reasoning in MLLMs",
+      "llm_evidence_cn": "用于多模态大语言模型空间推理的强化学习框架",
+      "llm_evidence": "用于多模态大语言模型空间推理的强化学习框架",
+      "canonical_evidence": "用于多模态大语言模型空间推理的强化学习框架",
+      "llm_tldr_en": "Proposes SVoT, a reinforcement learning framework that generates interleaved verifiable intermediate states and visualizations for spatial reasoning in MLLMs.",
+      "llm_tldr_cn": "针对多模态大语言模型在空间推理中中间状态未被验证、状态转移隐式的问题，提出状态感知思维可视化（SVoT）强化学习框架。通过生成交错的可验证中间状态与可视化，并集成转移推理链，使模型能够验证动作前提与效果。实验表明SVoT提升了多跳空间推理的可靠性与可解释性。",
+      "llm_tldr": "针对多模态大语言模型在空间推理中中间状态未被验证、状态转移隐式的问题，提出状态感知思维可视化（SVoT）强化学习框架。通过生成交错的可验证中间状态与可视化，并集成转移推理链，使模型能够验证动作前提与效果。实验表明SVoT提升了多跳空间推理的可靠性与可解释性。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    },
+    {
+      "id": "2606.12384v1",
+      "source": "arxiv",
+      "title": "APPO: Agentic Procedural Policy Optimization",
+      "abstract": "Recent advances in agentic Reinforcement Learning (RL) have substantially improved the multi-turn tool-use capabilities of large language model agents. However, most existing methods assign credit over coarse heuristic units, such as tool-call boundaries or fixed workflows, making it difficult to identify which intermediate decisions influence downstream outcomes. In this work, we study agentic RL from two perspectives: \\textit{where to branch and how to assign credit after branching}. Our pilot analysis shows that influential decision points are broadly distributed throughout the generated sequence rather than concentrated at tool calls, while token entropy alone does not reliably reflect their impact on final outcomes. Motivated by these observations, we propose \\textbf{Agentic Procedural Policy Optimization (APPO)}, which shifts branching and credit assignment from coarse interaction units to fine-grained decision points in the sequence. APPO selects branching locations using a Branching Score that combines token uncertainty with policy-induced likelihood gains of subsequent continuations, enabling more targeted exploration while filtering out spurious high-entropy positions. It further introduces procedure-level advantage scaling to better distribute credit across branched rollouts. Experiments on 13 benchmarks show that APPO consistently improves strong agentic RL baselines by nearly 4 points, while keeping efficient tool-calls and maintaining behavior interpretability.",
+      "authors": [
+        "Xucong Wang",
+        "Ziyu Ma",
+        "Yong Wang",
+        "Yuxiang Ji",
+        "Shidong Yang",
+        "Guanhua Chen",
+        "Pengkun Wang",
+        "Xiangxiang Chu"
+      ],
+      "primary_category": "cs.LG",
+      "categories": [
+        "cs.LG",
+        "cs.AI"
+      ],
+      "published": "2026-06-10T17:47:07+00:00",
+      "link": "https://arxiv.org/pdf/2606.12384v1",
+      "tags": [
+        "keyword:graph-part",
+        "keyword:graph-rl",
+        "query:graph-part",
+        "query:graph-rl"
+      ],
+      "llm_score": 7.0,
+      "llm_evidence_en": "Agentic RL policy optimization with procedural credit assignment",
+      "llm_evidence_cn": "智能体强化学习中的过程性信用分配策略优化",
+      "llm_evidence": "智能体强化学习中的过程性信用分配策略优化",
+      "canonical_evidence": "智能体强化学习中的过程性信用分配策略优化",
+      "llm_tldr_en": "Proposes Agentic Procedural Policy Optimization (APPO) for fine-grained credit assignment in multi-turn tool-use RL.",
+      "llm_tldr_cn": "该论文针对智能体强化学习中的信用分配问题，提出APPO方法。通过分析序列中决策点分布，提出细粒度的分支和信用分配策略。实验表明APPO提升了多轮工具使用场景下的学习效率和最终性能。为智能体RL提供了更有效的训练框架。",
+      "llm_tldr": "该论文针对智能体强化学习中的信用分配问题，提出APPO方法。通过分析序列中决策点分布，提出细粒度的分支和信用分配策略。实验表明APPO提升了多轮工具使用场景下的学习效率和最终性能。为智能体RL提供了更有效的训练框架。",
+      "llm_tags": [
+        "query:graph-part"
+      ],
+      "matched_query_tag": "query:graph-part",
+      "matched_query_text": "reinforcement learning algorithms and applications",
+      "matched_requirement_id": "req-1",
+      "selection_source": "fresh_fetch",
+      "quick_tier": "7"
+    }
+  ]
+}
