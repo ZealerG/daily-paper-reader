@@ -6,62 +6,37 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-11
-- 运行时间：2026-06-11 21:12:06 UTC
+- 最新运行日期：2026-06-12
+- 运行时间：2026-06-12 21:37:51 UTC
 - 运行状态：成功
-- 本次总论文数：14
-- 精读区：5
-- 速读区：9
+- 本次总论文数：5
+- 精读区：1
+- 速读区：4
 
 ### 今日简报（AI）
-今日推荐5篇强化学习前沿论文，聚焦连续环境动态机制与无基线策略优化两大突破。最值得精读《From Ticks to Flows》与《Baseline-Free Policy Optimization》，分别揭示神经强化学习在连续环境中的动力学特性及组合优化新方法。建议优先精读这两篇高分论文，再速读其余3篇作为扩展认知。
-- 详情：[/202606/11/README](/202606/11/README)
+今日聚焦LLM强化学习：精读黑盒差异下高效训练方案，速读推理验证与注意力机制论文。  
+最值得关注的是黑盒差异下RL优化（精读8.0）及可验证奖励不足时通过推理竞技场评估模型（速读6.0-7.0）。  
+建议优先精读《Reformulate LLM RL》掌握黑盒场景训练技巧，再配合《Reasoning Arena》了解无奖励评估方法。
+- 详情：[/202606/12/README](/202606/12/README)
 
 ### 精读区论文标签
-1. [From Ticks to Flows: Dynamics of Neural Reinforcement Learning in Continuous Environments](/202606/11/2606.04275v1-from-ticks-to-flows-dynamics-of-neural-reinforcement-learning-in-continuous-environments)  
-   标签：评分：9.0/10、query:graph-part
-   evidence：提出了连续环境中的深度强化学习理论框架
-2. [Baseline-Free Policy Optimization for Neural Combinatorial Optimization](/202606/11/2606.10321v1-baseline-free-policy-optimization-for-neural-combinatorial-optimization)  
-   标签：评分：9.0/10、query:graph-part
-   evidence：用于组合优化的无基线策略优化方法
-3. [TRACE: A Unified Rollout Budget Allocation Framework for Efficient Agentic Reinforcement Learning](/202606/11/2606.11119v1-trace-a-unified-rollout-budget-allocation-framework-for-efficient-agentic-reinforcement-learning)  
-   标签：评分：9.0/10、query:graph-part
-   evidence：用于多轮智能体任务的强化学习算法
-4. [Bellman-Taylor Score Decoding for Markov Decision Processes with State-Dependent Feasible Action Sets](/202606/11/2606.10979v1-bellman-taylor-score-decoding-for-markov-decision-processes-with-state-dependent-feasible-action-sets)  
+1. [Reformulate LLM Reinforcement Learning for Efficient Training under Black-box Discrepancy](/202606/12/2606.08779v2-reformulate-llm-reinforcement-learning-for-efficient-training-under-black-box-discrepancy)  
    标签：评分：8.0/10、query:graph-part
-   evidence：提出一种新的深度强化学习框架处理状态相关动作集合的MDP
-5. [PAWS: Preference Learning with Advantage-Weighted Segments](/202606/11/2606.11982v1-paws-preference-learning-with-advantage-weighted-segments)  
-   标签：评分：8.0/10、query:graph-part
-   evidence：提出使用优势函数进行片段偏好学习的策略优化方法
+   evidence：解决语言模型强化学习中的训练-推理不一致问题，提出自校正和容忍区域
 
 ### 速读区论文标签
-1. [Discovering Interpretable Multi-Parameter Control Policies for Evolutionary Algorithms Using Deep Reinforcement Learning](/202606/11/2606.10129v1-discovering-interpretable-multi-parameter-control-policies-for-evolutionary-algorithms-using-deep-reinforcement-learning)  
+1. [Reformulate LLM Reinforcement Learning for Efficient Training under Black-box Discrepancy](/202606/12/2606.08779v1-reformulate-llm-reinforcement-learning-for-efficient-training-under-black-box-discrepancy)  
    标签：评分：7.0/10、query:graph-part
-   evidence：使用深度强化学习发现进化算法的多参数控制策略
-2. [Representation-Aware Advantage Estimation: Your Reward Model Provides More Than A Scalar Output](/202606/11/2606.10528v1-representation-aware-advantage-estimation-your-reward-model-provides-more-than-a-scalar-output)  
-   标签：评分：7.0/10、query:graph-part
-   evidence：提出基于图传播的GraphAE方法用于RLHF中的优势估计
-3. [Event-Driven Reinforcement Learning Enables Long-Horizon Control in Semiconductor Fabrication](/202606/11/2606.10705v1-event-driven-reinforcement-learning-enables-long-horizon-control-in-semiconductor-fabrication)  
-   标签：评分：7.0/10、query:graph-part
-   evidence：面向半导体制造的深度强化学习多目标策略优化框架
-4. [Phi-Actor-Critic: Steering General-Sum Games to Pareto-Efficient Correlated Equilibria](/202606/11/2606.11284v1-phi-actor-critic-steering-general-sum-games-to-pareto-efficient-correlated-equilibria)  
-   标签：评分：7.0/10、query:graph-part
-   evidence：多智能体强化学习实现帕累托高效相关均衡
-5. [SVoT: State-aware Visualization-of-Thought for Spatial Reasoning via Reinforcement Learning](/202606/11/2606.11770v1-svot-state-aware-visualization-of-thought-for-spatial-reasoning-via-reinforcement-learning)  
-   标签：评分：7.0/10、query:graph-part
-   evidence：用于多模态大语言模型空间推理的强化学习框架
-6. [APPO: Agentic Procedural Policy Optimization](/202606/11/2606.12384v1-appo-agentic-procedural-policy-optimization)  
-   标签：评分：7.0/10、query:graph-part
-   evidence：智能体强化学习中的过程性信用分配策略优化
-7. [Reasoning or Memorization? Direction-Aware Diversity Exploration in LLM Reinforcement Learning](/202606/11/2606.10346v1-reasoning-or-memorization-direction-aware-diversity-exploration-in-llm-reinforcement-learning)  
+   evidence：提出重新构建强化学习训练以解决训练-推理差异
+2. [Reasoning Arena: Trace Tournaments When Verifiable Rewards Fall Short](/202606/12/2606.09380v1-reasoning-arena-trace-tournaments-when-verifiable-rewards-fall-short)  
    标签：评分：6.0/10、query:graph-part
-   evidence：大语言模型强化学习中的方向感知多样性探索
-8. [Effective Reinforcement Learning for Agentic Search by Recycling Zero-Variance Queries During Training](/202606/11/2606.10709v1-effective-reinforcement-learning-for-agentic-search-by-recycling-zero-variance-queries-during-training)  
+   evidence：通过轨迹锦标赛处理强化学习中无信息奖励的问题
+3. [How Does Reasoning Flow? Tracing Attention-Induced Information Flow for Targeted RL in LLMs](/202606/12/2606.10646v1-how-does-reasoning-flow-tracing-attention-induced-information-flow-for-targeted-rl-in-llms)  
+   标签：评分：6.0/10、query:graph-rl
+   evidence：基于注意力图的令牌信用分配用于强化学习
+4. [Continuous Strategy Adaptation and Discrete Switching Driven by Environment and Internal State in Meta-Learning](/202606/12/biorxiv-10-64898-2026-06-08-729424-v1-continuous-strategy-adaptation-and-discrete-switching-driven-by-environment-and-internal-state-in-meta-learning)  
    标签：评分：6.0/10、query:graph-part
-   evidence：通过查询回收强化学习训练LLM搜索代理
-9. [Multi-Faceted Interactivity Alignment in Full-Duplex Speech Models](/202606/11/2606.11167v1-multi-faceted-interactivity-alignment-in-full-duplex-speech-models)  
-   标签：评分：6.0/10、query:graph-part
-   evidence：应用强化学习改善全双工语音对话的交互性
+   evidence：使用带时变元参数的强化学习模型分析行为
 
 
 <div class="dpr-home-promo-card">
