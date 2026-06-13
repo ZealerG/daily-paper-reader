@@ -6,37 +6,35 @@
 </div>
 
 ## 每次日报
-- 最新运行日期：2026-06-12
-- 运行时间：2026-06-12 21:37:51 UTC
+- 最新运行日期：2026-06-13
+- 运行时间：2026-06-13 21:22:53 UTC
 - 运行状态：成功
 - 本次总论文数：5
-- 精读区：1
-- 速读区：4
+- 精读区：3
+- 速读区：2
 
 ### 今日简报（AI）
-今日聚焦LLM强化学习：精读黑盒差异下高效训练方案，速读推理验证与注意力机制论文。  
-最值得关注的是黑盒差异下RL优化（精读8.0）及可验证奖励不足时通过推理竞技场评估模型（速读6.0-7.0）。  
-建议优先精读《Reformulate LLM RL》掌握黑盒场景训练技巧，再配合《Reasoning Arena》了解无奖励评估方法。
-- 详情：[/202606/12/README](/202606/12/README)
+今日聚焦LLM agent的测试时学习与推理增强，精读两篇高分论文。最值得看的是强化学习应用于记忆增强的测试时学习（9.0分）以及扩散LLM中奖励与状态对齐推理（8.0分）。普通读者可优先关注“测试时学习”和“推理对齐”方向，了解其实际提升效果。
+- 详情：[/202606/13/README](/202606/13/README)
 
 ### 精读区论文标签
-1. [Reformulate LLM Reinforcement Learning for Efficient Training under Black-box Discrepancy](/202606/12/2606.08779v2-reformulate-llm-reinforcement-learning-for-efficient-training-under-black-box-discrepancy)  
+1. [From Player to Master: Enhancing Test-Time Learning of LLM Agents via Reinforcement Learning over Memory](/202606/13/2606.08656v1-from-player-to-master-enhancing-test-time-learning-of-llm-agents-via-reinforcement-learning-over-memory)  
+   标签：评分：9.0/10、query:graph-part
+   evidence：提出 MemoPilot，使用多轮 GRPO 强化学习方法更新 LLM 代理记忆
+2. [Back on Track: Aligning Rewards and States for Reasoning in Diffusion Large Language Models](/202606/13/2606.08501v1-back-on-track-aligning-rewards-and-states-for-reasoning-in-diffusion-large-language-models)  
    标签：评分：8.0/10、query:graph-part
-   evidence：解决语言模型强化学习中的训练-推理不一致问题，提出自校正和容忍区域
+   evidence：提出过程对齐策略优化(PAPO)，用于扩散大语言模型中的强化学习
+3. [Momentum for Reasoning: Dense Intrinsic Signals in Policy Optimization](/202606/13/2606.08815v1-momentum-for-reasoning-dense-intrinsic-signals-in-policy-optimization)  
+   标签：评分：8.0/10、query:graph-part
+   evidence：强化学习策略优化与密集内在信号
 
 ### 速读区论文标签
-1. [Reformulate LLM Reinforcement Learning for Efficient Training under Black-box Discrepancy](/202606/12/2606.08779v1-reformulate-llm-reinforcement-learning-for-efficient-training-under-black-box-discrepancy)  
+1. [DynaCF: Mitigating Shortcut Learning in Reward Models via Dynamic Counterfactual Sensitivity](/202606/13/2606.09043v1-dynacf-mitigating-shortcut-learning-in-reward-models-via-dynamic-counterfactual-sensitivity)  
    标签：评分：7.0/10、query:graph-part
-   evidence：提出重新构建强化学习训练以解决训练-推理差异
-2. [Reasoning Arena: Trace Tournaments When Verifiable Rewards Fall Short](/202606/12/2606.09380v1-reasoning-arena-trace-tournaments-when-verifiable-rewards-fall-short)  
+   evidence：RLHF奖励模型改进，与RL算法相关
+2. [The Art of Interrogation: Consistency Amplifies Factuality in Spatial Reasoning](/202606/13/2606.11918v1-the-art-of-interrogation-consistency-amplifies-factuality-in-spatial-reasoning)  
    标签：评分：6.0/10、query:graph-part
-   evidence：通过轨迹锦标赛处理强化学习中无信息奖励的问题
-3. [How Does Reasoning Flow? Tracing Attention-Induced Information Flow for Targeted RL in LLMs](/202606/12/2606.10646v1-how-does-reasoning-flow-tracing-attention-induced-information-flow-for-targeted-rl-in-llms)  
-   标签：评分：6.0/10、query:graph-rl
-   evidence：基于注意力图的令牌信用分配用于强化学习
-4. [Continuous Strategy Adaptation and Discrete Switching Driven by Environment and Internal State in Meta-Learning](/202606/12/biorxiv-10-64898-2026-06-08-729424-v1-continuous-strategy-adaptation-and-discrete-switching-driven-by-environment-and-internal-state-in-meta-learning)  
-   标签：评分：6.0/10、query:graph-part
-   evidence：使用带时变元参数的强化学习模型分析行为
+   evidence：提出利用一致性验证器的自监督强化学习框架用于空间推理
 
 
 <div class="dpr-home-promo-card">
